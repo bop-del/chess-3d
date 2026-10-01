@@ -1,4 +1,4 @@
-// Piece set factory (Agent 5): builds each (type, color) once, hands out clones that share geometry.
+// Piece set factory: builds each (type, color) once, hands out clones that share geometry.
 import * as THREE from 'three';
 import { buildPawn, buildRook, buildKnight } from './pieces/setA.js';
 import { buildBishop, buildQueen, buildKing } from './pieces/setB.js';

@@ -1,4 +1,4 @@
-// Camera orbit + board gimbal controls (Agent 5).
+// Camera orbit + board gimbal controls.
 import * as THREE from 'three';
 
 const DEG = Math.PI / 180;

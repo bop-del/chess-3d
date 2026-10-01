@@ -1,4 +1,4 @@
-// Owner: Agent 4. Bishop, queen and king builders (Staunton, high resolution lathe bodies).
+// Bishop, queen and king builders (Staunton, high resolution lathe bodies).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';

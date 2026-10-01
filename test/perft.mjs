@@ -1,4 +1,4 @@
-// Perft and rules sanity tests (Agent 5). Run: node test/perft.mjs
+// Perft and rules sanity tests. Run: node test/perft.mjs
 import { Chess, START_FEN, nameSq } from '../src/rules.js';
 
 let fail = 0;

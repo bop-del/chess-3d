@@ -1,4 +1,4 @@
-// Agent 3: Staunton set A (pawn, rook, knight). Owner: Agent 3 only.
+// Staunton set A (pawn, rook, knight).
 import * as THREE from 'three';
 import { mergeGeometries, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 

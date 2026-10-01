@@ -1,4 +1,4 @@
-// Chess rules engine (Agent 5). Pure JS, no dependencies, runs in node and the browser.
+// Chess rules engine. Pure JS, no dependencies, runs in node and the browser.
 // Square index = rank * 8 + file (a1 = 0, h1 = 7, a8 = 56). Pieces: 'PNBRQK' white, 'pnbrqk' black.
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';

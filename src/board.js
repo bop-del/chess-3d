@@ -1,4 +1,4 @@
-// Agent 2: chessboard (marble squares, walnut frame, gold inlay, labels, plinth, highlights).
+// chessboard (marble squares, walnut frame, gold inlay, labels, plinth, highlights).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { marbleWhite, marbleBlack, walnut, maple, brass, felt } from './textures.js';

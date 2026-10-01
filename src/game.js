@@ -1,4 +1,4 @@
-// Game controller (Agent 5): rules from ./rules.js plus 3D presentation, animation, undo, optional computer opponent.
+// Game controller: rules from ./rules.js plus 3D presentation, animation, undo, optional computer opponent.
 import * as THREE from 'three';
 import { Chess, START_FEN, sqName, nameSq } from './rules.js';
 import { searchMove } from './ai.js';

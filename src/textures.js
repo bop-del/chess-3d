@@ -1,4 +1,4 @@
-// Agent 2: procedural canvas textures (marble, wood, brass, felt). No image files, all tileable.
+// procedural canvas textures (marble, wood, brass, felt). No image files, all tileable.
 import * as THREE from 'three';
 
 // ---------------------------------------------------------------- noise

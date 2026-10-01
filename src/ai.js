@@ -1,4 +1,4 @@
-// Tiny alpha-beta engine (Agent 5). Runs as a generator so the caller can time-slice it across frames.
+// Tiny alpha-beta engine. Runs as a generator so the caller can time-slice it across frames.
 import { Chess } from './rules.js';
 
 const VAL = { p: 100, n: 320, b: 335, r: 500, q: 900, k: 0 };

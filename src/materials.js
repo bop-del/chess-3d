@@ -1,4 +1,4 @@
-// Agent 2: piece materials (ivory, ebony, gold). Lit by scene.environment.
+// piece materials (ivory, ebony, gold). Lit by scene.environment.
 import * as THREE from 'three';
 
 export function createPieceMaterials() {

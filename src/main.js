@@ -1,4 +1,4 @@
-// App entry (Agent 5): loads modules with progress, wires stage, board, pieces, game, controls and HUD.
+// App entry: loads modules with progress, wires stage, board, pieces, game, controls and HUD.
 import * as THREE from 'three';
 
 const params = new URLSearchParams(location.search);

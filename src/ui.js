@@ -1,4 +1,4 @@
-// HUD (Agent 5): glass panels, move list, captured pieces, sliders, presets, menus, banners.
+// HUD: glass panels, move list, captured pieces, sliders, presets, menus, banners.
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const g = (t) => GLYPH[t] + '︎';
 const VAL = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
