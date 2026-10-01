@@ -2,12 +2,15 @@
 // Usage: node tools/release-check.mjs [--port=5303] [--skip-install] [--extra-audit="<shell command>"] [--since=<tag>] [--no-browser]
 //   1. git hygiene: clean tree, no scratch, log, env or key files tracked, no tracked file over 1.5 MB (docs/ excepted), no wording from the
 //      optional tools/internal-terms.txt (one word or regular expression per line), no em dashes or spaced double hyphens as punctuation
-//      in tracked text and in commit messages since the last tag
+//      in tracked text and in commit messages since the last tag, no private data (home paths, private network addresses, e-mail
+//      addresses other than the commit trailer address) in tracked text
 //   2. a fresh copy of HEAD (git archive) is installed with npm ci and built; the build must succeed, dist must not contain local paths,
 //      user names or key like strings, sizes are printed
 //   3. the built site is served with vite preview and loaded in headless Chrome: normal pages and flag combinations must load with no console
 //      error, no page error and no request to a foreign host
-//   4. URL fuzzing: out of range and hostile values of every flag in src/main.js must not throw and must not reach a foreign host
+//   4. URL fuzzing: out of range and hostile values of every flag in src/main.js (prototype names, duplicates, null bytes, markup included)
+//      must not throw and must not reach a foreign host, and no request may come back with an HTTP error status
+//   4b. the built site is also served under a sub path (/chess-3d/, like GitHub Pages) and must boot there with no error
 //   5. docs: every URL flag, script, tool, file and relative link mentioned in README.md and docs/*.md exists in the code or the repo
 //      (skipped with a warning while there is no README.md)
 //   6. version: package.json version is printed and must differ from the last tag's version when commits exist since that tag
@@ -69,11 +72,22 @@ const files = tracked();
   for (const f of textFiles) {
     readFileSync(join(ROOT, f), 'utf8').split('\n').forEach((l, i) => {
       if (EMD.test(l) || l.includes(DD)) dashHits.push(`${f}:${i + 1}`);
-      if (f !== 'tools/release-check.mjs' && INTERNAL.test(l)) internalHits.push(`${f}:${i + 1}`);
+      if (!['tools/release-check.mjs', 'CLAUDE.md', 'bin/cc-chess3d'].includes(f) && INTERNAL.test(l)) internalHits.push(`${f}:${i + 1}`);   // developer tooling may name Claude
       if (f !== 'tools/internal-terms.txt' && TERMS.some((t) => t.test(l))) termHits.push(`${f}:${i + 1}`);
     });
   }
   dashHits.length ? fail('no em dashes or double hyphens as punctuation', dashHits.slice(0, 6).join(', ')) : pass('no em dashes or double hyphens as punctuation', `${textFiles.length} text files`);
+  // private data: built from parts so this file does not match itself
+  const PRIV = [['home path', new RegExp('/Us' + 'ers/|/ho' + 'me/[a-z]|[A-Z]:\\\\Us' + 'ers\\\\')],
+    ['private network address', /\b(192\.168|10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.\d{1,3}\.\d{1,3}\b/],
+    ['e-mail address', /[A-Za-z0-9._-]+@[A-Za-z0-9-]+\.[a-z]{2,}/]];
+  const MAIL_OK = /noreply@anthropic\.com/g;   // the commit trailer line in CLAUDE.md
+  const privHits = [];
+  for (const f of textFiles) {
+    if (f === 'tools/release-check.mjs') continue;
+    readFileSync(join(ROOT, f), 'utf8').split('\n').forEach((l, i) => { const t = l.replace(MAIL_OK, ''); for (const [what, re] of PRIV) if (re.test(t)) privHits.push(`${f}:${i + 1} (${what})`); });
+  }
+  privHits.length ? fail('no private data (home paths, private addresses, e-mail) in tracked text', privHits.slice(0, 6).join(', ')) : pass('no private data (home paths, private addresses, e-mail) in tracked text');
   internalHits.length ? warn('no internal process wording in tracked text', `${internalHits.length}: ` + internalHits.slice(0, 6).join(', ')) : pass('no internal process wording in tracked text');
   if (TERMS.length) termHits.length ? fail('no wording from tools/internal-terms.txt', termHits.slice(0, 6).join(', ')) : pass('no wording from tools/internal-terms.txt', `${TERMS.length} terms`);
   else pass('tools/internal-terms.txt', 'not present, nothing to check');
@@ -175,13 +189,33 @@ if (built && !flag('no-browser')) {
       Q + '&yaw=abc&pitch=NaN&dist=-5', Q + '&yaw=1e99&pitch=-1e99&dist=1e99',
       Q + '&light=nope', Q + '&light=__proto__', Q + '&hud=%ff&help=%%%&manual=0',
       Q + '&evil=http://evil.example/x&report=evil.example&' + 'x=1&'.repeat(300),
+      // prototype names as values, duplicates, null bytes and markup
+      Q + '&preset=constructor&light=toString', '/?quality=constructor&manual=1&ai=0', '/?quality=toString&manual=1&ai=0', Q + '&select=__proto__&promo=constructor',
+      Q + '&light=__proto__&light=Studio&preset=__proto__&preset=Side', Q + '&gx=1&gx=2&gx=NaN&ai=1&ai=2',
+      Q + '&fen=%00&moves=%00&select=%00&light=%00&preset=%00', Q + '&light=%3Cscript%3Ealert(1)%3C%2Fscript%3E&preset=%3Cimg%20src%3Dx%3E&help=%3Cb%3E',
+      Q + '&fen=__proto__&moves=__proto__,constructor,toString',
     ];
     let fuzzBad = 0;
     for (const p of fuzz) {
       const r = await visit(p, 400);
       if (r.problems.length) { fuzzBad++; fail(`hostile URL ${decodeURIComponent(p).slice(0, 70)}`, r.problems.slice(0, 2).join(' | ')); }
     }
-    if (!fuzzBad) pass('hostile and out of range URL parameters', `${fuzz.length} cases, no error and no foreign request`);
+    if (!fuzzBad) pass('hostile and out of range URL parameters', `${fuzz.length} cases, no error, no foreign request, no HTTP error`);
+    // the same build under a sub path, as GitHub Pages serves it
+    const SUB = '/chess-3d/';
+    const subServer = await startServer({ mode: 'preview', port: PORT + 1, outDir: 'dist', cwd: copy, subPath: SUB });
+    try {
+      watch.errs.length = 0; watch.foreign.length = 0;
+      let subOk = true;
+      try {
+        await page.goto(subServer.base + '?quality=low&manual=1&ai=0', { waitUntil: 'load', timeout: 60000 });
+        await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
+      } catch (e) { watch.errs.push('NAV ' + String(e.message).slice(0, 100)); subOk = false; }
+      await sleep(400);
+      const st = await page.evaluate(() => ({ ready: !!window.__chessReady, error: window.__chessError || null })).catch(() => ({ ready: false, error: 'page gone' }));
+      const subProblems = [...watch.errs, ...watch.foreign.map((u) => 'FOREIGN ' + u), ...(st.ready && subOk ? [] : ['NOT READY ' + (st.error || '')])];
+      subProblems.length ? fail(`built site works under ${SUB}`, subProblems.slice(0, 3).join(' | ')) : pass(`built site works under ${SUB}`, 'boots, no error, no HTTP error');
+    } finally { subServer.stop(); }
   } catch (e) {
     fail('serve and load the built site', String(e.message).slice(0, 300));
   }

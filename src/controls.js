@@ -76,8 +76,8 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     tw = { t: 0, dur, from, end };
   }
   function setPreset(name) {
+    if (!Object.hasOwn(PRESETS, name)) return;
     const p = PRESETS[name];
-    if (!p) return;
     spin = false;
     animateTo({ ...p });
   }

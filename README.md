@@ -83,6 +83,8 @@ Rendering
 
 Limits: there is no network play. Two people share one screen (computer off), or you play the computer.
 
+Browser support: needs WebGL 2. The build targets Safari 15 and later, and current Chrome, Edge and Firefox. It was tested in Chrome only. If the script cannot start (an old browser, a failed download), the loading screen says so after 20 seconds instead of waiting forever.
+
 ## URL parameters
 
 All optional. They are meant for screenshots and tests, but work for anyone.

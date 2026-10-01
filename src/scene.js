@@ -261,7 +261,7 @@ const GradeShader = {
 
 // ---------------------------------------------------------------------------
 export function createStage(canvas, opts = {}) {
-  let quality = QUALITY[opts.quality] ? opts.quality : 'high';
+  let quality = Object.hasOwn(QUALITY, opts.quality) ? opts.quality : 'high';
   let cfg = QUALITY[quality];
 
   const renderer = new THREE.WebGLRenderer({
@@ -622,7 +622,7 @@ export function createStage(canvas, opts = {}) {
   }
 
   function setQuality(q) {
-    if (!QUALITY[q] || q === quality) return;
+    if (!Object.hasOwn(QUALITY, q) || q === quality) return;
     quality = q; cfg = QUALITY[q];
     applyPixelRatio();
     renderer.setSize(width, height);

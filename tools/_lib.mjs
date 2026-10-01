@@ -54,6 +54,7 @@ export async function watchPage(page, hosts = ['127.0.0.1', 'localhost']) {
     else if (m.type() === 'warning') w.warns.push(m.text().slice(0, 200));
   });
   page.on('pageerror', (e) => w.errs.push('PAGEERR ' + String(e.message).slice(0, 200)));
+  page.on('response', (r) => { if (r.status() >= 400) w.errs.push(`HTTP ${r.status()} ${r.url().slice(0, 90)}`); });
   await page.setRequestInterception(true);
   page.on('request', (rq) => {
     const u = rq.url();
@@ -76,14 +77,15 @@ process.on('exit', killAll);
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { killAll(); process.exit(130); });
 
 /** mode 'preview' serves outDir with vite preview, mode 'dev' runs the dev server. Resolves { base, stop }. */
-export async function startServer({ mode = 'preview', port, outDir = 'dist', cwd = ROOT }) {
-  const args = mode === 'dev' ? ['--port', String(port), '--strictPort', '--host', '127.0.0.1']
-    : ['preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1', '--outDir', outDir];
+export async function startServer({ mode = 'preview', port, outDir = 'dist', cwd = ROOT, subPath = '' }) {
+  const baseArg = subPath ? ['--base', subPath] : [];   // for example '/chess-3d/', like GitHub Pages
+  const args = mode === 'dev' ? ['--port', String(port), '--strictPort', '--host', '127.0.0.1', ...baseArg]
+    : ['preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1', '--outDir', outDir, ...baseArg];
   const child = spawn(VITE(cwd), args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
   children.add(child);
   let log = ''; child.stdout.on('data', (d) => { log += d; }); child.stderr.on('data', (d) => { log += d; });
   let exited = false; child.on('exit', () => { exited = true; });
-  const base = `http://127.0.0.1:${port}/`;
+  const base = `http://127.0.0.1:${port}${subPath || '/'}`;
   for (let i = 0; i < 80; i++) {
     if (exited) throw new Error(`vite ${mode} exited early (port ${port} busy?): ${log.trim().split('\n').slice(-3).join(' | ')}`);
     try { const r = await fetch(base); if (r.ok) return { base, stop() { try { child.kill(); } catch (e) { /* ignore */ } children.delete(child); } }; } catch (e) { /* not up yet */ }

@@ -28,6 +28,16 @@
 <div id="promo" hidden></div>
 <div id="toast" aria-live="polite"></div>
 
+<script>
+  // if the game script never ran (a browser too old to parse it, a failed download), say so instead of loading forever
+  setTimeout(function () {
+    var l = document.getElementById('loader');
+    if (!l || window.__chessBooted) return;
+    var st = document.getElementById('loader-step'), er = document.getElementById('loader-err');
+    if (st) st.textContent = 'Could not start';
+    if (er) { er.hidden = false; er.textContent = 'Reload the page, or use a current browser with WebGL 2 (for example Chrome, Edge, Firefox or Safari 15 or later).'; }
+  }, 20000);
+</script>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

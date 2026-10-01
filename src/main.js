@@ -1,6 +1,7 @@
 // App entry: loads modules with progress, wires stage, board, pieces, game, controls and HUD.
 import * as THREE from 'three';
 
+window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
 const fillEl = $('loader-fill'), stepEl = $('loader-step'), errEl = $('loader-err'), loaderEl = $('loader');
