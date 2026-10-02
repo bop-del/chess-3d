@@ -10,8 +10,9 @@ const args = process.argv.slice(2);
 const PORT = Number((args.find((a) => a.startsWith('--port=')) || '--port=5350').slice(7));
 const R = reporter();
 const OUT = '.tmp/battle-dist';   // a build, so edits by other sessions do not reload the page mid test
-if (!args.includes('--skip-build')) build(OUT);
-const server = await startServer({ mode: 'preview', port: PORT, outDir: OUT });
+const BASE = (args.find((a) => a.startsWith('--base=')) || '').slice(7).replace(/\/$/, '');   // a server that is already up (test/smoke-groups.mjs)
+if (!BASE && !args.includes('--skip-build')) build(OUT);
+const server = BASE ? { stop() {} } : await startServer({ mode: 'preview', port: PORT, outDir: OUT });
 const browser = await launchBrowser({ w: 1280, h: 720 });
 const FEN = {
   p: ['4k3/8/8/3V4/4P3/8/8/4K3 w - - 0 1', 'e4', 'd5'],
@@ -26,7 +27,7 @@ try {
   const w = await watchPage(page, undefined, { scenes: true });
   const load = async (size = { width: 1280, height: 720 }) => {
     await page.setViewport(size);
-    await page.goto(`http://127.0.0.1:${PORT}/?quality=low&manual=1&ai=0${size.width < 500 ? '&touch=1' : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.goto(`${BASE || `http://127.0.0.1:${PORT}`}/?quality=low&manual=1&ai=0${size.width < 500 ? '&touch=1' : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
     await page.evaluate(() => { localStorage.clear(); window.__chess.step(2); window.__chess.draw(); });
   };

@@ -45,6 +45,8 @@ export function chromePath() {
 const SLOTS = ['', '.1', '.2', '.3'].map((x) => join(tmpdir(), 'chess-3d-chrome.lock' + x));
 const allowedSlots = () => { const l = loadavg()[0]; return l < 6 ? 4 : l < 10 ? 3 : 2; };
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+/** Slots free right now at this load (at least 0). Used by test/smoke-groups.mjs to size its parallelism. */
+export const freeSlots = () => SLOTS.slice(0, allowedSlots()).filter((lock) => { try { return !alive(Number(readFileSync(join(lock, 'pid'), 'utf8'))); } catch (e) { return !existsSync(lock); } }).length;
 let held = null;
 const releaseLock = () => { if (!held) return; const d = held; held = null; try { rmSync(d, { recursive: true, force: true }); } catch (e) { /* ignore */ } };
 process.on('exit', releaseLock);

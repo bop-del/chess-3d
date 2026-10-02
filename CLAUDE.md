@@ -14,11 +14,11 @@ A 3D chess game for the browser (three.js 0.186, Vite, fully procedural, no asse
 | Tier | Command | What it covers |
 |---|---|---|
 | fast | `node test/run.mjs` | rules perft, piece geometry contract, text lint. No browser, seconds |
-| smoke | `node test/run.mjs smoke` | build, serve, drive the real page in headless Chrome (software GL), about a minute |
+| smoke | `node test/run.mjs smoke` | build, serve, drive the real page in headless Chrome (software GL), parallel groups (test/smoke-groups.mjs), one Chrome each, about 2 minutes on a quiet machine |
 | phone | `node test/run.mjs phone` | phone sizes (portrait, landscape, short), tap target audit, real multi touch (pinch, twist, thumb bar). A few minutes |
 | release | `node tools/release-check.mjs` | fresh build, page load, hostile URLs, docs and repo hygiene. Run before a release |
 
-`node tools/audit-plan.mjs` says which tiers and audits a change needs. `node test/smoke.mjs --shots` writes a contact sheet per screen size: open that instead of each screenshot.
+`node tools/audit-plan.mjs` says which tiers and audits a change needs. `node test/run.mjs smoke --shots` writes a contact sheet per screen size: open that instead of each screenshot.
 
 No golden image diffs: software GL renders differ across machines. Take screenshots and look at them.
 

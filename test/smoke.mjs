@@ -11,6 +11,8 @@
 //   explain mode       test/explain.mjs runExplainChecks: wrong move refused, reply after the pause, Back, the Italian Game to its end, the Scandinavian opens with e4
 // vs computer is the default in the app: the page health run uses no ai flag and checks it, all other runs add ai=0.
 // --skip-fixes leaves out test/fixes.mjs. --dev serves the vite dev server on the dev port instead of building. --shots saves screenshots to .tmp/smoke-shots/ (emptied first) and a contact sheet of them, contact-<w>x<h>.png.
+// --group=core|fixes|explain|drill|learn|all (default all) runs one part of the checks, --part=i/n runs every n-th fix unit, --base=URL uses a server that is already up.
+//   test/smoke-groups.mjs (the entry point of node test/run.mjs smoke) builds once, serves once and runs the groups in parallel, one headless Chrome each.
 // Exit codes: 0 pass (warnings allowed), 1 at least one check failed, 2 setup error.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,19 +25,22 @@ const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); ret
 const flag = (n) => args.includes(`--${n}`);
 const PORT = Number(opt('port', 5303)), DEV_PORT = Number(opt('dev-port', 5302));
 const OUT = '.tmp/smoke-dist', SHOTS = join(ROOT, '.tmp/smoke-shots'), BUDGETS = join(ROOT, 'tools/budgets.json');
+const GROUP = opt('group', 'all'), BASE = opt('base', ''), PART = opt('part', '');
+const G = (g) => GROUP === 'all' || GROUP === g;
+const child = GROUP !== 'all';   // a group run started by smoke-groups.mjs: it clears the shots and makes the contact sheets
 const R = reporter();
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
 const URLQ = '?quality=low&manual=1&ai=0';   // human against human, deterministic
 const URL_DEFAULT = '?quality=low&manual=1';   // no ai flag: the computer plays black
-if (flag('shots')) {   // start empty, so the contact sheet shows this run only
+if (flag('shots') && !child) {   // start empty, so the contact sheet shows this run only
   mkdirSync(SHOTS, { recursive: true });
   for (const f of readdirSync(SHOTS)) if (f.endsWith('.png')) rmSync(join(SHOTS, f));
 }
 
 let server = null, browser = null;
 const finish = async () => {
-  if (flag('shots') && browser) {
+  if (flag('shots') && browser && !child) {
     try { for (const f of await contactSheets(browser, SHOTS)) console.log(`      contact sheet: ${f.slice(ROOT.length + 1)}`); }
     catch (e) { R.warn('contact sheet', String(e.message).slice(0, 200)); }
   }
@@ -47,11 +52,13 @@ const finish = async () => {
   process.exit(s.nf ? 1 : 0);
 };
 process.on('uncaughtException', (e) => { console.error('FAIL  uncaught', e && e.stack || e); R.fail('uncaught exception', String(e && e.message).slice(0, 200)); finish(); });
-const guard = async (name, fn) => { try { await fn(); } catch (e) { R.fail(name, 'threw: ' + String(e && e.stack || e).split('\n').slice(0, 3).join(' | ').slice(0, 300)); } };
+const guard = async (name, fn, group = 'core') => { if (!G(group)) return; const tg = Date.now(); try { await fn(); console.log(`      [time] ${name} ${((Date.now() - tg) / 1000).toFixed(1)}s`); } catch (e) { R.fail(name, 'threw: ' + String(e && e.stack || e).split('\n').slice(0, 3).join(' | ').slice(0, 300)); } };
 
 // ------------------------------------------------------------------ build and serve
 try {
-  if (flag('dev')) {
+  if (BASE) {
+    server = { base: BASE, stop() {} };
+  } else if (flag('dev')) {
     server = await startServer({ mode: 'dev', port: DEV_PORT });
     R.pass('dev server up', server.base);
   } else {
@@ -92,7 +99,7 @@ await guard('page health', async () => {
   if (w.length) R.warn('console warnings while loading', `${w.length}: ${w[0].slice(0, 120)}`);
   else R.pass('no console warnings while loading');
 });
-if (!ready) { R.fail('app ready, remaining checks skipped', ''); await finish(); }
+if (G('core') && !ready) { R.fail('app ready, remaining checks skipped', ''); await finish(); }
 
 // ------------------------------------------------------------------ helpers (Node side)
 const ev = (fn, ...a) => page.evaluate(fn, ...a);
@@ -372,8 +379,10 @@ await guard('pixels', async () => {
   await ev(() => { window.__chess.controls.reset(); window.__chess.step(2); });
 });
 await sleep(100);
+if (G('core')) {
 R.expect('no console error or page error during the whole run', watch.errs.length === 0, 'clean', watch.errs.slice(0, 3).join(' | '));
 R.expect('no request to a foreign host during the whole run', watch.foreign.length === 0, 'only 127.0.0.1', watch.foreign.slice(0, 3).join(' | '));
+}
 
 // ------------------------------------------------------------------ fix checks (written by another agent, optional)
 await guard('fix checks', async () => {
@@ -394,7 +403,7 @@ await guard('fix checks', async () => {
   try {
     // fresh pages with request and error watching; the units navigate them (baseUrl has no trailing slash). Several tabs of the one browser work at once.
     const res = await Promise.race([
-      mod.runFixChecks({ page: fp, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), newPage, tabs: Number(opt('tabs', 3)) }),
+      mod.runFixChecks({ page: fp, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), newPage, tabs: Number(opt('tabs', 3)), part: PART }),
       sleep(420000).then(() => { throw new Error('runFixChecks timed out after 420 s'); }),
     ]);
     for (const r of res || []) R.expect(`fix: ${r.name}`, !!r.pass, r.detail || '', r.detail || '');
@@ -402,7 +411,7 @@ await guard('fix checks', async () => {
   } finally { await fp.close().catch(() => {}); }
   const fe = watches.flatMap((w) => w.errs);
   if (fe.length) R.fail('fix checks page had console or page errors', fe.slice(0, 2).join(' | '));
-});
+}, 'fixes');
 
 // ------------------------------------------------------------------ explain mode (test/explain.mjs)
 await guard('explain checks', async () => {
@@ -418,7 +427,7 @@ await guard('explain checks', async () => {
     ]);
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   } finally { await ep.close().catch(() => {}); }
-});
+}, 'explain');
 
 // ------------------------------------------------------------------ drill (test/drill.mjs, needs window.__chess.train)
 await guard('drill checks', async () => {
@@ -434,7 +443,7 @@ await guard('drill checks', async () => {
     ]);
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   } finally { await dp.close().catch(() => {}); }
-});
+}, 'drill');
 
 // ------------------------------------------------------------------ learn UI (test/learn.mjs)
 await guard('learn checks', async () => {
@@ -448,6 +457,6 @@ await guard('learn checks', async () => {
     ]);
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   }
-});
+}, 'learn');
 
 await finish();

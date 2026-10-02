@@ -301,14 +301,16 @@ const UNITS = [
   ['device', checkContextLoss],
 ];
 
-export async function runFixChecks({ page, baseUrl, log = () => {}, newPage = null, tabs = 4 }) {
-  const results = UNITS.map(() => []);
+export async function runFixChecks({ page, baseUrl, log = () => {}, newPage = null, tabs = 4, part = '' }) {
+  const [pi, pn] = part ? part.split('/').map(Number) : [0, 1];   // part 'i/n' runs every n-th unit, so groups can run in separate browsers
+  const units = UNITS.filter((u, i) => i % pn === pi);
+  const results = units.map(() => []);
   let next = 0;
   const worker = async (pg) => {
     for (;;) {
       const i = next++;
-      if (i >= UNITS.length) return;
-      const [name, fn, arg] = UNITS[i];
+      if (i >= units.length) return;
+      const [name, fn, arg] = units[i];
       try {
         results[i] = await fn(pg, baseUrl, log, arg);
       } catch (err) {
@@ -319,7 +321,7 @@ export async function runFixChecks({ page, baseUrl, log = () => {}, newPage = nu
   const pages = [page];
   const own = [];
   try {
-    for (let k = 1; newPage && k < Math.min(tabs, UNITS.length); k++) { const p = await newPage(); own.push(p); pages.push(p); }
+    for (let k = 1; newPage && k < Math.min(tabs, units.length); k++) { const p = await newPage(); own.push(p); pages.push(p); }
     await Promise.all(pages.map(worker));
   } finally { for (const p of own) await p.close().catch(() => {}); }
   return results.flat();
