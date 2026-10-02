@@ -41,7 +41,7 @@ export function initDiag({ stage }) {
   box.id = 'diag';
   box.style.cssText = 'position:fixed;left:calc(env(safe-area-inset-left, 0px) + 6px);bottom:calc(env(safe-area-inset-bottom, 0px) + 72px);' +
     'z-index:9998;max-width:calc(100vw - 12px);min-width:150px;padding:5px 8px;font:11px/1.4 ui-monospace,Menlo,monospace;color:#dff;' +
-    'background:rgba(0,0,0,.86);border:1px solid rgba(70,230,210,.6);border-radius:6px;white-space:pre-wrap;pointer-events:auto;' +
+    'background:rgba(0,0,0,.86);border:1px solid rgba(70,230,210,.6);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box;pointer-events:auto;' +
     'touch-action:manipulation;user-select:none;-webkit-user-select:none;';
   box.addEventListener('pointerdown', (e) => e.stopPropagation());
   box.addEventListener('pointerup', (e) => { e.stopPropagation(); expanded = !expanded; draw(); });

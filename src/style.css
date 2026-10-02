@@ -379,3 +379,14 @@ body.phone .psheet { pointer-events: auto; }
 .swatch:hover { background: rgba(255, 255, 255, 0.09); color: var(--text); }
 .swatch.on { border-color: var(--gold); color: var(--text); background: rgba(255, 255, 255, 0.1); }
 body.phone .swatch { min-height: 56px; font-size: 11px; }
+
+/* thumb bar: short labels, gold icon, subtle bevel like a game piece, the pressed state sinks in */
+body.phone .tb span { white-space: nowrap; font-size: 11.5px; padding: 0 2px; }
+body.phone .tb svg { width: 24px; height: 24px; color: var(--gold); }
+body.phone .tb { gap: 3px; transition: transform 0.08s, box-shadow 0.08s, background 0.12s; }
+body.phone .tb:disabled { opacity: 1; color: rgba(255, 255, 255, 0.32); box-shadow: none; background: rgba(22, 24, 32, 0.6); border-color: var(--line); }
+body.phone .tb:disabled svg { color: rgba(255, 255, 255, 0.28); }
+body.phone .tb.on svg { color: #f3dfa8; }
+body.phone .tb { border-radius: 14px; border-color: rgba(255, 255, 255, 0.1); border-top-color: rgba(255, 255, 255, 0.26);
+  background: linear-gradient(180deg, rgba(48, 51, 62, 0.92), rgba(24, 26, 34, 0.94)); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45); }
+body.phone .tb:active { transform: translateY(1px); background: linear-gradient(180deg, rgba(16, 17, 24, 0.96), rgba(30, 32, 40, 0.94)); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6); border-top-color: rgba(255, 255, 255, 0.08); }

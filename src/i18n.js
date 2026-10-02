@@ -27,6 +27,7 @@ export const DE = {
   'phone.views': 'Ansichten', 'phone.viewsD': 'Kameraansichten durchschalten',
   'phone.newAsk': 'Neue Partie beginnen?', 'phone.yes': 'Ja', 'phone.cancel': 'Abbrechen',
   'phone.menu': 'Menü', 'phone.closeMenu': 'Menü schließen', 'phone.controls': 'Spielsteuerung',
+  'tb.undo': 'Zurück', 'tb.new': 'Neu', 'tb.flip': 'Wenden', 'tb.view': 'Ansicht', 'tb.learn': 'Lernen', 'tb.menu': 'Menü',
   'phone.viewGimbal': 'Ansicht und Kardan', 'phone.help': 'Hilfe', 'phone.last': 'Zuletzt: {move}',
 
   // HUD

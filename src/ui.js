@@ -390,8 +390,11 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     bar.setAttribute('aria-label', 'Game controls');
     bar.dataset.i18nAria = 'phone.controls';
     const btn = {};
-    for (const [id, label, key] of [['undo', 'Undo', 'hud.undo'], ['new', 'New game', 'hud.newGame'], ['flip', 'Flip', 'hud.flip'], ['views', 'Views', 'phone.views'], ['learn', 'Learn', 'learn.button'], ['menu', 'Menu', 'phone.menu']]) {
-      const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${key}">${label}</span>`);
+    // short word on the button (never wraps), the full name stays as aria-label and title
+    for (const [id, short, full, key, shortKey] of [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'New', 'New game', 'hud.newGame', 'tb.new'], ['flip', 'Flip', 'Flip', 'hud.flip', 'tb.flip'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']]) {
+      const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${shortKey}">${short}</span>`);
+      b.setAttribute('aria-label', full); b.setAttribute('title', full);
+      b.dataset.i18nAria = key; b.dataset.i18nTitle = key;
       b.dataset.act = id;
       bar.append(b);
       btn[id] = b;

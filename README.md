@@ -96,7 +96,7 @@ Sliders and buttons (left panel)
 
 Home Screen: on an iPhone or iPad the game can be added to the Home Screen from Safari (Share, then Add to Home Screen) and then runs full screen with its own icon (a web app manifest, no service worker). In a Safari tab it shows a short reminder with the three steps once after the first load, and at most twice more a few visits later. Later or a tap outside closes it at once. It never shows when the game is already installed, on desktop, or with any URL parameter below. The link preview used by chat apps and social sites is `public/og-image.png`.
 
-Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view stops all camera gestures. On a phone the game has a status line on top, a thumb bar with Undo, New game, Flip, Views, Learn and Menu, and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
+Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view stops all camera gestures. On a phone the game has a status line on top, a thumb bar with big icons and one short word each (Undo, New, Flip, View, Learn, Menu), and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
 
 ## Features
 
