@@ -12,6 +12,13 @@ Built with three.js (0.186) and Vite. Everything is procedural: the geometry com
 
 ![Top down view](docs/topdown.jpg)
 
+On a phone, in portrait: the game with its thumb bar, and the Menu sheet.
+
+<p>
+  <img src="docs/phone-portrait.jpg" alt="Phone, portrait: status line, board and thumb bar" width="300">
+  <img src="docs/phone-menu.jpg" alt="Phone, portrait: the Menu sheet" width="300">
+</p>
+
 ## Openings
 
 The Openings card (right column on a computer, first card in the Menu sheet on a phone) teaches twelve classic opening lines: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
@@ -133,13 +140,14 @@ Requires Node 20 or newer.
 
 The build uses relative asset paths (`base: './'`), so `dist/` can be hosted from any folder or sub path.
 
-Tests come in three tiers:
+Tests come in four tiers:
 
     node test/run.mjs            # fast, no browser: rules perft, piece geometry contract, text lint (this is npm test)
     node test/run.mjs smoke      # smoke, about a minute: build, serve, drive the real page in headless Chrome
+    node test/run.mjs phone      # phone, a few minutes: phone sizes, tap target audit, real multi touch
     node tools/release-check.mjs # release: fresh build, page load, hostile URLs, docs and repo hygiene
 
-The smoke tier plays a scripted game with real pointer clicks (capture, castling, en passant, promotion, a mate, undo, the computer reply), walks an opening line to its end, moves each gimbal slider, checks the render budgets and checks the canvas pixels in every view preset. The browser tiers use puppeteer-core with a locally installed Google Chrome, which renders with a software GL in headless mode. For that reason there are no golden image comparisons: the pixels differ between machines. Look at the screenshots instead.
+The phone tier loads the page as an iPhone at five screen sizes (portrait, landscape and short landscape views), audits every tap target for the 44 px minimum and drives real multi touch events: tap, pinch, twist and the thumb bar. The smoke tier plays a scripted game with real pointer clicks (capture, castling, en passant, promotion, a mate, undo, the computer reply), walks an opening line to its end, moves each gimbal slider, checks the render budgets and checks the canvas pixels in every view preset. The browser tiers use puppeteer-core with a locally installed Google Chrome, which renders with a software GL in headless mode. For that reason there are no golden image comparisons: the pixels differ between machines. Look at the screenshots instead.
 
 `node tools/audit-plan.mjs` lists which of these checks a change needs, from the files changed since the last release.
 
@@ -150,7 +158,7 @@ The module layout and the APIs between modules are in [docs/ARCHITECTURE.md](doc
 ## Known issues
 
 - The marble and walnut textures are 1024 px, so extreme close-ups look soft.
-- Frame rate on real GPUs is unmeasured beyond the author's machine. Tested mainly on software and Apple silicon GPUs. Two finger pinch zoom is untested.
+- Frame rate on real GPUs is unmeasured beyond the author's machine. Tested mainly on software and Apple silicon GPUs.
 
 ## Licence
 

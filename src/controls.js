@@ -50,9 +50,9 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   // and slides its target sideways in the view plane so the board sits in the middle of the free area. Zero insets (desktop,
   // tablets) keep the old fit() untouched. cam.dist stays the user's zoom: FRAME_REF is the neutral value (presets are 19 to 20).
   let frame = { top: 0, right: 0, bottom: 0, left: 0 };
-  const FRAME_REF = 19, FRAME_MARGIN = 0.03, TAN_HALF = Math.tan(17.5 * DEG);
+  const FRAME_REF = 19, FRAME_MARGIN = 0.03, PORTRAIT_MARGIN = 0.04, BOARD_CORNERS = 8, TAN_HALF = Math.tan(17.5 * DEG);
   const corners = [];
-  for (const x of [-4, 4]) for (const z of [-4, 4]) for (const y of [-0.3, 2.0]) corners.push(new THREE.Vector3(x, y, z));
+  for (const x of [-4, 4]) for (const z of [-4, 4]) for (const y of [-0.3, 2.0]) corners.push(new THREE.Vector3(y < 0 ? x * 1.16 : x, y, y < 0 ? z * 1.16 : z));   // the frame foot reaches 4.65
   for (const x of [-6.5, 6.5]) for (const z of [-1.5, 3.45]) for (const y of [-0.3, 1.2]) corners.push(new THREE.Vector3(x, y, z));
   const fTarget = new THREE.Vector3();
   const gq = new THREE.Quaternion(), gEuler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -67,16 +67,18 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     fUp.crossVectors(fRight, fFwd);                                             // right x forward = up
     if (fUp.y < 0) fUp.negate();
     gq.setFromEuler(gEuler.set(gim.x, gim.y, gim.z, 'YXZ'));
-    for (let i = 0; i < corners.length; i++) pts[i].copy(corners[i]).applyQuaternion(gq).sub(target);
-    const freeW = Math.max(40, size.w - frame.left - frame.right) * (1 - FRAME_MARGIN);
+    // portrait: the board with its pieces fills the free width, the capture trays may run off screen; landscape keeps the trays in
+    const portrait = size.h > size.w, n = portrait ? BOARD_CORNERS : corners.length;
+    for (let i = 0; i < n; i++) pts[i].copy(corners[i]).applyQuaternion(gq).sub(target);
+    const freeW = Math.max(40, size.w - frame.left - frame.right) * (1 - (portrait ? PORTRAIT_MARGIN : FRAME_MARGIN));
     const freeH = Math.max(40, size.h - frame.top - frame.bottom) * (1 - FRAME_MARGIN);
     const P = (size.h / 2) / TAN_HALF;                                          // px per unit at depth 1
     const ox = (frame.left - frame.right) / 2, oy = (frame.top - frame.bottom) / 2; // free centre relative to screen centre, y down
     let sx = 0, sy = 0;
     const extent = (d) => {
       let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-      for (const p of pts) {
-        const a = p.dot(fRight) - sx, b = p.dot(fUp) - sy, depth = d + p.dot(fFwd);
+      for (let i = 0; i < n; i++) {
+        const p = pts[i], a = p.dot(fRight) - sx, b = p.dot(fUp) - sy, depth = d + p.dot(fFwd);
         const px = a * P / depth, py = -b * P / depth;
         if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
       }

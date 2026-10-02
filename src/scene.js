@@ -543,6 +543,14 @@ export function createStage(canvas, opts = {}) {
       gtaoPass = new GTAOPass(scene, camera, width * pixelRatio, height * pixelRatio);
       gtaoPass.output = GTAOPass.OUTPUT.Default;
       gtaoPass.blendIntensity = 0.85;
+      // GTAOPass draws the scene with an override material, which turns the instanced highlight quads into one quad at the board
+      // centre (a grey patch in the AO). The highlights are flat overlays with no AO of their own: hide them for that pass.
+      const gtaoRender = gtaoPass.render.bind(gtaoPass);
+      gtaoPass.render = (...a) => {
+        const hl = scene.getObjectByName('highlights'), was = hl && hl.visible;
+        if (hl) hl.visible = false;
+        try { gtaoRender(...a); } finally { if (hl) hl.visible = was; }
+      };
       gtaoPass.updateGtaoMaterial({ radius: 0.55, distanceExponent: 1.2, thickness: 1.0, scale: 1.0, samples: 16, distanceFallOff: 1.0, screenSpaceRadius: false });
       gtaoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 16 });
       composer.addPass(gtaoPass);
