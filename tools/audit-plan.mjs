@@ -52,6 +52,7 @@ export function commands(p) {
   const c = ['node test/run.mjs'];
   if (p.visual.due) c.push('node test/smoke.mjs --shots   (then open .tmp/smoke-shots/contact-*.png)');
   else if (p.smoke.due) c.push('node test/smoke.mjs');
+  if (p.device.due) c.push('node test/run.mjs phone   (then open .tmp/phone-shots/contact-*.png)');
   c.push(p.release.fullInstall ? 'node tools/release-check.mjs' : 'node tools/release-check.mjs --skip-install');
   return c;
 }

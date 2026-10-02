@@ -1,6 +1,7 @@
-// Test runner: node test/run.mjs [fast|smoke|all]   (default fast; npm test calls it)
+// Test runner: node test/run.mjs [fast|smoke|phone|all]   (default fast; npm test calls it)
 //   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules
 //   smoke  about a minute: vite build, preview on port 5303, headless Chrome, scripted game, gimbal, budgets, pixel checks, fix checks
+//   phone  phone sizes and real touch: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes
 // Exit codes: 0 all pass, 1 a check failed, 2 usage error.
@@ -10,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [tier = 'fast', ...rest] = process.argv.slice(2);
-if (!['fast', 'smoke', 'all'].includes(tier)) { console.error('usage: node test/run.mjs [fast|smoke|all] [smoke options]'); process.exit(2); }
+if (!['fast', 'smoke', 'phone', 'all'].includes(tier)) { console.error('usage: node test/run.mjs [fast|smoke|phone|all] [smoke options]'); process.exit(2); }
 
 const results = [];
 const run = (name, script, args = [], { show = false } = {}) => {
@@ -40,6 +41,11 @@ if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((
   console.log('--- smoke tier (headless Chrome)');
   run('smoke (test/smoke.mjs)', 'test/smoke.mjs', rest, { show: true });
 } else if (tier === 'all') console.log('--- smoke tier skipped because the fast tier failed');
+if (tier === 'phone') {
+  console.log('--- phone tier (headless Chrome, phone sizes, real touch)');
+  run('phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', rest, { show: true });
+  run('real touch (test/touch.mjs)', 'test/touch.mjs', rest, { show: true });
+}
 
 const bad = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length} steps, ${bad} failed, ${((Date.now() - t0) / 1000).toFixed(1)}s`);

@@ -18,6 +18,8 @@ check('minor bump: code review due', plan(['package.json'], 'minor').review.due)
 check('patch bump: no code review', !plan(['package.json'], 'patch').review.due);
 check('bumpKind', bumpKind('1.0.0', '1.0.1') === 'patch' && bumpKind('1.0.1', '1.1.0') === 'minor' && bumpKind('1.9.0', '2.0.0') === 'major' && bumpKind('1.0.0', '1.0.0') === 'none');
 check('visual change asks for shots and the contact sheet', commands(plan(['src/ui.js'])).some((c) => c.includes('--shots')));
+check('mobile change asks for the phone tier', commands(plan(['src/style.css'])).some((c) => c.includes('run.mjs phone')));
+check('rules change asks for no phone tier', !commands(plan(['src/rules.js'])).some((c) => c.includes('phone')));
 check('docs only asks for no smoke run', !commands(plan(['README.md'])).some((c) => c.includes('smoke')));
 
 for (const c of cases) console.log(`${c.ok ? 'ok  ' : 'FAIL'} ${c.name}`);
