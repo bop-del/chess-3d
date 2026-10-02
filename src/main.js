@@ -123,6 +123,8 @@ async function boot() {
   applyParams({ game, controls, stage, ui });
 
   window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick, openings };
+  // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
+  if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
   // render loop
   let last = performance.now(), t = 0;
@@ -152,6 +154,7 @@ async function boot() {
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
   window.__chessReady = true;
+  if (device.ios && !device.standalone) import('./install-hint.js').then((m) => m.mountInstallHint()).catch(() => {});   // iPhone Safari only
 }
 
 // WebGL context loss (every device): the stage pauses drawing and rebuilds on restore. If the browser does not give the

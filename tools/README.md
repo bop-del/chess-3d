@@ -1,6 +1,6 @@
 # Tools and tests
 
-Three tiers, from instant to thorough. `npm test` runs the fast tier.
+Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` runs the fast tier.
 
 | Tier | Command | Time | Needs | Checks |
 | --- | --- | --- | --- | --- |
@@ -32,11 +32,21 @@ Three tiers, from instant to thorough. `npm test` runs the fast tier.
 
 ## Phone tier
 
-`node test/run.mjs phone` runs `tools/phoneshots.mjs` and then `test/touch.mjs`. The smoke tier stays desktop only.
+`node test/run.mjs phone` runs `tools/phoneshots.mjs`, then `test/touch.mjs`, then `test/install.mjs`. The smoke tier stays desktop only.
 
 **Phone shots** (`node tools/phoneshots.mjs [--skip-build] [--port=5306] [--only=portrait,se] [--dpr=3]`, about 4 minutes in software GL): builds into `.tmp/phone-dist`, serves it on port 5306 and loads the page as an iPhone (dpr 3, isMobile, hasTouch, iPhone user agent, `?quality=low&manual=1&ai=0&touch=1`) at `portrait` 390x844, `landscape` 844x390, `short290` 844x290, `short260` 740x260 (Safari tab with the bars up) and `se` 667x375. Simulated safe area insets (portrait 47 top 34 bottom, landscape 47 left and right 21 bottom, the short sizes keep the sides) go through CDP `Emulation.setSafeAreaInsetsOverride`. Per size it saves `start`, `selected` (a real tap on a white piece, `?select=e2` if the HUD covers every piece), `menu` (the Menu sheet opened by a tap on the thumb bar), `help` and `promo` into `.tmp/phone-shots/<size>/` plus a contact sheet: open the contact sheet, not each shot. Audits on every shot: tap targets under 44 x 44 CSS px (FAIL since the phone layout; `TAP_TARGET_FAILS`), text under 11 px (WARN), HUD elements reaching outside the viewport (WARN; sections scrolled inside the Menu sheet show up here), page errors and foreign requests (FAIL), blank canvas (FAIL). Exit 0 pass, 1 a check failed, 2 setup error.
 
 **Real touch** (`node test/touch.mjs [--port=5305] [--skip-build]`, about 20 s): builds into `.tmp/touch-dist`, serves it on port 5305 and drives the page as an iPhone (dpr 3, isMobile, hasTouch, `?touch=1&quality=low&manual=1&ai=0`) at 390x844 and 844x390 with real CDP `Input.dispatchTouchEvent` events, no synthetic DOM events. Checks, per size: tap to select, an illegal tap moves nothing, four plies by tapping projected squares (verified through `window.__chess.game`), pinch out and in on the board changes `controls.camera.dist`, a pinch does not select or move, `visualViewport.scale` stays 1 after a page pinch and a double tap, `device.js` calls `preventDefault` on the second tap of a double tap on the board and on a two finger move off the canvas, the thumb bar's Views and New game (with its confirm: Cancel keeps the game, Yes resets it), the Menu sheet opens and its close button closes it, a two finger twist turns the board while a pinch alone does not, and Lock view stops orbit, pinch and twist while taps still move pieces. Exit 0 pass, 1 a check failed, 2 setup error.
+
+**Install reminder** (`node test/install.mjs [--port=5362] [--skip-build]`, several minutes in software GL, 15 real page loads): builds into `.tmp/install-dist`, serves it and checks the Add to Home Screen support. The manifest (`public/manifest.webmanifest`: name Chess 3D, standalone, portrait) and every icon it names load at the size they claim (192, 512, maskable 512, `apple-touch-icon.png` 180, `og-image.png` 1200 x 630), `index.html` links the manifest and the touch icon, and the og and twitter tags use absolute URLs under `https://bop-del.github.io/chess-3d/`. Then as an iPhone Safari tab (iPhone user agent, 390x844, touch): the sheet from `src/install-hint.js` shows on the first visit, closes with Later, with a tap outside and with Escape, the visit counter keeps it quiet on the next visit, shows it again a few visits later and a third and last time, and never a fourth. Never on a desktop user agent, under `navigator.webdriver`, with `?manual`, `?diag`, `?fen`, `?moves`, `?select`, `?promo` or `?quality`, or when `navigator.standalone` is true. Each visit starts from a seeded `localStorage` entry (`chess3d.install-hint`). The shot of the open sheet goes to `.tmp/install/hint-portrait.png`: open it. Exit 0 pass, 1 a check failed, 2 setup error.
+
+## Diagnostics overlay and device check
+
+`?diag=1` shows `src/dev/diag.js` on top of the page: fps, frame time p50, p95 and max over 5 seconds, quality tier and whether the post chain is on, pixel ratio against the device pixel ratio, canvas and CSS size, draw calls and thousands of triangles, an estimated graphics memory figure (labelled est.: drawing buffer, post targets, shadow map, reflection target and a flat guess per texture and geometry) and the touch, phone, ios and standalone facts. It is a box at the bottom left; one tap toggles a collapsed line (fps, p95, tier) and the full box, and taps on it never reach the board. Without the exact value `1` nothing of it is loaded: the module is a separate chunk that is never requested and no element or frame loop exists. `bin/device-check [--no-signal] [--port=4173] [--diag]` prints the URL, QR code and Signal note for a real phone, with `--diag` adding `?diag=1`. The phone tier does not run with `diag=1`.
+
+## Icons and link preview
+
+`node tools/render-assets.mjs variants [--out=<dir>] [--port=5361]` renders the icon candidates at 512 px into a folder with a contact sheet (nothing written to `public/`). `node tools/render-assets.mjs final --icon=<variant> [--port=5361]` writes `public/icon-512.png`, `icon-192.png`, `apple-touch-icon.png` (180), `icon-maskable-512.png` (the artwork pulled back into the 80 percent safe circle) and `og-image.png` (1200 x 630, the start position in Studio light). The current icon is `float`. The variants are named scenes in the tool (a FEN, an orbit camera, a light preset and a backdrop each); the tool builds into `.tmp/assets-dist`, serves it with vite preview, opens the page in headless Chrome through `launchBrowser` and sets the camera, lights and visible pieces through `window.__chess` in manual mode. These PNGs are the only asset files in the repo: generated by this tool, committed, regenerated on demand. After a change to the board or the pieces, regenerate them and open every file.
 
 ## Audit plan
 
@@ -62,10 +72,11 @@ Git hygiene (clean tree, no scratch or key files, no file over 1.5 MB outside `d
 
 ## URL flags used by the tests
 
-`quality=low|medium|high`, `touch=1|0`, `manual=1` (no render loop, tests call `window.__chess.step(sec)` and `.draw()`), `ai=0` (computer off; default is on, you play white; `ai=3` or `ai=4` raises the level), `fen`, `moves`, `select`, `preset`, `gx` `gy` `gz`, `yaw` `pitch` `dist`, `hud=0`, `help=1`, `light`, `spin=1`, `promo`.
+`quality=low|medium|high`, `touch=1|0`, `manual=1` (no render loop, tests call `window.__chess.step(sec)` and `.draw()`), `ai=0` (computer off; default is on, you play white; `ai=3` or `ai=4` raises the level), `fen`, `moves`, `select`, `preset`, `gx` `gy` `gz`, `yaw` `pitch` `dist`, `hud=0`, `help=1`, `light`, `spin=1`, `promo`, `diag=1` (diagnostics overlay).
 
 ## Files
 
 - `_lib.mjs`: shared reporter, Chrome launcher, page watcher, server starter.
 - `budgets.json`: render budgets for the smoke tier.
 - `release-check.mjs`: the release tier.
+- `render-assets.mjs`: renders the icons and the link preview (see Icons and link preview).

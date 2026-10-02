@@ -197,6 +197,7 @@ if (built && !flag('no-browser')) {
       Q + '&light=__proto__&light=Studio&preset=__proto__&preset=Side', Q + '&gx=1&gx=2&gx=NaN&ai=1&ai=2',
       Q + '&fen=%00&moves=%00&select=%00&light=%00&preset=%00', Q + '&light=%3Cscript%3Ealert(1)%3C%2Fscript%3E&preset=%3Cimg%20src%3Dx%3E&help=%3Cb%3E',
       Q + '&fen=__proto__&moves=__proto__,constructor,toString',
+      Q + '&diag=1', Q + '&diag=0', Q + '&diag=2', Q + '&diag=%00', Q + '&diag=constructor', Q + '&diag=__proto__', Q + '&diag=1&diag=0', '/?diag=1&touch=1&manual=1&ai=0',
       Q + '&touch=2', Q + '&touch=__proto__', Q + '&touch=1&touch=0', Q + '&touch=%00&quality=constructor', '/?touch=1&manual=1&ai=0',
     ];
     // the same build under a sub path, as GitHub Pages serves it: a second server, its case runs in the same batch

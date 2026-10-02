@@ -1,7 +1,7 @@
 // Test runner: node test/run.mjs [fast|smoke|phone|all]   (default fast; npm test calls it)
 //   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules
 //   smoke  about a minute: vite build, preview on port 5303, headless Chrome, scripted game, gimbal, budgets, pixel checks, fix checks
-//   phone  phone sizes and real touch: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs
+//   phone  phone sizes and real touch: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes
 // Exit codes: 0 all pass, 1 a check failed, 2 usage error.
@@ -46,6 +46,7 @@ if (tier === 'phone') {
   console.log('--- phone tier (headless Chrome, phone sizes, real touch)');
   run('phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', rest, { show: true });
   run('real touch (test/touch.mjs)', 'test/touch.mjs', rest, { show: true });
+  run('install reminder and manifest (test/install.mjs)', 'test/install.mjs', rest, { show: true });
 }
 
 const bad = results.filter((r) => !r.ok).length;
