@@ -186,7 +186,7 @@ The module layout and the APIs between modules are in [docs/ARCHITECTURE.md](doc
 
 ## Known issues
 
-- The marble and walnut textures are 1024 px, so extreme close-ups look soft.
+- The marble and walnut textures are 1024 px (512 px on phones and Low quality, made once and cached in the browser), so extreme close-ups look soft.
 - Frame rate on real GPUs is unmeasured beyond the author's machine. Tested mainly on software and Apple silicon GPUs.
 
 ## Licence

@@ -17,7 +17,8 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
     src/device.js        device facts (touch, ios, phone, standalone, portrait), body classes and gesture blocking (the iOS Home Screen meta tags are static in index.html)
     src/scene.js         stage: renderer, lights, studio environment, floor, post chain, quality
     src/board.js         board, frame, inlay, labels, plinth, square highlights
-    src/textures.js      procedural canvas textures (marble, walnut, maple, brass, felt)
+    src/textures.js      board textures: cache, Worker pool, canvas textures (marble, walnut, maple, brass, felt)
+    src/texture-gen.js   the pure pixel generators (no three, no DOM), also run by src/texture-worker.js
     src/materials.js     ivory, ebony and gold piece materials, and applyPieceTheme
     src/themes/          theme registry, spec applier, swatch row, one module per theme (see Themes)
     src/pieces/setA.js   pawn, rook, knight geometry
@@ -113,8 +114,9 @@ Read once at start (only `portrait` follows rotation). `touch` is `(pointer: coa
 
 ### `src/textures.js`, `src/materials.js`
 
+    await prepareTextures({ cap, onStep })       // before createBoard: pixels from the IndexedDB cache (cap 512 only) or parallel Workers, else the main thread with yields
     marbleWhite(), marbleBlack(), walnut(), maple(), brass(), felt()
-        -> { map, normalMap, roughnessMap, ... }    // cached on first use, tileable canvas textures
+        -> { map, normalMap, roughnessMap, ... }    // the prepared textures (generated on the spot if prepareTextures did not run)
     disposeTextures()
     createPieceMaterials() -> { white: { body, accent }, black: { body, accent } }
 

@@ -42,9 +42,9 @@ window.addEventListener('unhandledrejection', (e) => fail(e.reason));
 async function boot() {
   progress(0.02, 'Loading modules');
   await tick();
-  const [{ createStage }, { createBoard }, { createPieceMaterials }, { createPieceSet }, { createGame }, { createControls }, { createUI }, { createDirector }, { sfx }, { audio }] =
+  const [{ createStage }, { createBoard }, { prepareTextures }, { createPieceMaterials }, { createPieceSet }, { createGame }, { createControls }, { createUI }, { createDirector }, { sfx }, { audio }] =
     await Promise.all([
-      import('./scene.js'), import('./board.js'), import('./materials.js'),
+      import('./scene.js'), import('./board.js'), import('./textures.js'), import('./materials.js'),
       import('./pieceset.js'), import('./game.js'), import('./controls.js'), import('./ui.js'), import('./battle/director.js'), import('./battle/sfx.js'), import('./audio.js'),
     ]);
   progress(0.1, 'Preparing the studio');
@@ -63,6 +63,8 @@ async function boot() {
   const materials = createPieceMaterials();
   progress(0.3, 'Inlaying the board');
   await tick();
+  // phones and Low quality get 512 px textures; the pixels come from a cache or Workers, and the bar moves per texture
+  await prepareTextures({ cap: device.phone || quality === 'low' ? 512 : 1024, onStep: (n, m) => progress(0.3 + 0.08 * n / m) });
   const board = createBoard();
   gimbal.add(board.group);
 
