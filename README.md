@@ -21,13 +21,19 @@ On a phone, in portrait: the game with its thumb bar, and the Menu sheet.
 
 ## Openings
 
-The Openings card (right column on a computer, first card in the Menu sheet on a phone) teaches twelve classic opening lines: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
+The Learn card (right column on a computer) and the Learn button (sixth button of the thumb bar on a phone, which opens the Learn sheet) have three tabs: Openings, Mine and Practise. The Openings tab teaches twelve classic opening lines: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
 
 Pick a line and the board turns to your side. You play your own moves on the board and the game plays the other side after a short pause. Every move comes with one sentence that says what it is for. Any other move is refused and the card tells you which move the line plays.
 
 - A gold marker shows the move you are about to play: a faint square where the piece stands, a strong square where it goes and an arrow between them. Hide the hint with the button on the card. The choice is kept in your browser.
 - Show me plays the next move for you, Back returns to your previous move, and at the end of a line Again starts it over or you can choose another line.
 - Leaving Openings starts a fresh ordinary game.
+
+At the end of a line the button Add to my openings puts the line into your repertoire. A calm gold light runs once over the board and your pieces, and the button reads In my openings. Adopted lines carry a small gold mark in the Openings tab.
+
+- Mine lists your adopted lines with a progress bar instead of the idea text, no numbers. Tap a line to walk it again. Edit and Done remove a line; its progress is kept in case you add it back.
+- Practise (greyed until you have added your first line) is one thing: when positions are ready to be repeated it starts a session over them, otherwise it offers your lines for a whole run. You play your own moves, the other side is played for you. A wrong move slides back, the hint shows the right move and the sentence says what it is for, and you play it yourself. A session ends with the same gold light. A run of a whole line changes no progress.
+- Your repertoire and progress are stored in the browser (one record, `chess3d.train`). Export and Import in the Menu (on a computer, in the Scene card) save and load it as a JSON file; an import that does not fit says what is wrong and changes nothing.
 
 The line texts, names and the card are written in English and German. The EN and DE switch sits in the left panel (at the top of the Menu sheet on a phone). The language defaults to the browser's language and your choice is stored in the browser, not in the link. In German the move list and the line texts use the German piece letters (K, D, T, L, S).
 
@@ -81,7 +87,7 @@ Sliders and buttons (left panel)
 
 Home Screen: on an iPhone or iPad the game can be added to the Home Screen from Safari (Share, then Add to Home Screen) and then runs full screen with its own icon (a web app manifest, no service worker). In a Safari tab it shows a short reminder with the three steps once after the first load, and at most twice more a few visits later. Later or a tap outside closes it at once. It never shows when the game is already installed, on desktop, or with any URL parameter below. The link preview used by chat apps and social sites is `public/og-image.png`.
 
-Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view stops all camera gestures. On a phone the game has a status line on top, a thumb bar with Undo, New game, Flip, Views and Menu, and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
+Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view stops all camera gestures. On a phone the game has a status line on top, a thumb bar with Undo, New game, Flip, Views, Learn and Menu, and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
 
 ## Features
 

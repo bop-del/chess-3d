@@ -125,6 +125,8 @@ export function setLanguage(lang) {
   if (changed) listeners.forEach((fn) => fn(language));
 }
 export function onLanguage(fn) { listeners.push(fn); }
+// modules register their own German strings, so the DE table above is not a shared file for every feature
+export function addDE(map) { Object.assign(DE, map); }
 export const i18n = { get language() { return language; } };
 
 // ---------------------------------------------------------------- DOM helper

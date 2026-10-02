@@ -1,0 +1,220 @@
+// Learn UI: the tabs Openings, Mine and Practise, the Export and Import block, and the wiring between the store, the drill and
+// the Explain panel. Phone: the tabs live in the Learn sheet (opened by the sixth thumb bar button). Desktop: the same tabs
+// sit in the openings card while no line runs (the explain panel swaps the card to the walking UI during a line).
+// Every string goes through t(); German strings are in strings.js. The line texts come in { en, de } pairs.
+import './strings.js';
+import * as I18N from '../i18n.js';
+import './learn.css';
+
+const { t, onLanguage, i18n } = I18N;
+
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+};
+const pick = (pair) => (pair ? pair[i18n.language] || pair.en || '' : '');
+const sideLabel = (l) => t(l.side === 'w' ? 'explain.forWhite' : 'explain.forBlack', l.side === 'w' ? 'You play White' : 'You play Black');
+const TABS = ['openings', 'mine', 'practise'];
+
+export function mountLearn({ ui, openings, store, drill }) {
+  const { explain, idle } = openings;
+  const sheet = ui.learnSheet;                 // null on desktop
+  if (sheet) sheet.body.append(idle);
+
+  let tab = 'openings';
+  let editing = false;
+  let practiseLines = false;                   // the Practise tab shows the lines instead of the start button
+
+  const closeSheet = () => sheet?.close();
+  const button = (label, cls, fn) => {
+    const b = el('button', `btn ${cls || ''}`.trim(), label);
+    b.type = 'button';
+    b.addEventListener('click', fn);
+    return b;
+  };
+  // A line starts: whatever else runs on the board gives way first.
+  function leaveOthers() {
+    if (drill.state().phase !== 'idle') drill.stop();
+  }
+  function walk(id) {
+    leaveOthers();
+    if (explain.start(id)) closeSheet();
+  }
+
+  // ------------------------------------------------------------ rows
+  function nameLine(line, mark) {
+    const head = el('span', 'xname');
+    head.append(el('b', '', pick(line.name)));
+    if (mark) {
+      const m = el('i', 'xmark');
+      m.setAttribute('role', 'img');
+      m.setAttribute('aria-label', t('learn.mark', 'In my openings'));
+      m.title = t('learn.mark', 'In my openings');
+      head.append(m);
+    }
+    return head;
+  }
+  function row(line, kind) {
+    const b = el('button', `xline ${kind}`);
+    b.type = 'button';
+    b.dataset.id = line.id;
+    const ok = explain.playable(line);
+    if (kind === 'openings') {
+      b.disabled = !ok;
+      b.append(nameLine(line, store.isAdopted(line.id)), el('span', 'xside', sideLabel(line)), el('span', 'xidea', ok ? pick(line.idea) : t('explain.soon', 'Coming soon')));
+      b.addEventListener('click', () => walk(line.id));
+    } else if (kind === 'mine') {
+      b.disabled = !ok;
+      b.append(nameLine(line, false), el('span', 'xside', sideLabel(line)));
+      const bar = el('span', 'xbar');
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-label', t('learn.progress', 'Progress'));
+      bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '1');
+      const p = store.progress(line.id);
+      bar.setAttribute('aria-valuenow', String(Math.round(p * 100) / 100));
+      const fill = el('i');
+      fill.style.width = `${Math.round(p * 100)}%`;
+      bar.append(fill);
+      b.append(bar);
+      b.addEventListener('click', () => walk(line.id));
+    } else {                                   // practise
+      b.append(nameLine(line, false), el('span', 'xside', sideLabel(line)), el('span', 'xidea', pick(line.idea)));
+      b.addEventListener('click', () => {
+        if (explain.state().phase !== 'list') explain.stop();
+        if (drill.startPractise(line.id)) closeSheet();
+      });
+    }
+    return b;
+  }
+
+  // ------------------------------------------------------------ tabs
+  function openingsView() {
+    const box = el('div', 'xlist');
+    box.append(el('p', 'xlead', t('explain.lead', 'Pick an opening. You play your moves, the game plays the other side, and every move says what it is for.')));
+    for (const line of explain.lines) box.append(row(line, 'openings'));
+    return box;
+  }
+
+  const adoptedLines = () => store.adopted().map((id) => explain.lines.find((l) => l.id === id)).filter(Boolean);
+
+  function mineView() {
+    const box = el('div', 'xlist');
+    const lines = adoptedLines();
+    if (!lines.length) {
+      editing = false;
+      box.append(el('p', 'xlead xempty', t('learn.mineEmpty', 'Openings you add appear here. Walk a line to its end, then tap "Add to my openings".')));
+      return box;
+    }
+    const top = el('div', 'xedit');
+    top.append(button(editing ? t('learn.done', 'Done') : t('learn.edit', 'Edit'), 'xeditbtn', () => { editing = !editing; render(); }));
+    box.append(top);
+    for (const line of lines) {
+      const item = el('div', 'xitem');
+      item.append(row(line, 'mine'));
+      if (editing) {
+        const del = button(t('learn.remove', 'Remove'), 'xdel', () => { store.remove(line.id); });
+        del.setAttribute('aria-label', t('learn.removeOne', 'Remove {name}', { name: pick(line.name) }));
+        item.append(del);
+      }
+      box.append(item);
+    }
+    return box;
+  }
+
+  function practiseView() {
+    const box = el('div', 'xlist');
+    const due = store.dueKeys(Date.now()).length > 0;
+    if (due && !practiseLines) {
+      box.append(button(t('learn.practiseStart', 'Start practising'), 'primary xstart', () => {
+        if (explain.state().phase !== 'list') explain.stop();
+        if (drill.startDue()) closeSheet();
+        else { practiseLines = true; render(); }
+      }));
+      return box;
+    }
+    const lines = adoptedLines();
+    if (!lines.length) { box.append(el('p', 'xlead xempty', t('learn.practiseNone', 'You have not added an opening yet. Find one under Openings.'))); return box; }
+    box.append(el('p', 'xlead', t('learn.practiseLead', 'Pick an opening to practise. Your progress stays as it is.')));
+    for (const line of lines) box.append(row(line, 'practise'));
+    return box;
+  }
+
+  function render() {
+    if (!store.everAdopted() && tab === 'practise') tab = 'openings';
+    if (tab !== 'mine') editing = false;
+    if (tab !== 'practise') practiseLines = false;
+    const tabs = el('div', 'xtabs');
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', t('learn.tabs', 'Learn'));
+    for (const id of TABS) {
+      const locked = id === 'practise' && !store.everAdopted();
+      const b = el('button', 'xtab', t(`learn.tab.${id}`, { openings: 'Openings', mine: 'Mine', practise: 'Practise' }[id]));
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.dataset.tab = id;
+      b.setAttribute('aria-selected', String(tab === id));
+      b.disabled = locked;
+      b.addEventListener('click', () => { tab = id; render(); });
+      tabs.append(b);
+    }
+    const view = tab === 'mine' ? mineView() : tab === 'practise' ? practiseView() : openingsView();
+    view.setAttribute('role', 'tabpanel');
+    idle.replaceChildren(tabs, view);
+  }
+
+  store.onChange(render);
+  explain.on((s) => { if (s.phase === 'list') render(); });
+  drill.on((s) => { if (s.phase === 'idle') render(); });
+  onLanguage(render);
+  render();
+
+  // ------------------------------------------------------------ Export and Import (the Menu)
+  const data = el('div', 'xdata');
+  const title = el('b', 'xdatahead', '');
+  const msg = el('p', 'xdatamsg');
+  msg.setAttribute('aria-live', 'polite');
+  const file = el('input');
+  file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true;
+  const exportBtn = button('', 'small', () => {
+    const blob = new Blob([store.exportJSON()], { type: 'application/json' });
+    const a = el('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chess3d-openings.json';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    msg.textContent = t('learn.exported', 'File saved.');
+  });
+  const importBtn = button('', 'small', () => file.click());
+  file.addEventListener('change', async () => {
+    const f = file.files && file.files[0];
+    file.value = '';
+    if (!f) return;
+    let text;
+    try { text = await f.text(); } catch (e) { msg.textContent = t('learn.importFailed', 'Import failed: {why}', { why: t('learn.importUnreadable', 'The file could not be read.') }); return; }
+    const r = store.importJSON(text);
+    msg.textContent = r.ok ? t('learn.imported', 'Imported.') : t('learn.importFailed', 'Import failed: {why}', { why: r.error });
+  });
+  const dataRow = el('div', 'xrow');
+  dataRow.append(exportBtn, importBtn);
+  data.append(title, dataRow, msg, file);
+  ui.mountSettings('train-data', data);
+  const labels = () => {
+    title.textContent = t('learn.data', 'Your openings');
+    exportBtn.textContent = t('learn.export', 'Export');
+    importBtn.textContent = t('learn.import', 'Import');
+  };
+  labels();
+  onLanguage(labels);
+
+  return {
+    idle, render,
+    get tab() { return tab; },
+    show(id) { if (TABS.includes(id)) { tab = id; render(); } },
+    get editing() { return editing; },
+    export: exportBtn, import: importBtn, file, message: msg,
+  };
+}

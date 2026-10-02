@@ -7,6 +7,7 @@
 //   render budgets     draw calls, triangles, geometries, textures against tools/budgets.json (--write-budgets stores 1.5x measured)
 //   pixels             canvas not blank, no black frame, no white out, board region holds light and dark pixels, in every view preset
 //   fix checks         test/fixes.mjs runFixChecks({ page, baseUrl, log }) when that file exists
+//   drill              test/drill.mjs runDrillChecks: a scheduled session with a miss and a retry, a Practise run that changes no level, the end sweep
 //   explain mode       test/explain.mjs runExplainChecks: wrong move refused, reply after the pause, Back, the Italian Game to its end, the Scandinavian opens with e4
 // vs computer is the default in the app: the page health run uses no ai flag and checks it, all other runs add ai=0.
 // --skip-fixes leaves out test/fixes.mjs. --dev serves the vite dev server on the dev port instead of building. --shots saves screenshots to .tmp/smoke-shots/ (emptied first) and a contact sheet of them, contact-<w>x<h>.png.
@@ -417,6 +418,36 @@ await guard('explain checks', async () => {
     ]);
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   } finally { await ep.close().catch(() => {}); }
+});
+
+// ------------------------------------------------------------------ drill (test/drill.mjs, needs window.__chess.train)
+await guard('drill checks', async () => {
+  const file = join(ROOT, 'test/drill.mjs');
+  if (!existsSync(file)) { R.warn('drill checks', 'test/drill.mjs not found, skipped'); return; }
+  const mod = await import(pathToFileURL(file).href + '?t=' + Date.now());
+  const dp = await browser.newPage();
+  try {
+    const shot = flag('shots') ? (name) => dp.screenshot({ path: join(SHOTS, `${name}.png`) }) : null;
+    const res = await Promise.race([
+      mod.runDrillChecks({ page: dp, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), shot }),
+      sleep(300000).then(() => { throw new Error('runDrillChecks timed out after 300 s'); }),
+    ]);
+    for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
+  } finally { await dp.close().catch(() => {}); }
+});
+
+// ------------------------------------------------------------------ learn UI (test/learn.mjs)
+await guard('learn checks', async () => {
+  const file = join(ROOT, 'test/learn.mjs');
+  if (!existsSync(file)) { R.warn('learn checks', 'test/learn.mjs not found, skipped'); return; }
+  const mod = await import(pathToFileURL(file).href + '?t=' + Date.now());
+  {
+    const res = await Promise.race([
+      mod.runLearnChecks({ browser, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), shotsDir: flag('shots') ? SHOTS : null }),
+      sleep(300000).then(() => { throw new Error('runLearnChecks timed out after 300 s'); }),
+    ]);
+    for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
+  }
 });
 
 await finish();

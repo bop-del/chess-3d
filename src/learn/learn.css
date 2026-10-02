@@ -1,0 +1,40 @@
+/* Learn tabs, rows, Mine bars, adopt control, Export and Import. Colours and radii come from the HUD tokens in style.css. */
+.xidle { display: flex; flex-direction: column; gap: 8px; }
+.xtabs { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); }
+.xtab {
+  flex: 1 1 0; min-height: 34px; padding: 0 6px; border: 0; border-radius: 9px; background: transparent; color: var(--dim);
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.xtab[aria-selected="true"] { background: var(--gold-soft); color: #f3dfa8; }
+.xtab:disabled { opacity: 0.4; cursor: default; }
+body.phone .xtab { min-height: 44px; font-size: 14px; }
+
+.xname { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.xname b { overflow: hidden; text-overflow: ellipsis; }
+.xmark { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px rgba(216, 180, 104, 0.55); }
+.xempty { margin: 6px 2px; }
+.xline.mine { grid-template-columns: 1fr auto; }
+.xbar { grid-column: 1 / -1; height: 6px; margin-top: 3px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.xbar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #b08d45, var(--gold)); }
+.xitem { display: flex; gap: 6px; align-items: stretch; }
+.xitem .xline { flex: 1 1 auto; min-width: 0; }
+.xdel { flex: none; padding: 0 12px; font-size: 12px; color: #ffb3a9; }
+.xedit { display: flex; justify-content: flex-end; }
+.xeditbtn { padding: 5px 12px; font-size: 12px; }
+body.phone .xeditbtn { min-height: 44px; }
+.xstart { width: 100%; }
+
+.xadopt { width: 100%; }
+.xadopt.done { opacity: 1; color: #f3dfa8; background: var(--gold-soft); border-color: rgba(216, 180, 104, 0.6); }
+
+.xdata { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.xdatahead { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.xdata .btn.small { margin-top: 0; }
+.xdatamsg { margin: 0; min-height: 1em; font-size: 12px; color: var(--dim); line-height: 1.4; }
+
+/* the Learn sheet and the drill strip: the camera frame moves below the strip like it does for Explain */
+body.phone .plearn .psheet-body { padding-top: 2px; }
+body.phone.drilling .pframe { top: calc(var(--st) + var(--stat) + var(--gap) * 2 + var(--dh, 0px)); }
+body.drilling .card[data-card="openings"] { display: none; }
+/* six thumb bar buttons in a column: the short landscape height needs a tighter gap */
+@media (max-height: 340px) { body.phone:not(.portrait) .pbar { gap: 2px; } }

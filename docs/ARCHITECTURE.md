@@ -176,7 +176,7 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 
     createUI({ game, controls, stage, quality }) -> { sync(), toast(msg), toggleHud(force), toggleHelp(), render(state) }
 
-Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal sliders, lighting and quality selects) and a right column (game buttons, computer opponent settings, SAN move list, captured pieces with the material balance). It also renders the promotion chooser (`#promo`), the game over banner (`#banner`), a toast for check (`#toast`) and the shortcut sheet. Below 900 px width the cards collapse and the left column becomes a sheet opened by the Controls button. On phones (`body.phone`, see device.js) `buildPhone()` adds a different HUD instead: a status line (`.pstatus`: turn, check, computer thinking, last move), a thumb bar (`.pbar`, buttons `.tb[data-act]`: Undo, New game with a confirm during a game, Flip, Views cycling to the next preset, Menu) at the bottom in portrait and on the right in landscape, and a bottom sheet (`.psheet` over `.pscrim`) with accordion sections Game, Moves, View and gimbal (with Lock view), Scene and Help. An invisible `.pframe` element marks the free area; its rectangle goes to `controls.setFrame`. Phones get lite glass (no backdrop blur). Tablets keep the desktop HUD with 44 px targets.
+Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal sliders, lighting and quality selects) and a right column (game buttons, computer opponent settings, SAN move list, captured pieces with the material balance). It also renders the promotion chooser (`#promo`), the game over banner (`#banner`), a toast for check (`#toast`) and the shortcut sheet. Below 900 px width the cards collapse and the left column becomes a sheet opened by the Controls button. On phones (`body.phone`, see device.js) `buildPhone()` adds a different HUD instead: a status line (`.pstatus`: turn, check, computer thinking, last move), a thumb bar (`.pbar`, buttons `.tb[data-act]`: Undo, New game with a confirm during a game, Flip, Views cycling to the next preset, Learn (opens the Learn sheet), Menu) at the bottom in portrait and on the right in landscape, and a bottom sheet (`.psheet` over `.pscrim`) with accordion sections Game, Moves, View and gimbal (with Lock view), Scene and Help. An invisible `.pframe` element marks the free area; its rectangle goes to `controls.setFrame`. Phones get lite glass (no backdrop blur). Tablets keep the desktop HUD with 44 px targets.
 
 ### `src/openings/explain.js`, `explain-panel.js`, `arrow.js`
 
@@ -197,6 +197,19 @@ Explain mode: walk one of the starter lines on the 3D board.
 - The hint is a flat gold overlay in the gimbal group: the from-square faint, the to-square strong, a straight arrow between them. It is shown only while the board listens for an own move. The switch is stored under `chess3d.hint` in localStorage.
 - Phone: the card in the Menu sheet holds the list; while a line runs a strip under the status line carries the sentence and the buttons, and `body.explaining` moves the camera frame below it (`--xh` is the strip height).
 - `window.__chess.openings` is the test hook: `{ explain, hint, card, strip, tick }`.
+
+### `src/learn/`, `src/train/` (Learn, Adopt, Mine, Drill)
+
+    mountLearn({ ui, openings, store, drill }) -> { idle, render, tab, show(tab), editing, export, import, file, message }
+
+- `src/train/store.js` keeps the repertoire and the cards (one per own move position, key `positionKey4()`), `ladder.js` and `guesses.js` the schedule, `planner.js` the session plan, `drill.js` and `drill-panel.js` the drill, `sweep.js` the gold light. Their APIs are in the file headers.
+- Boot (`main.js`): store, sweep, `mountExplain({ ..., store, sweep })`, drill, drill panel, `mountLearn`. The frame loop ticks `drill.tick(dt)` and `sweep.tick(dt)`, so `?manual=1` stepping drives both.
+- `explain-panel.js` no longer builds the line list. It owns an empty `idle` element that `learn.js` fills with the tabs. Desktop: the card shows `idle` while no line runs and the walking UI during a line (and is hidden by `body.drilling`). Phone: the card is not mounted, `idle` sits in the Learn sheet (`ui.learnSheet.body`) and the walking UI is the strip.
+- `ui.js` adds the sixth thumb bar button (`.tb[data-act="learn"]`) and a second bottom sheet `.psheet.plearn`; only one sheet is open at a time (`close()` closes both). `ui.learnSheet` is `{ body, open(), close(), isOpen }` on a phone and `null` elsewhere.
+- Adopt: at the end of a line `explain-panel.js` shows `.xadopt` (Add to my openings, then In my openings, inert). It calls `store.adopt(id)` and `sweep.play({ side, squares })` with the player's own piece squares. Practise: due cards exist, one start button (`drill.startDue()`), else the adopted lines (`drill.startPractise(id)`). Mine: bar from `store.progress(id)`, Edit shows Remove per row (`store.remove`). A line or run starting stops whatever else runs on the board.
+- Export and Import are a block mounted with `ui.mountSettings('train-data', ...)`: a file download of `store.exportJSON()` and a file input into `store.importJSON(text)`, whose error sentence is shown.
+- Learn strings (English fallbacks in the code, German in `src/learn/strings.js`) are registered with `addDE`.
+- `window.__chess.train = { store, drill, sweep, learn }` is the test hook. `test/learn.mjs` (smoke tier) drives it on desktop and on phone sizes.
 
 ### `src/install-hint.js`
 

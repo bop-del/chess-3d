@@ -24,7 +24,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
 
   const listeners = {};
   const emit = (evt, data) => (listeners[evt] || []).forEach((fn) => fn(data));
-  // CONTRACT (lead, for the Openings and Battle lanes): mode is 'play' or 'explain'; captureHooks run before a captured
+  // CONTRACT (lead, for the Openings and Battle lanes): mode is 'play', 'explain' or 'drill'; captureHooks run before a captured
   // piece flies to its tray in normal play (the battle lane wires the awaiting); 'move' is emitted after every move.
   let mode = 'play';
   const captureHooks = [];
@@ -604,9 +604,9 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     move: (from, to, promo) => doMove({ from: nameSq(from), to: nameSq(to), promo }),
     finishAnimations,
     // CONTRACT stubs (lead): filled in by the Openings (C) and Battle (B) lanes
-    // Explain stops the computer opponent (it resumes in play) and drops any pending search or selection.
+    // Explain and drill stop the computer opponent (it resumes in play) and drops any pending search or selection.
     setMode(m) {
-      mode = m === 'explain' ? 'explain' : 'play';
+      mode = m === 'explain' || m === 'drill' ? m : 'play';
       search = null; selected = -1;
       if (mode === 'play') moveGuard = null;
       refreshHighlights();

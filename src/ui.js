@@ -3,6 +3,7 @@
 // see buildPhone() at the end of createUI. Desktop and tablets keep the columns.
 import { device } from './device.js';
 import { PRESETS } from './controls.js';
+import './learn/strings.js';
 import { t, setLanguage, onLanguage, translateTree, sanDisplay, i18n } from './i18n.js';
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const g = (t) => GLYPH[t] + '︎';
@@ -17,6 +18,7 @@ const ICON = {
   new: '<path d="M12 5v14M5 12h14"/>',
   flip: '<path d="M8 20V6M4 10l4-4 4 4"/><path d="M16 4v14M12 14l4 4 4-4"/>',
   views: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  learn: '<path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
 };
 const PIECE_NAME = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
@@ -351,7 +353,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     bar.setAttribute('aria-label', 'Game controls');
     bar.dataset.i18nAria = 'phone.controls';
     const btn = {};
-    for (const [id, label, key] of [['undo', 'Undo', 'hud.undo'], ['new', 'New game', 'hud.newGame'], ['flip', 'Flip', 'hud.flip'], ['views', 'Views', 'phone.views'], ['menu', 'Menu', 'phone.menu']]) {
+    for (const [id, label, key] of [['undo', 'Undo', 'hud.undo'], ['new', 'New game', 'hud.newGame'], ['flip', 'Flip', 'hud.flip'], ['views', 'Views', 'phone.views'], ['learn', 'Learn', 'learn.button'], ['menu', 'Menu', 'phone.menu']]) {
       const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${key}">${label}</span>`);
       b.dataset.act = id;
       bar.append(b);
@@ -371,6 +373,13 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     sheet.dataset.i18nAria = 'phone.menu';
     sheet.innerHTML = '<div class="psheet-head"><i class="grip"></i><b data-i18n="phone.menu">Menu</b><button class="psheet-x" aria-label="Close menu" data-i18n-aria="phone.closeMenu">&#x2715;</button></div><div class="psheet-body"></div>';
     const sheetBody = sheet.querySelector('.psheet-body');
+    // Learn sheet: the second bottom sheet, filled by src/learn (tabs Openings, Mine, Practise). Only one sheet is open at a time.
+    const learnSheet = el('section', 'psheet plearn');
+    learnSheet.setAttribute('role', 'dialog');
+    learnSheet.setAttribute('aria-label', 'Learn');
+    learnSheet.dataset.i18nAria = 'learn.title';
+    learnSheet.innerHTML = '<div class="psheet-head"><i class="grip"></i><b data-i18n="learn.title">Learn</b><button class="psheet-x" aria-label="Close" data-i18n-aria="learn.close">&#x2715;</button></div><div class="psheet-body"></div>';
+    const learnBody = learnSheet.querySelector('.psheet-body');
 
     // sections: the existing cards move here. Gimbal sliders join the View card, captured pieces stay in the 3D trays.
     const gameC = cardOf('game'), movesC = cardOf('moves'), viewC = cardOf('view'), sceneC = cardOf('scene');
@@ -393,42 +402,54 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
       c.querySelector('header').addEventListener('click', () => { if (c.classList.contains('collapsed')) openCard(c); else c.classList.add('collapsed'); });
     }
 
-    hud.append(status, bar, probe, scrim, sheet, confirmBox);
+    hud.append(status, bar, probe, scrim, sheet, learnSheet, confirmBox);
 
     // sheet open and close; swipe down on the header closes it
     const isOpen = () => sheet.classList.contains('open');
-    function close() { confirmBox.hidden = true; sheet.classList.remove('open'); scrim.classList.remove('open'); btn.menu.classList.remove('on'); }
+    const isLearnOpen = () => learnSheet.classList.contains('open');
+    function close() {
+      confirmBox.hidden = true;
+      sheet.classList.remove('open'); learnSheet.classList.remove('open'); scrim.classList.remove('open');
+      btn.menu.classList.remove('on'); btn.learn.classList.remove('on');
+    }
     function open(card) {
+      close();
       sheet.classList.add('open'); scrim.classList.add('open'); btn.menu.classList.add('on');
       const lb = hud.querySelector('.lang');   // the language switch stays the first thing in the sheet, whatever mounted since
       if (lb && sheetBody.firstElementChild !== lb) sheetBody.prepend(lb);
       if (card) openCard(card);
       if (!movesC.classList.contains('collapsed')) movesEl.scrollTop = movesEl.scrollHeight;
     }
+    function openLearn() {
+      close();
+      learnSheet.classList.add('open'); scrim.classList.add('open'); btn.learn.classList.add('on');
+    }
     scrim.addEventListener('click', close);
-    sheet.querySelector('.psheet-x').addEventListener('click', close);
-    const head = sheet.querySelector('.psheet-head');
-    let drag = null;
-    head.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.psheet-x')) return;
-      drag = { y: e.clientY, dy: 0 };
-      try { head.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-      sheet.style.transition = 'none';
-    });
-    head.addEventListener('pointermove', (e) => {
-      if (!drag) return;
-      drag.dy = Math.max(0, e.clientY - drag.y);
-      sheet.style.transform = `translateY(${drag.dy}px)`;
-    });
-    const release = () => {
-      if (!drag) return;
-      const far = drag.dy > 70;
-      drag = null;
-      sheet.style.transition = ''; sheet.style.transform = '';
-      if (far) close();
-    };
-    head.addEventListener('pointerup', release);
-    head.addEventListener('pointercancel', release);
+    for (const sh of [sheet, learnSheet]) {
+      sh.querySelector('.psheet-x').addEventListener('click', close);
+      const head = sh.querySelector('.psheet-head');
+      let drag = null;
+      head.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.psheet-x')) return;
+        drag = { y: e.clientY, dy: 0 };
+        try { head.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        sh.style.transition = 'none';
+      });
+      head.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        drag.dy = Math.max(0, e.clientY - drag.y);
+        sh.style.transform = `translateY(${drag.dy}px)`;
+      });
+      const release = () => {
+        if (!drag) return;
+        const far = drag.dy > 70;
+        drag = null;
+        sh.style.transition = ''; sh.style.transform = '';
+        if (far) close();
+      };
+      head.addEventListener('pointerup', release);
+      head.addEventListener('pointercancel', release);
+    }
 
     // thumb bar
     let vi = -1;
@@ -466,6 +487,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
       toast(t(`preset.${controls.presets[vi]}`, controls.presets[vi]), 'info');
     });
     btn.menu.addEventListener('click', () => (isOpen() ? close() : open()));
+    btn.learn.addEventListener('click', () => (isLearnOpen() ? close() : openLearn()));
 
     // free area for the camera
     function frame() {
@@ -497,6 +519,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     }
     return {
       status: statusRender, close, frame, resetStatus() { lastKey = ''; },
+      learn: { body: learnBody, open: openLearn, close, get isOpen() { return isLearnOpen(); } },
       toggleHelp() { if (isOpen() && !helpC.classList.contains('collapsed')) close(); else open(helpC); },
     };
   }
@@ -550,5 +573,6 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     return element;
   }
 
-  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings };
+  // Phone only: the Learn sheet { body, open(), close(), isOpen }, null elsewhere. src/learn fills the body.
+  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings, learnSheet: phoneUI ? phoneUI.learn : null };
 }
