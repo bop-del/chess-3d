@@ -44,6 +44,7 @@ function open(branch) {
   const nm = join(path, 'node_modules');
   if (!existsSync(nm)) symlinkSync(join(MAIN, 'node_modules'), nm);
   console.log(`lane ${branch}: ${path}\nworkspace ${ws} "${branch}", first tab "diff" (hunk diff main --watch)`);
+  { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'linear-hook'); if (existsSync(h)) spawnSync(h, ['open', branch], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook, never blocks a lane
   const t = spawnSync(process.execPath, ['test/run.mjs'], { cwd: path, encoding: 'utf8' });
   const pane = (res.root_pane || {}).pane_id;
   if (pane) { run('herdr', ['pane', 'send-text', pane, 'hunk diff main --watch']); run('herdr', ['pane', 'send-keys', pane, 'Enter']); }
@@ -120,6 +121,7 @@ function close(branch, message) {
   if (m.status !== 0) { spawnSync('git', ['merge', '--abort'], { cwd: MAIN }); spawnSync('git', ['reset', '--hard', 'HEAD'], { cwd: MAIN }); die(`squash merge of ${branch} failed, main is unchanged:\n${m.stdout}${m.stderr}`); }
   run('git', ['commit', '-q', '-F', '-'], { input: message, stdio: ['pipe', 'pipe', 'pipe'] });
   console.log(`squash merged ${branch} into main: ${git('log', '-1', '--format=%h %s')}`);
+  { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'linear-hook'); if (existsSync(h)) spawnSync(h, ['close', branch, git('log', '-1', '--format=%h')], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook
   if (lane && lane.open_workspace_id) run('herdr', ['worktree', 'remove', '--workspace', lane.open_workspace_id]);
   else if (path) git('worktree', 'remove', path);
   git('branch', '-D', branch);
