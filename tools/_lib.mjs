@@ -2,14 +2,14 @@
 //   ROOT                     repo root
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
 //   launchBrowser(opts)      headless Chrome through puppeteer-core with software GL (swiftshader), so it runs anywhere.
-//                            Waits for one of two machine wide slots first, so parallel agents and lanes never run more than two.
+//                            Waits for a machine wide slot first: two always, three under load 10, four under load 6.
 //   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted)
 //   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers
 //   build(outDir)            vite build into outDir (inside a folder, never touches dist/)
 // Exit codes used by the tools: 0 pass (warnings allowed), 1 a check failed, 2 usage or setup error.
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, loadavg } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
@@ -38,11 +38,12 @@ export function chromePath() {
   return cands.find((p) => existsSync(p));
 }
 
-// At most two headless Chromes at a time on this machine, across lanes and agents: two lock directories in the temp
-// folder (slot 0 keeps the original single lock name, so older checkouts still count against the limit), each holding
-// its owner's pid. A lock whose pid is gone is stale and taken over. Released when the browser closes or the process
-// exits.
-const SLOTS = [join(tmpdir(), 'chess-3d-chrome.lock'), join(tmpdir(), 'chess-3d-chrome.lock.1')];
+// Headless Chromes at a time on this machine, across lanes and agents, adaptive by load: two slots always, a third
+// while the 1 minute load is under 10, a fourth under 6. Each slot is a lock directory in the temp folder holding its
+// owner's pid (slot 0 keeps the original lock name, so older checkouts still count). A lock whose pid is gone is stale
+// and taken over. Released when the browser closes or the process exits.
+const SLOTS = ['', '.1', '.2', '.3'].map((x) => join(tmpdir(), 'chess-3d-chrome.lock' + x));
+const allowedSlots = () => { const l = loadavg()[0]; return l < 6 ? 4 : l < 10 ? 3 : 2; };
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 let held = null;
 const releaseLock = () => { if (!held) return; const d = held; held = null; try { rmSync(d, { recursive: true, force: true }); } catch (e) { /* ignore */ } };
@@ -50,13 +51,13 @@ process.on('exit', releaseLock);
 async function acquireLock(maxWaitMs = 15 * 60 * 1000) {
   const t0 = Date.now(); let said = false;
   for (;;) {
-    for (const lock of SLOTS) {
+    for (const lock of SLOTS.slice(0, allowedSlots())) {
       try { mkdirSync(lock); writeFileSync(join(lock, 'pid'), String(process.pid)); held = lock; return; } catch (e) { /* taken */ }
       let pid = 0; try { pid = Number(readFileSync(join(lock, 'pid'), 'utf8')); } catch (e) { /* being written */ }
       if (pid && !alive(pid)) rmSync(lock, { recursive: true, force: true });
     }
-    if (Date.now() - t0 > maxWaitMs) throw new Error(`both headless Chrome locks busy for over ${maxWaitMs / 60000} min`);
-    if (!said) { console.log('      waiting for a headless Chrome slot (two in use)'); said = true; }
+    if (Date.now() - t0 > maxWaitMs) throw new Error(`all headless Chrome slots busy for over ${maxWaitMs / 60000} min`);
+    if (!said) { console.log(`      waiting for a headless Chrome slot (${allowedSlots()} allowed at this load)`); said = true; }
     await sleep(1000);
   }
 }
