@@ -1,0 +1,83 @@
+#!/usr/bin/env node
+// Lanes: one branch, one git worktree and one Herdr workspace per backlog item or agent round.
+// Usage:
+//   bin/lane open <branch>              worktree and workspace "<branch>" under ~/.herdr/worktrees/chess-3d/,
+//                                       tab named "<branch> lane shell", node_modules linked in, fast tier run in the lane
+//   bin/lane list                       open lanes of this repo
+//   bin/lane close <branch> [-m <msg>]  squash merge into main (the main checkout, which must be on main), then remove the
+//                                       workspace, the worktree and the branch. Without -m the lane's only commit message
+//                                       is reused; a lane with several commits needs -m.
+// Exit codes: 0 done, 1 a step failed (nothing after it ran), 2 usage error.
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, lstatSync, symlinkSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const USAGE = 'usage: bin/lane open <branch> | bin/lane list | bin/lane close <branch> [-m <message>]';
+const die = (msg, code = 1) => { console.error(msg); process.exit(code); };
+// the main clone, also when this script runs from inside a lane. Every git command below runs there.
+const MAIN = resolve(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: ROOT, encoding: 'utf8' }).trim(), '..');
+const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { cwd: MAIN, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
+const git = (...a) => run('git', a);
+const herdr = (...a) => JSON.parse(run('herdr', a)).result;
+
+function lanes() {
+  const res = herdr('worktree', 'list', '--cwd', MAIN);
+  const list = res.worktrees || res.items || [];
+  return list.filter((w) => w.is_linked_worktree);
+}
+
+function open(branch) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(branch || '')) die(`branch names are lower case words joined by hyphens\n${USAGE}`, 2);
+  if (git('branch', '--list', branch)) die(`branch ${branch} exists already`);
+  const res = herdr('worktree', 'create', '--cwd', MAIN, '--branch', branch, '--base', 'main', '--label', branch, '--no-focus');
+  const path = res.worktree.path, ws = res.workspace.workspace_id, tab = res.tab.tab_id;
+  run('herdr', ['tab', 'rename', tab, `${branch} lane shell`]);
+  const nm = join(path, 'node_modules');
+  if (!existsSync(nm)) symlinkSync(join(MAIN, 'node_modules'), nm);
+  console.log(`lane ${branch}: ${path}\nworkspace ${ws} "${branch}", tab "${branch} lane shell"`);
+  const t = spawnSync(process.execPath, ['test/run.mjs'], { cwd: path, encoding: 'utf8' });
+  console.log(t.status === 0 ? 'fast tier green in the lane' : `FAST TIER RED in the lane, fix before building on it:\n${t.stdout}${t.stderr}`);
+  process.exit(t.status === 0 ? 0 : 1);
+}
+
+function list() {
+  const ls = lanes();
+  if (!ls.length) { console.log('no open lanes'); return; }
+  for (const w of ls) console.log(`${(w.branch || '?').padEnd(28)} ${w.path}${w.open_workspace_id ? `  (workspace ${w.open_workspace_id})` : '  (no workspace)'}`);
+}
+
+function close(branch, message) {
+  if (!branch) die(USAGE, 2);
+  if (git('branch', '--show-current') !== 'main') die(`the main checkout ${MAIN} is not on main`);
+  if (git('status', '--porcelain')) die('main has uncommitted changes: commit or stash them first');
+  const lane = lanes().find((w) => w.branch === branch);
+  const path = lane ? lane.path : null;
+  if (path && run('git', ['status', '--porcelain'], { cwd: path })) die(`lane ${branch} has uncommitted changes: commit them in the lane first`);
+  const commits = git('rev-list', `main..${branch}`).split('\n').filter(Boolean);
+  if (!commits.length) die(`lane ${branch} has no commits beyond main`);
+  if (!message) {
+    if (commits.length > 1) die(`lane ${branch} has ${commits.length} commits: pass -m with the squash commit message`);
+    message = git('log', '-1', '--format=%B', branch);
+  }
+  const m = spawnSync('git', ['merge', '--squash', branch], { cwd: MAIN, encoding: 'utf8' });
+  if (m.status !== 0) { spawnSync('git', ['merge', '--abort'], { cwd: MAIN }); spawnSync('git', ['reset', '--hard', 'HEAD'], { cwd: MAIN }); die(`squash merge of ${branch} failed, main is unchanged:\n${m.stdout}${m.stderr}`); }
+  run('git', ['commit', '-q', '-F', '-'], { input: message, stdio: ['pipe', 'pipe', 'pipe'] });
+  console.log(`squash merged ${branch} into main: ${git('log', '-1', '--format=%h %s')}`);
+  if (lane && lane.open_workspace_id) run('herdr', ['worktree', 'remove', '--workspace', lane.open_workspace_id]);
+  else if (path) git('worktree', 'remove', path);
+  git('branch', '-D', branch);
+  console.log(`removed the lane: ${lane && lane.open_workspace_id ? `workspace ${lane.open_workspace_id}, ` : ''}worktree${path ? ` ${path}` : ''}, branch ${branch}`);
+  console.log('Servers the lane started are not stopped here: stop them by PID. Pushing needs the owner\'s go.');
+}
+
+const [cmd, ...rest] = process.argv.slice(2);
+try {
+  if (cmd === 'open' && rest.length === 1) open(rest[0]);
+  else if (cmd === 'list' && !rest.length) list();
+  else if (cmd === 'close' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) close(rest[0], rest[2]);
+  else die(USAGE, 2);
+} catch (e) {
+  die(`lane ${cmd} failed: ${String(e.stderr || e.message).trim().split('\n').slice(-3).join(' | ')}`);
+}
