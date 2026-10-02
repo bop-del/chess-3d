@@ -8,12 +8,13 @@
 //   pixels             canvas not blank, no black frame, no white out, board region holds light and dark pixels, in every view preset
 //   fix checks         test/fixes.mjs runFixChecks({ page, baseUrl, log }) when that file exists
 // vs computer is the default in the app: the page health run uses no ai flag and checks it, all other runs add ai=0.
-// --skip-fixes leaves out test/fixes.mjs. --dev serves the vite dev server on the dev port instead of building. --shots saves screenshots to .tmp/smoke-shots/.
+// --skip-fixes leaves out test/fixes.mjs. --dev serves the vite dev server on the dev port instead of building. --shots saves screenshots to .tmp/smoke-shots/ (emptied first) and a contact sheet of them, contact-<w>x<h>.png.
 // Exit codes: 0 pass (warnings allowed), 1 at least one check failed, 2 setup error.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep } from '../tools/_lib.mjs';
+import { contactSheets } from '../tools/contact-sheet.mjs';
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
@@ -25,10 +26,17 @@ const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
 const URLQ = '?quality=low&manual=1&ai=0';   // human against human, deterministic
 const URL_DEFAULT = '?quality=low&manual=1';   // no ai flag: the computer plays black
-if (flag('shots')) mkdirSync(SHOTS, { recursive: true });
+if (flag('shots')) {   // start empty, so the contact sheet shows this run only
+  mkdirSync(SHOTS, { recursive: true });
+  for (const f of readdirSync(SHOTS)) if (f.endsWith('.png')) rmSync(join(SHOTS, f));
+}
 
 let server = null, browser = null;
 const finish = async () => {
+  if (flag('shots') && browser) {
+    try { for (const f of await contactSheets(browser, SHOTS)) console.log(`      contact sheet: ${f.slice(ROOT.length + 1)}`); }
+    catch (e) { R.warn('contact sheet', String(e.message).slice(0, 200)); }
+  }
   try { await browser?.close(); } catch (e) { /* ignore */ }
   try { server?.stop(); } catch (e) { /* ignore */ }
   const s = R.summary();

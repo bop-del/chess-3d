@@ -28,7 +28,7 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
     src/ui.js            HUD: panels, move list, captured pieces, sliders, banners
     src/style.css        HUD styles
     test/                fast, smoke and perft checks (see the README)
-    tools/               release check and browser helpers
+    tools/               release check, audit plan, contact sheets and browser helpers
 
 Everything the player sees on the board lives in one `gimbal` group inside the scene. The camera orbits outside it, so the gimbal rotation and the camera orbit are independent.
 

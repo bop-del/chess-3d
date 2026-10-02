@@ -128,6 +128,8 @@ Tests come in three tiers:
 
 The smoke tier plays a scripted game with real pointer clicks (capture, castling, en passant, promotion, a mate, undo, the computer reply), moves each gimbal slider, checks the render budgets and checks the canvas pixels in every view preset. The browser tiers use puppeteer-core with a locally installed Google Chrome, which renders with a software GL in headless mode. For that reason there are no golden image comparisons: the pixels differ between machines. Look at the screenshots instead.
 
+`node tools/audit-plan.mjs` lists which of these checks a change needs, from the files changed since the last release.
+
 A GitHub Actions workflow (`.github/workflows/pages.yml`) runs the fast test tier, then builds the site and deploys it to GitHub Pages on every push to `main`. If a test fails, nothing is deployed.
 
 The module layout and the APIs between modules are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

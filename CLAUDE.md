@@ -17,6 +17,8 @@ A 3D chess game for the browser (three.js 0.186, Vite, fully procedural, no asse
 | smoke | `node test/run.mjs smoke` | build, serve, drive the real page in headless Chrome (software GL), about a minute |
 | release | `node tools/release-check.mjs` | fresh build, page load, hostile URLs, docs and repo hygiene. Run before a release |
 
+`node tools/audit-plan.mjs` says which tiers and audits a change needs. `node test/smoke.mjs --shots` writes a contact sheet per screen size: open that instead of each screenshot.
+
 No golden image diffs: software GL renders differ across machines. Take screenshots and look at them.
 
 ## Conventions

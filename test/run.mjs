@@ -1,5 +1,5 @@
 // Test runner: node test/run.mjs [fast|smoke|all]   (default fast; npm test calls it)
-//   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint
+//   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules
 //   smoke  about a minute: vite build, preview on port 5303, headless Chrome, scripted game, gimbal, budgets, pixel checks, fix checks
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes
@@ -34,6 +34,7 @@ if (tier === 'fast' || tier === 'all') {
   run('rules: perft and game logic (test/perft.mjs)', 'test/perft.mjs');
   run('piece geometry contract (test/geometry.mjs)', 'test/geometry.mjs');
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
+  run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
 }
 if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((r) => r.ok))) {
   console.log('--- smoke tier (headless Chrome)');
