@@ -30,10 +30,20 @@ export function bumpKind(from, to) {
   return 'none';
 }
 
-/** Pure planner: files is a list of repo relative paths, bump is the result of bumpKind. */
-export function plan(files, bump = 'none') {
+/** True when two package.json texts differ in the "version" field at most (so no dependency, script or config change). */
+export function versionOnly(before, after) {
+  try {
+    const strip = (t) => { const j = JSON.parse(t); delete j.version; return JSON.stringify(j); };
+    return strip(before) === strip(after);
+  } catch (e) { return false; }
+}
+
+/** Pure planner: files is a list of repo relative paths, bump is the result of bumpKind, pkgVersionOnly says package.json changed only in its version. */
+export function plan(files, bump = 'none', { pkgVersionOnly = false } = {}) {
   const hits = (key) => files.filter((f) => RULES[key].some((re) => re.test(f)));
-  const smoke = hits('smoke'), visual = hits('visual'), device = hits('device'), ci = hits('ci'), install = hits('install');
+  const smoke = hits('smoke'), visual = hits('visual'), device = hits('device'), ci = hits('ci');
+  const install = hits('install').filter((f) => !(pkgVersionOnly && f === 'package.json'));
+  const versionNote = pkgVersionOnly && files.includes('package.json') && !install.length ? ' (package.json changed only in "version": same as no dependency change, no fresh npm ci)' : '';
   return {
     files,
     bump,
@@ -41,7 +51,7 @@ export function plan(files, bump = 'none') {
     smoke: { due: smoke.length > 0, why: smoke },
     visual: { due: visual.length > 0, why: visual },
     device: { due: device.length > 0, why: device },
-    release: { due: true, why: install.length ? 'dependencies changed: run without --skip-install' : 'before every push', fullInstall: install.length > 0 },
+    release: { due: true, why: install.length ? 'dependencies changed: run without --skip-install' : 'before every push' + versionNote, fullInstall: install.length > 0 },
     review: { due: bump === 'minor' || bump === 'major', why: bump },
     ci: { due: ci.length > 0, why: ci },
   };
@@ -64,6 +74,10 @@ function changedFiles(since) {
   return [...new Set(lines.split('\n').map((l) => l.trim()).filter(Boolean))].sort();
 }
 
+function pkgText(ref) {
+  try { return ref ? git('show', `${ref}:package.json`) : readFileSync(join(ROOT, 'package.json'), 'utf8'); } catch (e) { return null; }
+}
+
 function versionAt(ref) {
   try { return JSON.parse(git('show', `${ref}:package.json`)).version; } catch (e) { return null; }
 }
@@ -79,7 +93,8 @@ function main() {
   let files;
   try { files = changedFiles(since); } catch (e) { console.error(`git diff against ${since} failed: ${String(e.stderr || e.message).trim()}`); process.exit(2); }
   const from = versionAt(since), to = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
-  const p = plan(files, bumpKind(from, to));
+  const before = pkgText(since), after = pkgText(null);
+  const p = plan(files, bumpKind(from, to), { pkgVersionOnly: before !== null && after !== null && versionOnly(before, after) });
   if (args.includes('--json')) { console.log(JSON.stringify({ since, from, to, ...p, commands: commands(p) }, null, 2)); return; }
 
   const list = (xs) => (xs.length > 4 ? `${xs.slice(0, 4).join(', ')} and ${xs.length - 4} more` : xs.join(', '));

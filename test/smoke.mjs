@@ -380,20 +380,26 @@ await guard('fix checks', async () => {
   if (!existsSync(file)) { R.warn('fix checks', 'test/fixes.mjs not found, skipped'); return; }
   const mod = await import(pathToFileURL(file).href + '?t=' + Date.now());
   if (typeof mod.runFixChecks !== 'function') { R.fail('fix checks', 'test/fixes.mjs does not export runFixChecks'); return; }
-  await page.close().catch(() => {});   // one busy page at a time
-  const fp = await browser.newPage();
-  const fw = await watchPage(fp, ['127.0.0.1', 'localhost']);
-  await fp.setViewport({ width: 1280, height: 720 });
+  await page.close().catch(() => {});   // the fix checks use their own tabs
+  const watches = [];
+  const newPage = async () => {
+    const p = await browser.newPage();
+    watches.push(await watchPage(p, ['127.0.0.1', 'localhost']));
+    await p.setViewport({ width: 1280, height: 720 });
+    return p;
+  };
+  const fp = await newPage();
   try {
-    // a fresh page with request and error watching; runFixChecks navigates it itself (baseUrl has no trailing slash)
+    // fresh pages with request and error watching; the units navigate them (baseUrl has no trailing slash). Several tabs of the one browser work at once.
     const res = await Promise.race([
-      mod.runFixChecks({ page: fp, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m) }),
+      mod.runFixChecks({ page: fp, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), newPage, tabs: Number(opt('tabs', 3)) }),
       sleep(420000).then(() => { throw new Error('runFixChecks timed out after 420 s'); }),
     ]);
     for (const r of res || []) R.expect(`fix: ${r.name}`, !!r.pass, r.detail || '', r.detail || '');
     if (!res || !res.length) R.warn('fix checks', 'runFixChecks returned no rows');
   } finally { await fp.close().catch(() => {}); }
-  if (fw.errs.length) R.fail('fix checks page had console or page errors', fw.errs.slice(0, 2).join(' | '));
+  const fe = watches.flatMap((w) => w.errs);
+  if (fe.length) R.fail('fix checks page had console or page errors', fe.slice(0, 2).join(' | '));
 });
 
 await finish();

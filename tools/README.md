@@ -27,7 +27,7 @@ Three tiers, from instant to thorough. `npm test` runs the fast tier.
 - Budgets: draw calls, triangles, geometries, textures and shader programs of one frame at the start position (`renderer.info`) and the time to `window.__chessReady`, against `tools/budgets.json` (1.5x the measured value). After an intended change to the scene, run `node test/smoke.mjs --write-budgets` and commit the new file.
 - Pixels: not blank, no black frame, no white out, and light plus dark pixels inside the projected board corners, in five view presets and one tilted view.
 - Device checks in `test/fixes.mjs` (a few seconds each, 800x500): default load starts on High with no `touch` class, `?touch=1` sets the class and starts on Medium, `?touch=0` behaves like the default, `?touch=1&quality=low` starts on Low, and a WebGL context lost and restored through `WEBGL_lose_context` leaves the board rendering again (pixel check) with no console error.
-- `test/fixes.mjs` (`runFixChecks({ page, baseUrl, log })`) is called with a fresh page when the file exists.
+- `test/fixes.mjs` (`runFixChecks({ page, baseUrl, log })`) is called when the file exists: 12 independent units (labels, picking, five tray sizes, device and context loss), run in several tabs of the one browser (`--tabs=N`, default 3).
 - `--dev` uses the vite dev server on port 5302 instead of a build. `--shots` empties `.tmp/smoke-shots/`, saves the screenshots there and adds a contact sheet per screen size (`contact-<w>x<h>.png`).
 
 ## Phone tier
@@ -56,9 +56,9 @@ A shot counts as `changed` when its size differs or more than 0.05% of its pixel
 
 ## Release check
 
-`node tools/release-check.mjs [--port=5303] [--skip-install] [--since=<tag>] [--extra-audit="<cmd>"] [--no-browser]`
+`node tools/release-check.mjs [--port=5303] [--skip-install] [--since=<tag>] [--extra-audit="<cmd>"] [--no-browser] [--tabs=3]`
 
-Git hygiene (clean tree, no scratch or key files, no file over 1.5 MB outside `docs/`, optional `tools/internal-terms.txt` with one word or regular expression per line, no em dashes or double hyphens in text or commit messages since the last tag), fresh copy of HEAD built with `npm ci`, dist scanned for local paths, user names and keys, normal pages loaded without console errors or foreign requests, URL fuzzing of every flag in `src/main.js`, README and `docs/*.md` checked against the code and the repo, version compared with the last tag. Before the first commit it copies the working tree instead of HEAD and says so.
+Git hygiene (clean tree, no scratch or key files, no file over 1.5 MB outside `docs/`, optional `tools/internal-terms.txt` with one word or regular expression per line, no em dashes or double hyphens in text or commit messages since the last tag), fresh copy of HEAD built with `npm ci`, dist scanned for local paths, user names and keys, normal pages loaded without console errors or foreign requests, URL fuzzing of every flag in `src/main.js`, README and `docs/*.md` checked against the code and the repo, version compared with the last tag. The page loads (normal pages, hostile URLs, sub path) run in `--tabs=N` tabs of one browser (default 3). Gains need a quiet machine: one page load spends about 3.4 s building the piece geometry on one thread. Before the first commit it copies the working tree instead of HEAD and says so.
 
 ## URL flags used by the tests
 

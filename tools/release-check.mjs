@@ -149,31 +149,34 @@ if (built && !flag('no-browser')) {
   try {
     server = await startServer({ mode: 'preview', port: PORT, outDir: 'dist', cwd: copy });
     browser = await launchBrowser({ w: 1280, h: 720 });
-    const page = await browser.newPage();
-    const watch = await watchPage(page, ['127.0.0.1', 'localhost']);
     const base = server.base.replace(/\/$/, '');
-    // one page is reused; a case is the URL plus the problems that appeared while it loaded and settled
-    const visit = async (path, settleMs = 600) => {
+    // Several tabs of the one browser load pages at the same time. Each tab has its own watcher, so a case is the URL plus the
+    // problems that appeared on that tab while it loaded and settled. run() keeps the order of the cases.
+    const TABS = Math.max(1, Number(opt('tabs', 3)));
+    const tabs = [];
+    for (let i = 0; i < TABS; i++) { const page = await browser.newPage(); tabs.push({ page, watch: await watchPage(page, ['127.0.0.1', 'localhost']) }); }
+    const visit = async (tab, url, settleMs = 600) => {
+      const { page, watch } = tab;
       watch.errs.length = 0; watch.foreign.length = 0;
       try {
-        await page.goto(base + path, { waitUntil: 'load', timeout: 60000 });
+        await page.goto(url, { waitUntil: 'load', timeout: 60000 });
         await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
       } catch (e) { watch.errs.push('NAV ' + String(e.message).slice(0, 100)); }
       await sleep(settleMs);
       const st = await page.evaluate(() => ({ ready: !!window.__chessReady, error: window.__chessError || null })).catch(() => ({ ready: false, error: 'page gone' }));
       return { problems: [...watch.errs, ...watch.foreign.map((u) => 'FOREIGN ' + u), ...(st.ready ? [] : ['NOT READY ' + (st.error || '')])] };
     };
+    /** cases: [url, settleMs]. Resolves the results in case order. */
+    const run = async (cases) => {
+      const out = new Array(cases.length); let next = 0;
+      await Promise.all(tabs.map(async (tab) => { for (;;) { const i = next++; if (i >= cases.length) return; out[i] = await visit(tab, cases[i][0], cases[i][1]); } }));
+      return out;
+    };
 
     const pages = ['/', '/?quality=medium&manual=1', '/?quality=low&manual=1&ai=3', '/?quality=low&manual=1&ai=0&preset=Top%20down&hud=0&help=1&light=Studio',
       '/?quality=low&manual=1&ai=0&gx=20&gy=30&gz=-15&yaw=30&pitch=40&dist=24&spin=1',
       '/?quality=low&manual=1&ai=0&moves=e2e4,e7e5,g1f3,b8c6,f1c4,g8f6&select=f3', '/?quality=low&manual=1&ai=0&fen=' + encodeURIComponent('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1'),
       '/?quality=low&manual=1&ai=0&fen=' + encodeURIComponent('8/P6k/8/8/8/8/8/K7 w - - 0 1') + '&promo=a7a8'];
-    let bad = 0;
-    for (const p of pages) {
-      const r = await visit(p);
-      if (r.problems.length) { bad++; fail(`page ${p.slice(0, 90)} loads clean`, r.problems.slice(0, 2).join(' | ')); }
-    }
-    if (!bad) pass('normal pages and flag combinations load clean', `${pages.length} pages, no console error, page error or foreign request`);
 
     const Q = '/?quality=low&manual=1&ai=0';
     const long = 'A'.repeat(6000);
@@ -196,26 +199,19 @@ if (built && !flag('no-browser')) {
       Q + '&fen=__proto__&moves=__proto__,constructor,toString',
       Q + '&touch=2', Q + '&touch=__proto__', Q + '&touch=1&touch=0', Q + '&touch=%00&quality=constructor', '/?touch=1&manual=1&ai=0',
     ];
-    let fuzzBad = 0;
-    for (const p of fuzz) {
-      const r = await visit(p, 400);
-      if (r.problems.length) { fuzzBad++; fail(`hostile URL ${decodeURIComponent(p).slice(0, 70)}`, r.problems.slice(0, 2).join(' | ')); }
-    }
-    if (!fuzzBad) pass('hostile and out of range URL parameters', `${fuzz.length} cases, no error, no foreign request, no HTTP error`);
-    // the same build under a sub path, as GitHub Pages serves it
+    // the same build under a sub path, as GitHub Pages serves it: a second server, its case runs in the same batch
     const SUB = '/chess-3d/';
     const subServer = await startServer({ mode: 'preview', port: PORT + 1, outDir: 'dist', cwd: copy, subPath: SUB });
     try {
-      watch.errs.length = 0; watch.foreign.length = 0;
-      let subOk = true;
-      try {
-        await page.goto(subServer.base + '?quality=low&manual=1&ai=0', { waitUntil: 'load', timeout: 60000 });
-        await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
-      } catch (e) { watch.errs.push('NAV ' + String(e.message).slice(0, 100)); subOk = false; }
-      await sleep(400);
-      const st = await page.evaluate(() => ({ ready: !!window.__chessReady, error: window.__chessError || null })).catch(() => ({ ready: false, error: 'page gone' }));
-      const subProblems = [...watch.errs, ...watch.foreign.map((u) => 'FOREIGN ' + u), ...(st.ready && subOk ? [] : ['NOT READY ' + (st.error || '')])];
-      subProblems.length ? fail(`built site works under ${SUB}`, subProblems.slice(0, 3).join(' | ')) : pass(`built site works under ${SUB}`, 'boots, no error, no HTTP error');
+      const all = await run([...pages.map((p) => [base + p, 600]), ...fuzz.map((p) => [base + p, 400]), [subServer.base + '?quality=low&manual=1&ai=0', 400]]);
+      const rp = all.slice(0, pages.length), rf = all.slice(pages.length, pages.length + fuzz.length), rs = all[all.length - 1];
+      let bad = 0;
+      pages.forEach((p, i) => { if (rp[i].problems.length) { bad++; fail(`page ${p.slice(0, 90)} loads clean`, rp[i].problems.slice(0, 2).join(' | ')); } });
+      if (!bad) pass('normal pages and flag combinations load clean', `${pages.length} pages, no console error, page error or foreign request`);
+      let fuzzBad = 0;
+      fuzz.forEach((p, i) => { if (rf[i].problems.length) { fuzzBad++; fail(`hostile URL ${decodeURIComponent(p).slice(0, 70)}`, rf[i].problems.slice(0, 2).join(' | ')); } });
+      if (!fuzzBad) pass('hostile and out of range URL parameters', `${fuzz.length} cases, no error, no foreign request, no HTTP error`);
+      rs.problems.length ? fail(`built site works under ${SUB}`, rs.problems.slice(0, 3).join(' | ')) : pass(`built site works under ${SUB}`, 'boots, no error, no HTTP error');
     } finally { subServer.stop(); }
   } catch (e) {
     fail('serve and load the built site', String(e.message).slice(0, 300));

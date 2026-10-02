@@ -7,7 +7,7 @@ const FLAGS = 'quality=low&manual=1&ai=0';
 async function load(page, baseUrl, query = '', size = { width: 1400, height: 800 }) {
   await page.setViewport(size);
   await page.goto(`${baseUrl}/?${FLAGS}${query ? `&${query}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+  await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000, polling: 100 });
   await page.evaluate(() => { window.__chess.step(2); window.__chess.draw(); });
 }
 
@@ -16,10 +16,12 @@ async function load(page, baseUrl, query = '', size = { width: 1400, height: 800
 // its glyph "up" (texture v increasing) must point toward the screen top and its glyph "right" (u increasing)
 // toward the screen right. The old board baked in White-side orientation on two edges and Black-side on the
 // other two, so half of the labels were upside down from any single viewpoint.
+const LABEL_VIEWS = [['White view', 'preset=White%20view'], ['Top down', 'preset=Top%20down'], ['Black view', 'preset=Black%20view']];
 async function checkLabels(page, baseUrl, log) {
   const out = [];
-  for (const [preset, query] of [['White view', 'preset=White%20view'], ['Top down', 'preset=Top%20down'], ['Black view', 'preset=Black%20view']]) {
-    await load(page, baseUrl, query);
+  await load(page, baseUrl, LABEL_VIEWS[0][1]);   // the first view goes through ?preset, the others switch in the page like the app does at load
+  for (const [preset] of LABEL_VIEWS) {
+    await page.evaluate((name) => { const c = window.__chess.controls; c.setPreset(name); for (let i = 0; i < 120; i++) c.update(0.02); window.__chess.step(2); window.__chess.draw(); }, preset);
     const r = await page.evaluate(() => {
       const { THREE, stage, gimbal } = window.__chess;
       stage.scene.updateMatrixWorld(true);
@@ -100,13 +102,23 @@ async function clickAt(page, x, y) {
   await settle(page);
 }
 
+/** the first position goes through ?fen at load, the others are set in the page (game.loadFen is what ?fen calls) */
+async function position(page, baseUrl, fen, first) {
+  if (first) await load(page, baseUrl, `fen=${encodeURIComponent(fen)}`);
+  else await page.evaluate((f) => { const g = window.__chess.game; g.newGame({ instant: true }); g.loadFen(f); window.__chess.step(2); window.__chess.draw(); }, fen);
+  await page.evaluate(PICK_HELPERS);
+}
+
 async function checkPicking(page, baseUrl, log) {
+  return [...(await pickFront(page, baseUrl, log)), ...(await pickCapture(page, baseUrl, log)), ...(await pickMove(page, baseUrl, log))];
+}
+
+async function pickFront(page, baseUrl, log) {
   const out = [];
 
   // 1) A queen with no legal moves (boxed in by its own men) stands directly in front of a pawn that can move.
   //    Clicking the visible queen must select the queen, not the pawn hidden behind it.
-  await load(page, baseUrl, `fen=${encodeURIComponent('4k3/8/8/8/8/2PPP3/2PQP3/2BRKB2 w - - 0 1')}`);
-  await page.evaluate(PICK_HELPERS);
+  await position(page, baseUrl, '4k3/8/8/8/8/2PPP3/2PQP3/2BRKB2 w - - 0 1', true);
   const found = await page.evaluate(() => {
     // scan the queen's screen silhouette for a ray that hits the queen first and the d3 pawn right behind it
     const { game } = window.__chess;
@@ -134,10 +146,13 @@ async function checkPicking(page, baseUrl, log) {
     });
   }
   log?.(`picking front piece: ${out[out.length - 1].pass ? 'ok' : 'FAIL'}`);
+  return out;
+}
 
+async function pickCapture(page, baseUrl, log) {
+  const out = [];
   // 2) Clicking a capture target piece still captures; clicking an empty destination square still moves.
-  await load(page, baseUrl, `fen=${encodeURIComponent('4k3/8/8/3p4/8/8/8/3RK3 w - - 0 1')}`);
-  await page.evaluate(PICK_HELPERS);
+  await position(page, baseUrl, '4k3/8/8/3p4/8/8/8/3RK3 w - - 0 1');
   const rook = await page.evaluate(() => window.__fx.screen(-0.5, 0.5, 3.5)); // rook on d1
   await clickAt(page, rook.x, rook.y);
   const sel = await page.evaluate(() => window.__chess.game.getState().selected);
@@ -147,9 +162,12 @@ async function checkPicking(page, baseUrl, log) {
   const capPass = sel === 'd1' && cap.moves.length === 1 && /x/.test(cap.moves[0]) && cap.captured === 1;
   out.push({ name: 'clicking a capture target piece captures it', pass: capPass, detail: `selected ${sel}, moves ${JSON.stringify(cap.moves)}, black pieces captured ${cap.captured}` });
   log?.(`picking capture: ${capPass ? 'ok' : 'FAIL'}`);
+  return out;
+}
 
-  await load(page, baseUrl, `fen=${encodeURIComponent('4k3/8/8/8/8/8/8/3RK3 w - - 0 1')}`);
-  await page.evaluate(PICK_HELPERS);
+async function pickMove(page, baseUrl, log) {
+  const out = [];
+  await position(page, baseUrl, '4k3/8/8/8/8/8/8/3RK3 w - - 0 1');
   const r2 = await page.evaluate(() => window.__fx.screen(-0.5, 0.5, 3.5));
   await clickAt(page, r2.x, r2.y);
   const dest = await page.evaluate(() => window.__fx.screen(-0.5, 0, 0.5)); // empty square d4
@@ -164,11 +182,11 @@ async function checkPicking(page, baseUrl, log) {
 // ---------------------------------------------------------------- (c) trays vs HUD
 // Projects the two capture tray volumes (slab footprint, tall enough for the captured pieces) to the screen and
 // compares the bounding rectangles against every visible HUD card and the viewport.
-async function checkTrays(page, baseUrl, log) {
+const TRAY_SIZES = [[1280, 720], [1280, 800], [1400, 788], [1600, 900], [1920, 1080]];
+async function checkTrays(page, baseUrl, log, [width, height]) {
   const out = [];
-  const sizes = [[1280, 720], [1280, 800], [1400, 788], [1600, 900], [1920, 1080]];
-  for (const [width, height] of sizes) {
-    // a fresh load per size: resizing a live software-GL page repeatedly can crash headless Chrome
+  {
+    // a fresh load per size: a live resize leaves the camera framing of the old size (clearances differ from a fresh load), and repeated resizes can crash headless Chrome
     await load(page, baseUrl, 'moves=e2e4,d7d5,e4d5,d8d5,b1c3,d5a5', { width, height });
     const r = await page.evaluate(() => {
       const { THREE, stage, gimbal } = window.__chess;
@@ -213,25 +231,26 @@ async function checkTrays(page, baseUrl, log) {
 async function loadRaw(page, baseUrl, query) {
   await page.setViewport({ width: 800, height: 500 });
   await page.goto(`${baseUrl}/?manual=1&ai=0&${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+  await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000, polling: 100 });
   return page.evaluate(() => ({ touchClass: document.body.classList.contains('touch'), quality: window.__chess.stage.quality, select: document.querySelector('#sel-quality').value }));
 }
 
-async function checkDevice(page, baseUrl, log) {
-  const out = [];
-  const cases = [
+const DEVICE_CASES = [
     ['default load starts on high without the touch class', '', (r) => r.quality === 'high' && !r.touchClass && r.select === 'high'],
     ['?touch=1 sets the touch class and starts on medium', 'touch=1', (r) => r.quality === 'medium' && r.touchClass && r.select === 'medium'],
     ['?touch=0 behaves like the default', 'touch=0', (r) => r.quality === 'high' && !r.touchClass],
     ['?touch=1&quality=low starts on low', 'touch=1&quality=low', (r) => r.quality === 'low' && r.touchClass],
-  ];
-  for (const [name, query, ok] of cases) {
-    const r = await loadRaw(page, baseUrl, query);
-    const pass = !!ok(r);
-    out.push({ name, pass, detail: `quality ${r.quality}, touch class ${r.touchClass}` });
-    log?.(`device ${query || 'default'}: ${pass ? 'ok' : 'FAIL'}`);
-  }
+];
 
+async function checkDevice(page, baseUrl, log, [name, query, ok]) {
+  const r = await loadRaw(page, baseUrl, query);
+  const pass = !!ok(r);
+  log?.(`device ${query || 'default'}: ${pass ? 'ok' : 'FAIL'}`);
+  return [{ name, pass, detail: `quality ${r.quality}, touch class ${r.touchClass}` }];
+}
+
+async function checkContextLoss(page, baseUrl, log) {
+  const out = [];
   // forced context loss and restore: the board must render again and nothing may log an error
   const errs = [];
   const onErr = (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 160)); };
@@ -255,10 +274,10 @@ async function checkDevice(page, baseUrl, log) {
       window.__lose = gl.getExtension('WEBGL_lose_context');
       window.__lose.loseContext();
     });
-    await page.waitForFunction('window.__chess.stage.contextLost === true', { timeout: 10000 });
+    await page.waitForFunction('window.__chess.stage.contextLost === true', { timeout: 10000, polling: 100 });
     await page.evaluate(() => { window.__chess.draw(); });   // drawing while lost must be a quiet no-op
     await page.evaluate(() => window.__lose.restoreContext());
-    await page.waitForFunction('window.__chess.stage.contextLost === false', { timeout: 30000 });
+    await page.waitForFunction('window.__chess.stage.contextLost === false', { timeout: 30000, polling: 100 });
     await page.evaluate(() => { window.__chess.step(1); });
     const after = await readFrame();
     const pass = before.std > 8 && after.std > 8 && after.colors > 40 && after.mean > 8 && !after.lost && errs.length === 0;
@@ -272,14 +291,36 @@ async function checkDevice(page, baseUrl, log) {
   return out;
 }
 
-export async function runFixChecks({ page, baseUrl, log = () => {} }) {
-  const results = [];
-  for (const [name, fn] of [['labels', checkLabels], ['picking', checkPicking], ['trays', checkTrays], ['device', checkDevice]]) {
-    try {
-      results.push(...(await fn(page, baseUrl, log)));
-    } catch (err) {
-      results.push({ name: `${name} checks ran`, pass: false, detail: String(err && err.stack || err).slice(0, 400) });
+// One unit of work is one fresh page load plus its checks. Units are independent, so they run in several tabs of the one browser
+// when the caller passes newPage; results keep the order of the units either way.
+const UNITS = [
+  ['labels', checkLabels],
+  ['picking', checkPicking],
+  ...TRAY_SIZES.map((a) => ['trays', checkTrays, a]),
+  ...DEVICE_CASES.map((a) => ['device', checkDevice, a]),
+  ['device', checkContextLoss],
+];
+
+export async function runFixChecks({ page, baseUrl, log = () => {}, newPage = null, tabs = 4 }) {
+  const results = UNITS.map(() => []);
+  let next = 0;
+  const worker = async (pg) => {
+    for (;;) {
+      const i = next++;
+      if (i >= UNITS.length) return;
+      const [name, fn, arg] = UNITS[i];
+      try {
+        results[i] = await fn(pg, baseUrl, log, arg);
+      } catch (err) {
+        results[i] = [{ name: `${name} checks ran`, pass: false, detail: String(err && err.stack || err).slice(0, 400) }];
+      }
     }
-  }
-  return results;
+  };
+  const pages = [page];
+  const own = [];
+  try {
+    for (let k = 1; newPage && k < Math.min(tabs, UNITS.length); k++) { const p = await newPage(); own.push(p); pages.push(p); }
+    await Promise.all(pages.map(worker));
+  } finally { for (const p of own) await p.close().catch(() => {}); }
+  return results.flat();
 }
