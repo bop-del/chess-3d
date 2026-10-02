@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Lanes: one branch, one git worktree and one Herdr workspace per backlog item or agent round.
 // Usage:
-//   bin/lane open <branch>              worktree and workspace "<branch>" under ~/.herdr/worktrees/chess-3d/,
-//                                       tab named "<branch> lane shell", node_modules linked in, fast tier run in the lane
+//   bin/lane open <branch>              worktree and workspace "<branch>" under ~/.herdr/worktrees/chess-3d/, its first
+//                                       tab "diff" running hunk diff main --watch, node_modules linked in, fast tier run
 //   bin/lane agent <branch> <name> <brief> [--model <m>]
 //                                       a tab "<name> agent" in the lane's workspace with a visible Claude session
 //                                       (plus, once per lane, a "diff" tab running hunk diff main --watch)
@@ -39,11 +39,14 @@ function open(branch) {
   if (git('branch', '--list', branch)) die(`branch ${branch} exists already`);
   const res = herdr('worktree', 'create', '--cwd', MAIN, '--branch', branch, '--base', 'main', '--label', branch, '--no-focus');
   const path = res.worktree.path, ws = res.workspace.workspace_id, tab = res.tab.tab_id;
-  run('herdr', ['tab', 'rename', tab, `${branch} lane shell`]);
+  // the first tab shows the lane's changes against main, live (hunk); a lane needs no plain shell tab
+  run('herdr', ['tab', 'rename', tab, 'diff']);
   const nm = join(path, 'node_modules');
   if (!existsSync(nm)) symlinkSync(join(MAIN, 'node_modules'), nm);
-  console.log(`lane ${branch}: ${path}\nworkspace ${ws} "${branch}", tab "${branch} lane shell"`);
+  console.log(`lane ${branch}: ${path}\nworkspace ${ws} "${branch}", first tab "diff" (hunk diff main --watch)`);
   const t = spawnSync(process.execPath, ['test/run.mjs'], { cwd: path, encoding: 'utf8' });
+  const pane = (res.root_pane || {}).pane_id;
+  if (pane) { run('herdr', ['pane', 'send-text', pane, 'hunk diff main --watch']); run('herdr', ['pane', 'send-keys', pane, 'Enter']); }
   console.log(t.status === 0 ? 'fast tier green in the lane' : `FAST TIER RED in the lane, fix before building on it:\n${t.stdout}${t.stderr}`);
   process.exit(t.status === 0 ? 0 : 1);
 }
