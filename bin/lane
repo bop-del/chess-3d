@@ -5,6 +5,7 @@
 //                                       tab named "<branch> lane shell", node_modules linked in, fast tier run in the lane
 //   bin/lane agent <branch> <name> <brief> [--model <m>]
 //                                       a tab "<name> agent" in the lane's workspace with a visible Claude session
+//                                       (plus, once per lane, a "diff" tab running hunk diff main --watch)
 //                                       (default model sonnet), prompted to read the brief and to send its final
 //                                       report to the lead session (Herdr agent chess-3d-lead)
 //   bin/lane list                       open lanes of this repo
@@ -47,11 +48,23 @@ function open(branch) {
   process.exit(t.status === 0 ? 0 : 1);
 }
 
+// A "diff" tab per lane running `hunk diff main --watch`: the lane's changes against main, live, while agents work.
+function ensureDiffTab(lane) {
+  const tabs = (herdr('tab', 'list', '--workspace', lane.open_workspace_id).tabs || []);
+  if (tabs.some((t) => t.label === 'diff')) return;
+  const tab = herdr('tab', 'create', '--workspace', lane.open_workspace_id, '--cwd', lane.path, '--label', 'diff');
+  const pane = (tab.root_pane || tab.pane || {}).pane_id;
+  if (!pane) return;
+  run('herdr', ['pane', 'send-text', pane, 'hunk diff main --watch']);
+  run('herdr', ['pane', 'send-keys', pane, 'Enter']);
+}
+
 function agent(branch, name, brief, model = 'sonnet') {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(name || '')) die(`agent names are lower case words joined by hyphens\n${USAGE}`, 2);
   if (!existsSync(brief || '')) die(`brief not found: ${brief}`, 2);
   const lane = lanes().find((w) => w.branch === branch);
   if (!lane || !lane.open_workspace_id) die(`no open lane ${branch} with a workspace: bin/lane open ${branch} first`);
+  ensureDiffTab(lane);
   const tab = herdr('tab', 'create', '--workspace', lane.open_workspace_id, '--cwd', lane.path, '--label', `${name} agent`);
   const pane = (tab.root_pane || tab.pane || {}).pane_id;
   if (!pane) die(`could not read the new tab's pane from herdr: ${JSON.stringify(tab).slice(0, 200)}`);
