@@ -342,7 +342,13 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     apply();
   }
 
+  // CONTRACT stubs (lead) for the Battle lane: a cinematic camera move to a close-up and back. The B system agent
+  // implements them; until then they resolve at once and change nothing.
+  function cinematic({ target, yaw, pitch, dist, dur = 0.6 } = {}) { return Promise.resolve(); }
+  function restore({ dur = 0.6 } = {}) { return Promise.resolve(); }
+
   return {
+    cinematic, restore,
     update, apply, setPreset, reset, levelBoard, flip, topDown, toggleSpin, setGimbal, nudgeZoom, setCamera, onResize, setFrame, setLocked,
     get locked() { return locked; },
     get frame() { return { ...frame }; },

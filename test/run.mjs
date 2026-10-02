@@ -36,6 +36,7 @@ if (tier === 'fast' || tier === 'all') {
   run('piece geometry contract (test/geometry.mjs)', 'test/geometry.mjs');
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
+  run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
 }
 if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((r) => r.ok))) {
   console.log('--- smoke tier (headless Chrome)');

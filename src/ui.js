@@ -489,5 +489,25 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     phoneUI.status(game.getState());
   }
 
-  return { sync, toast, toggleHud, toggleHelp, render };
+  // CONTRACT (lead): other modules mount their own panels and settings blocks. Desktop: a panel goes into the right
+  // column above the move list, a settings block into the Scene card. Phone: both become sections of the Menu sheet.
+  function mountPanel(id, element, { title = id } = {}) {
+    const card = el('section', 'card');
+    card.dataset.card = id;
+    card.innerHTML = `<header><h2>${title}</h2><span class="chev"></span></header><div class="body"></div>`;
+    card.querySelector('.body').append(element);
+    card.querySelector('header').addEventListener('click', () => card.classList.toggle('collapsed'));
+    const sheetBody = hud.querySelector('.psheet-body');
+    if (document.body.classList.contains('phone') && sheetBody) sheetBody.append(card);
+    else right.insertBefore(card, right.querySelector('.card[data-card="moves"]'));
+    return card;
+  }
+  function mountSettings(id, element) {
+    element.dataset.settings = id;
+    const scene = hud.querySelector('.card[data-card="scene"] .body') || hud.querySelector('.card[data-card="scene"]');
+    scene.append(element);
+    return element;
+  }
+
+  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings };
 }

@@ -24,6 +24,10 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
 
   const listeners = {};
   const emit = (evt, data) => (listeners[evt] || []).forEach((fn) => fn(data));
+  // CONTRACT (lead, for the Openings and Battle lanes): mode is 'play' or 'explain'; captureHooks run before a captured
+  // piece flies to its tray in normal play (the battle lane wires the awaiting); 'move' is emitted after every move.
+  let mode = 'play';
+  const captureHooks = [];
 
   let map = new Map();           // square -> piece object
   let records = [];              // parallel to chess.history
@@ -320,6 +324,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     evaluateEnd();
     refreshHighlights();
     changed();
+    emit('move', rec);
     return rec;
   }
 
@@ -590,6 +595,13 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     clickSquare, pickSquare, hoverAction, update, newGame, undo, loadFen, setVsComputer, getState, playMoves, selectSquare,
     move: (from, to, promo) => doMove({ from: nameSq(from), to: nameSq(to), promo }),
     finishAnimations,
+    // CONTRACT stubs (lead): filled in by the Openings (C) and Battle (B) lanes
+    setMode(m) { mode = m === 'explain' ? 'explain' : 'play'; changed(); },
+    get mode() { return mode; },
+    onMove(fn) { (listeners.move = listeners.move || []).push(fn); },
+    onCapture(fn) { captureHooks.push(fn); },
+    get captureHooks() { return captureHooks; },
+    playSan(san, { animate = true } = {}) { return null; },   // C engine agent: parse SAN with src/rules.js and play it
     // consistency check for tests: compares visual pieces with the engine board; returns a list of problems
     audit() {
       const bad = [];

@@ -1,0 +1,148 @@
+# chess-3d
+
+The vocabulary of a 3D chess game that also teaches a child chess openings.
+Terms here are the ones this project argues about; general chess words that mean
+what they always mean are not listed. The target device for the trainer is a
+phone, used by a child, which settles many choices below.
+
+## Language
+
+### Teaching
+
+**Line**:
+One concrete sequence of moves that the game teaches, belonging to an opening
+and carrying a text per move. There are twelve; three ship with texts.
+_Avoid_: opening (means the named idea, not our sequence), variation, repertoire entry
+
+**Opening**:
+The named idea a line belongs to: "Italian Game", "Queen's Gambit". Named by
+the catalogue, not by us, and one opening covers many possible lines.
+_Avoid_: line, defence, system
+
+**Catalogue**:
+The 3,810 CC0 entries from Lichess, keyed by position. Its only job is naming a
+position, including one reached by a move order the line did not anticipate. It
+is exhaustive, not curated, so it can never be the list a child chooses from.
+_Avoid_: database, dataset, opening list
+
+**Starter list**:
+The twelve lines we hand-picked and wrote ourselves. Curation is the part the
+catalogue cannot do.
+_Avoid_: catalogue, our openings, the twelve
+
+**Position key**:
+The first four FEN fields: placement, side to move, castling rights, en
+passant. Drops the clocks, so two move orders reaching the same position share
+one key. Everything hangs on this rather than on a node in a tree. Produced from
+the rules engine's own position, never from a second source.
+_Avoid_: FEN (that is the six-field string), hash, position id
+
+**Own move**:
+A move of the line played by the side the line is for. The player makes these
+on the 3D board; the game accepts only this move and refuses any other.
+_Avoid_: user move, correct move, player move
+
+**Opponent move**:
+A move of the line played by the other side. The game plays these itself, with
+their text, the same way Drill will. Four of the Scandinavian's eight moves are
+these, because that line is taught from Black.
+_Avoid_: computer move (that is the Easy opponent of ordinary play), White's
+move (depends on the line), automatic move
+
+**Move text**:
+The one sentence attached to a move, saying what it achieves. Always names a
+plan, never an evaluation. Display-only: never stored, never exported.
+_Avoid_: comment, annotation, explanation, description
+
+**Move hint**:
+The next own move, shown on the 3D board itself: its from-square marked quietly,
+its to-square marked strongly, and an arrow drawn from one to the other. A
+per-viewer preference that can be switched off, defaulting to on.
+_Avoid_: hint alone where a wrong-move correction is meant, highlight, cue
+
+**Arrow**:
+The line with a head drawn from the hint's from-square to its to-square. Part of
+the move hint, not a feature beside it: the same switch turns it off, and it is
+absent in every case the square marks are. Straight for every move, knights
+included: it says *from here to there*, not *along this path*.
+_Avoid_: move arrow (the hint is the move; this is one of its marks), line (that
+means a taught sequence here), pointer
+
+### Modes and screens
+
+**Mode**:
+One of the things the player can be doing inside the 3D game. Play (ordinary
+chess against the Easy opponent or another person) and Explain exist now. Adopt
+and Drill come later. Adopt is an act rather than a place, so only some modes are
+tabs.
+_Avoid_: screen (that is one view), tab (that is the control), section
+
+**Explain**:
+The mode that walks a line with a sentence per move: the player makes the own
+moves, the game plays the opponent moves, and each move shows its text.
+_Avoid_: Explore (the earlier, list-only mode it replaced), tutorial, lesson
+
+**Adopt**:
+The act of taking a line into the repertoire. The only way anything enters it.
+_Avoid_: save, add, favourite
+
+**Drill**:
+The mode that asks the player for the own moves of adopted lines from memory,
+scheduling cards by due day.
+_Avoid_: quiz, test, practice (that is the tab)
+
+**Tab**:
+One of the destinations on the list screen: Openings, Mine, Practise. They name
+where the player is, not what they are doing, so they are absent while a line is
+being walked. A tab that cannot be used yet is greyed and carries the condition
+that opens it: a path, not a promised reward.
+_Avoid_: menu, nav, mode (a tab is the control, not the thing)
+
+### Progress
+
+**Repertoire**:
+The lines the player has adopted, and what the Mine tab shows. Their data, in
+their browser, keyed by position. Adopting is the only way anything enters it.
+Progress starts fresh in chess-3d; nothing is imported from the earlier app.
+_Avoid_: my openings, collection, favourites, saved lines
+
+**Card**:
+One position the player answers, with the ladder level and due day for it.
+Shared between every line that passes through that position, so practising it
+once counts everywhere.
+_Avoid_: item, entry, position (that is the chess term), node
+
+**Dormant card**:
+A card no adopted line points at any more. Drill never schedules it, and it
+keeps its level and due day: removing a line must not cost progress. It wakes
+if the line is adopted again.
+_Avoid_: orphaned, deleted, archived, stale
+
+**Best level**:
+The highest ladder level a card has ever reached, kept beside its current one. A
+miss lowers what Drill schedules; it never lowers this. What the meter reads, so
+the meter can only rise.
+_Avoid_: high score, record, peak (all sound like a game), max level
+
+### The game itself
+
+**Rules engine**:
+`src/rules.js`, the project's own legality, notation and position code. The one
+engine for ordinary play, the trainer and the opening parser. There is no second
+engine.
+_Avoid_: chess.js (not used here), validator
+
+**Gimbal**:
+The group that holds everything on the board, rotated on three axes so the
+whole board can be tilted and turned as one. The camera orbits outside it.
+_Avoid_: pivot, rig, board group
+
+**View preset**:
+A named camera and gimbal arrangement that can be picked in one step, such as a
+side-on or top-down view.
+_Avoid_: camera mode, angle, layout
+
+**Quality tier**:
+A named level of rendering detail (for example low) trading looks for speed on
+weaker devices.
+_Avoid_: graphics setting, resolution, LOD
