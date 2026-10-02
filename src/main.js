@@ -1,12 +1,15 @@
 // App entry: loads modules with progress, wires stage, board, pieces, game, controls and HUD.
 import * as THREE from 'three';
 import { device } from './device.js';
+import { t, translateTree, i18n } from './i18n.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
 const fillEl = $('loader-fill'), stepEl = $('loader-step'), errEl = $('loader-err'), loaderEl = $('loader');
 
+translateTree(loaderEl);
+document.documentElement.lang = i18n.language;
 let shownProgress = 0;
 function progress(p, msg) {
   shownProgress = Math.max(shownProgress, p);
@@ -26,7 +29,7 @@ function fail(err) {
   console.error(err);
   errEl.hidden = false;
   errEl.textContent = String(err && (err.stack || err.message) || err).slice(0, 900);
-  stepEl.textContent = 'Something went wrong while loading';
+  stepEl.textContent = t('loader.error', 'Something went wrong while loading');
   window.__chessError = String(err && err.message || err);
 }
 window.addEventListener('error', (e) => { if (!loaderEl.classList.contains('done')) fail(e.error || e.message); });
@@ -91,6 +94,9 @@ async function boot() {
     },
   });
   const ui = createUI({ game, controls, stage, quality });
+  // Openings (Explain mode): its own panel in the HUD, its own hint marks on the board, ticked with the frame
+  const { mountExplain } = await import('./openings/explain-panel.js');
+  const openings = mountExplain({ game, controls, ui, gimbal });
 
   // resize
   const resize = () => {
@@ -116,7 +122,7 @@ async function boot() {
   // scripted states for testing and screenshots
   applyParams({ game, controls, stage, ui });
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick };
+  window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick, openings };
 
   // render loop
   let last = performance.now(), t = 0;
@@ -126,7 +132,7 @@ async function boot() {
     upLocal.set(0, 1, 0).applyQuaternion(stage.camera.quaternion).applyQuaternion(gimbalInv.copy(gimbal.quaternion).invert());
     board.orientLabels(upLocal);
   };
-  const advance = (dt) => { t += dt; controls.update(dt); game.update(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  const advance = (dt) => { t += dt; controls.update(dt); game.update(dt); openings.tick(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
@@ -154,7 +160,7 @@ function showContextNotice(state) {
   const el = $('notice');
   if (!el) return;
   if (state === 'ok' || state === 'lost') { el.hidden = true; return; }   // a short loss recovers on its own: no notice yet
-  el.textContent = state === 'failed' ? 'Graphics could not be restored. Tap to reload the page.' : 'The browser has not returned the graphics yet. Tap to reload the page.';
+  el.textContent = state === 'failed' ? t('notice.failed', 'Graphics could not be restored. Tap to reload the page.') : t('notice.stalled', 'The browser has not returned the graphics yet. Tap to reload the page.');
   el.hidden = false;
 }
 

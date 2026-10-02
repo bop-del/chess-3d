@@ -96,6 +96,39 @@ export class Chess {
     return `${parts[0]} ${parts[1]} ${parts[2]} ${ep}`;
   }
 
+  // Four field key (placement, turn, castling, en passant only when a capture is possible): the opening position key.
+  positionKey4() { return this.positionKey(); }
+
+  // The legal move a SAN string names in the current position, or null. Tolerates check marks, annotation marks,
+  // zero castling and a promotion without '='. Matching is done against the generated legal moves, so an ambiguous or
+  // illegal string never matches.
+  moveFromSan(san) {
+    const clean = String(san).trim().replace(/[+#!?]+$/, '').replace(/0/g, 'O');
+    if (!clean) return null;
+    const legal = this.moves();
+    if (/^O-O(-O)?$/.test(clean)) {
+      const flag = clean === 'O-O' ? 'k' : 'q';
+      return legal.find((m) => m.flag === flag) || null;
+    }
+    const mt = /^([NBRQK])?([a-h])?([1-8])?(x)?([a-h][1-8])(?:=?([NBRQnbrq]))?$/.exec(clean);
+    if (!mt) return null;
+    const [, pc, ff, fr, x, dest, pr] = mt;
+    const piece = (pc || 'P').toLowerCase();
+    const to = nameSq(dest);
+    const promo = pr ? pr.toLowerCase() : null;
+    const found = legal.filter((m) => m.piece === piece && m.to === to && (m.promo || null) === promo
+      && (piece !== 'p' || !!m.captured === !!(x || ff))
+      && (!ff || (m.from & 7) === ff.charCodeAt(0) - 97) && (!fr || (m.from >> 3) === +fr - 1));
+    if (found.length !== 1) return null;
+    return found[0];
+  }
+
+  // Play a move given as SAN. Returns the move record (with .san) or null when it is not legal here.
+  playSan(san) {
+    const m = this.moveFromSan(san);
+    return m ? this.play(m) : null;
+  }
+
   kingSquare(color) {
     const k = color === 'w' ? 'K' : 'k';
     for (let i = 0; i < 64; i++) if (this.board[i] === k) return i;

@@ -3,14 +3,15 @@
 // see buildPhone() at the end of createUI. Desktop and tablets keep the columns.
 import { device } from './device.js';
 import { PRESETS } from './controls.js';
+import { t, setLanguage, onLanguage, translateTree, sanDisplay, i18n } from './i18n.js';
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const g = (t) => GLYPH[t] + '︎';
 const VAL = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
 const PHONE_KEYS = [
-  ['Tap a piece', 'Select it, then tap a square'], ['Drag', 'Orbit camera'], ['Two fingers', 'Pinch to zoom'],
-  ['Undo', 'Take back a move'], ['Flip', 'View from the other side'], ['Views', 'Cycle the camera views'],
+  ['phone.tapPiece', 'Tap a piece', 'Select it, then tap a square'], ['phone.drag', 'Drag', 'Orbit camera'],
+  ['phone.two', 'Two fingers', 'Pinch to zoom'], ['phone.undo', 'Undo', 'Take back a move'],
+  ['phone.flip', 'Flip', 'View from the other side'], ['phone.views', 'Views', 'Cycle the camera views'],
 ];
-const PHONE_TEXT = { newAsk: 'Start a new game?', yes: 'Yes', cancel: 'Cancel' };
 const ICON = {
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   new: '<path d="M12 5v14M5 12h14"/>',
@@ -19,13 +20,16 @@ const ICON = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
 };
 const PIECE_NAME = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
+const pieceName = (p) => t(`piece.${p}`, PIECE_NAME[p]);
 
 const KEYS = [
-  ['Drag', 'Orbit camera'], ['Shift + drag / right drag', 'Rotate board'], ['Wheel / pinch', 'Zoom'],
-  ['Q / E', 'Board roll (Z)'], ['W / S', 'Board pitch (X)'], ['A / D', 'Board yaw (Y)'],
-  ['Arrow keys', 'Orbit camera'], ['+ / -', 'Zoom'], ['R', 'Reset view'], ['F', 'Flip to other side'],
-  ['V', 'Top down'], ['1 to 5', 'View presets'], ['Space', 'Auto spin'], ['U', 'Undo'], ['N', 'New game'], ['H', 'Hide / show HUD'],
+  ['key.drag', 'Drag', 'Orbit camera'], ['key.shiftDrag', 'Shift + drag / right drag', 'Rotate board'], ['key.wheel', 'Wheel / pinch', 'Zoom'],
+  ['key.qe', 'Q / E', 'Board roll (Z)'], ['key.ws', 'W / S', 'Board pitch (X)'], ['key.ad', 'A / D', 'Board yaw (Y)'],
+  ['key.arrows', 'Arrow keys', 'Orbit camera'], ['key.plusMinus', '+ / -', 'Zoom'], ['key.r', 'R', 'Reset view'], ['key.f', 'F', 'Flip to other side'],
+  ['key.v', 'V', 'Top down'], ['key.1to5', '1 to 5', 'View presets'], ['key.space', 'Space', 'Auto spin'], ['key.u', 'U', 'Undo'],
+  ['key.n', 'N', 'New game'], ['key.h', 'H', 'Hide / show HUD'],
 ];
+const keyRows = (rows) => rows.map(([k, kf, df]) => `<dt>${t(k, kf)}</dt><dd>${t(k + 'D', df)}</dd>`).join('');
 
 function el(tag, cls, html) {
   const e = document.createElement(tag);
@@ -44,37 +48,38 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     <section class="card brand">
       <div class="brand-row">
         <div class="logo" aria-hidden="true">${g('n')}</div>
-        <div><h1>Chess 3D</h1><p class="sub">Studio edition</p></div>
-        <button class="icon-btn" id="btn-hide" title="Hide HUD (H)" aria-label="Hide HUD">&#x2715;</button>
+        <div><h1 data-i18n="hud.title">Chess 3D</h1><p class="sub" data-i18n="hud.sub">Studio edition</p></div>
+        <button class="icon-btn" id="btn-hide" title="Hide HUD (H)" aria-label="Hide HUD" data-i18n-title="hud.hide" data-i18n-aria="hud.hideLabel">&#x2715;</button>
       </div>
+      <div class="lang" role="group" aria-label="Language" data-i18n-aria="lang.label"><button class="lang-btn" data-lang="en" aria-label="English">EN</button><button class="lang-btn" data-lang="de" aria-label="Deutsch">DE</button></div>
       <div class="turn" id="turn"><i class="dot w"></i><div><b id="turn-main">White to move</b><small id="turn-sub">&nbsp;</small></div></div>
     </section>
 
     <div class="tools" id="tools">
     <section class="card" data-card="view">
-      <header><h2>View</h2><span class="chev"></span></header>
+      <header><h2 data-i18n="hud.view">View</h2><span class="chev"></span></header>
       <div class="body">
         <div class="presets" id="presets"></div>
-        <label class="switch lockrow" title="Stop all camera gestures; taps still move pieces"><input type="checkbox" id="chk-lock"><span class="track"><i></i></span><em>Lock view</em></label>
+        <label class="switch lockrow" title="Stop all camera gestures; taps still move pieces" data-i18n-title="hud.lockTitle"><input type="checkbox" id="chk-lock"><span class="track"><i></i></span><em data-i18n="hud.lockView">Lock view</em></label>
         <div class="row three">
-          <button class="btn" id="btn-flip" title="Flip to the other side (F)">Flip</button>
-          <button class="btn toggle" id="btn-spin" title="Auto spin (Space)">Spin</button>
-          <button class="btn" id="btn-reset" title="Reset view (R)">Reset</button>
+          <button class="btn" id="btn-flip" title="Flip to the other side (F)" data-i18n="hud.flip" data-i18n-title="hud.flipTitle">Flip</button>
+          <button class="btn toggle" id="btn-spin" title="Auto spin (Space)" data-i18n="hud.spin" data-i18n-title="hud.spinTitle">Spin</button>
+          <button class="btn" id="btn-reset" title="Reset view (R)" data-i18n="hud.reset" data-i18n-title="hud.resetTitle">Reset</button>
         </div>
       </div>
     </section>
 
     <section class="card" data-card="gimbal">
-      <header><h2>Board gimbal</h2><span class="chev"></span></header>
+      <header><h2 data-i18n="hud.gimbal">Board gimbal</h2><span class="chev"></span></header>
       <div class="body sliders" id="sliders"></div>
     </section>
 
     <section class="card" data-card="scene">
-      <header><h2>Scene</h2><span class="chev"></span></header>
+      <header><h2 data-i18n="hud.scene">Scene</h2><span class="chev"></span></header>
       <div class="body">
-        <label class="field"><span>Lighting</span><select id="sel-light"></select></label>
-        <label class="field"><span>Quality</span><select id="sel-quality">
-          <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+        <label class="field"><span data-i18n="hud.lighting">Lighting</span><select id="sel-light"></select></label>
+        <label class="field"><span data-i18n="hud.quality">Quality</span><select id="sel-quality">
+          <option value="low" data-i18n="hud.low">Low</option><option value="medium" data-i18n="hud.medium">Medium</option><option value="high" data-i18n="hud.high">High</option></select></label>
       </div>
     </section>
     </div>`;
@@ -83,43 +88,45 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   const right = el('aside', 'col right');
   right.innerHTML = `
     <section class="card" data-card="game">
-      <header><h2>Game</h2><span class="chev"></span></header>
+      <header><h2 data-i18n="hud.game">Game</h2><span class="chev"></span></header>
       <div class="body">
         <div class="row three">
-          <button class="btn primary" id="btn-new" title="New game (N)">New game</button>
-          <button class="btn" id="btn-undo" title="Undo (U)">Undo</button>
-          <button class="btn" id="btn-help" title="Keyboard shortcuts (?)">Keys</button>
+          <button class="btn primary" id="btn-new" title="New game (N)" data-i18n="hud.newGame" data-i18n-title="hud.newGameTitle">New game</button>
+          <button class="btn" id="btn-undo" title="Undo (U)" data-i18n="hud.undo" data-i18n-title="hud.undoTitle">Undo</button>
+          <button class="btn" id="btn-help" title="Keyboard shortcuts (?)" data-i18n="hud.keys" data-i18n-title="hud.keysTitle">Keys</button>
         </div>
         <div class="row ai">
-          <label class="switch"><input type="checkbox" id="chk-ai"><span class="track"><i></i></span><em>vs computer</em></label>
-          <select id="sel-ai-color" title="Your side"><option value="w">Play white</option><option value="b">Play black</option></select>
-          <select id="sel-ai-level" title="Strength"><option value="2">Easy ~900</option><option value="3">Normal ~1200</option><option value="4">Hard ~1450</option></select>
+          <label class="switch"><input type="checkbox" id="chk-ai"><span class="track"><i></i></span><em data-i18n="hud.vsComputer">vs computer</em></label>
+          <select id="sel-ai-color" title="Your side" data-i18n-title="hud.yourSide"><option value="w" data-i18n="hud.playWhite">Play white</option><option value="b" data-i18n="hud.playBlack">Play black</option></select>
+          <select id="sel-ai-level" title="Strength" data-i18n-title="hud.strength"><option value="2" data-i18n="hud.easy">Easy ~900</option><option value="3" data-i18n="hud.normal">Normal ~1200</option><option value="4" data-i18n="hud.hard">Hard ~1450</option></select>
         </div>
       </div>
     </section>
 
     <section class="card grow" data-card="moves">
-      <header><h2>Moves</h2><span class="chev"></span></header>
+      <header><h2 data-i18n="hud.moves">Moves</h2><span class="chev"></span></header>
       <div class="body">
         <ol class="moves" id="moves"></ol>
       </div>
     </section>
 
     <section class="card" data-card="captured">
-      <header><h2>Captured</h2><span class="chev"></span></header>
+      <header><h2 data-i18n="hud.captured">Captured</h2><span class="chev"></span></header>
       <div class="body">
-        <div class="cap"><span class="who">By white</span><span class="glyphs b" id="cap-b"></span><span class="adv" id="adv-w"></span></div>
-        <div class="cap"><span class="who">By black</span><span class="glyphs w" id="cap-w"></span><span class="adv" id="adv-b"></span></div>
+        <div class="cap"><span class="who" data-i18n="hud.byWhite">By white</span><span class="glyphs b" id="cap-b"></span><span class="adv" id="adv-w"></span></div>
+        <div class="cap"><span class="who" data-i18n="hud.byBlack">By black</span><span class="glyphs w" id="cap-w"></span><span class="adv" id="adv-b"></span></div>
       </div>
     </section>`;
 
   const help = el('div', 'help card');
   help.hidden = true;
-  help.innerHTML = `<header><h2>Keyboard and mouse</h2></header><dl>${KEYS.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
+  help.innerHTML = `<header><h2 data-i18n="hud.keyboardMouse">Keyboard and mouse</h2></header><dl id="help-keys">${keyRows(KEYS)}</dl>`;
 
   const showBtn = el('button', 'show-btn', 'Show HUD');
+  showBtn.dataset.i18n = 'hud.show';
   showBtn.hidden = true;
   const drawerBtn = el('button', 'drawer-btn', 'Controls');
+  drawerBtn.dataset.i18n = 'hud.controls';
 
   hud.append(left, right, help, showBtn, drawerBtn);
 
@@ -139,7 +146,8 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   // ------------------------------------------------------------ presets and view buttons
   const presetBox = $('#presets');
   for (const name of controls.presets) {
-    const b = el('button', 'btn preset', name);
+    const b = el('button', 'btn preset', t(`preset.${name}`, name));
+    b.dataset.preset = name;
     b.addEventListener('click', () => controls.setPreset(name));
     presetBox.append(b);
   }
@@ -163,7 +171,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   const sliders = {};
   for (const [axis, label, hint] of AXES) {
     const row = el('div', 'slider');
-    row.innerHTML = `<label for="sl-${axis}"><b>${label}</b><span>${hint}</span></label>
+    row.innerHTML = `<label for="sl-${axis}"><b>${label}</b><span data-i18n="hud.${hint}">${hint}</span></label>
       <input type="range" id="sl-${axis}" min="-180" max="180" step="1" value="0">
       <output id="out-${axis}">0&deg;</output>`;
     sliderBox.append(row);
@@ -176,13 +184,14 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     input.addEventListener('keydown', (e) => e.stopPropagation());
   }
   const resetG = el('button', 'btn small', 'Level board');
+  resetG.dataset.i18n = 'hud.levelBoard';
   resetG.addEventListener('click', () => controls.levelBoard());
   sliderBox.append(resetG);
 
   // ------------------------------------------------------------ scene selects
   const selLight = $('#sel-light'), selQuality = $('#sel-quality');
   const presets = stage.lightingPresets || [];
-  for (const n of presets) selLight.append(new Option(n, n));
+  for (const n of presets) selLight.append(new Option(t(`light.${n}`, n), n));
   selLight.parentElement.hidden = !presets.length;
   selLight.addEventListener('change', () => stage.setLightingPreset?.(selLight.value));
   selQuality.value = quality;
@@ -223,38 +232,39 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   const movesEl = $('#moves');
   let lastMovesKey = null;
   let lastCheck = false;
+  const sideName = (w) => (w === 'w' ? t('side.white', 'White') : t('side.black', 'Black'));
   function render(st) {
     // turn
     const white = st.turn === 'w';
     const dot = $('.turn .dot');
     dot.className = 'dot ' + st.turn;
-    let main = white ? 'White to move' : 'Black to move', sub = ' ';
+    let main = white ? t('turn.white', 'White to move') : t('turn.black', 'Black to move'), sub = ' ';
     if (st.over) {
       const w = st.over.winner;
-      main = st.over.reason === 'checkmate' ? `Checkmate. ${w === 'w' ? 'White' : 'Black'} wins` : 'Draw';
-      sub = st.over.reason === 'checkmate' ? 'Game over' : st.over.reason;
-    } else if (st.thinking) { sub = 'Computer is thinking'; }
-    else if (st.check) sub = 'Check';
-    else if (st.vsComputer) sub = st.turn === st.computerColor ? 'Computer to move' : 'Your move';
+      main = st.over.reason === 'checkmate' ? t('turn.checkmate', 'Checkmate. {side} wins', { side: sideName(w) }) : t('turn.draw', 'Draw');
+      sub = st.over.reason === 'checkmate' ? t('turn.gameOver', 'Game over') : t(`reason.${st.over.reason}`, st.over.reason);
+    } else if (st.thinking) { sub = t('turn.thinking', 'Computer is thinking'); }
+    else if (st.check) sub = t('turn.check', 'Check');
+    else if (st.vsComputer) sub = st.turn === st.computerColor ? t('turn.computerMove', 'Computer to move') : t('turn.yourMove', 'Your move');
     $('#turn-main').textContent = main;
     $('#turn-sub').textContent = sub;
     $('.turn').classList.toggle('check', !!st.check && !st.over);
     $('.turn').classList.toggle('think', !!st.thinking);
 
     // moves
-    const key = st.moves.join(' ');
+    const key = i18n.language + '|' + st.moves.join(' ');
     if (key !== lastMovesKey) {
       lastMovesKey = key;
       movesEl.innerHTML = '';
       for (let i = 0; i < st.moves.length; i += 2) {
         const li = el('li');
-        li.innerHTML = `<span class="n">${i / 2 + 1}.</span><span class="m">${st.moves[i]}</span><span class="m">${st.moves[i + 1] || ''}</span>`;
+        li.innerHTML = `<span class="n">${i / 2 + 1}.</span><span class="m">${sanDisplay(st.moves[i])}</span><span class="m">${sanDisplay(st.moves[i + 1] || '')}</span>`;
         if (i + 1 >= st.moves.length - 1) li.classList.add('latest');
         movesEl.append(li);
       }
       const latest = movesEl.querySelector('.latest');
       if (latest) latest.scrollIntoView({ block: 'nearest' });
-      if (!st.moves.length) movesEl.append(el('li', 'empty', 'No moves yet. Click a piece to begin.'));
+      if (!st.moves.length) movesEl.append(el('li', 'empty', t('moves.empty', 'No moves yet. Click a piece to begin.')));
     }
     // captured: st.captured.b = black pieces lost (captured by white)
     const sortFn = (a, b) => VAL[b] - VAL[a];
@@ -264,7 +274,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     $('#adv-b').textContent = st.advantage < 0 ? `+${-st.advantage}` : '';
 
     $('#btn-undo').disabled = !st.canUndo;
-    if (st.check && !lastCheck && !st.over) toast('Check');
+    if (st.check && !lastCheck && !st.over) toast(t('turn.check', 'Check'));
     lastCheck = st.check;
     if (chkAi.checked !== st.vsComputer) chkAi.checked = st.vsComputer;
     phoneUI?.status(st);
@@ -276,8 +286,8 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   const promoEl = document.getElementById('promo');
   let promoCancel = null;
   game.on('promotion', ({ color, choose }) => {
-    promoEl.innerHTML = `<div class="promo-card"><h3>Promote pawn</h3><div class="promo-row">${['q', 'r', 'b', 'n']
-      .map((t) => `<button data-p="${t}" class="pbtn ${color}" title="${PIECE_NAME[t]}"><span>${g(t)}</span><small>${PIECE_NAME[t]}</small></button>`).join('')}</div></div>`;
+    promoEl.innerHTML = `<div class="promo-card"><h3>${t('promo.title', 'Promote pawn')}</h3><div class="promo-row">${['q', 'r', 'b', 'n']
+      .map((p) => `<button data-p="${p}" class="pbtn ${color}" title="${pieceName(p)}"><span>${g(p)}</span><small>${pieceName(p)}</small></button>`).join('')}</div></div>`;
     promoEl.hidden = false;
     const done = (p) => { promoEl.hidden = true; promoCancel = null; choose(p); };
     promoCancel = () => done(null);
@@ -290,10 +300,11 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   function hideBanner() { banner.hidden = true; }
   game.on('gameover', (st) => {
     const mate = st.reason === 'checkmate';
-    const title = mate ? 'Checkmate' : 'Draw';
-    const sub = mate ? `${st.winner === 'w' ? 'White' : 'Black'} wins` : st.reason.charAt(0).toUpperCase() + st.reason.slice(1);
+    const title = mate ? t('banner.checkmate', 'Checkmate') : t('banner.draw', 'Draw');
+    const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+    const sub = mate ? t('banner.wins', '{side} wins', { side: sideName(st.winner) }) : t(`reason.${st.reason}`, cap(st.reason));
     banner.innerHTML = `<div class="banner-card"><small>${st.result}</small><h2>${title}</h2><p>${sub}</p>
-      <div class="row"><button class="btn primary" id="bn-new">New game</button><button class="btn" id="bn-view">Review board</button></div></div>`;
+      <div class="row"><button class="btn primary" id="bn-new">${t('hud.newGame', 'New game')}</button><button class="btn" id="bn-view">${t('banner.review', 'Review board')}</button></div></div>`;
     banner.hidden = false;
     banner.querySelector('#bn-new').onclick = () => { game.newGame(); hideBanner(); };
     banner.querySelector('#bn-view').onclick = hideBanner;
@@ -338,9 +349,10 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     status.innerHTML = '<i class="dot w"></i><b class="ps-main">White to move</b><span class="ps-sub"></span><span class="ps-last"></span>';
     const bar = el('nav', 'pbar');
     bar.setAttribute('aria-label', 'Game controls');
+    bar.dataset.i18nAria = 'phone.controls';
     const btn = {};
-    for (const [id, label] of [['undo', 'Undo'], ['new', 'New game'], ['flip', 'Flip'], ['views', 'Views'], ['menu', 'Menu']]) {
-      const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span>${label}</span>`);
+    for (const [id, label, key] of [['undo', 'Undo', 'hud.undo'], ['new', 'New game', 'hud.newGame'], ['flip', 'Flip', 'hud.flip'], ['views', 'Views', 'phone.views'], ['menu', 'Menu', 'phone.menu']]) {
+      const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${key}">${label}</span>`);
       b.dataset.act = id;
       bar.append(b);
       btn[id] = b;
@@ -348,7 +360,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     const confirmBox = el('div', 'pconfirm');
     confirmBox.hidden = true;
     confirmBox.setAttribute('role', 'alertdialog');
-    confirmBox.innerHTML = `<p>${PHONE_TEXT.newAsk}</p><div class="row"><button class="btn primary" data-a="yes">${PHONE_TEXT.yes}</button><button class="btn" data-a="no">${PHONE_TEXT.cancel}</button></div>`;
+    confirmBox.innerHTML = '<p data-i18n="phone.newAsk">Start a new game?</p><div class="row"><button class="btn primary" data-a="yes" data-i18n="phone.yes">Yes</button><button class="btn" data-a="no" data-i18n="phone.cancel">Cancel</button></div>';
     const probe = el('div', 'pframe');
     probe.setAttribute('aria-hidden', 'true');
 
@@ -356,18 +368,20 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     const sheet = el('section', 'psheet');
     sheet.setAttribute('role', 'dialog');
     sheet.setAttribute('aria-label', 'Menu');
-    sheet.innerHTML = '<div class="psheet-head"><i class="grip"></i><b>Menu</b><button class="psheet-x" aria-label="Close menu">&#x2715;</button></div><div class="psheet-body"></div>';
+    sheet.dataset.i18nAria = 'phone.menu';
+    sheet.innerHTML = '<div class="psheet-head"><i class="grip"></i><b data-i18n="phone.menu">Menu</b><button class="psheet-x" aria-label="Close menu" data-i18n-aria="phone.closeMenu">&#x2715;</button></div><div class="psheet-body"></div>';
     const sheetBody = sheet.querySelector('.psheet-body');
 
     // sections: the existing cards move here. Gimbal sliders join the View card, captured pieces stay in the 3D trays.
     const gameC = cardOf('game'), movesC = cardOf('moves'), viewC = cardOf('view'), sceneC = cardOf('scene');
+    viewC.querySelector('h2').dataset.i18n = 'phone.viewGimbal';
     viewC.querySelector('h2').textContent = 'View and gimbal';
     const sl = $('#sliders');
     sl.classList.remove('body');
     viewC.querySelector('.body').append(sl);
     const helpC = el('section', 'card');
     helpC.dataset.card = 'help';
-    helpC.innerHTML = `<header><h2>Help</h2><span class="chev"></span></header><div class="body"><dl class="keys">${PHONE_KEYS.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></div>`;
+    helpC.innerHTML = `<header><h2 data-i18n="phone.help">Help</h2><span class="chev"></span></header><div class="body"><dl class="keys" id="phone-keys">${keyRows(PHONE_KEYS)}</dl></div>`;
     const cards = [gameC, movesC, viewC, sceneC, helpC];
     sheetBody.append(...cards);
     const openCard = (c) => {
@@ -386,6 +400,8 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     function close() { confirmBox.hidden = true; sheet.classList.remove('open'); scrim.classList.remove('open'); btn.menu.classList.remove('on'); }
     function open(card) {
       sheet.classList.add('open'); scrim.classList.add('open'); btn.menu.classList.add('on');
+      const lb = hud.querySelector('.lang');   // the language switch stays the first thing in the sheet, whatever mounted since
+      if (lb && sheetBody.firstElementChild !== lb) sheetBody.prepend(lb);
       if (card) openCard(card);
       if (!movesC.classList.contains('collapsed')) movesEl.scrollTop = movesEl.scrollHeight;
     }
@@ -447,7 +463,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
       }
       vi = (vi + 1) % controls.presets.length;
       controls.setPreset(controls.presets[vi]);
-      toast(controls.presets[vi], 'info');
+      toast(t(`preset.${controls.presets[vi]}`, controls.presets[vi]), 'info');
     });
     btn.menu.addEventListener('click', () => (isOpen() ? close() : open()));
 
@@ -467,7 +483,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     function statusRender(st) {
       const sub = $('#turn-sub').textContent.trim();
       const main = $('#turn-main').textContent;
-      const last = st.moves.length ? `Last: ${st.moves[st.moves.length - 1]}` : '';
+      const last = st.moves.length ? t('phone.last', 'Last: {move}', { move: sanDisplay(st.moves[st.moves.length - 1]) }) : '';
       const key = `${st.turn}|${main}|${sub}|${last}|${!!st.check}|${!!st.thinking}`;
       btn.undo.disabled = !st.canUndo;
       if (key === lastKey) return;
@@ -480,7 +496,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
       status.classList.toggle('think', !!st.thinking);
     }
     return {
-      status: statusRender, close, frame,
+      status: statusRender, close, frame, resetStatus() { lastKey = ''; },
       toggleHelp() { if (isOpen() && !helpC.classList.contains('collapsed')) close(); else open(helpC); },
     };
   }
@@ -489,12 +505,37 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     phoneUI.status(game.getState());
   }
 
+  // ------------------------------------------------------------ language switch
+  // The two buttons sit in the brand card (desktop) and move into the Menu sheet on phones. Everything marked data-i18n is
+  // translated in place; the parts built from tables or state (key help, preset and lighting names, move list, status) are redone.
+  const langBox = $('.lang');
+  if (phoneUI) hud.querySelector('.psheet-body').prepend(langBox);
+  langBox.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-lang]');
+    if (b) setLanguage(b.dataset.lang);
+  });
+  function applyLanguage() {
+    langBox.querySelectorAll('[data-lang]').forEach((b) => b.classList.toggle('on', b.dataset.lang === i18n.language));
+    $('#help-keys').innerHTML = keyRows(KEYS);
+    const pk = $('#phone-keys');
+    if (pk) pk.innerHTML = keyRows(PHONE_KEYS);
+    presetBox.querySelectorAll('[data-preset]').forEach((b) => { b.textContent = t(`preset.${b.dataset.preset}`, b.dataset.preset); });
+    [...selLight.options].forEach((o) => { o.textContent = t(`light.${o.value}`, o.value); });
+    translateTree(hud);
+    phoneUI?.resetStatus();
+    lastMovesKey = null;
+    render(game.getState());
+  }
+  onLanguage(applyLanguage);
+  applyLanguage();
+
   // CONTRACT (lead): other modules mount their own panels and settings blocks. Desktop: a panel goes into the right
   // column above the move list, a settings block into the Scene card. Phone: both become sections of the Menu sheet.
   function mountPanel(id, element, { title = id } = {}) {
     const card = el('section', 'card');
     card.dataset.card = id;
     card.innerHTML = `<header><h2>${title}</h2><span class="chev"></span></header><div class="body"></div>`;
+    translateTree(card);
     card.querySelector('.body').append(element);
     card.querySelector('header').addEventListener('click', () => card.classList.toggle('collapsed'));
     const sheetBody = hud.querySelector('.psheet-body');

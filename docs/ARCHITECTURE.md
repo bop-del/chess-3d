@@ -175,6 +175,26 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 
 Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal sliders, lighting and quality selects) and a right column (game buttons, computer opponent settings, SAN move list, captured pieces with the material balance). It also renders the promotion chooser (`#promo`), the game over banner (`#banner`), a toast for check (`#toast`) and the shortcut sheet. Below 900 px width the cards collapse and the left column becomes a sheet opened by the Controls button. On phones (`body.phone`, see device.js) `buildPhone()` adds a different HUD instead: a status line (`.pstatus`: turn, check, computer thinking, last move), a thumb bar (`.pbar`, buttons `.tb[data-act]`: Undo, New game with a confirm during a game, Flip, Views cycling to the next preset, Menu) at the bottom in portrait and on the right in landscape, and a bottom sheet (`.psheet` over `.pscrim`) with accordion sections Game, Moves, View and gimbal (with Lock view), Scene and Help. An invisible `.pframe` element marks the free area; its rectangle goes to `controls.setFrame`. Phones get lite glass (no backdrop blur). Tablets keep the desktop HUD with 44 px targets.
 
+### `src/openings/explain.js`, `explain-panel.js`, `arrow.js`
+
+Explain mode: walk one of the starter lines on the 3D board.
+
+    createExplain({ game, hint, lines, pause = 900, onSide }) -> {
+      state(),                  // { phase: 'list' | 'walking' | 'finished', line, ply, total, message, due, hint, canBack }
+      start(id), stop(), restart(), next(), back(), setHint(on),
+      tick(dt),                 // every frame: plays the opponent move once the pause has run, keeps the hint in step
+      on(fn), lines, playable(line)
+    }
+    createHint({ gimbal }) -> { show(fromSq, toSq), hide(), enabled, visible }
+    mountExplain({ game, controls, ui, gimbal, pause }) -> { explain, hint, card, strip, tick }
+
+- The player makes the own moves on the board; `game.setMoveGuard(fn)` lets the controller refuse every other move (the piece does not move, the message says what the line plays). The opponent moves are played with `game.playSan` after `pause` milliseconds, counted in `tick(dt)` while the board is at rest, so `?manual=1` tests step time and `pause = 0` plays on the next tick.
+- `game.setMode('explain')` stops the computer opponent and the two move undo; `stop()` returns to play on a fresh board.
+- `message` is a descriptor (`intro`, `move` with its ply, `refused`), never text: the panel picks the line text by language, so a language switch redraws it. Positions come from the rules engine (`moveFromSan` gives the from and to squares of the due move).
+- The hint is a flat gold overlay in the gimbal group: the from-square faint, the to-square strong, a straight arrow between them. It is shown only while the board listens for an own move. The switch is stored under `chess3d.hint` in localStorage.
+- Phone: the card in the Menu sheet holds the list; while a line runs a strip under the status line carries the sentence and the buttons, and `body.explaining` moves the camera frame below it (`--xh` is the strip height).
+- `window.__chess.openings` is the test hook: `{ explain, hint, card, strip, tick }`.
+
 ## Test hooks
 
 `window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game and board by simulated time, and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.

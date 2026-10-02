@@ -28,6 +28,8 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   // piece flies to its tray in normal play (the battle lane wires the awaiting); 'move' is emitted after every move.
   let mode = 'play';
   const captureHooks = [];
+  // Explain mode: the controller may refuse a move the player tries. guard({ from, to, promo, san }) returns true to allow it.
+  let moveGuard = null;
 
   let map = new Map();           // square -> piece object
   let records = [];              // parallel to chess.history
@@ -386,11 +388,17 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   // ---------------------------------------------------------------- public actions
   function clickSquare(sq) {
     if (busy() || pendingPromo || gameOver || search) return;
-    if (vsComputer && chess.turn === computerColor) return;
+    if (mode === 'play' && vsComputer && chess.turn === computerColor) return;
     const piece = map.get(sq);
     const own = piece && piece.color === chess.turn;
     if (selected >= 0) {
       const cands = legal.filter((m) => m.from === selected && m.to === sq);
+      if (cands.length && moveGuard && !moveGuard({ from: cands[0].from, to: cands[0].to, promo: cands[0].promo || null, san: chess.san(cands[0]) })) {
+        selected = -1;
+        refreshHighlights();
+        changed();
+        return;
+      }
       if (cands.length) {
         if (cands[0].promo) {
           pendingPromo = { from: selected, to: sq, color: chess.turn };
@@ -449,7 +457,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     finishAnimations();
     search = null; pendingPromo = null; gameOver = null; selected = -1;
     resetToppled();
-    const two = vsComputer && records.length >= 2 && records[records.length - 1].m.color === computerColor;
+    const two = mode === 'play' && vsComputer && records.length >= 2 && records[records.length - 1].m.color === computerColor;
     if (two) undoOne(false);
     undoOne(true);
     legal = chess.moves();
@@ -459,7 +467,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   }
 
   function maybeComputer() {
-    if (vsComputer && !gameOver && !search && chess.turn === computerColor && !pendingPromo) {
+    if (mode === 'play' && vsComputer && !gameOver && !search && chess.turn === computerColor && !pendingPromo) {
       search = searchMove(chess.fen(), depth);
       thinkDelay = 0.45;
       changed();
@@ -523,7 +531,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
 
   // Cheap hover test (proxies and squares only): is there something clickable under the ray?
   function hoverAction(raycaster) {
-    if (busy() || pendingPromo || gameOver || search || (vsComputer && chess.turn === computerColor)) return false;
+    if (busy() || pendingPromo || gameOver || search || (mode === 'play' && vsComputer && chess.turn === computerColor)) return false;
     const proxies = [];
     for (const o of map.values()) proxies.push(o.hit);
     const hits = [];
@@ -596,12 +604,25 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     move: (from, to, promo) => doMove({ from: nameSq(from), to: nameSq(to), promo }),
     finishAnimations,
     // CONTRACT stubs (lead): filled in by the Openings (C) and Battle (B) lanes
-    setMode(m) { mode = m === 'explain' ? 'explain' : 'play'; changed(); },
+    // Explain stops the computer opponent (it resumes in play) and drops any pending search or selection.
+    setMode(m) {
+      mode = m === 'explain' ? 'explain' : 'play';
+      search = null; selected = -1;
+      if (mode === 'play') moveGuard = null;
+      refreshHighlights();
+      changed();
+      maybeComputer();
+    },
+    setMoveGuard(fn) { moveGuard = typeof fn === 'function' ? fn : null; },
     get mode() { return mode; },
     onMove(fn) { (listeners.move = listeners.move || []).push(fn); },
     onCapture(fn) { captureHooks.push(fn); },
     get captureHooks() { return captureHooks; },
-    playSan(san, { animate = true } = {}) { return null; },   // C engine agent: parse SAN with src/rules.js and play it
+    // Play a move given as SAN (opening lines, tests). Returns the move record or null when it is not legal here.
+    playSan(san, { animate = true } = {}) {
+      const m = chess.moveFromSan(san);
+      return m ? doMove({ from: m.from, to: m.to, promo: m.promo }, { instant: !animate }) : null;
+    },
     // consistency check for tests: compares visual pieces with the engine board; returns a list of problems
     audit() {
       const bad = [];

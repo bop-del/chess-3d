@@ -12,6 +12,18 @@ Built with three.js (0.186) and Vite. Everything is procedural: the geometry com
 
 ![Top down view](docs/topdown.jpg)
 
+## Openings
+
+The Openings card (right column on a computer, first card in the Menu sheet on a phone) teaches twelve classic opening lines: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
+
+Pick a line and the board turns to your side. You play your own moves on the board and the game plays the other side after a short pause. Every move comes with one sentence that says what it is for. Any other move is refused and the card tells you which move the line plays.
+
+- A gold marker shows the move you are about to play: a faint square where the piece stands, a strong square where it goes and an arrow between them. Hide the hint with the button on the card. The choice is kept in your browser.
+- Show me plays the next move for you, Back returns to your previous move, and at the end of a line Again starts it over or you can choose another line.
+- Leaving Openings starts a fresh ordinary game.
+
+The line texts, names and the card are written in English and German. The EN and DE switch sits in the left panel (at the top of the Menu sheet on a phone). The language defaults to the browser's language and your choice is stored in the browser, not in the link. In German the move list and the line texts use the German piece letters (K, D, T, L, S).
+
 ## Controls
 
 Mouse
@@ -127,7 +139,7 @@ Tests come in three tiers:
     node test/run.mjs smoke      # smoke, about a minute: build, serve, drive the real page in headless Chrome
     node tools/release-check.mjs # release: fresh build, page load, hostile URLs, docs and repo hygiene
 
-The smoke tier plays a scripted game with real pointer clicks (capture, castling, en passant, promotion, a mate, undo, the computer reply), moves each gimbal slider, checks the render budgets and checks the canvas pixels in every view preset. The browser tiers use puppeteer-core with a locally installed Google Chrome, which renders with a software GL in headless mode. For that reason there are no golden image comparisons: the pixels differ between machines. Look at the screenshots instead.
+The smoke tier plays a scripted game with real pointer clicks (capture, castling, en passant, promotion, a mate, undo, the computer reply), walks an opening line to its end, moves each gimbal slider, checks the render budgets and checks the canvas pixels in every view preset. The browser tiers use puppeteer-core with a locally installed Google Chrome, which renders with a software GL in headless mode. For that reason there are no golden image comparisons: the pixels differ between machines. Look at the screenshots instead.
 
 `node tools/audit-plan.mjs` lists which of these checks a change needs, from the files changed since the last release.
 
