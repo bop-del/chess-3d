@@ -28,6 +28,17 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   // piece flies to its tray in normal play (the battle lane wires the awaiting); 'move' is emitted after every move.
   let mode = 'play';
   const captureHooks = [];
+  // Battle scene in flight: { ctrl: AbortController, afterwards: [] } or null. While it is set the game is busy.
+  // CONTRACT (system agent, battle lane): a capture hook runs for every capture of a normal (animated, play mode) move and may
+  // be async. A hook with `stage === true` asks for a scene: the attacker then stops STAND short of the victim, the game waits
+  // for every hook, and only then the attacker steps onto the square and the victim flies to the tray. `hook.enabled()`
+  // (optional) says whether it wants this capture at all. Hooks get { attacker, victim, square, attackerObj, victimObj,
+  // attackerColor, victimColor, dir, signal }: the piece objects (use .group); dir is the unit vector from attacker to victim
+  // in gimbal space, always along z (-z when white attacks, +z when black), the attacker stands STAND short of the victim
+  // along it; signal aborts when undo, new game, load or a skip ends the scene early. Never called on undo, instant
+  // (scripted, loaded) moves or in explain mode.
+  let battle = null;
+  const STAND = 0.85;
   // Explain mode: the controller may refuse a move the player tries. guard({ from, to, promo, san }) returns true to allow it.
   let moveGuard = null;
 
@@ -77,20 +88,23 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     anims = keep.concat(anims);
   }
   function finishAnimations() {
+    cancelBattle();
     let guard = 0;
     while (anims.length && guard++ < 50) {
       const cur = anims; anims = [];
       for (const a of cur) { a.step(a.ease(1), 1); a.done?.(); }
     }
   }
-  const busy = () => anims.length > 0;
+  const busy = () => anims.length > 0 || !!battle;
 
   // ---------------------------------------------------------------- pieces
   let nextId = 1;
+  const hitGeo = new THREE.CylinderGeometry(0.4, 0.4, 1, 12), hitMat = new THREE.MeshBasicMaterial({ visible: false });
   function makePiece(type, color) {
     const group = pieceSet.make(type, color);
     const h = group.userData.height || 1.2;
-    const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, h, 12), new THREE.MeshBasicMaterial({ visible: false }));
+    const hit = new THREE.Mesh(hitGeo, hitMat);   // one shared unit cylinder, scaled to the piece height (no allocation per piece)
+    hit.scale.y = h;
     hit.position.y = h / 2;
     hit.userData.hit = true;
     group.add(hit);
@@ -214,6 +228,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     toppled = null;
   }
   function toppleKing(obj) {
+    if (battle) { battle.afterwards.push(() => toppleKing(obj)); return; }   // after the scene, not during it
     // tip the mated king over, hinging on the edge of its base
     const g = obj.group;
     const dir = obj.color === 'w' ? 1 : -1;
@@ -267,6 +282,37 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     });
   }
 
+  // ---------------------------------------------------------------- battle scenes
+  function captureInfo(rec, dir, signal) {
+    return {
+      attacker: rec.m.piece, victim: rec.captured.type, square: sqName(rec.capSq),
+      attackerObj: rec.piece, victimObj: rec.captured, attackerColor: rec.m.color, victimColor: rec.captured.color,
+      dir: dir || new THREE.Vector3(0, 0, -1), signal,
+    };
+  }
+  function callHooks(rec, b, dir) {
+    const info = captureInfo(rec, dir, b?.ctrl.signal);
+    return Promise.all(captureHooks.map(async (h) => {
+      if (h.enabled && !h.enabled()) return;
+      try { await h(info); } catch (e) { console.warn('capture hook failed', e); }
+    }));
+  }
+  function startBattle(b, dir) {
+    callHooks(b.rec, b, dir).then(() => { if (battle === b) resolveBattle(); });
+  }
+  // The scene is over (finished, skipped or cancelled): the attacker steps onto the square, the victim goes to its tray.
+  function resolveBattle() {
+    const b = battle;
+    if (!b) return;
+    battle = null;
+    b.ctrl.abort();                                   // anything still running stops; scenes clean up on this signal
+    const { rec, target, finishPromo } = b;
+    if (rec.captured) flyToTray(rec.captured, 0);
+    slide(rec.piece, target, { dur: 0.3, arc: 0.05, done: finishPromo });
+    b.afterwards.forEach((fn) => fn());
+  }
+  function cancelBattle() { if (battle) resolveBattle(); }
+
   function doMove(input, { instant = false } = {}) {
     const m = chess.play(input);
     if (!m) return null;
@@ -310,7 +356,15 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       tween({ dur: 0.5, ease: easeOutBack, step: (e) => { n.group.scale.setScalar(Math.max(0.01, e)); n.group.position.y = Math.sin(Math.PI * Math.min(1, e)) * 0.35; } });
     };
 
-    if (instant) {
+    const stage = !!rec.captured && !instant && mode === 'play' && captureHooks.some((h) => h.stage && (!h.enabled || h.enabled()));
+    if (stage) {
+      // the attacker stops short of the victim; the scene plays; resolveBattle() finishes the move
+      const V = new THREE.Vector3(sqX(rec.capSq), 0, sqZ(rec.capSq));
+      const dir = new THREE.Vector3(0, 0, m.color === 'w' ? -1 : 1);   // scenes stage every fight along the board's z axis, the attacker on its own side
+      const standAt = V.clone().addScaledVector(dir, -STAND);
+      const b = battle = { ctrl: new AbortController(), afterwards: [], rec, target, finishPromo };
+      slide(moving, standAt, { dur: dur * 0.8, arc: knight ? 1.0 : 0.12, done: () => { if (battle === b) startBattle(b, dir); } });
+    } else if (instant) {
       finishAnimations();
       if (rec.captured) { flyToTray(rec.captured, 0); }
       moving.group.position.copy(target);
@@ -319,6 +373,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       if (rec.promoNew) finishPromo();
       finishAnimations();
     } else {
+      if (rec.captured && !instant && mode === 'play') callHooks(rec, null);   // plain hooks (sound, say): no staging, no waiting
       slide(moving, target, { dur, arc: knight ? 1.0 : 0.12, done: finishPromo });
       if (rec.rook) slide(rec.rook, new THREE.Vector3(sqX(rec.rookTo), 0, sqZ(rec.rookTo)), { dur: dur * 0.9, delay: 0.05, arc: 0.1 });
       if (rec.captured) flyToTray(rec.captured, dur * 0.55);

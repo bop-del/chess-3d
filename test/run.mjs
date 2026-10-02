@@ -42,6 +42,7 @@ if (tier === 'fast' || tier === 'all') {
 if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((r) => r.ok))) {
   console.log('--- smoke tier (headless Chrome)');
   run('smoke (test/smoke.mjs)', 'test/smoke.mjs', rest, { show: true });
+  run('battle scenes: director, camera, settings (test/battle.mjs)', 'test/battle.mjs', [], { show: true });
 } else if (tier === 'all') console.log('--- smoke tier skipped because the fast tier failed');
 if (tier === 'phone') {
   console.log('--- phone tier (headless Chrome, phone sizes, real touch)');

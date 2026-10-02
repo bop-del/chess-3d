@@ -108,6 +108,12 @@ Rendering
 - Shadows, bloom, ambient occlusion (High tier), a vignette and grade pass, and a soft reflection of the pieces in the studio floor
 - Board gimbal on X, Y and Z, independent of the camera orbit. The floor fades out when the board is tilted far from level
 
+Battle scenes and sound
+
+- When a piece captures in a game, the camera swoops in and the two pieces fight it out in a short scene that suits the attacker (pawn, knight, bishop, rook, queen or king), about three seconds, then the victim goes to its tray
+- The Battle scenes setting (Scene card, or Menu on a phone) picks On, Short (about twice as fast) or Off; the choice is kept in your browser. A tap or any key skips a scene. Undo, New game and loaded positions never play one, nor does Openings
+- Synthesised sound for moves, captures, check and the battle scenes, made in the browser with no audio files. The Mute switch sits next to Battle scenes and is remembered; sound starts only after your first tap or key
+
 Limits: there is no network play. Two people share one screen (computer off), or you play the computer.
 
 Browser support: needs WebGL 2. The build targets Safari 15 and later, and current Chrome, Edge and Firefox. It was tested in Chrome only. If the script cannot start (an old browser, a failed download), the loading screen says so after 20 seconds instead of waiting forever.
@@ -152,7 +158,7 @@ The build uses relative asset paths (`base: './'`), so `dist/` can be hosted fro
 Tests come in four tiers:
 
     node test/run.mjs            # fast, no browser: rules perft, piece geometry contract, text lint (this is npm test)
-    node test/run.mjs smoke      # smoke, about a minute: build, serve, drive the real page in headless Chrome
+    node test/run.mjs smoke      # smoke, a few minutes: build, serve, drive the real page in headless Chrome, then the battle scenes (test/battle.mjs)
     node test/run.mjs phone      # phone, several minutes: phone sizes, tap target audit, real multi touch, the Add to Home Screen reminder
     node tools/release-check.mjs # release: fresh build, page load, hostile URLs, docs and repo hygiene
 

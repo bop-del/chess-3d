@@ -55,6 +55,8 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   for (const x of [-4, 4]) for (const z of [-4, 4]) for (const y of [-0.3, 2.0]) corners.push(new THREE.Vector3(y < 0 ? x * 1.16 : x, y, y < 0 ? z * 1.16 : z));   // the frame foot reaches 4.65
   for (const x of [-6.5, 6.5]) for (const z of [-1.5, 3.45]) for (const y of [-0.3, 1.2]) corners.push(new THREE.Vector3(x, y, z));
   const fTarget = new THREE.Vector3();
+  const cFwd = new THREE.Vector3(), cRight = new THREE.Vector3(), cUp = new THREE.Vector3(), cLook = new THREE.Vector3(), cBlend = new THREE.Vector3();
+  let cine = null;                              // battle close-up: { yaw, pitch, dist, target, k, tw }
   const gq = new THREE.Quaternion(), gEuler = new THREE.Euler(0, 0, 0, 'YXZ');
   const fRight = new THREE.Vector3(), fUp = new THREE.Vector3(), fFwd = new THREE.Vector3();
   const pts = corners.map(() => new THREE.Vector3());
@@ -102,7 +104,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   function apply() {
     cam.pitch = clamp(cam.pitch, limits.minPitch, limits.maxPitch);
     cam.dist = clamp(cam.dist, limits.minDist, limits.maxDist);
-    let d, look = target;
+    let d, look = target, yawV = cam.yaw, pitchV = cam.pitch;
     if (framed()) {
       const f = frameFit();
       d = f.d * cam.dist / FRAME_REF;
@@ -110,8 +112,30 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
       const k = cam.dist / FRAME_REF;
       look = fTarget.copy(target).addScaledVector(fRight, f.sx * k).addScaledVector(fUp, f.sy * k);
     } else d = cam.dist * fit();
-    const cp = Math.cos(cam.pitch);
-    camera.position.set(look.x + d * cp * Math.sin(cam.yaw), look.y + d * Math.sin(cam.pitch), look.z + d * cp * Math.cos(cam.yaw));
+    if (cine && cine.k > 0) {
+      // battle close-up: blend the normal pose towards the close-up pose. cam is never touched, so at k = 0 the view is exact.
+      const k = cine.k;
+      let cd = cine.dist, cl = cine.target;
+      const freeW = Math.max(40, size.w - frame.left - frame.right), freeH = Math.max(40, size.h - frame.top - frame.bottom);
+      cd *= Math.max(1, 0.75 / (freeW / freeH));                                  // narrow free areas pull the camera back
+      if (framed()) {
+        // put the close-up target in the middle of the free area instead of the middle of the screen
+        const cpc = Math.cos(cine.pitch), spc = Math.sin(cine.pitch);
+        cFwd.set(-cpc * Math.sin(cine.yaw), -spc, -cpc * Math.cos(cine.yaw));
+        cRight.set(Math.cos(cine.yaw), 0, -Math.sin(cine.yaw));
+        cUp.crossVectors(cRight, cFwd);
+        if (cUp.y < 0) cUp.negate();
+        const P = (size.h / 2) / TAN_HALF;
+        const ox = (frame.left - frame.right) / 2, oy = (frame.top - frame.bottom) / 2;
+        cl = cLook.copy(cl).addScaledVector(cRight, -ox * cd / P).addScaledVector(cUp, oy * cd / P);
+      }
+      yawV += wrapPi(cine.yaw - yawV) * k;
+      pitchV += (cine.pitch - pitchV) * k;
+      d += (cd - d) * k;
+      look = cBlend.copy(look).lerp(cl, k);
+    }
+    const cp = Math.cos(pitchV);
+    camera.position.set(look.x + d * cp * Math.sin(yawV), look.y + d * Math.sin(pitchV), look.z + d * cp * Math.cos(yawV));
     camera.lookAt(look);
     gimbal.rotation.set(gim.x, gim.y, gim.z, 'YXZ');
     // fade the floor as the board tilts away from horizontal
@@ -239,7 +263,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   }
   function onWheel(e) {
     e.preventDefault();
-    if (locked) return;
+    if (locked || cine) return;
     tw = null;
     const k = e.deltaMode === 1 ? 0.05 : 0.0012;
     cam.dist = clamp(cam.dist * Math.exp(e.deltaY * k), limits.minDist, limits.maxDist);
@@ -256,7 +280,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   const inField = (e) => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '');
   const hooks = {};
   function onKeyDown(e) {
-    if (e.metaKey || e.ctrlKey || e.altKey || inField(e)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || inField(e) || cine) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (['q', 'e', 'w', 's', 'a', 'd', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '_'].includes(k)) {
       keys.add(k); tw = null; e.preventDefault(); return;
@@ -310,7 +334,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
         vel.yaw *= damp; vel.pitch *= damp;
         dirty = true;
       }
-      if (spin) { cam.yaw += dt * 0.35; dirty = true; }
+      if (spin && !cine) { cam.yaw += dt * 0.35; dirty = true; }
     }
     if (keys.size) {
       const boost = 1;
@@ -329,6 +353,19 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
       if (keys.has('-') || keys.has('_')) cam.dist *= zoom;
       dirty = true;
     }
+    if (cine?.tw) {
+      const c = cine.tw;
+      c.t += dt;
+      const u = Math.min(1, c.t / c.dur);
+      cine.k = c.from + (c.to - c.from) * easeInOut(u);
+      dirty = true;
+      if (u >= 1) {
+        cine.tw = null;
+        cine.k = c.to;
+        if (c.to === 0) cine = null;
+        c.resolve();
+      }
+    }
     for (const a of ['x', 'y', 'z']) gim[a] = wrapPi(gim[a]);
     apply();
     if (dirty) notify();
@@ -344,10 +381,23 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     apply();
   }
 
-  // CONTRACT stubs (lead) for the Battle lane: a cinematic camera move to a close-up and back. The B system agent
-  // implements them; until then they resolve at once and change nothing.
-  function cinematic({ target, yaw, pitch, dist, dur = 0.6 } = {}) { return Promise.resolve(); }
-  function restore({ dur = 0.6 } = {}) { return Promise.resolve(); }
+  // Battle close-up. cinematic() swoops the camera to a pose around `target` (a point in gimbal space, so it follows the
+  // board) and resolves when it arrives; restore() glides back to wherever the normal camera is and resolves when the
+  // view is exactly the normal one again. The user's own camera state (cam, gimbal) is never changed in between.
+  // Orbit, wheel, keys and spin are ignored while a close-up is held, tw (a preset glide) is left running underneath.
+  const settleCine = () => { if (cine?.tw) { const r = cine.tw.resolve; cine.tw = null; r(); } };
+  function cinematic({ target: at, yaw = cam.yaw, pitch = 12 * DEG, dist = 7, dur = 0.6 } = {}) {
+    settleCine();
+    gq.setFromEuler(gEuler.set(gim.x, gim.y, gim.z, 'YXZ'));
+    const world = (at ? new THREE.Vector3(at.x, at.y, at.z) : new THREE.Vector3()).applyQuaternion(gq);
+    cine = { yaw, pitch: clamp(pitch, 0.5 * DEG, 89 * DEG), dist: Math.max(2, dist), target: world, k: cine ? cine.k : 0, tw: null };
+    return new Promise((resolve) => { cine.tw = { t: 0, dur: Math.max(0.001, dur), from: cine.k, to: 1, resolve }; });
+  }
+  function restore({ dur = 0.6 } = {}) {
+    if (!cine) return Promise.resolve();
+    settleCine();
+    return new Promise((resolve) => { cine.tw = { t: 0, dur: Math.max(0.001, dur), from: cine.k, to: 0, resolve }; });
+  }
 
   return {
     cinematic, restore,
@@ -360,7 +410,8 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     get spin() { return spin; },
     get camera() { return { yaw: cam.yaw, pitch: cam.pitch, dist: cam.dist }; },
     get gimbalDeg() { return { x: gim.x / DEG, y: gim.y / DEG, z: gim.z / DEG }; },
-    get animating() { return !!tw; },
+    get animating() { return !!tw || !!cine; },
+    get cinematicActive() { return !!cine; },
     dispose() {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);

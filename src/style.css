@@ -45,8 +45,8 @@ button, select, input { font: inherit; color: inherit; }
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; transition: opacity 0.35s ease; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
 #hud.hidden > .col, #hud.hidden > .help, #hud.hidden > .drawer-btn, #hud.hidden > .pstatus, #hud.hidden > .pbar { opacity: 0; pointer-events: none !important; transform: translateY(6px); }
 .col { position: absolute; top: max(14px, env(safe-area-inset-top)); bottom: max(14px, env(safe-area-inset-bottom)); width: clamp(224px, 17vw, 268px); display: flex; flex-direction: column; gap: 10px; transition: opacity 0.35s ease, transform 0.35s ease; }
-.col.left { left: max(14px, env(safe-area-inset-left)); }
-.col.right { right: max(14px, env(safe-area-inset-right)); }
+.col.left { left: max(14px, env(safe-area-inset-left)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.col.right { right: max(14px, env(safe-area-inset-right)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .card {
   pointer-events: auto; position: relative;
   background: var(--glass); border: 1px solid var(--line); border-radius: var(--r);
@@ -213,14 +213,14 @@ body.touch .lockrow { display: flex; }
 .tools { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 @media (max-width: 1100px) { .help { width: 236px; } }
 @media (max-width: 900px) {
-  .col.left { top: max(10px, env(safe-area-inset-top)); bottom: auto; left: 10px; right: 10px; width: auto; pointer-events: none; }
+  .col.left { top: max(10px, env(safe-area-inset-top)); bottom: auto; left: 10px; right: 10px; width: auto; pointer-events: none; overflow: visible; }
   .col.left .brand { padding: 10px 12px; margin-right: 92px; pointer-events: auto; }
   .col.left .brand-row { display: none; }
   .col.left .turn { margin-top: 0; }
   .tools { position: fixed; left: 10px; right: 10px; bottom: 176px; max-height: 50vh; overflow-y: auto; transform: translateY(16px); opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; padding-bottom: 2px; }
   .col.left.open .tools { transform: none; opacity: 1; pointer-events: auto; }
   .drawer-btn { display: block; top: max(10px, env(safe-area-inset-top)); right: 10px; left: auto; bottom: auto; height: 50px; border-radius: 16px; }
-  .col.right { top: auto; left: 10px; right: 10px; width: auto; bottom: max(10px, env(safe-area-inset-bottom)); max-height: 40vh; pointer-events: none; }
+  .col.right { top: auto; left: 10px; right: 10px; width: auto; bottom: max(10px, env(safe-area-inset-bottom)); max-height: 40vh; pointer-events: none; overflow: visible; }
   .col.right .card { pointer-events: auto; }
   .card.grow { max-height: 28vh; }
   .help { right: 10px; left: 10px; width: auto; bottom: 180px; }

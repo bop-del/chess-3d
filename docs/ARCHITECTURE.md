@@ -178,6 +178,20 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 
 Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal sliders, lighting and quality selects) and a right column (game buttons, computer opponent settings, SAN move list, captured pieces with the material balance). It also renders the promotion chooser (`#promo`), the game over banner (`#banner`), a toast for check (`#toast`) and the shortcut sheet. Below 900 px width the cards collapse and the left column becomes a sheet opened by the Controls button. On phones (`body.phone`, see device.js) `buildPhone()` adds a different HUD instead: a status line (`.pstatus`: turn, check, computer thinking, last move), a thumb bar (`.pbar`, buttons `.tb[data-act]`: Undo, New game with a confirm during a game, Flip, Views cycling to the next preset, Learn (opens the Learn sheet), Menu) at the bottom in portrait and on the right in landscape, and a bottom sheet (`.psheet` over `.pscrim`) with accordion sections Game, Moves, View and gimbal (with Lock view), Scene and Help. An invisible `.pframe` element marks the free area; its rectangle goes to `controls.setFrame`. Phones get lite glass (no backdrop blur). Tablets keep the desktop HUD with 44 px targets.
 
+### Battle scenes: `src/battle/director.js`, `settings.js`, the capture hook in `game.js`, `controls.cinematic`
+
+    createDirector({ game, controls, stage, ui }) -> { settings, update(dt), skip(), ready(), active }
+    createSettings({ ui }) -> { mode: 'on' | 'short' | 'off', set(partial), onChange(fn) }
+    game.onCapture(hook)          // hook(info) may be async; hook.stage = true asks for a scene, hook.enabled() = false opts out
+    controls.cinematic({ target, yaw, pitch, dist, dur }) -> Promise   // swoop to a close-up; target is in gimbal space
+    controls.restore({ dur }) -> Promise                              // glide back; the normal camera state is never changed
+
+- Every capture of a normal move (animated, play mode) calls the capture hooks. Not called on undo, loaded positions, scripted URL moves (`playMoves`, instant) or in explain mode. With a staging hook enabled the attacker stops 0.85 short of the victim along the z axis (towards the victim, so -z when white attacks), the game is busy until every hook has finished, then the attacker steps onto the square and the victim flies to its tray. Undo, new game and load cancel a running scene (the hook's `signal` aborts) and the state settles at once.
+- The director runs one scene at a time: it loads the scene module for the attacker (`scenes/<pawn|knight|bishop|rook|queen|king>.js`, default export `{ attacker, cam?, run(ctx) }`) and `fx.js` and `sfx.js` lazily, swoops the camera to a low close-up across the fight, runs the scene, restores every transform and attachment on both pieces, disposes the fx and sends the camera back. A tap or any key skips (aborts `ctx.signal`). A scene longer than 6 s of scene time is skipped. Short runs the scene clock 3 times faster. Until a scene module exists a built in lunge and tumble plays.
+- `ctx` has `stage, attackerObj, victimObj` (the game's piece objects: use `.group`), `square, short, fx, sfx, signal, dir, center, root, gimbal`, and a scene clock: `time()`, `wait(s)`, `tween({ dur, delay, ease, step(e, u) })`, `onFrame(fn(dt, t))`. `wait` and `tween` never resolve after an abort, so a skipped scene just stops.
+- The camera close-up blends the normal pose towards the close-up in `controls.apply` (`cine.k` from 0 to 1) instead of changing yaw, pitch and distance, so the way back is exact. On phones the target is centred in the free area, narrow views pull back. Orbit, wheel, keys and spin are ignored while it is held.
+- Scenes are promise driven. Tests use `__chess.stepAsync(seconds)` (awaited, gives the event loop a turn per slice) instead of `__chess.step` wherever a scene may play, and `__chess.battle.ready()` to have every module loaded.
+
 ### `src/openings/explain.js`, `explain-panel.js`, `arrow.js`
 
 Explain mode: walk one of the starter lines on the 3D board.
@@ -230,7 +244,7 @@ Imported by `main.js` only for exactly `?diag=1` (right after `window.__chess` i
 
 ## Test hooks
 
-`window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game and board by simulated time, and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
+`window.__chess = { stage, gimbal, board, game, controls, ui, battle, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
 
 `window.__chessReady` becomes `true` once loading is done and `window.__chessError` holds a message if loading failed.
 

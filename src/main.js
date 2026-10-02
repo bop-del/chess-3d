@@ -38,10 +38,10 @@ window.addEventListener('unhandledrejection', (e) => fail(e.reason));
 async function boot() {
   progress(0.02, 'Loading modules');
   await tick();
-  const [{ createStage }, { createBoard }, { createPieceMaterials }, { createPieceSet }, { createGame }, { createControls }, { createUI }] =
+  const [{ createStage }, { createBoard }, { createPieceMaterials }, { createPieceSet }, { createGame }, { createControls }, { createUI }, { createDirector }, { sfx }, { audio }] =
     await Promise.all([
       import('./scene.js'), import('./board.js'), import('./materials.js'),
-      import('./pieceset.js'), import('./game.js'), import('./controls.js'), import('./ui.js'),
+      import('./pieceset.js'), import('./game.js'), import('./controls.js'), import('./ui.js'), import('./battle/director.js'), import('./battle/sfx.js'), import('./audio.js'),
     ]);
   progress(0.1, 'Preparing the studio');
   await tick();
@@ -94,6 +94,9 @@ async function boot() {
     },
   });
   const ui = createUI({ game, controls, stage, quality });
+  const battle = createDirector({ game, controls, stage, ui });
+  sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
+  audio.mountMute(ui);     // the mute switch, right below the Battle scenes setting
   // Openings (Explain mode): its own panel in the HUD, its own hint marks on the board, ticked with the frame
   const [{ mountExplain }, { createStore }, { createSweep }, { createDrill }, { mountDrillPanel }, { mountLearn }] = await Promise.all([
     import('./openings/explain-panel.js'), import('./train/store.js'), import('./train/sweep.js'),
@@ -131,7 +134,7 @@ async function boot() {
   // scripted states for testing and screenshots
   applyParams({ game, controls, stage, ui });
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick, openings, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
@@ -143,7 +146,7 @@ async function boot() {
     upLocal.set(0, 1, 0).applyQuaternion(stage.camera.quaternion).applyQuaternion(gimbalInv.copy(gimbal.quaternion).invert());
     board.orientLabels(upLocal);
   };
-  const advance = (dt) => { t += dt; controls.update(dt); game.update(dt); openings.tick(dt); drill.tick(dt); sweep.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  const advance = (dt) => { t += dt; controls.update(dt); game.update(dt); battle.update(dt); openings.tick(dt); drill.tick(dt); sweep.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
@@ -154,6 +157,12 @@ async function boot() {
   if (params.get('manual') === '1') {
     // deterministic mode for automated tests: no loop, caller steps time and draws
     window.__chess.step = (seconds, hz = 30) => { const n = Math.max(1, Math.round(seconds * hz)); for (let i = 0; i < n; i++) advance(1 / hz); };
+    // like step, but gives the event loop a turn after every slice: battle scenes are promise driven and load modules on
+    // demand, so a synchronous step loop would never let them start. Use this (awaited) wherever a scene may play.
+    window.__chess.stepAsync = async (seconds, hz = 30) => {
+      const n = Math.max(1, Math.round(seconds * hz));
+      for (let i = 0; i < n; i++) { advance(1 / hz); await new Promise((r) => setTimeout(r, 0)); }
+    };
     window.__chess.draw = (dt = 0.016) => { orientLabels(); stage.render(dt); stage.render(dt); };
     window.__chess.draw();
   } else requestAnimationFrame(frame);

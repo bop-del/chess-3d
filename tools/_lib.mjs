@@ -3,7 +3,7 @@
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
 //   launchBrowser(opts)      headless Chrome through puppeteer-core with software GL (swiftshader), so it runs anywhere.
 //                            Waits for a machine wide slot first: two always, three under load 10, four under load 6.
-//   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted)
+//   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted); sets Battle scenes Off for the page unless { scenes: true }
 //   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers
 //   build(outDir)            vite build into outDir (inside a folder, never touches dist/)
 // Exit codes used by the tools: 0 pass (warnings allowed), 1 a check failed, 2 usage or setup error.
@@ -81,8 +81,11 @@ export async function launchBrowser({ w = 1280, h = 720, args = [] } = {}) {
 }
 
 /** Attach collectors to a page. Requests to hosts other than the given ones are recorded and aborted. */
-export async function watchPage(page, hosts = ['127.0.0.1', 'localhost']) {
+export async function watchPage(page, hosts = ['127.0.0.1', 'localhost'], { scenes = false } = {}) {
   const w = { errs: [], warns: [], foreign: [] };
+  // Battle scenes are promise driven and take game time: tests of rules and layout play with them Off unless the page
+  // already has a stored choice. Pass { scenes: true } to keep the app default (On).
+  if (!scenes) await page.evaluateOnNewDocument(() => { try { if (!localStorage.getItem('chess3d.battle')) localStorage.setItem('chess3d.battle', '{"mode":"off","style":"gore"}'); } catch (e) { /* ignore */ } });
   page.on('console', (m) => {
     if (m.type() === 'error') w.errs.push('console: ' + m.text().slice(0, 200));
     else if (m.type() === 'warning') w.warns.push(m.text().slice(0, 200));
