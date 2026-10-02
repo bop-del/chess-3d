@@ -36,11 +36,11 @@ export function createPieceSet(materials) {
   }
 
   return {
-    // Returns a fresh Group: outer wrapper (game owns position/scale), inner clone (black rotated by PI).
+    // Returns a fresh Group: outer wrapper (game owns position/scale), inner clone (black rotated by PI, except knights, which the game turns by file).
     make(type, color) {
       const wrap = new THREE.Group();
       const inner = proto(type, color).clone(true);
-      inner.rotation.y = color === 'b' ? Math.PI : 0;
+      inner.rotation.y = color === 'b' && type !== 'n' ? Math.PI : 0;
       wrap.add(inner);
       wrap.name = `${color}${type}`;
       wrap.userData.piece = { type, color };

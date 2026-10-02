@@ -218,7 +218,7 @@ export function buildBishop(mat) {
   m.arc(0, 1.302, 0.048, -Math.acos(0.028 / 0.048), PI / 2, 9);   // finial ball
   const alpha = 0.62, yc = 1.0, sa = Math.sin(alpha), ca = Math.cos(alpha);
   const W = 0.0235, D = 0.05;
-  const mitre = lathe(m, 224, {
+  const mitre = lathe(m, 240, {
     flipFront: true,
     displace: (x, y, z, r) => {
       if (y < 0.88 || y > 1.14 || r < 0.05) return 0;
@@ -226,7 +226,7 @@ export function buildBishop(mat) {
       if (dist > W) return 0;
       const g = sstep(0.2, 0.7, Math.abs(z) / r);                  // slit on both faces (-z and +z)
       if (g <= 0) return 0;
-      const s = 1 - sstep(0.3 * W, W, dist);
+      const s = 1 - sstep(0.0, W, dist);               // rounded groove, a wall the grid can resolve
       return D * g * s * (r / 0.17);
     },
   });

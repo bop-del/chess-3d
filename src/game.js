@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { Chess, START_FEN, sqName, nameSq } from './rules.js';
 import { searchMove } from './ai.js';
+import { device } from './device.js';
 
 export * from './rules.js';
 
@@ -11,6 +12,8 @@ const sqZ = (sq) => 3.5 - (sq >> 3);
 const easeInOut = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
 const easeOut = (u) => 1 - Math.pow(1 - u, 3);
 const easeOutBack = (u) => { const c = 1.70158; return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2); };
+// A finger is wider than a square edge: on touch, a tap that misses every legal target counts for the closest one within this distance.
+const FORGIVE = 0.6;
 const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
 export function createGame({ gimbal, board, pieceSet, materials }) {
@@ -89,8 +92,14 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     hit.userData.pieceObj = obj;
     return obj;
   }
+  // Knights look sideways along their rank toward the board centre: files a to d face +x, e to h face -x.
+  const faceAngle = (x) => (x < 0 ? -Math.PI / 2 : Math.PI / 2);
+  function setFacing(obj, x) {
+    if (obj.type === 'n') obj.group.children[0].rotation.y = faceAngle(x);
+  }
   function place(obj, sq) {
     obj.sq = sq;
+    setFacing(obj, sqX(sq));
     obj.group.position.set(sqX(sq), 0, sqZ(sq));
     obj.group.scale.setScalar(1);
     obj.group.rotation.set(0, 0, 0);
@@ -218,12 +227,16 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   // ---------------------------------------------------------------- moves
   function slide(obj, to, { dur, delay = 0, arc = 0.12, done }) {
     const from = obj.group.position.clone();
+    const inner = obj.type === 'n' ? obj.group.children[0] : null;
+    const a0 = inner ? inner.rotation.y : 0;
+    const da = inner ? Math.atan2(Math.sin(faceAngle(to.x) - a0), Math.cos(faceAngle(to.x) - a0)) : 0;
     tween({
       dur, delay,
       step: (e) => {
         const p = obj.group.position;
         p.lerpVectors(from, to, e);
         p.y = from.y + (to.y - from.y) * e + Math.sin(Math.PI * e) * arc;
+        if (inner) inner.rotation.y = a0 + da * e;
       },
       done,
     });
@@ -285,6 +298,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       moving.group.parent?.remove(moving.group);
       const n = rec.promoNew;
       n.group.position.copy(target);
+      setFacing(n, target.x);
       root.add(n.group);
       n.group.scale.setScalar(0.01);
       tween({ dur: 0.5, ease: easeOutBack, step: (e) => { n.group.scale.setScalar(Math.max(0.01, e)); n.group.position.y = Math.sin(Math.PI * Math.min(1, e)) * 0.35; } });
@@ -294,6 +308,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       finishAnimations();
       if (rec.captured) { flyToTray(rec.captured, 0); }
       moving.group.position.copy(target);
+      setFacing(moving, target.x);
       if (rec.rook) rec.rook.group.position.set(sqX(rec.rookTo), 0, sqZ(rec.rookTo));
       if (rec.promoNew) finishPromo();
       finishAnimations();
@@ -325,13 +340,14 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       mover = rec.promoPawn;
       mover.group.position.set(sqX(m.to), 0, sqZ(m.to));
       mover.group.scale.setScalar(1);
+      setFacing(mover, sqX(m.to));
       root.add(mover.group);
     } else map.delete(m.to);
     mover.sq = m.from;
     map.set(m.from, mover);
 
     if (animate) slide(mover, home, { dur, arc: m.piece === 'n' ? 0.9 : 0.1 });
-    else mover.group.position.copy(home);
+    else { mover.group.position.copy(home); setFacing(mover, home.x); }
 
     if (rec.rook) {
       map.delete(rec.rookTo); map.set(rec.rookFrom, rec.rook); rec.rook.sq = rec.rookFrom;
@@ -345,6 +361,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       c.trayIndex = -1; c.sq = rec.capSq;
       map.set(rec.capSq, c);
       const cp = new THREE.Vector3(sqX(rec.capSq), 0, sqZ(rec.capSq));
+      setFacing(c, cp.x);
       if (animate) {
         const from = c.group.position.clone();
         tween({
@@ -472,9 +489,31 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       const s = h.object.userData.square;
       if (s) { hits.push({ d: h.distance, sq: s.rank * 8 + s.file }); break; }
     }
-    if (!hits.length) return -1;
     hits.sort((x, y) => x.d - y.d);
-    return hits[0].sq;
+    const sq = hits.length ? hits[0].sq : -1;
+    return device.touch ? forgive(raycaster, sq) : sq;
+  }
+
+  // Forgiving taps (touch only): with a piece selected, a tap that did not land on a legal target, nor on another piece of the
+  // mover's own colour (that reselects), goes to the nearest legal target on the board plane if one is within FORGIVE squares.
+  const fRay = new THREE.Ray(), fInv = new THREE.Matrix4();
+  function forgive(raycaster, sq) {
+    if (selected < 0 || busy() || pendingPromo || gameOver || search) return sq;
+    if (legal.some((m) => m.from === selected && m.to === sq)) return sq;
+    if (sq >= 0 && sq !== selected && map.get(sq)?.color === chess.turn) return sq;
+    root.updateWorldMatrix(true, false);
+    fRay.copy(raycaster.ray).applyMatrix4(fInv.copy(root.matrixWorld).invert());
+    if (Math.abs(fRay.direction.y) < 1e-6) return sq;
+    const t = -fRay.origin.y / fRay.direction.y;
+    if (t < 0) return sq;
+    const x = fRay.origin.x + fRay.direction.x * t, z = fRay.origin.z + fRay.direction.z * t;
+    let best = sq, bd = FORGIVE;
+    for (const m of legal) {
+      if (m.from !== selected) continue;
+      const d = Math.hypot(x - sqX(m.to), z - sqZ(m.to));
+      if (d < bd) { bd = d; best = m.to; }
+    }
+    return best;
   }
 
   // Cheap hover test (proxies and squares only): is there something clickable under the ray?

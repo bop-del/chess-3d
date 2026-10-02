@@ -557,6 +557,8 @@ function orientRing(pos, normal, radius, tube) {
   return g;
 }
 
+const HEAD_DEPTH = 0.72, HEAD_SHIFT = 0.04;
+
 export function buildKnight(mat) {
   const R = 0.30;
   const baseKnots = [
@@ -573,7 +575,7 @@ export function buildKnight(mat) {
 
   // eyes and nostrils
   const darkGeos = [];
-  const accentGeos = [baseRing];
+  const accentGeos = [];
   for (const e of head.eyes) {
     const eye = new THREE.SphereGeometry(0.0235, 28, 20);
     eye.scale(1, 0.92, 1);
@@ -596,9 +598,15 @@ export function buildKnight(mat) {
   const g = new THREE.Group();
   g.name = 'knight';
   g.add(mesh(base, mat.body));
-  g.add(mesh(bodyGeo, mat.body));
-  g.add(mesh(mergeGeometries(accentGeos), mat.accent));
-  g.add(mesh(mergeGeometries(darkGeos), getDarkMaterial()));
+  g.add(mesh(baseRing, mat.accent));
+  // The knight faces sideways, so the head is squeezed front to back until nose and mane stay inside the base circle.
+  const headGroup = new THREE.Group();
+  headGroup.scale.z = HEAD_DEPTH;
+  headGroup.position.z = HEAD_SHIFT;
+  headGroup.add(mesh(bodyGeo, mat.body));
+  headGroup.add(mesh(mergeGeometries(accentGeos), mat.accent));
+  headGroup.add(mesh(mergeGeometries(darkGeos), getDarkMaterial()));
+  g.add(headGroup);
   return g;
 }
 
