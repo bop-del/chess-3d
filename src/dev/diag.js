@@ -53,7 +53,7 @@ export function initDiag({ stage }) {
     const info = renderer.info.render;
     const touch = device.touch ? `touch${device.phone ? ' phone' : ''}${device.ios ? ' ios' : ''}${device.standalone ? ' standalone' : ''}` : 'pointer';
     return {
-      short: `${avg ? (1000 / avg).toFixed(0) : '0'} fps  p95 ${pct(s, 0.95).toFixed(0)}ms  ${stage.quality}`,
+      short: `${avg ? (1000 / avg).toFixed(0) : '0'} fps  p95 ${pct(s, 0.95).toFixed(0)}ms  ${stage.quality}${window.__chessBoot?.first ? `  start ${(window.__chessBoot.first / 1000).toFixed(1)}s` : ''}`,
       full: [
         `fps: ${avg ? (1000 / avg).toFixed(1) : '0'}`,
         `frame ms: p50 ${pct(s, 0.5).toFixed(1)}  p95 ${pct(s, 0.95).toFixed(1)}  max ${pct(s, 1).toFixed(0)}`,
@@ -63,8 +63,16 @@ export function initDiag({ stage }) {
         `draw: ${info.calls} calls  ${(info.triangles / 1000).toFixed(0)}k tris`,
         `gpu mem: ~${estimateMB().toFixed(0)} MB (est.)`,
         `input: ${touch}`,
+        bootLine(),
       ].join('\n'),
     };
+  }
+
+  // start timings recorded by main.js (ms since navigation): pieces built, first frame shown, first render (shader compile)
+  function bootLine() {
+    const b = window.__chessBoot;
+    if (!b || !b.first) return 'start: measuring';
+    return `start: pieces ${(b.pieces / 1000).toFixed(1)}s  first frame ${(b.first / 1000).toFixed(1)}s  (render ${(b.render / 1000).toFixed(1)}s, ${b.programs} programs)`;
   }
 
   function draw() {

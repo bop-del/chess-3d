@@ -64,6 +64,7 @@ async function boot() {
 
   const pieceSet = createPieceSet(materials);
   await pieceSet.buildAll((f, msg) => progress(0.4 + f * 0.52, msg));
+  const boot = window.__chessBoot = { pieces: performance.now() };   // start timings for ?diag=1, ms since navigation
   progress(0.94, 'Setting up the game');
   await tick();
 
@@ -151,7 +152,12 @@ async function boot() {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     advance(dt);
-    stage.render(dt);
+    if (!boot.first) {
+      // the first render compiles every shader program: time it on its own
+      const a = performance.now();
+      stage.render(dt);
+      boot.render = performance.now() - a; boot.first = performance.now(); boot.programs = stage.renderer.info.programs?.length || 0;
+    } else stage.render(dt);
     requestAnimationFrame(frame);
   }
   if (params.get('manual') === '1') {
