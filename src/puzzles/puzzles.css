@@ -1,0 +1,20 @@
+/* Puzzles tab and panel. Builds on the Explain and Drill classes (explain.css); colours come from the HUD tokens. */
+.pztheme { font-size: 16px; }
+.pzsay[data-kind="wrong"] { color: #ffcfa8; }
+.pzsay[data-kind="solved"] { color: var(--gold); font-weight: 600; }
+.pzband { text-transform: none; }
+.pzbandline { display: flex; justify-content: space-between; align-items: baseline; margin: 2px 0 6px; color: var(--dim); font-size: 13px; }
+.pzbandline b { color: var(--gold); font-weight: 600; }
+.pzstart, .pznext { width: 100%; min-height: 52px; font-size: 17px; }
+.pzhelp { width: 100%; }
+/* the strip is shorter than the Drill one: no long sentence, so the camera frame follows --ph */
+body.phone.puzzling .pframe { top: calc(var(--st) + var(--stat) + var(--gap) * 2 + var(--ph, 0px)); }
+body.phone .pzstrip .pzhelp, body.phone .pzstrip .pznext { min-height: 48px; }
+/* phone landscape is short: one row (theme, message, Help, close) so the board keeps the room */
+body.phone:not(.portrait) .pzstrip .xwalk { flex-direction: row; align-items: center; gap: 10px; }
+body.phone:not(.portrait) .pzstrip .xhead { display: contents; }
+body.phone:not(.portrait) .pzstrip .xtitle { order: 1; flex: none; }
+body.phone:not(.portrait) .pzstrip .xtext { order: 2; flex: 1; min-width: 0; max-height: none; font-size: 13px; }
+body.phone:not(.portrait) .pzstrip .xrow { order: 3; flex: none; width: 128px; }
+body.phone:not(.portrait) .pzstrip .xclose { order: 4; flex: none; }
+body.phone:not(.portrait) .pzstrip { padding: 6px 10px; }

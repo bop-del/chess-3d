@@ -3,6 +3,7 @@
 // sit in the openings card while no line runs (the explain panel swaps the card to the walking UI during a line).
 // Every string goes through t(); German strings are in strings.js. The line texts come in { en, de } pairs.
 import './strings.js';
+import { puzzlesTab } from '../puzzles/panel.js';
 import * as I18N from '../i18n.js';
 import './learn.css';
 
@@ -16,9 +17,9 @@ const el = (tag, cls, text) => {
 };
 const pick = (pair) => (pair ? pair[i18n.language] || pair.en || '' : '');
 const sideLabel = (l) => t(l.side === 'w' ? 'explain.forWhite' : 'explain.forBlack', l.side === 'w' ? 'You play White' : 'You play Black');
-const TABS = ['openings', 'mine', 'practise'];
+const TABS = ['openings', 'mine', 'practise', 'puzzles'];
 
-export function mountLearn({ ui, openings, store, drill }) {
+export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress }) {
   const { explain, idle } = openings;
   const sheet = ui.learnSheet;                 // null on desktop
   if (sheet) sheet.body.append(idle);
@@ -37,6 +38,7 @@ export function mountLearn({ ui, openings, store, drill }) {
   // A line starts: whatever else runs on the board gives way first.
   function leaveOthers() {
     if (drill.state().phase !== 'idle') drill.stop();
+    if (puzzles.state().phase !== 'idle') puzzles.stop();
   }
   function walk(id) {
     leaveOthers();
@@ -83,6 +85,7 @@ export function mountLearn({ ui, openings, store, drill }) {
       b.append(nameLine(line, false), el('span', 'xside', sideLabel(line)), el('span', 'xidea', pick(line.idea)));
       b.addEventListener('click', () => {
         if (explain.state().phase !== 'list') explain.stop();
+        if (puzzles.state().phase !== 'idle') puzzles.stop();
         if (drill.startPractise(line.id)) closeSheet();
       });
     }
@@ -129,6 +132,7 @@ export function mountLearn({ ui, openings, store, drill }) {
     if (due && !practiseLines) {
       box.append(button(t('learn.practiseStart', 'Start practising'), 'primary xstart', () => {
         if (explain.state().phase !== 'list') explain.stop();
+        if (puzzles.state().phase !== 'idle') puzzles.stop();
         if (drill.startDue()) closeSheet();
         else { practiseLines = true; render(); }
       }));
@@ -141,6 +145,17 @@ export function mountLearn({ ui, openings, store, drill }) {
     return box;
   }
 
+  function puzzlesView() {
+    return puzzlesTab({
+      puzzles, progress: puzzleProgress,
+      onStart() {
+        if (explain.state().phase !== 'list') explain.stop();
+        if (drill.state().phase !== 'idle') drill.stop();
+        closeSheet();
+      },
+    });
+  }
+
   function render() {
     if (!store.everAdopted() && tab === 'practise') tab = 'openings';
     if (tab !== 'mine') editing = false;
@@ -150,7 +165,7 @@ export function mountLearn({ ui, openings, store, drill }) {
     tabs.setAttribute('aria-label', t('learn.tabs', 'Learn'));
     for (const id of TABS) {
       const locked = id === 'practise' && !store.everAdopted();
-      const b = el('button', 'xtab', t(`learn.tab.${id}`, { openings: 'Openings', mine: 'Mine', practise: 'Practise' }[id]));
+      const b = el('button', 'xtab', t(`learn.tab.${id}`, { openings: 'Openings', mine: 'Mine', practise: 'Practise', puzzles: 'Puzzles' }[id]));
       b.type = 'button';
       b.setAttribute('role', 'tab');
       b.dataset.tab = id;
@@ -159,7 +174,7 @@ export function mountLearn({ ui, openings, store, drill }) {
       b.addEventListener('click', () => { tab = id; render(); });
       tabs.append(b);
     }
-    const view = tab === 'mine' ? mineView() : tab === 'practise' ? practiseView() : openingsView();
+    const view = tab === 'mine' ? mineView() : tab === 'practise' ? practiseView() : tab === 'puzzles' ? puzzlesView() : openingsView();
     view.setAttribute('role', 'tabpanel');
     idle.replaceChildren(tabs, view);
   }
@@ -167,6 +182,8 @@ export function mountLearn({ ui, openings, store, drill }) {
   store.onChange(render);
   explain.on((s) => { if (s.phase === 'list') render(); });
   drill.on((s) => { if (s.phase === 'idle') render(); });
+  puzzles.on((s) => { if (s.phase === 'idle') render(); });
+  puzzleProgress.onChange(() => { if (puzzles.state().phase === 'idle') render(); });
   onLanguage(render);
   render();
 

@@ -97,7 +97,7 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
     await snap(page, 'learn-practise-running');
     await page.evaluate(() => window.__chess.train.drill.stop());
     await step(page, 0.3);
-    ok('learn: stopping the run restores the tabs', (await count(page, '.xtab')) === 3 && lvl.length > 0);
+    ok('learn: stopping the run restores the tabs', (await count(page, '.xtab')) === 4 && lvl.length > 0);
 
     // due cards: one button
     await page.evaluate(() => { const st = window.__chess.train.store; const s = JSON.parse(st.exportJSON()); for (const c of Object.values(s.cards)) c.due = 0; st.importJSON(JSON.stringify(s)); });
@@ -169,7 +169,7 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
       await pp.evaluate(() => document.querySelector('.tb[data-act="learn"]').click());
       await pp.waitForFunction(() => document.querySelector('.plearn').getBoundingClientRect().top < innerHeight, { timeout: 10000 }).catch(() => {});
       await new Promise((r) => setTimeout(r, 450));
-      ok(`learn ${tag}: the Learn button opens the sheet with three tabs`, (await pp.evaluate(() => document.querySelector('.plearn').classList.contains('open'))) && (await count(pp, '.plearn .xtab')) === 3);
+      ok(`learn ${tag}: the Learn button opens the sheet with four tabs`, (await pp.evaluate(() => document.querySelector('.plearn').classList.contains('open'))) && (await count(pp, '.plearn .xtab')) === 4);
       const sb = await visibleBox(pp, '.plearn');
       ok(`learn ${tag}: the sheet fits the screen`, sb && sb.y >= -0.5 && sb.y + sb.h <= h + 0.5 && sb.x >= -0.5 && sb.x + sb.w <= w + 0.5, JSON.stringify(sb));
       const tabsOk = await pp.evaluate(() => [...document.querySelectorAll('.plearn .xtab, .plearn .xline')].every((e) => e.getBoundingClientRect().height >= 43.5));

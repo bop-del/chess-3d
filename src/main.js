@@ -105,13 +105,22 @@ async function boot() {
     import('./openings/explain-panel.js'), import('./train/store.js'), import('./train/sweep.js'),
     import('./train/drill.js'), import('./train/drill-panel.js'), import('./learn/learn.js'),
   ]);
+  const [{ createPuzzles }, { createPuzzleProgress }, { PUZZLES }, { mountPuzzlesPanel }] = await Promise.all([
+    import('./puzzles/controller.js'), import('./puzzles/progress.js'), import('./puzzles/data.js'), import('./puzzles/panel.js'),
+  ]);
   // Train and Learn: the store (localStorage), the gold sweep, the drill, and the Learn UI over them
   const store = createStore({});
   const sweep = createSweep({ gimbal, stage });
   const openings = mountExplain({ game, controls, ui, gimbal, store, sweep });
   const drill = createDrill({ game, hint: openings.hint, store, sweep, onSide: openings.onSide });
   mountDrillPanel({ drill, ui });
-  const learn = mountLearn({ ui, openings, store, drill });
+  // Puzzles: the controller shares the Openings hint arrow (one arrow on the board at a time) and the gold sweep
+  let puzzleStore = null;
+  try { puzzleStore = window.localStorage; } catch (e) { /* storage blocked: progress lives for the session */ }
+  const puzzleProgress = createPuzzleProgress({ storage: puzzleStore, puzzles: PUZZLES });
+  const puzzles = createPuzzles({ game, hint: openings.hint, sweep, progress: puzzleProgress, onSide: openings.onSide });
+  mountPuzzlesPanel({ puzzles, ui });
+  const learn = mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress });
   // Good move?: one good move shown with its own arrow (it does not follow the Explain hint switch)
   const [{ createGoodMove }, { createHint }] = await Promise.all([import('./goodmove.js'), import('./openings/arrow.js')]);
   const goodMove = createGoodMove({ game, hint: createHint({ gimbal, persist: false }) });
@@ -141,7 +150,7 @@ async function boot() {
   // scripted states for testing and screenshots
   applyParams({ game, controls, stage, ui });
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, goodMove, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, puzzles, puzzleProgress, goodMove, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
@@ -153,7 +162,7 @@ async function boot() {
     upLocal.set(0, 1, 0).applyQuaternion(stage.camera.quaternion).applyQuaternion(gimbalInv.copy(gimbal.quaternion).invert());
     board.orientLabels(upLocal);
   };
-  const advance = (dt) => { t += dt; controls.update(dt); game.update(dt); battle.update(dt); openings.tick(dt); drill.tick(dt); sweep.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  const advance = (dt) => { t += dt; controls.update(dt); game.update(dt); battle.update(dt); openings.tick(dt); drill.tick(dt); puzzles.tick(dt); sweep.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;

@@ -70,6 +70,12 @@ A shot counts as `changed` when its size differs or more than 0.05% of its pixel
 
 Git hygiene (clean tree, no scratch or key files, no file over 1.5 MB outside `docs/`, optional `tools/internal-terms.txt` with one word or regular expression per line, no em dashes or double hyphens in text or commit messages since the last tag), fresh copy of HEAD built with `npm ci`, dist scanned for local paths, user names and keys, normal pages loaded without console errors or foreign requests, URL fuzzing of every flag in `src/main.js`, README and `docs/*.md` checked against the code and the repo, version compared with the last tag. The page loads (normal pages, hostile URLs, sub path) run in `--tabs=N` tabs of one browser (default 3). Gains need a quiet machine: one page load spends about 3.4 s building the piece geometry on one thread. Before the first commit it copies the working tree instead of HEAD and says so.
 
+## Puzzle data
+
+`node tools/build-puzzles.mjs [--csv=<file.csv|file.csv.zst>] [--per-band=100] [--out=src/puzzles/data.js]`
+
+Writes `src/puzzles/data.js` from the Lichess puzzle database (CC0). Without `--csv` it downloads `lichess_db_puzzle.csv.zst` (about 300 MB) once to `.tmp/data/` (gitignored) and reuses it; `.zst` files need `zstd` on the PATH. The CSV is streamed, never committed. Filters: rating 400 to 1000 in three bands (starter 400 to 599, growing 600 to 799, tricky 800 to 1000), popularity 90 or more, 500 plays or more, themes mateIn1, mateIn2, hangingPiece or fork, one to three own moves. Per band the picks follow a theme mix (30% mate1, 25% mate2, 25% hanging, 20% fork), most popular first. Every pick is replayed on `src/rules.js`: all moves legal, mate themes end in checkmate, hanging and fork puzzles win material. The output is deterministic for one CSV, so a rerun gives the same file. Each entry is `{ id, fen, moves, theme, rating, band }`: `fen` is the position before the opponent's last move and `moves[0]` is that move (UCI), then the player's solution alternates with the replies. `test/puzzles-data.mjs` (fast tier) checks the shipped file.
+
 ## URL flags used by the tests
 
 `quality=low|medium|high`, `touch=1|0`, `manual=1` (no render loop, tests call `window.__chess.step(sec)` and `.draw()`), `ai=0` (computer off; default is on, you play white; `ai=3` or `ai=4` raises the level), `fen`, `moves`, `select`, `preset`, `gx` `gy` `gz`, `yaw` `pitch` `dist`, `hud=0`, `help=1`, `light`, `spin=1`, `promo`, `diag=1` (diagnostics overlay).
@@ -78,5 +84,6 @@ Git hygiene (clean tree, no scratch or key files, no file over 1.5 MB outside `d
 
 - `_lib.mjs`: shared reporter, Chrome launcher, page watcher, server starter.
 - `budgets.json`: render budgets for the smoke tier.
+- `build-puzzles.mjs`: builds `src/puzzles/data.js` (see Puzzle data).
 - `release-check.mjs`: the release tier.
 - `render-assets.mjs`: renders the icons and the link preview (see Icons and link preview).

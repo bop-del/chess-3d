@@ -24,7 +24,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
 
   const listeners = {};
   const emit = (evt, data) => (listeners[evt] || []).forEach((fn) => fn(data));
-  // CONTRACT (lead, for the Openings and Battle lanes): mode is 'play', 'explain' or 'drill'; captureHooks run before a captured
+  // CONTRACT (lead, for the Openings and Battle lanes): mode is 'play', 'explain', 'drill' or 'puzzle'; captureHooks run before a captured
   // piece flies to its tray in normal play (the battle lane wires the awaiting); 'move' is emitted after every move.
   let mode = 'play';
   const captureHooks = [];
@@ -634,7 +634,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     }
     if (gameOver && overTimer > 0 && !busy()) {
       overTimer -= dt;
-      if (overTimer <= 0) emit('gameover', gameOver);
+      if (overTimer <= 0 && mode !== 'puzzle') emit('gameover', gameOver);   // a mate in a puzzle is the answer, not the end of a game
     }
     if (!busy() && !search) maybeComputer();
   }
@@ -662,7 +662,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     // CONTRACT stubs (lead): filled in by the Openings (C) and Battle (B) lanes
     // Explain and drill stop the computer opponent (it resumes in play) and drops any pending search or selection.
     setMode(m) {
-      mode = m === 'explain' || m === 'drill' ? m : 'play';
+      mode = m === 'explain' || m === 'drill' || m === 'puzzle' ? m : 'play';
       search = null; selected = -1;
       if (mode === 'play') moveGuard = null;
       refreshHighlights();

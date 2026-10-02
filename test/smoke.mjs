@@ -7,12 +7,13 @@
 //   render budgets     draw calls, triangles, geometries, textures against tools/budgets.json (--write-budgets stores 1.5x measured)
 //   pixels             canvas not blank, no black frame, no white out, board region holds light and dark pixels, in every view preset
 //   fix checks         test/fixes.mjs runFixChecks({ page, baseUrl, log }) when that file exists
+//   puzzles            test/puzzles.mjs runPuzzleChecks: open, wrong move and retry, Help, solve, no repeat, band up and down, saved progress, phone strip
 //   good move          test/goodmove.mjs runGoodMoveChecks: level select and memory, the arrow shows and clears, disabled while the computer thinks, in Explain and when over, the phone bulb
 //   drill              test/drill.mjs runDrillChecks: a scheduled session with a miss and a retry, a Practise run that changes no level, the end sweep
 //   explain mode       test/explain.mjs runExplainChecks: wrong move refused, reply after the pause, Back, the Italian Game to its end, the Scandinavian opens with e4
 // vs computer is the default in the app: the page health run uses no ai flag and checks it, all other runs add ai=0.
 // --skip-fixes leaves out test/fixes.mjs. --dev serves the vite dev server on the dev port instead of building. --shots saves screenshots to .tmp/smoke-shots/ (emptied first) and a contact sheet of them, contact-<w>x<h>.png.
-// --group=core|fixes|explain|drill|learn|goodmove|all (default all) runs one part of the checks, --part=i/n runs every n-th fix unit, --base=URL uses a server that is already up.
+// --group=core|fixes|explain|drill|learn|puzzles|goodmove|all (default all) runs one part of the checks, --part=i/n runs every n-th fix unit, --base=URL uses a server that is already up.
 //   test/smoke-groups.mjs (the entry point of node test/run.mjs smoke) builds once, serves once and runs the groups in parallel, one headless Chrome each.
 // Exit codes: 0 pass (warnings allowed), 1 at least one check failed, 2 setup error.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -76,7 +77,7 @@ try {
   browser = await launchBrowser({ w: 1280, h: 720 });
 } catch (e) {
   R.fail('build, serve and launch', String(e.stderr || e.stdout || e.message).split('\n').slice(-4).join(' | ').slice(0, 400));
-  await finish();
+await finish();
 }
 const base = server.base;
 
@@ -475,5 +476,21 @@ await guard('learn checks', async () => {
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   }
 }, 'learn');
+
+// ------------------------------------------------------------------ puzzles (test/puzzles.mjs)
+await guard('puzzle checks', async () => {
+  const file = join(ROOT, 'test/puzzles.mjs');
+  if (!existsSync(file)) { R.warn('puzzle checks', 'test/puzzles.mjs not found, skipped'); return; }
+  const mod = await import(pathToFileURL(file).href + '?t=' + Date.now());
+  const pp = await browser.newPage();
+  try {
+    const shot = flag('shots') ? (name) => pp.screenshot({ path: join(SHOTS, `${name}.png`) }) : null;
+    const res = await Promise.race([
+      mod.runPuzzleChecks({ page: pp, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), shot }),
+      sleep(240000).then(() => { throw new Error('runPuzzleChecks timed out after 240 s'); }),
+    ]);
+    for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
+  } finally { await pp.close().catch(() => {}); }
+}, 'puzzles');
 
 await finish();

@@ -37,6 +37,9 @@ if (tier === 'fast' || tier === 'all') {
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
+  run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
+  run('puzzle controller (test/puzzle-controller.mjs)', 'test/puzzle-controller.mjs');
+  run('puzzle data is legal and solvable (test/puzzles-data.mjs)', 'test/puzzles-data.mjs');
   run('novice level (test/novice.mjs)', 'test/novice.mjs');
   run('training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs');
 }

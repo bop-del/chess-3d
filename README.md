@@ -37,6 +37,14 @@ At the end of a line the button Add to my openings puts the line into your reper
 
 The line texts, names and the card are written in English and German. The EN and DE switch sits in the left panel (at the top of the Menu sheet on a phone). The language defaults to the browser's language and your choice is stored in the browser, not in the link. In German the move list and the line texts use the German piece letters (K, D, T, L, S).
 
+## Puzzles
+
+The Puzzles tab in the Learn sheet serves short tactics from the Lichess puzzle database: about 300 easy ones in three levels (Einsteiger, Auf dem Weg, Knifflig in German; Starter, Growing, Tricky in English), mate in one and two, loose pieces and forks, one to three moves of your own. Press Start: the board shows the opponent's last move and turns to your side, one line above the board says what to look for, and you play on the board.
+
+- A wrong move slides back with a calm message, as often as you like. Help shows the gold arrow for the move. A puzzle with a miss or with Help counts as not yet and comes back after a few others.
+- A solved puzzle gets the gold sweep and a Next button. It is endless: no daily limit and no streak. Three solved in a row go up a level, three in a row that were not clean go down one. A solved puzzle does not come back until its level is used up.
+- Progress is kept in your browser (`chess3d.puzzles`), not in the link.
+
 ## Controls
 
 Mouse
@@ -180,6 +188,8 @@ The module layout and the APIs between modules are in [docs/ARCHITECTURE.md](doc
 ## Licence
 
 MIT, see [LICENSE](LICENSE). Uses [three.js](https://threejs.org/), also MIT, copyright the three.js authors.
+
+The puzzles are taken from the [Lichess puzzle database](https://database.lichess.org/#puzzles), released under CC0 (public domain).
 
 ## Computer strength
 
