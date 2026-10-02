@@ -3,6 +3,10 @@
 // Usage:
 //   bin/lane open <branch>              worktree and workspace "<branch>" under ~/.herdr/worktrees/chess-3d/,
 //                                       tab named "<branch> lane shell", node_modules linked in, fast tier run in the lane
+//   bin/lane agent <branch> <name> <brief> [--model <m>]
+//                                       a tab "<name> agent" in the lane's workspace with a visible Claude session
+//                                       (default model sonnet), prompted to read the brief and to send its final
+//                                       report to the lead session (Herdr agent chess-3d-lead)
 //   bin/lane list                       open lanes of this repo
 //   bin/lane close <branch> [-m <msg>]  squash merge into main (the main checkout, which must be on main), then remove the
 //                                       workspace, the worktree and the branch. Without -m the lane's only commit message
@@ -14,7 +18,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const USAGE = 'usage: bin/lane open <branch> | bin/lane list | bin/lane close <branch> [-m <message>]';
+const USAGE = 'usage: bin/lane open <branch> | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane close <branch> [-m <message>]';
+const LEAD = 'chess-3d-lead';   // the lead session\'s Herdr agent name
 const die = (msg, code = 1) => { console.error(msg); process.exit(code); };
 // the main clone, also when this script runs from inside a lane. Every git command below runs there.
 const MAIN = resolve(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: ROOT, encoding: 'utf8' }).trim(), '..');
@@ -40,6 +45,24 @@ function open(branch) {
   const t = spawnSync(process.execPath, ['test/run.mjs'], { cwd: path, encoding: 'utf8' });
   console.log(t.status === 0 ? 'fast tier green in the lane' : `FAST TIER RED in the lane, fix before building on it:\n${t.stdout}${t.stderr}`);
   process.exit(t.status === 0 ? 0 : 1);
+}
+
+function agent(branch, name, brief, model = 'sonnet') {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(name || '')) die(`agent names are lower case words joined by hyphens\n${USAGE}`, 2);
+  if (!existsSync(brief || '')) die(`brief not found: ${brief}`, 2);
+  const lane = lanes().find((w) => w.branch === branch);
+  if (!lane || !lane.open_workspace_id) die(`no open lane ${branch} with a workspace: bin/lane open ${branch} first`);
+  const tab = herdr('tab', 'create', '--workspace', lane.open_workspace_id, '--cwd', lane.path, '--label', `${name} agent`);
+  const pane = (tab.root_pane || tab.pane || {}).pane_id;
+  if (!pane) die(`could not read the new tab's pane from herdr: ${JSON.stringify(tab).slice(0, 200)}`);
+  const id = `${branch}-${name}`;
+  run('herdr', ['agent', 'start', id, '--kind', 'claude', '--pane', pane, '--timeout', '60000', '--',
+    '--model', model, '--plugin-dir', join(process.env.HOME, 'code', 'mattpocock-skills')]);
+  const prompt = `You are the "${name}" agent of lane ${branch} (worktree ${lane.path}). Read your brief at ${resolve(brief)} and follow it exactly. `
+    + `When you are done, send your final report to the lead session with: herdr agent prompt ${LEAD} "<your report>" (one message, plain text). `
+    + 'Then stop and wait; the lead may message you with follow ups.';
+  run('herdr', ['agent', 'prompt', id, prompt]);
+  console.log(`agent ${id} started in tab "${name} agent" of workspace ${lane.open_workspace_id} (${model}); it reports to ${LEAD}`);
 }
 
 function list() {
@@ -75,6 +98,7 @@ function close(branch, message) {
 const [cmd, ...rest] = process.argv.slice(2);
 try {
   if (cmd === 'open' && rest.length === 1) open(rest[0]);
+  else if (cmd === 'agent' && (rest.length === 3 || (rest.length === 5 && rest[3] === '--model'))) agent(rest[0], rest[1], rest[2], rest[4]);
   else if (cmd === 'list' && !rest.length) list();
   else if (cmd === 'close' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) close(rest[0], rest[2]);
   else die(USAGE, 2);
