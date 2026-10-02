@@ -13,6 +13,7 @@
 // victim back, drops anything the scene attached to them, disposes the fx and stops the scene sounds.
 import * as THREE from 'three';
 import { createSettings } from './settings.js';
+import { viewsAllowBattle } from '../views/registry.js';
 
 const SCENES = import.meta.glob('./scenes/*.js');
 const FX = import.meta.glob('./fx.js');
@@ -118,7 +119,7 @@ export function createDirector({ game, controls, stage, ui }) {
   // ------------------------------------------------------------ one capture
   async function handler(info) {
     const mode = settings.mode;
-    if (mode === 'off' || info.signal?.aborted || active) return;
+    if (mode === 'off' || info.signal?.aborted || active || !viewsAllowBattle()) return;   // the easy views skip every scene
     const short = mode === 'short', speed = short ? SHORT_SPEED : 1;
     const r = active = {
       info, short, speed, time: 0, playing: false, dead: false, ac: new AbortController(),
@@ -162,7 +163,7 @@ export function createDirector({ game, controls, stage, ui }) {
     if (r.info.victimObj.group && r.victimHiddenByScene) r.info.victimObj.group.visible = true;
   }
   handler.stage = true;
-  handler.enabled = () => settings.mode !== 'off';
+  handler.enabled = () => settings.mode !== 'off' && viewsAllowBattle();
   game.onCapture(handler);
 
   const abortion = (r) => new Promise((res) => { if (r.ac.signal.aborted) res(); else r.ac.signal.addEventListener('abort', res, { once: true }); });

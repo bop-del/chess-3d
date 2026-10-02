@@ -107,7 +107,7 @@ body.touch .lang-btn { min-height: 44px; min-width: 48px; }
 .btn.small { width: 100%; margin-top: 8px; padding: 6px; font-size: 12px; }
 .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
 .presets .btn.preset { padding: 7px 6px; font-size: 12px; }
-.presets .btn.preset:first-child { grid-column: span 2; }
+.presets .btn.preset:first-child, .presets .btn.preset[data-view="play"] { grid-column: span 2; }
 .btn:focus-visible, select:focus-visible, .pbtn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* sliders */

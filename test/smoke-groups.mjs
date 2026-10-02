@@ -18,9 +18,9 @@ const PORT = Number(opt('port', 5303)), DEV_PORT = Number(opt('dev-port', 5302))
 const JOBS = Math.max(1, Number(opt('jobs', Math.max(2, freeSlots()))));
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
-// longest first: the two fix halves (about 60 s each), then the rest. battle is test/battle.mjs, its own script, on the same server.
+// longest first: the two fix halves (about 60 s each), then the rest. battle, views, symbols and play are their own scripts (test/battle.mjs, views.mjs, symbols.mjs, play.mjs), on the same server.
 const SMOKE = 'test/smoke.mjs';
-const GROUPS = [['fixes 1/2', SMOKE, ['--group=fixes', '--part=0/2']], ['fixes 2/2', SMOKE, ['--group=fixes', '--part=1/2']], ['battle', 'test/battle.mjs', []], ['learn', SMOKE, ['--group=learn']], ['drill', SMOKE, ['--group=drill']], ['puzzles', SMOKE, ['--group=puzzles']], ['core', SMOKE, ['--group=core']], ['explain', SMOKE, ['--group=explain']], ['goodmove', SMOKE, ['--group=goodmove']]]
+const GROUPS = [['fixes 1/2', SMOKE, ['--group=fixes', '--part=0/2']], ['fixes 2/2', SMOKE, ['--group=fixes', '--part=1/2']], ['battle', 'test/battle.mjs', []], ['learn', SMOKE, ['--group=learn']], ['drill', SMOKE, ['--group=drill']], ['core', SMOKE, ['--group=core']], ['explain', SMOKE, ['--group=explain']], ['views', 'test/views.mjs', []], ['symbols', 'test/symbols.mjs', []], ['play', 'test/play.mjs', []], ['goodmove', SMOKE, ['--group=goodmove']], ['puzzles', SMOKE, ['--group=puzzles']]]
   .filter(([n]) => !(flag('skip-fixes') && n.startsWith('fixes')));
 
 let server = null;

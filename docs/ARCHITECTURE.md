@@ -161,6 +161,10 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 - `audit()` compares the visual pieces with the engine board and returns a list of problems (empty when consistent). The tests use it.
 - `pickSquare` uses cheap proxies first, then the real meshes, then the square tops, and prefers what the player can actually use when a tall piece hides a smaller one.
 
+### Projection and focus (`src/scene.js`, `src/controls.js`)
+
+`stage.setProjection('perspective' | 'ortho')` swaps the active camera and rebuilds the post chain (the passes hold a camera); `stage.camera` is a getter for the active one, so callers read it fresh on every use (picking sets its raycaster from `stage.camera`). The orthographic frame is sized by the controls through `stage.setOrthoSize(halfHeight)`. In ortho the planar floor reflection is off, and the floor fades out when looking straight down. `controls.setProjection(kind, { pitch, yaw, dist, dur })` switches and glides to a pose; in ortho `cam.dist` is the zoom (19 is neutral) and the frame fit (`orthoFit`) puts the board, and in landscape the trays, in the middle of the free area (the HUD columns count as insets on desktop). `controls.setFocus({ x, z } | null, { dur, zoom })` eases the look point in the board plane and an extra pull back factor (zoom >= 1), reset by `setFocus(null)`.
+
 ### `src/controls.js`
 
     createControls({ stage, gimbal, canvas, onPick, onHover }) -> {
@@ -180,6 +184,18 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 - Presets animate yaw, pitch, distance and the gimbal together on an ease curve, taking the shortest way round for every angle.
 - The floor fades with `stage.setFloorVisibility` once the board tilts more than 8 degrees on X or Z, and is gone at 38.
 - `hooks` is filled by the UI (`undo`, `newGame`, `toggleHud`, `toggleHelp`) so the keyboard handler can reach it.
+
+### `src/views/registry.js`
+
+The single list of views the player chooses from. `VIEWS = [{ id, label, kind: 'preset' | 'easy' | 'play', style?, when? }]`: `white`, `black`, `top`, `side`, `iso` (perspective presets), `easy-flat` (style A: orthographic top view, orbit locked with `controls.setOrbitLock`: no tilt or turn by drag, twist or keys, zoom and Flip work, 3D pieces hidden, symbols drawn by `src/views/symbols.js`), `easy-3d` (style B: orthographic, pitch 62 degrees, the 3D pieces scaled 1.15x around their base on their inner nodes, the game keeps the group scale), `play` (phone portrait only, perspective, closer, followed by `src/views/play.js`).
+
+    createViews({ controls, stage, game, board, device }) -> { list(), current(), set(id, { instant, remember }), next(), isEasy(), style(), label(), on(fn), update() }
+
+`list()` is filtered by `when` for the device and orientation. The choice lives in localStorage `chess3d.view`; a stored id that is not offered (play after turning to landscape) falls back to `play` on a phone in portrait, else `white`. `?view=` applies for one load and is not stored. `update()` runs every frame (main.js advance): it keeps the style B scale on pieces made later and falls back when the device turns. `viewsAllowBattle()` is false while an easy view is on: the director asks it before a battle scene. `controls.hooks.preset` is set so keys 1 to 5 and V go through the views. German names are added to `DE` in this module.
+
+### `src/views/play.js`
+
+The follow camera of the Play view (phone portrait). `createPlayView({ controls, game, views, device, stage, hint?, size? }) -> { update(dt), focus, home, dispose() }`, created in main.js after the views and ticked in `advance`. It does nothing unless `views.current() === 'play'`. The Play view's home is registry `dist` 10.3, pitch 40 degrees, plus `HOME_FOCUS` (look point 0.8 towards the player's side) and a `lift` of 2.2 along the view's up axis, so the board sits low with the player's pieces large above the thumb bar; the a and h files may crop. The follow policy picks the squares that must stay visible: the selected piece (its top counts too) and every legal target; else the squares of the move just made, until it has landed plus 0.55 s (the computer's reply is followed the same way); else the squares of any visible hint arrow (groups named `move-hint` in the gimbal: Explain, Drill, Practise, Good move, puzzles). `solveFocus({ camera, w, h, free, squares, at })` (exported, pure) projects those squares through the live camera against the free canvas area (`controls.frame`) and returns `{ x, z, zoom }`: a slide of the look point and, only when sliding cannot fit them (a queen with targets on both wings), a pull back factor. It is sent to `controls.setFocus(p, { dur: 0.55, zoom, lift })`; after the move the focus returns to home. The first entry into the view is instant. `controls.setFocus` eases `{ x, z }` (board plane shift of the look point; this moves the camera with it, so near rows look bigger), `zoom` (a factor on the fitted distance) and `lift` (a shift along the screen's up axis: the board slides down without coming closer). `setFocus(null)` resets all three.
 
 ### `src/ui.js`
 
@@ -269,7 +285,7 @@ Imported by `main.js` only for exactly `?diag=1` (right after `window.__chess` i
 
 ## Test hooks
 
-`window.__chess = { stage, gimbal, board, game, controls, ui, battle, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
+`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, views, play, symbols, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
 
 `window.__chessReady` becomes `true` once loading is done and `window.__chessError` holds a message if loading failed.
 

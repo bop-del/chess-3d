@@ -247,14 +247,16 @@ async function runSize(size) {
     if (collapsedGame) { await tapEl(gameHdr); await sleep(400); }
     const hudOk = await ev(() => !!document.getElementById('btn-new'));
     R.expect(`${tag}: HUD is built`, hudOk, '');
-    // a view preset. Phone HUD: the Views button on the thumb bar cycles the presets (White, Black, Top down, Side, ...); three
-    // taps always leave the 46 degree start pitch. Older layouts: the third preset button, which may sit in the Controls drawer.
+    // a view. Phone HUD: the Views button on the thumb bar cycles the views (src/views/registry.js: White, Black, Top down, Side, Isometric,
+    // Easy flat, Easy 3D, and Play in portrait). One tap moves to the next view. Older layouts: the third preset button, which may sit in the Controls drawer.
     const viewsBtn = '.tb[data-act="views"]';
     if (await centre(viewsBtn)) {
       const before = (await state()).pitch;
-      for (let k = 0; k < 3; k++) { await tapEl(viewsBtn); await step(2); }
+      const viewBefore = await ev(() => window.__chess.views?.current());
+      await tapEl(viewsBtn); await step(2);
       s = await state();
-      R.expect(`${tag}: tapping Views on the thumb bar cycles the presets`, Math.abs(s.pitch - before) > 0.05, `pitch ${(before * 57.3).toFixed(0)} to ${(s.pitch * 57.3).toFixed(0)} deg after 3 taps`);
+      const viewAfter = await ev(() => window.__chess.views?.current());
+      R.expect(`${tag}: tapping Views on the thumb bar cycles the views`, viewAfter !== viewBefore, `view ${viewBefore} to ${viewAfter}, pitch ${(before * 57.3).toFixed(0)} to ${(s.pitch * 57.3).toFixed(0)} deg`);
     } else {
     const presetSel = '#presets .preset:nth-child(3)';
     let c = await centre(presetSel);

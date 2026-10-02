@@ -17,7 +17,6 @@ export const PRESETS = {
 const HOME = PRESETS['White view'];
 
 export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
-  const camera = stage.camera;
   const target = new THREE.Vector3(0, 0.15, 0);
   const cam = { yaw: HOME.yaw, pitch: HOME.pitch, dist: HOME.dist };
   const gim = { x: 0, y: 0, z: 0 };            // radians
@@ -25,6 +24,10 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   const limits = { minDist: 6, maxDist: 40, minPitch: 1.5 * DEG, maxPitch: 89.6 * DEG };
   let spin = false;
   let tw = null;                                // preset transition
+  let ortho = false, orthoPitch = 89.6 * DEG;   // easy views: orthographic camera, `cam.dist` then works as the zoom
+  let focusTw = null;                           // glide of the focus offset
+  const focus = { x: 0, z: 0, zoom: 1, lift: 0 };        // board plane shift of the look point (play view follow camera), pull back, and lift: a shift along the view's up axis
+  const focusV = new THREE.Vector3();
   let aspect = 1.5;
   let floorT = 1;
   const listeners = [];
@@ -101,17 +104,64 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     }
     return { d, sx, sy };
   }
+  // Orthographic fit (easy views): no perspective, so the board and its pieces (and in landscape the capture trays) project to a
+  // rectangle in the view plane. The frame size is the zoom that makes it just fit the free area; the target slides so the
+  // rectangle sits in the middle of it. Desktop layouts have no insets, so the two HUD columns count as insets there.
+  function orthoFit() {
+    const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+    fFwd.set(-cp * Math.sin(cam.yaw), -sp, -cp * Math.cos(cam.yaw));
+    fRight.set(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
+    fUp.crossVectors(fRight, fFwd);
+    if (fUp.y < 0) fUp.negate();
+    gq.setFromEuler(gEuler.set(gim.x, gim.y, gim.z, 'YXZ'));
+    const portrait = size.h > size.w, n = portrait ? BOARD_CORNERS : corners.length;
+    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+    for (let i = 0; i < n; i++) {
+      pts[i].copy(corners[i]).applyQuaternion(gq).sub(target);
+      const a = pts[i].dot(fRight), b = pts[i].dot(fUp);
+      if (a < a0) a0 = a; if (a > a1) a1 = a; if (b < b0) b0 = b; if (b > b1) b1 = b;
+    }
+    let fr = frame;
+    if (!framed() && size.w > 900) { const g = hudW + 2 * HUD_GAP; fr = { top: 0, bottom: 0, left: g, right: g }; }
+    const freeW = Math.max(40, size.w - fr.left - fr.right) * (1 - (portrait ? PORTRAIT_MARGIN : FRAME_MARGIN));
+    const freeH = Math.max(40, size.h - fr.top - fr.bottom) * (1 - FRAME_MARGIN);
+    const s = Math.min(freeW / Math.max(0.1, a1 - a0), freeH / Math.max(0.1, b1 - b0));   // px per world unit
+    const ox = (fr.left - fr.right) / 2, oy = (fr.top - fr.bottom) / 2;
+    return { hh: (size.h / 2) / s, sx: (a0 + a1) / 2 - ox / s, sy: (b0 + b1) / 2 + oy / s };
+  }
   function apply() {
+    const camera = stage.camera;
     cam.pitch = clamp(cam.pitch, limits.minPitch, limits.maxPitch);
     cam.dist = clamp(cam.dist, limits.minDist, limits.maxDist);
     let d, look = target, yawV = cam.yaw, pitchV = cam.pitch;
-    if (framed()) {
+    if (ortho) {
+      const o = orthoFit(), k = cam.dist / FRAME_REF;
+      stage.setOrthoSize(o.hh * k * focus.zoom);
+      look = fTarget.copy(target).addScaledVector(fRight, o.sx * k).addScaledVector(fUp, o.sy * k);
+      d = 40;
+    } else if (framed()) {
       const f = frameFit();
       d = f.d * cam.dist / FRAME_REF;
       // a world-space shift in the view plane, scaled when the user zooms so the board stays where it was fitted
       const k = cam.dist / FRAME_REF;
       look = fTarget.copy(target).addScaledVector(fRight, f.sx * k).addScaledVector(fUp, f.sy * k);
     } else d = cam.dist * fit();
+    if (!ortho) d *= focus.zoom;
+    if (focus.lift) {
+      // lift moves the look point along the screen's up axis: the picture slides down by that much without the camera
+      // coming closer to the board (a board plane shift would, which magnifies the near rows)
+      if (look === target) look = fTarget.copy(target);
+      const cpl = Math.cos(cam.pitch), spl = Math.sin(cam.pitch);
+      fFwd.set(-cpl * Math.sin(cam.yaw), -spl, -cpl * Math.cos(cam.yaw));
+      fRight.set(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
+      fUp.crossVectors(fRight, fFwd);
+      if (fUp.y < 0) fUp.negate();
+      look.addScaledVector(fUp, focus.lift * (cam.dist / FRAME_REF));
+    }
+    if (focus.x || focus.z) {
+      if (look === target) look = fTarget.copy(target);
+      look.add(focusV.set(focus.x, 0, focus.z).applyQuaternion(gq.setFromEuler(gEuler.set(gim.x, gim.y, gim.z, 'YXZ'))));
+    }
     if (cine && cine.k > 0) {
       // battle close-up: blend the normal pose towards the close-up pose. cam is never touched, so at k = 0 the view is exact.
       const k = cine.k;
@@ -140,7 +190,8 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     gimbal.rotation.set(gim.x, gim.y, gim.z, 'YXZ');
     // fade the floor as the board tilts away from horizontal
     const tilt = Math.max(Math.abs(wrapPi(gim.x)), Math.abs(wrapPi(gim.z))) / DEG;
-    const t = clamp(1 - (tilt - 8) / 30, 0, 1);
+    // the flat easy view looks straight down: the floor with its shadow patch would only show as a dark slab behind the board
+    const t = ortho && cam.pitch > 80 * DEG ? 0 : clamp(1 - (tilt - 8) / 30, 0, 1);
     if (Math.abs(t - floorT) > 0.002) { floorT = t; stage.setFloorVisibility?.(t); }
   }
   const notify = () => listeners.forEach((fn) => fn());
@@ -167,14 +218,17 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     animateTo({ ...p });
   }
   function levelBoard() { animateTo({ yaw: cam.yaw, pitch: cam.pitch, dist: cam.dist }, 0.7); }
-  function reset() { spin = false; animateTo({ ...HOME }); }
+  function reset() {
+    spin = false;
+    if (ortho) animateTo({ yaw: 0, pitch: orthoPitch, dist: FRAME_REF }); else animateTo({ ...HOME });
+  }
   function flip() {
     // turn the view to the other side of the board, keep pitch and zoom
     const target_ = Math.round(cam.yaw / Math.PI) * Math.PI + Math.PI;
     animateTo({ yaw: target_, pitch: cam.pitch, dist: cam.dist, gx: gim.x, gy: gim.y, gz: gim.z }, 0.9);
   }
-  function topDown() { setPreset('Top down'); }
-  function toggleSpin() { spin = !spin; notify(); return spin; }
+  function topDown() { if (hooks.preset) hooks.preset('Top down'); else setPreset('Top down'); }
+  function toggleSpin() { if (orbitLocked) return spin; spin = !spin; notify(); return spin; }
   function setGimbal(axis, deg) { tw = null; gim[axis] = deg * DEG; notify(); }
   function nudgeZoom(f) { tw = null; cam.dist = clamp(cam.dist * f, limits.minDist, limits.maxDist); }
   // Lock view: orbit, pinch, twist and wheel do nothing; taps, keys, presets and Reset still work
@@ -183,13 +237,40 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     if (locked) { vel.yaw = vel.pitch = 0; pinch = null; if (drag?.moved) drag = null; }
     notify();
   }
+  function setOrbitLock(v) { orbitLocked = !!v; if (orbitLocked) { vel.yaw = vel.pitch = 0; spin = false; } notify(); }
   function setCamera(v) { tw = null; Object.assign(cam, v); apply(); }
+
+  // Projection of the camera: 'ortho' for the easy views, 'perspective' for everything else. Yaw, pitch and zoom keep working;
+  // in ortho the zoom (cam.dist, neutral FRAME_REF) sets the frame size. opts.pitch / yaw / dist glide to that pose (0.6 s),
+  // the board is levelled. The orbit keeps working afterwards.
+  function setProjection(kind, opts = {}) {
+    const next = kind === 'ortho';
+    if (next !== ortho) { ortho = next; stage.setProjection(next ? 'ortho' : 'perspective'); }
+    if (next && opts.pitch != null) orthoPitch = opts.pitch;
+    if (opts.pitch != null || opts.yaw != null || opts.dist != null) {
+      animateTo({ yaw: opts.yaw ?? cam.yaw, pitch: opts.pitch ?? cam.pitch, dist: opts.dist ?? (next ? FRAME_REF : cam.dist) }, opts.dur ?? 0.6);
+    }
+    apply();
+    notify();
+  }
+
+  // Focus: shift the look point in the board plane (world x and z, board at y 0) with an eased glide. null goes back to the
+  // home framing. Used by the play view's follow camera.
+  // opts.zoom >= 1 pulls the camera back by that factor on the fitted distance (ortho: a larger frame), eased with the focus;
+  // opts.lift shifts the look point along the view's up axis (world units at the neutral distance): the board slides down the
+  // screen, no closer to the camera. setFocus(null) resets zoom and lift.
+  function setFocus(p, { dur = 0.5, zoom = 1, lift = 0 } = {}) {
+    const to = p ? { x: p.x, z: p.z, zoom: Math.max(1, zoom), lift } : { x: 0, z: 0, zoom: 1, lift: 0 };
+    if (dur <= 0) { focusTw = null; focus.x = to.x; focus.z = to.z; focus.zoom = to.zoom; focus.lift = to.lift; apply(); return; }
+    focusTw = { t: 0, dur, from: { x: focus.x, z: focus.z, zoom: focus.zoom, lift: focus.lift }, to };
+  }
 
   // --------------------------------------------------------------- pointer input
   const pointers = new Map();
   let drag = null;
   let pinch = null;
   let locked = false;
+  let orbitLocked = false;                     // Easy flat: no tilt or turn by drag, twist or keys; zoom and Flip still work
   const TWIST_DEAD = 6 * DEG;                  // a pure pinch wobbles a few degrees: ignore the twist until it is deliberate
   const pairAngle = () => { const [a, b] = [...pointers.values()]; return Math.atan2(b.y - a.y, b.x - a.x); };
   let lastMoveT = 0;
@@ -219,6 +300,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
       cam.dist = clamp(pinch.dist * (pinch.d / Math.max(10, d)), limits.minDist, limits.maxDist);
       // twist: the change of the angle between the two fingers turns the board about its vertical axis (clockwise on
       // screen is clockwise seen from above, which is negative gimbal yaw)
+      if (orbitLocked) return;
       const ang = pairAngle();
       const dA = wrapPi(ang - pinch.last);
       pinch.last = ang;
@@ -235,7 +317,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
       drag.moved = true;
       if (!locked) tw = null;
     }
-    if (locked) { drag.lx = e.clientX; drag.ly = e.clientY; return; }
+    if (locked || orbitLocked) { drag.lx = e.clientX; drag.ly = e.clientY; return; }
     drag.lx = e.clientX; drag.ly = e.clientY;
     const now = performance.now();
     const dtm = Math.max(1, now - lastMoveT) / 1000;
@@ -283,6 +365,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     if (e.metaKey || e.ctrlKey || e.altKey || inField(e) || cine) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (['q', 'e', 'w', 's', 'a', 'd', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '_'].includes(k)) {
+      if (orbitLocked && !['+', '=', '-', '_'].includes(k)) { e.preventDefault(); return; }
       keys.add(k); tw = null; e.preventDefault(); return;
     }
     let handled = true;
@@ -291,11 +374,11 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
       case 'f': flip(); break;
       case 'v': topDown(); break;
       case ' ': toggleSpin(); break;
-      case '1': setPreset('White view'); break;
-      case '2': setPreset('Black view'); break;
-      case '3': setPreset('Top down'); break;
-      case '4': setPreset('Side'); break;
-      case '5': setPreset('Isometric'); break;
+      case '1': (hooks.preset || setPreset)('White view'); break;
+      case '2': (hooks.preset || setPreset)('Black view'); break;
+      case '3': (hooks.preset || setPreset)('Top down'); break;
+      case '4': (hooks.preset || setPreset)('Side'); break;
+      case '5': (hooks.preset || setPreset)('Isometric'); break;
       case 'u': hooks.undo?.(); break;
       case 'n': hooks.newGame?.(); break;
       case 'h': hooks.toggleHud?.(); break;
@@ -327,7 +410,15 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
       gim.z = f.gz + (n.gz - f.gz) * e;
       if (u >= 1) tw = null;
       dirty = true;
-    } else if (!drag || !drag.moved) {
+    }
+    if (focusTw) {
+      focusTw.t += dt;
+      const u = Math.min(1, focusTw.t / focusTw.dur), e = easeInOut(u), { from: f, to: n } = focusTw;
+      focus.x = f.x + (n.x - f.x) * e; focus.z = f.z + (n.z - f.z) * e; focus.zoom = f.zoom + (n.zoom - f.zoom) * e; focus.lift = f.lift + (n.lift - f.lift) * e;
+      if (u >= 1) focusTw = null;
+      dirty = true;
+    }
+    if (!tw && (!drag || !drag.moved)) {
       if (Math.abs(vel.yaw) > 1e-4 || Math.abs(vel.pitch) > 1e-4) {
         cam.yaw += vel.yaw * dt; cam.pitch += vel.pitch * dt;
         const damp = Math.exp(-dt * 4);
@@ -401,6 +492,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
 
   return {
     cinematic, restore,
+    setProjection, setFocus, setOrbitLock,
     update, apply, setPreset, reset, levelBoard, flip, topDown, toggleSpin, setGimbal, nudgeZoom, setCamera, onResize, setFrame, setLocked,
     get locked() { return locked; },
     get frame() { return { ...frame }; },
@@ -412,6 +504,10 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     get gimbalDeg() { return { x: gim.x / DEG, y: gim.y / DEG, z: gim.z / DEG }; },
     get animating() { return !!tw || !!cine; },
     get cinematicActive() { return !!cine; },
+    get ortho() { return ortho; },
+    get orbitLocked() { return orbitLocked; },
+    get focus() { return { x: focus.x, z: focus.z, zoom: focus.zoom, lift: focus.lift }; },
+    get focusing() { return !!focusTw; },
     dispose() {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);

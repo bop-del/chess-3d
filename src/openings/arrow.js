@@ -48,7 +48,8 @@ export function createHint({ gimbal, persist = true }) {
   const fromMesh = new THREE.Mesh(square, fromMat);
   const toMesh = new THREE.Mesh(square, toMat);
   const arrowMesh = new THREE.Mesh(new THREE.BufferGeometry(), arrowMat);
-  for (const m of [fromMesh, toMesh, arrowMesh]) { m.renderOrder = 4; m.position.y = LIFT; group.add(m); }
+  // renderOrder above the Easy flat symbols (11), so the hint stays on top of them
+  for (const m of [fromMesh, toMesh, arrowMesh]) { m.renderOrder = 12; m.position.y = LIFT; group.add(m); }
   arrowMesh.position.y = LIFT * 2;
 
   let enabled = persist ? readPref() : true;

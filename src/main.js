@@ -96,7 +96,13 @@ async function boot() {
       });
     },
   });
-  const ui = createUI({ game, controls, stage, quality });
+  const { createViews } = await import('./views/registry.js');
+  const views = createViews({ controls, stage, game, board, device });
+  const ui = createUI({ game, controls, stage, quality, views });
+  const [{ createPlayView }, { createSymbols }] = await Promise.all([import('./views/play.js'), import('./views/symbols.js')]);
+  const play = createPlayView({ controls, game, views, device, stage });
+  const symbols = createSymbols({ gimbal, game, materials, stage });
+  views.on(() => symbols.setVisible(views.style() === 'A'));
   const battle = createDirector({ game, controls, stage, ui });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
   audio.mountMute(ui);     // the mute switch, right below the Battle scenes setting
@@ -126,6 +132,7 @@ async function boot() {
   const goodMove = createGoodMove({ game, hint: createHint({ gimbal, persist: false }) });
   ui.bindGoodMove(goodMove);
 
+  symbols.setVisible(false);
   // resize
   const resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
@@ -148,9 +155,9 @@ async function boot() {
   resize();
 
   // scripted states for testing and screenshots
-  applyParams({ game, controls, stage, ui });
+  applyParams({ game, controls, stage, ui, views });
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, puzzles, puzzleProgress, goodMove, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, goodMove, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
@@ -162,7 +169,7 @@ async function boot() {
     upLocal.set(0, 1, 0).applyQuaternion(stage.camera.quaternion).applyQuaternion(gimbalInv.copy(gimbal.quaternion).invert());
     board.orientLabels(upLocal);
   };
-  const advance = (dt) => { t += dt; controls.update(dt); game.update(dt); battle.update(dt); openings.tick(dt); drill.tick(dt); puzzles.tick(dt); sweep.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  const advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(); battle.update(dt); openings.tick(dt); drill.tick(dt); puzzles.tick(dt); sweep.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
@@ -206,7 +213,7 @@ function showContextNotice(state) {
   el.hidden = false;
 }
 
-function applyParams({ game, controls, stage, ui }) {
+function applyParams({ game, controls, stage, ui, views }) {
   const fen = params.get('fen');
   if (fen) { try { game.loadFen(fen); } catch (e) { console.warn('Ignoring invalid fen parameter'); } }
   const moves = params.get('moves');
@@ -222,6 +229,9 @@ function applyParams({ game, controls, stage, ui }) {
     const level = LEVELS[(+ai || 0) - 1]?.id || (LEVELS.some((l) => l.id === stored) ? stored : 'easy');
     game.setVsComputer(true, { color: 'b', level });
   }
+  const view = params.get('view');
+  // ?view= is for this load only; without it the remembered choice (or the device default) is applied
+  if (!(view && views.set(view, { instant: true, remember: false }))) views.set(views.current(), { instant: true });
   const preset = params.get('preset');
   if (preset) {
     controls.setPreset(preset);

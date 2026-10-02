@@ -2,7 +2,6 @@
 // On phones (device.phone) the same cards are moved into a bottom sheet (Menu) and a status line plus a thumb bar are added,
 // see buildPhone() at the end of createUI. Desktop and tablets keep the columns.
 import { device } from './device.js';
-import { PRESETS } from './controls.js';
 import './learn/strings.js';
 import { t, setLanguage, onLanguage, translateTree, sanDisplay, i18n } from './i18n.js';
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
@@ -41,7 +40,7 @@ function el(tag, cls, html) {
   return e;
 }
 
-export function createUI({ game, controls, stage, quality = 'high' }) {
+export function createUI({ game, controls, stage, quality = 'high', views }) {
   const hud = document.getElementById('hud');
   hud.innerHTML = '';
 
@@ -151,12 +150,20 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
 
   // ------------------------------------------------------------ presets and view buttons
   const presetBox = $('#presets');
-  for (const name of controls.presets) {
-    const b = el('button', 'btn preset', t(`preset.${name}`, name));
-    b.dataset.preset = name;
-    b.addEventListener('click', () => controls.setPreset(name));
-    presetBox.append(b);
-  }
+  const buildViewButtons = () => {
+    presetBox.textContent = '';
+    for (const v of views.list()) {
+      const b = el('button', 'btn preset', t(`preset.${v.label}`, v.label));
+      b.dataset.preset = v.label;
+      b.dataset.view = v.id;
+      b.addEventListener('click', () => views.set(v.id));
+      presetBox.append(b);
+    }
+    markView();
+  };
+  const markView = () => presetBox.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === views.current()));
+  views.on(() => { buildViewButtons(); });
+  buildViewButtons();
   $('#btn-flip').addEventListener('click', () => controls.flip());
   $('#btn-reset').addEventListener('click', () => controls.reset());
   $('#btn-spin').addEventListener('click', () => controls.toggleSpin());
@@ -489,7 +496,6 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     }
 
     // thumb bar
-    let vi = -1;
     btn.undo.addEventListener('click', () => { game.undo(); hideBanner(); });
     // New game: one tap at the start or after the game ended, a small confirm while a game is in progress
     const startNew = () => { confirmBox.hidden = true; game.newGame(); hideBanner(); close(); };
@@ -507,21 +513,8 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     }, true);
     btn.flip.addEventListener('click', () => controls.flip());
     btn.views.addEventListener('click', () => {
-      // the preset after the one in view: the last one picked while the camera is still moving, else the nearest one to the camera
-      if (!controls.animating) {
-        const c = controls.camera;
-        let best = -1, bd = 0.4;
-        controls.presets.forEach((n, i) => {
-          const P = PRESETS[n];
-          const dy = Math.abs(Math.atan2(Math.sin(c.yaw - P.yaw), Math.cos(c.yaw - P.yaw)));
-          const d = dy * Math.max(0.2, Math.cos(P.pitch)) + Math.abs(c.pitch - P.pitch);
-          if (d < bd) { bd = d; best = i; }
-        });
-        vi = best;
-      }
-      vi = (vi + 1) % controls.presets.length;
-      controls.setPreset(controls.presets[vi]);
-      toast(t(`preset.${controls.presets[vi]}`, controls.presets[vi]), 'info');
+      views.next();
+      toast(t(`preset.${views.label()}`, views.label()), 'info');
     });
     btn.menu.addEventListener('click', () => (isOpen() ? close() : open()));
     btn.learn.addEventListener('click', () => (isLearnOpen() ? close() : openLearn()));

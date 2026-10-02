@@ -85,7 +85,7 @@ Sliders and buttons (left panel)
 
 | Control | What it does |
 |---|---|
-| View presets | White view, Black view, Top down, Side, Isometric. Smooth animated transitions |
+| Views | White view, Black view, Top down, Side, Isometric, plus Easy flat (a flat top view with symbols) and Easy 3D (a steep orthographic view, pieces about 1.15 times larger). On phones in portrait also Play, the default there: the board as big as the screen allows, and the camera glides sideways so the selected piece and all its moves, the computer's reply and any hint arrow stay in view. Smooth animated transitions. The choice is remembered per device. Easy views skip the battle scenes |
 | Flip, Spin, Reset | Turn to the other side, toggle auto spin, return to the start view |
 | Board gimbal X, Y, Z | Three sliders from -180 to 180 degrees with a numeric readout, and a Level board button |
 | Lighting | Studio, Gallery, Sunset, Night |
@@ -135,6 +135,7 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `quality` | `low`, `medium`, `high` | Start in this quality tier (default `high`, `medium` on touch devices) |
 | `touch` | `1`, `0` | `1` forces touch mode on (Medium start tier, page gesture blocking), `0` forces it off (desktop behaviour even on a touch device). Without it touch is detected from the primary input. An explicit `quality` wins over the touch start tier |
 | `light` | `Studio`, `Gallery`, `Sunset`, `Night` | Start with this lighting preset |
+| `view` | `white`, `black`, `top`, `side`, `iso`, `easy-flat`, `easy-3d`, `play` | Start in this view for this load only (without it the remembered view, or the device default). `play` only exists on a phone in portrait |
 | `preset` | `White view`, `Black view`, `Top down`, `Side`, `Isometric` | Jump to a view preset |
 | `yaw`, `pitch` | degrees | Set the camera angles |
 | `dist` | number | Set the camera distance |
@@ -170,7 +171,7 @@ Tests come in four tiers:
     node test/run.mjs phone      # phone, several minutes: phone sizes, tap target audit, real multi touch, the Add to Home Screen reminder
     node tools/release-check.mjs # release: fresh build, page load, hostile URLs, docs and repo hygiene
 
-The phone tier loads the page as an iPhone at five screen sizes (portrait, landscape and short landscape views), audits every tap target for the 44 px minimum and drives real multi touch events: tap, pinch, twist and the thumb bar. The smoke tier plays a scripted game with real pointer clicks (capture, castling, en passant, promotion, a mate, undo, the computer reply), walks an opening line to its end, moves each gimbal slider, checks the render budgets and checks the canvas pixels in every view preset. The browser tiers use puppeteer-core with a locally installed Google Chrome, which renders with a software GL in headless mode. For that reason there are no golden image comparisons: the pixels differ between machines. Look at the screenshots instead.
+The phone tier loads the page as an iPhone at five screen sizes (portrait, landscape and short landscape views), audits every tap target for the 44 px minimum and drives real multi touch events: tap, pinch, twist and the thumb bar. The smoke tier plays a scripted game with real pointer clicks (capture, castling, en passant, promotion, a mate, undo, the computer reply), walks an opening line to its end, moves each gimbal slider, checks the render budgets and checks the canvas pixels in every view preset. `test/views.mjs` (part of the smoke tier) opens every view at four screen sizes and checks projection, picking with real clicks, legal target squares on screen, the remembered choice and the piece scale. The browser tiers use puppeteer-core with a locally installed Google Chrome, which renders with a software GL in headless mode. For that reason there are no golden image comparisons: the pixels differ between machines. Look at the screenshots instead.
 
 The icons and the link preview are regenerated with `node tools/render-assets.mjs final --icon=float` (see `tools/README.md`). To look at the game on a real phone with the diagnostics box, run `bin/device-check --diag`.
 
