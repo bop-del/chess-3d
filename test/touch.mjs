@@ -162,6 +162,9 @@ async function runSize(size) {
       const horiz = size.w > size.h || true;
       const span = (d) => ev((m, dd) => { const ok = (x, y) => { const t = document.elementFromPoint(x, y); return t && t.id === 'stage'; }; let h = dd; while (h > 10 && !(ok(m.x - h, m.y) && ok(m.x + h, m.y))) h -= 5; return h; }, mid, d);
       const half = await span(70);
+      const gimY = () => ev(() => window.__chess.controls.gimbalDeg.y);
+      const camYaw = () => ev(() => window.__chess.controls.camera.yaw);
+      const gy0 = await gimY();
       const d0 = (await state()).dist;
       await down(1, mid.x - half * 0.3, mid.y); await down(2, mid.x + half * 0.3, mid.y);
       await moveTo(1, mid.x - half, mid.y); await moveTo(2, mid.x + half, mid.y);
@@ -176,6 +179,46 @@ async function runSize(size) {
       s = await state();
       R.expect(`${tag}: a pinch does not select or move anything`, s.moves.length === 4 && s.selected === null, 'moves unchanged', `${s.moves.length} moves, selected ${s.selected}`);
 
+      const gyPinch = await gimY();
+      R.expect(`${tag}: a pinch alone does not turn the board`, Math.abs(gyPinch - gy0) < 2, `gimbal yaw ${gy0.toFixed(1)} to ${gyPinch.toFixed(1)} deg`);
+
+      // ---- twist: two fingers rotating about their midpoint turn the board (clockwise on screen: negative gimbal yaw)
+      const twist = async (deg, r = half * 0.6, n = 12) => {
+        const a0 = 0, pos = (k, ang) => ({ x: mid.x + k * r * Math.cos(ang), y: mid.y + k * r * Math.sin(ang) });
+        await down(1, pos(-1, a0).x, pos(-1, a0).y); await down(2, pos(1, a0).x, pos(1, a0).y);
+        for (let i = 1; i <= n; i++) {
+          const ang = (deg * Math.PI / 180) * (i / n);
+          for (const [id, k] of [[1, -1], [2, 1]]) { const q = pos(k, ang); pts.set(id, q); await send('touchMove', id, q); }
+          await sleep(16);
+        }
+        await up(2); await up(1); await step(0.3);
+      };
+      const dragOrbit = async () => { await down(1, mid.x - 30, mid.y); await moveTo(1, mid.x + 30, mid.y, 8); await up(1); await step(0.3); };
+      await twist(40);
+      const gyTwist = await gimY();
+      R.expect(`${tag}: a two finger twist turns the board`, gyTwist - gyPinch < -20 && gyTwist - gyPinch > -50, `gimbal yaw ${gyPinch.toFixed(1)} to ${gyTwist.toFixed(1)} deg (clockwise 40 deg)`);
+      const gyBeforeCcw = gyTwist;
+      await twist(-40);
+      R.expect(`${tag}: twisting the other way turns it back`, (await gimY()) - gyBeforeCcw > 20, `gimbal yaw ${gyBeforeCcw.toFixed(1)} to ${(await gimY()).toFixed(1)} deg`);
+
+      // ---- Lock view: orbit and twist do nothing, a tap still moves a piece
+      await ev(() => window.__chess.controls.setLocked(true));
+      const lk = await ev(() => window.__chess.controls.locked);
+      const gyL0 = await gimY(), yawL0 = await camYaw(), dL0 = (await state()).dist;
+      await dragOrbit(); await twist(40);
+      const gyL1 = await gimY(), yawL1 = await camYaw();
+      R.expect(`${tag}: locked view ignores one finger orbit and twist`, lk === true && Math.abs(yawL1 - yawL0) < 1e-4 && Math.abs(gyL1 - gyL0) < 0.01, `locked ${lk}, camera yaw ${yawL0.toFixed(3)} to ${yawL1.toFixed(3)}, gimbal yaw ${gyL0.toFixed(1)} to ${gyL1.toFixed(1)}`);
+      await down(1, mid.x - half, mid.y); await down(2, mid.x + half, mid.y);
+      await moveTo(1, mid.x - half * 0.3, mid.y); await moveTo(2, mid.x + half * 0.3, mid.y);
+      await up(2); await up(1); await step(0.3);
+      R.expect(`${tag}: locked view ignores pinch`, Math.abs((await state()).dist - dL0) < 1e-4, `dist ${dL0.toFixed(2)} to ${(await state()).dist.toFixed(2)}`);
+      await play('d2', 'd3');
+      s = await state();
+      R.expect(`${tag}: locked view still lets a tap move a piece`, s.moves.length === 5 && s.moves[4] === 'd3' && s.audit.length === 0, 'd3 played', `${s.moves.join(' ')} ${s.audit.join(',')}`);
+      await ev(() => window.__chess.controls.setLocked(false));
+      await dragOrbit();
+      R.expect(`${tag}: unlocking brings orbit back`, Math.abs((await camYaw()) - yawL1) > 0.05, `camera yaw ${yawL1.toFixed(3)} to ${(await camYaw()).toFixed(3)}`);
+
       // ---- page zoom is blocked
       await ev(() => {
         window.__tt = { dblPrevented: [], multiPrevented: [] };
@@ -185,7 +228,8 @@ async function runSize(size) {
       const sp = (await freeSpots())[0] || mid;
       await tap(sp.x, sp.y); await tap(sp.x, sp.y);   // double tap on the board
       // two fingers off the canvas: the HUD card, or the header of a drawer, whichever is free; fall back to the top edge strip
-      const off = await ev(() => { const el = document.querySelector('#hud .card') || document.getElementById('turn'); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }; });
+      // (phone HUD: the thumb bar, always visible; older layouts: the first card)
+      const off = await ev(() => { const el = document.querySelector('.pbar') || document.querySelector('#hud .card') || document.getElementById('turn'); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }; });
       const ofs = Math.min(40, off.w / 4);
       await down(1, off.x - ofs, off.y); await down(2, off.x + ofs, off.y);
       await moveTo(1, off.x - ofs * 2, off.y, 4); await moveTo(2, off.x + ofs * 2, off.y, 4);
@@ -203,7 +247,15 @@ async function runSize(size) {
     if (collapsedGame) { await tapEl(gameHdr); await sleep(400); }
     const hudOk = await ev(() => !!document.getElementById('btn-new'));
     R.expect(`${tag}: HUD is built`, hudOk, '');
-    // a view preset: the toolbox may sit in the Controls drawer on narrow layouts
+    // a view preset. Phone HUD: the Views button on the thumb bar cycles the presets (White, Black, Top down, Side, ...); three
+    // taps always leave the 46 degree start pitch. Older layouts: the third preset button, which may sit in the Controls drawer.
+    const viewsBtn = '.tb[data-act="views"]';
+    if (await centre(viewsBtn)) {
+      const before = (await state()).pitch;
+      for (let k = 0; k < 3; k++) { await tapEl(viewsBtn); await step(2); }
+      s = await state();
+      R.expect(`${tag}: tapping Views on the thumb bar cycles the presets`, Math.abs(s.pitch - before) > 0.05, `pitch ${(before * 57.3).toFixed(0)} to ${(s.pitch * 57.3).toFixed(0)} deg after 3 taps`);
+    } else {
     const presetSel = '#presets .preset:nth-child(3)';
     let c = await centre(presetSel);
     if (!c) { await tapEl('.drawer-btn'); await sleep(150); c = await centre(presetSel); }
@@ -219,12 +271,46 @@ async function runSize(size) {
       s = await state();
       R.expect(`${tag}: tapping the view preset "${name}" moves the camera`, Math.abs(s.pitch - before) > 0.05, `pitch ${(before * 57.3).toFixed(0)} to ${(s.pitch * 57.3).toFixed(0)} deg`);
     }
-    // New game
-    let tapped = await tapEl('#btn-new');
+    }
+    // Menu sheet (phone HUD): Menu opens it, the close button closes it
+    if (await centre('.tb[data-act="menu"]')) {
+      await tapEl('.tb[data-act="menu"]');
+      // the sheet slides in with a CSS transition: poll (software GL is slow) until its close button can be hit
+      // and until it stopped moving: a point sampled mid-slide is stale by the time the finger lands
+      let x = null, prev = null;
+      for (let k = 0; k < 40 && !x; k++) {
+        await sleep(100);
+        const c = await centre('.psheet-x');
+        if (c && prev && Math.abs(c.x - prev.x) < 0.5 && Math.abs(c.y - prev.y) < 0.5) x = c;
+        prev = c;
+      }
+      const open = await ev(() => document.querySelector('.psheet')?.classList.contains('open'));
+      R.expect(`${tag}: Menu on the thumb bar opens the sheet`, open && !!x, 'sheet open, close button reachable', `open ${open}, close button ${x ? 'reachable' : 'covered or off screen'}`);
+      if (x) await tap(x.x, x.y);
+      let closed = false;
+      for (let k = 0; k < 30 && !closed; k++) { await sleep(100); closed = !(await ev(() => document.querySelector('.psheet')?.classList.contains('open'))); }
+      R.expect(`${tag}: the sheet's close button closes it`, closed, 'closed', 'still open');
+      await sleep(500);
+    }
+    // New game: on the phone HUD a game in progress asks "Start a new game?" first (Yes and Cancel)
+    const newBtn = '.tb[data-act="new"]';
+    const before = (await state()).moves.length;
+    let tapped = await tapEl(newBtn) || await tapEl('#btn-new');
     if (!tapped) { await tapEl('.drawer-btn'); await sleep(150); tapped = await tapEl('#btn-new'); }
+    await sleep(200);
+    const asked = await centre('.pconfirm [data-a="no"]');
+    if (asked) {
+      await tap(asked.x, asked.y); await sleep(200); await step(0.5);
+      s = await state();
+      R.expect(`${tag}: Cancel on the new game question keeps the game`, s.moves.length === before && before > 0 && !(await centre('.pconfirm [data-a="no"]')), `${before} moves kept, question closed`, `moves ${s.moves.length} of ${before}`);
+      await tapEl(newBtn); await sleep(200);
+      const yes = await centre('.pconfirm [data-a="yes"]');
+      if (yes) await tap(yes.x, yes.y);
+      else R.fail(`${tag}: the Yes button of the new game question can be tapped`, 'not reachable');
+    }
     await sleep(100); await step(2.5);
     s = await state();
-    R.expect(`${tag}: tapping New game resets the game`, tapped && s.moves.length === 0 && s.turn === 'w' && s.audit.length === 0, 'start position', `tapped ${tapped}, moves ${s.moves.length}`);
+    R.expect(`${tag}: tapping New game, then Yes, resets the game`, tapped && s.moves.length === 0 && s.turn === 'w' && s.audit.length === 0, 'start position', `tapped ${tapped}, asked ${!!asked}, moves ${s.moves.length}`);
     R.expect(`${tag}: no console or page error during the touch run`, watch.errs.length === 0, 'clean', watch.errs.slice(0, 3).join(' | '));
   } finally { await page.close().catch(() => {}); }
 }

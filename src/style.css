@@ -43,7 +43,7 @@ button, select, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- HUD layout */
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; transition: opacity 0.35s ease; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
-#hud.hidden > .col, #hud.hidden > .help, #hud.hidden > .drawer-btn { opacity: 0; pointer-events: none !important; transform: translateY(6px); }
+#hud.hidden > .col, #hud.hidden > .help, #hud.hidden > .drawer-btn, #hud.hidden > .pstatus, #hud.hidden > .pbar { opacity: 0; pointer-events: none !important; transform: translateY(6px); }
 .col { position: absolute; top: max(14px, env(safe-area-inset-top)); bottom: max(14px, env(safe-area-inset-bottom)); width: clamp(224px, 17vw, 268px); display: flex; flex-direction: column; gap: 10px; transition: opacity 0.35s ease, transform 0.35s ease; }
 .col.left { left: max(14px, env(safe-area-inset-left)); }
 .col.right { right: max(14px, env(safe-area-inset-right)); }
@@ -130,6 +130,10 @@ select {
 select option { background: #15161d; color: var(--text); }
 .field select { flex: 0 0 140px; }
 
+/* lock view: touch devices only */
+.lockrow { display: none; margin-bottom: 10px; }
+body.touch .lockrow { display: flex; }
+
 /* vs computer */
 .row.ai { align-items: center; flex-wrap: wrap; }
 .row.ai select { flex: 1; padding: 5px 24px 5px 8px; font-size: 12px; }
@@ -194,6 +198,7 @@ select option { background: #15161d; color: var(--text); }
 .pbtn small { color: var(--dim); font-size: 11px; }
 .pbtn:hover { transform: translateY(-3px); background: var(--gold-soft); border-color: rgba(216, 180, 104, 0.7); }
 #toast { position: fixed; left: 50%; top: 18px; transform: translate(-50%, -14px); opacity: 0; z-index: 25; padding: 8px 18px; border-radius: 999px; background: rgba(255, 107, 90, 0.92); color: #fff; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; pointer-events: none; transition: opacity 0.3s, transform 0.3s; box-shadow: 0 8px 30px rgba(255, 107, 90, 0.35); }
+#toast.info { background: rgba(30, 32, 42, 0.95); color: var(--text); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #notice { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; max-width: min(360px, 86vw); padding: 16px 20px; border-radius: var(--r); background: var(--glass-strong); border: 1px solid var(--line-strong); color: var(--text); text-align: center; line-height: 1.45; cursor: pointer; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
 @keyframes pop { from { transform: scale(0.85) translateY(10px); opacity: 0; } }
@@ -215,4 +220,130 @@ select option { background: #15161d; color: var(--text); }
   .card.grow { max-height: 28vh; }
   .help { right: 10px; left: 10px; width: auto; bottom: 180px; }
 }
+/* ---------------------------------------------------------------- tablets: 44 px targets (phones have their own block below) */
+body.touch:not(.phone) .btn, body.touch:not(.phone) select, body.touch:not(.phone) .drawer-btn, body.touch:not(.phone) .show-btn, body.touch:not(.phone) .switch { min-height: 44px; }
+body.touch:not(.phone) .card > header { min-height: 44px; }
+body.touch:not(.phone) .icon-btn { width: 44px; height: 44px; }
+body.touch:not(.phone) input[type="range"] { height: 44px; }
+body.touch:not(.phone) .pbtn { min-height: 44px; }
+
+/* ---------------------------------------------------------------- phones (body.phone, set by src/device.js)
+   Status line on top, thumb bar at the bottom (a column on the right in landscape), Menu bottom sheet. Lite glass: no backdrop
+   blur, a more solid fill, lighter shadows. .pframe is an invisible probe: the free area for the camera (controls.setFrame). */
+.pstatus, .pbar, .pframe, .pscrim, .psheet { display: none; }
+body.phone {
+  --sl: max(8px, env(safe-area-inset-left)); --sr: max(8px, env(safe-area-inset-right));
+  --st: max(8px, env(safe-area-inset-top)); --sb: max(6px, env(safe-area-inset-bottom));
+  --stat: 36px; --bar: 52px; --barw: 60px; --gap: 6px;
+  --glass: rgba(22, 24, 32, 0.84); --glass-strong: rgba(16, 17, 24, 0.94); --r: 14px;
+}
+body.phone .col, body.phone .drawer-btn, body.phone .help, body.phone #btn-help { display: none !important; }
+body.phone .card, body.phone .banner-card, body.phone .promo-card, body.phone .show-btn, body.phone #notice {
+  backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+body.phone .pstatus, body.phone .pbar, body.phone .psheet, body.phone .pscrim, body.phone .pframe { display: flex; }
+
+body.phone .pstatus {
+  position: fixed; z-index: 12; top: var(--st); left: var(--sl); right: var(--sr); height: var(--stat); padding: 0 12px; gap: 8px;
+  align-items: center; border-radius: 12px; background: var(--glass); border: 1px solid var(--line); pointer-events: none;
+  font-size: 13px; white-space: nowrap; overflow: hidden; transition: opacity 0.35s ease, background 0.3s, border-color 0.3s;
+}
+body.phone .pstatus b { font-weight: 600; flex: none; }
+body.phone .pstatus .ps-sub { color: var(--dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+body.phone .pstatus .ps-last { margin-left: auto; color: var(--dim); font-variant-numeric: tabular-nums; flex: none; }
+body.phone .pstatus.check { border-color: rgba(255, 107, 90, 0.55); background: rgba(60, 24, 22, 0.9); }
+body.phone .pstatus.check .ps-sub { color: #ff9b8f; }
+body.phone .pstatus .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; border: 1px solid rgba(255, 255, 255, 0.35); }
+body.phone .pstatus .dot.w { background: radial-gradient(circle at 35% 30%, #fff, #d9d4c6 70%); }
+body.phone .pstatus .dot.b { background: radial-gradient(circle at 35% 30%, #4a4d57, #0b0c10 70%); }
+body.phone .pstatus.think .dot { animation: pulse 1s ease-in-out infinite; }
+
+body.phone .pbar {
+  position: fixed; z-index: 16; left: var(--sl); right: var(--sr); bottom: var(--sb); height: var(--bar); gap: var(--gap);
+  pointer-events: auto; transition: opacity 0.35s ease;
+}
+body.phone .tb {
+  flex: 1 1 0; min-width: 44px; min-height: 44px; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: 14px; border: 1px solid var(--line-strong); background: var(--glass); color: var(--text); cursor: pointer; touch-action: manipulation;
+}
+body.phone .tb svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+body.phone .tb span { font-size: 11px; line-height: 1.1; font-weight: 550; letter-spacing: 0.01em; }
+body.phone .tb:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.14); }
+body.phone .tb:disabled { opacity: 0.35; }
+body.phone .tb.on { background: var(--gold-soft); border-color: rgba(216, 180, 104, 0.6); color: #f3dfa8; }
+
+body.phone .pframe { position: fixed; z-index: -1; visibility: hidden; pointer-events: none; top: calc(var(--st) + var(--stat) + var(--gap)); bottom: calc(var(--sb) + var(--bar) + var(--gap)); left: var(--sl); right: var(--sr); }
+
+body.phone .pscrim { position: fixed; inset: 0; z-index: 13; background: rgba(0, 0, 0, 0.4); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.25s, visibility 0s 0.25s; }
+body.phone .pscrim.open { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.25s; }
+body.phone .psheet {
+  position: fixed; z-index: 15; left: var(--sl); right: var(--sr); max-width: 520px; margin-inline: auto; flex-direction: column;
+  bottom: calc(var(--sb) + var(--bar) + var(--gap));
+  max-height: calc(100% - var(--st) - var(--stat) - var(--sb) - var(--bar) - 24px);
+  background: var(--glass-strong); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.35);
+  transform: translateY(calc(100% + 80px)); visibility: hidden; transition: transform 0.3s ease, visibility 0s 0.3s;
+}
+body.phone .psheet.open { transform: none; visibility: visible; transition: transform 0.3s ease; }
+body.phone .psheet-head { position: relative; flex: none; height: 48px; display: flex; align-items: center; justify-content: center; touch-action: none; cursor: grab; }
+body.phone .psheet-head b { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+body.phone .grip { position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 4px; background: rgba(255, 255, 255, 0.28); }
+body.phone .psheet-x { position: absolute; right: 2px; top: 2px; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--dim); font-size: 16px; cursor: pointer; }
+body.phone .psheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 8px; -webkit-overflow-scrolling: touch; }
+body.phone .psheet .card { background: rgba(255, 255, 255, 0.05); box-shadow: none; }
+body.phone .psheet .card.grow { max-height: none; min-height: 0; display: block; }
+body.phone .psheet .card.grow .body { display: block; overflow: visible; }
+body.phone .psheet .moves { max-height: min(34vh, 220px); }
+body.phone .psheet .moves li { padding: 7px 6px; }
+body.phone .card > header { min-height: 44px; padding: 0 14px; }
+body.phone .card > header h2 { font-size: 11px; }
+body.phone .btn { min-height: 44px; font-size: 14px; }
+body.phone .presets { gap: 8px; }
+body.phone .presets .btn.preset { min-height: 44px; font-size: 13px; }
+body.phone .btn.small { min-height: 44px; margin-top: 10px; font-size: 13px; }
+body.phone select { min-height: 44px; font-size: 14px; }
+body.phone .field select { flex: 0 0 150px; }
+body.phone .row.ai { gap: 8px; }
+body.phone .row.ai select { flex: 1 1 40%; font-size: 13px; }
+body.phone .switch { min-height: 44px; }
+body.phone .switch em { font-size: 14px; }
+body.phone .field > span { font-size: 13px; }
+body.phone .slider { grid-template-columns: 64px 1fr 44px; gap: 6px; }
+body.phone .slider label span { font-size: 11px; }
+body.phone .slider output { font-size: 13px; }
+body.phone input[type="range"] { height: 44px; }
+body.phone input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -10px; }
+body.phone input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+body.phone .sliders { gap: 0; }
+body.phone .keys { margin: 0; padding: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; }
+body.phone .keys dt { font-weight: 600; font-size: 13px; color: var(--gold); white-space: nowrap; }
+body.phone .keys dd { margin: 0; color: var(--dim); font-size: 13px; }
+
+body.phone .show-btn { top: var(--st); right: var(--sr); min-height: 44px; min-width: 44px; font-size: 13px; }
+body.phone #toast { top: calc(var(--st) + var(--stat) + 10px); }
+
+body.phone .pconfirm { position: fixed; z-index: 17; left: 50%; transform: translateX(-50%); bottom: calc(var(--sb) + var(--bar) + var(--gap) + 8px); width: min(300px, calc(100% - 16px)); padding: 14px; border-radius: 16px; background: var(--glass-strong); border: 1px solid var(--line-strong); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4); text-align: center; pointer-events: auto; }
+body.phone .pconfirm p { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+body.phone .pconfirm .row .btn { flex: 1; }
+body.phone:not(.portrait) .pconfirm { bottom: calc(var(--sb) + 8px); left: calc((100% - var(--barw) - var(--gap)) / 2); }
+
+/* promotion chooser fits a 390 px screen, banner sits above the thumb bar */
+body.phone .promo-card { padding: 14px 14px 16px; max-width: calc(100vw - 16px); }
+body.phone .promo-row { gap: 8px; }
+body.phone .pbtn { width: 66px; min-height: 72px; padding: 6px 0; }
+body.phone .pbtn span { font-size: 38px; }
+body.phone #banner { align-items: end; padding: 0 8px calc(var(--sb) + var(--bar) + 14px); }
+body.phone .banner-card { padding: 12px 18px 14px; }
+body.phone .banner-card h2 { font-size: 26px; }
+body.phone .banner-card p { margin-bottom: 10px; font-size: 14px; }
+
+/* landscape: the thumb bar is a column on the right */
+body.phone:not(.portrait) .pstatus { right: calc(var(--sr) + var(--barw) + var(--gap)); }
+body.phone:not(.portrait) .pbar { left: auto; top: var(--st); width: var(--barw); height: auto; flex-direction: column; justify-content: center; }
+body.phone:not(.portrait) .tb { flex: 0 1 60px; }
+body.phone:not(.portrait) .pframe { bottom: var(--sb); right: calc(var(--sr) + var(--barw) + var(--gap)); }
+body.phone:not(.portrait) .psheet { bottom: var(--sb); right: calc(var(--sr) + var(--barw) + var(--gap)); max-height: calc(100% - var(--st) - var(--sb) - 6px); }
+body.phone:not(.portrait) #banner { padding: 0 calc(var(--sr) + var(--barw) + var(--gap)) calc(var(--sb) + 8px) var(--sl); }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+/* the sheet itself takes taps (the HUD layer passes them through), so its close button and swipe grip work */
+body.phone .psheet { pointer-events: auto; }

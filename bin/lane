@@ -69,10 +69,20 @@ function agent(branch, name, brief, model = 'sonnet') {
   const pane = (tab.root_pane || tab.pane || {}).pane_id;
   if (!pane) die(`could not read the new tab's pane from herdr: ${JSON.stringify(tab).slice(0, 200)}`);
   const id = `${branch}-${name}`;
-  run('herdr', ['agent', 'start', id, '--kind', 'claude', '--pane', pane, '--timeout', '60000', '--',
-    '--model', model, '--plugin-dir', join(process.env.HOME, 'code', 'mattpocock-skills')]);
+  // a fresh tab needs a moment before its shell takes input: retry while herdr says the pane is busy
+  for (let i = 0; ; i++) {
+    try {
+      run('herdr', ['agent', 'start', id, '--kind', 'claude', '--pane', pane, '--timeout', '60000', '--',
+        '--model', model, '--plugin-dir', join(process.env.HOME, 'code', 'mattpocock-skills')]);
+      break;
+    } catch (e) {
+      if (i >= 10 || !/agent_pane_busy/.test(String(e.stderr || e.stdout || e.message))) throw e;
+      spawnSync('sleep', ['1']);
+    }
+  }
   const prompt = `You are the "${name}" agent of lane ${branch} (worktree ${lane.path}). Read your brief at ${resolve(brief)} and follow it exactly. `
-    + `When you are done, send your final report to the lead session with: herdr agent prompt ${LEAD} "<your report>" (one message, plain text). `
+    + `When you are done, write your final report to .tmp/${name}/report.md in the lane AND send it to the lead session with: herdr agent prompt ${LEAD} "<your report>" (one message, plain text). `
+    + 'If the send is refused (the lead may be waiting on the owner), retry every 2 minutes, at most 10 times. '
     + 'Then stop and wait; the lead may message you with follow ups.';
   run('herdr', ['agent', 'prompt', id, prompt]);
   console.log(`agent ${id} started in tab "${name} agent" of workspace ${lane.open_workspace_id} (${model}); it reports to ${LEAD}`);

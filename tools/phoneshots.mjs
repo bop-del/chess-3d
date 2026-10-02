@@ -1,11 +1,11 @@
 // Phone tier, part 1: screenshots and layout audits at five iPhone sizes (headless Chrome, touch emulation, software GL).
 // Usage: node tools/phoneshots.mjs [--skip-build] [--port=5306] [--only=portrait,se] [--dpr=3]
 //   Builds into .tmp/phone-dist, serves it on port 5306 and, for each size, loads the page with quality=low&manual=1&ai=0&touch=1
-//   and takes five shots into .tmp/phone-shots/<size>/ : start, selected (a real tap on e2), drawer (Controls tapped), help, promo.
+//   and takes five shots into .tmp/phone-shots/<size>/ : start, selected (a real tap on e2), menu (the Menu sheet opened by tap), help, promo.
 //   Simulated safe area insets (portrait 47 top 34 bottom, landscape 47 left and right 21 bottom, the short sizes keep the side
 //   insets and drop the bottom one) go through CDP Emulation.setSafeAreaInsetsOverride. One contact sheet per size follows.
 // Audits per size, on every shot, duplicates merged:
-//   tap targets      visible button, select, input, [role=button], .card header under 44 x 44 CSS px: WARN (M3 flips TAP_TARGET_FAILS)
+//   tap targets      visible button, select, input, [role=button], .card header under 44 x 44 CSS px: FAIL since the phone layout (TAP_TARGET_FAILS)
 //   text size        visible text under 11 CSS px: WARN
 //   clipping         visible HUD elements reaching outside the viewport: WARN
 //   page errors      console errors, page errors, foreign requests: FAIL
@@ -17,7 +17,7 @@ import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep } f
 import { contactSheets } from './contact-sheet.mjs';
 
 // M3 switches the tap target audit from WARN to FAIL by flipping this one constant.
-const TAP_TARGET_FAILS = false;
+const TAP_TARGET_FAILS = true;   // switched on with the phone layout (M3)
 const TAP_MIN = 44, TEXT_MIN = 11;
 
 const SIZES = {
@@ -210,12 +210,12 @@ try {
       }
       await shot('selected');
 
-      // Controls drawer (narrow layout)
+      // Menu sheet (phone layout)
       await load();
-      const tapped = await tapEl('.drawer-btn');
-      const open = await page.evaluate(() => !!document.querySelector('.col.left')?.classList.contains('open'));
-      R.expect(`${name} Controls drawer opens by tap`, tapped && open, '', tapped ? 'drawer did not open' : 'no .drawer-btn visible');
-      await shot('drawer');
+      const tapped = await tapEl('.tb[data-act="menu"]');
+      const open = await page.evaluate(() => !!document.querySelector('.psheet')?.classList.contains('open'));
+      R.expect(`${name} Menu sheet opens by tap`, tapped && open, '', tapped ? 'sheet did not open' : 'no Menu button visible');
+      await shot('menu');
 
       // help panel
       await load('&help=1');

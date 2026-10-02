@@ -1,7 +1,23 @@
 // HUD: glass panels, move list, captured pieces, sliders, presets, menus, banners.
+// On phones (device.phone) the same cards are moved into a bottom sheet (Menu) and a status line plus a thumb bar are added,
+// see buildPhone() at the end of createUI. Desktop and tablets keep the columns.
+import { device } from './device.js';
+import { PRESETS } from './controls.js';
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const g = (t) => GLYPH[t] + '︎';
 const VAL = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
+const PHONE_KEYS = [
+  ['Tap a piece', 'Select it, then tap a square'], ['Drag', 'Orbit camera'], ['Two fingers', 'Pinch to zoom'],
+  ['Undo', 'Take back a move'], ['Flip', 'View from the other side'], ['Views', 'Cycle the camera views'],
+];
+const PHONE_TEXT = { newAsk: 'Start a new game?', yes: 'Yes', cancel: 'Cancel' };
+const ICON = {
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  new: '<path d="M12 5v14M5 12h14"/>',
+  flip: '<path d="M8 20V6M4 10l4-4 4 4"/><path d="M16 4v14M12 14l4 4 4-4"/>',
+  views: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+};
 const PIECE_NAME = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
 
 const KEYS = [
@@ -39,6 +55,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
       <header><h2>View</h2><span class="chev"></span></header>
       <div class="body">
         <div class="presets" id="presets"></div>
+        <label class="switch lockrow" title="Stop all camera gestures; taps still move pieces"><input type="checkbox" id="chk-lock"><span class="track"><i></i></span><em>Lock view</em></label>
         <div class="row three">
           <button class="btn" id="btn-flip" title="Flip to the other side (F)">Flip</button>
           <button class="btn toggle" id="btn-spin" title="Auto spin (Space)">Spin</button>
@@ -110,12 +127,14 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
 
   // ------------------------------------------------------------ collapsible cards
   const narrow = () => window.matchMedia('(max-width: 900px)').matches;
-  hud.querySelectorAll('.card[data-card] > header').forEach((h) => {
+  if (!device.phone) hud.querySelectorAll('.card[data-card] > header').forEach((h) => {
     h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
   });
-  if (narrow()) right.querySelectorAll('.card[data-card]').forEach((c) => { if (c.dataset.card !== 'game') c.classList.add('collapsed'); });
+  if (narrow() && !device.phone) right.querySelectorAll('.card[data-card]').forEach((c) => { if (c.dataset.card !== 'game') c.classList.add('collapsed'); });
   drawerBtn.addEventListener('click', () => { $('#tools').style.bottom = `${right.offsetHeight + 20}px`; left.classList.toggle('open'); drawerBtn.classList.toggle('on', left.classList.contains('open')); });
   // expose toolbox on narrow screens as a sheet
+
+  let phoneUI = null;   // set by buildPhone() on phones
 
   // ------------------------------------------------------------ presets and view buttons
   const presetBox = $('#presets');
@@ -127,6 +146,16 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   $('#btn-flip').addEventListener('click', () => controls.flip());
   $('#btn-reset').addEventListener('click', () => controls.reset());
   $('#btn-spin').addEventListener('click', () => controls.toggleSpin());
+
+  // Lock view (touch only, the row is hidden by CSS otherwise): stops orbit, pinch, twist and wheel. Remembered per device.
+  const chkLock = $('#chk-lock');
+  try { chkLock.checked = localStorage.getItem('chess3d.lockView') === '1'; } catch (e) { /* storage blocked */ }
+  const applyLock = () => controls.setLocked?.(chkLock.checked);
+  chkLock.addEventListener('change', () => {
+    applyLock();
+    try { localStorage.setItem('chess3d.lockView', chkLock.checked ? '1' : '0'); } catch (e) { /* storage blocked */ }
+  });
+  if (device.touch) applyLock();
 
   // ------------------------------------------------------------ gimbal sliders
   const sliderBox = $('#sliders');
@@ -178,16 +207,17 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     const hide = force ?? !hud.classList.contains('hidden');
     hud.classList.toggle('hidden', hide);
     showBtn.hidden = !hide;
-    if (hide) { help.hidden = true; }
+    if (hide) { help.hidden = true; phoneUI?.close(); }
+    phoneUI?.frame();
   }
-  function toggleHelp() { help.hidden = !help.hidden; }
+  function toggleHelp() { if (phoneUI) phoneUI.toggleHelp(); else help.hidden = !help.hidden; }
   $('#btn-hide').addEventListener('click', () => toggleHud(true));
   showBtn.addEventListener('click', () => toggleHud(false));
   controls.hooks.undo = () => { game.undo(); hideBanner(); };
   controls.hooks.newGame = () => { game.newGame(); hideBanner(); };
   controls.hooks.toggleHud = () => toggleHud();
   controls.hooks.toggleHelp = toggleHelp;
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { help.hidden = true; hideBanner(); game.pendingPromotion && promoCancel?.(); } });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { help.hidden = true; phoneUI?.close(); hideBanner(); game.pendingPromotion && promoCancel?.(); } });
 
   // ------------------------------------------------------------ state rendering
   const movesEl = $('#moves');
@@ -237,6 +267,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     if (st.check && !lastCheck && !st.over) toast('Check');
     lastCheck = st.check;
     if (chkAi.checked !== st.vsComputer) chkAi.checked = st.vsComputer;
+    phoneUI?.status(st);
   }
   game.on('change', render);
   render(game.getState());
@@ -272,8 +303,9 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   // ------------------------------------------------------------ toast
   const toastEl = document.getElementById('toast');
   let toastT = 0;
-  function toast(msg) {
+  function toast(msg, kind) {
     toastEl.textContent = msg;
+    toastEl.classList.toggle('info', kind === 'info');
     toastEl.classList.add('show');
     clearTimeout(toastT);
     toastT = setTimeout(() => toastEl.classList.remove('show'), 1400);
@@ -293,6 +325,168 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
       s.out.innerHTML = `${v}&deg;`;
     }
     $('#btn-spin').classList.toggle('on', controls.spin);
+  }
+
+  // ------------------------------------------------------------ phone HUD
+  // Status line on top, thumb bar (Undo, New game, Flip, Views, Menu) at the bottom (a column on the right in landscape) and a
+  // Menu bottom sheet that takes over the existing cards: Game, Moves, View and gimbal, Scene, Help. A hidden probe element
+  // (.pframe) is positioned by the stylesheet to the free area between them; its rectangle goes to controls.setFrame.
+  function buildPhone() {
+    const cardOf = (n) => hud.querySelector(`.card[data-card="${n}"]`);
+    const status = el('div', 'pstatus');
+    status.setAttribute('role', 'status');
+    status.innerHTML = '<i class="dot w"></i><b class="ps-main">White to move</b><span class="ps-sub"></span><span class="ps-last"></span>';
+    const bar = el('nav', 'pbar');
+    bar.setAttribute('aria-label', 'Game controls');
+    const btn = {};
+    for (const [id, label] of [['undo', 'Undo'], ['new', 'New game'], ['flip', 'Flip'], ['views', 'Views'], ['menu', 'Menu']]) {
+      const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span>${label}</span>`);
+      b.dataset.act = id;
+      bar.append(b);
+      btn[id] = b;
+    }
+    const confirmBox = el('div', 'pconfirm');
+    confirmBox.hidden = true;
+    confirmBox.setAttribute('role', 'alertdialog');
+    confirmBox.innerHTML = `<p>${PHONE_TEXT.newAsk}</p><div class="row"><button class="btn primary" data-a="yes">${PHONE_TEXT.yes}</button><button class="btn" data-a="no">${PHONE_TEXT.cancel}</button></div>`;
+    const probe = el('div', 'pframe');
+    probe.setAttribute('aria-hidden', 'true');
+
+    const scrim = el('div', 'pscrim');
+    const sheet = el('section', 'psheet');
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-label', 'Menu');
+    sheet.innerHTML = '<div class="psheet-head"><i class="grip"></i><b>Menu</b><button class="psheet-x" aria-label="Close menu">&#x2715;</button></div><div class="psheet-body"></div>';
+    const sheetBody = sheet.querySelector('.psheet-body');
+
+    // sections: the existing cards move here. Gimbal sliders join the View card, captured pieces stay in the 3D trays.
+    const gameC = cardOf('game'), movesC = cardOf('moves'), viewC = cardOf('view'), sceneC = cardOf('scene');
+    viewC.querySelector('h2').textContent = 'View and gimbal';
+    const sl = $('#sliders');
+    sl.classList.remove('body');
+    viewC.querySelector('.body').append(sl);
+    const helpC = el('section', 'card');
+    helpC.dataset.card = 'help';
+    helpC.innerHTML = `<header><h2>Help</h2><span class="chev"></span></header><div class="body"><dl class="keys">${PHONE_KEYS.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></div>`;
+    const cards = [gameC, movesC, viewC, sceneC, helpC];
+    sheetBody.append(...cards);
+    const openCard = (c) => {
+      cards.forEach((x) => x.classList.toggle('collapsed', x !== c));
+      sheetBody.scrollTop = Math.max(0, c.offsetTop - sheetBody.offsetTop - 4);
+    };
+    openCard(gameC);
+    for (const c of cards) {
+      c.querySelector('header').addEventListener('click', () => { if (c.classList.contains('collapsed')) openCard(c); else c.classList.add('collapsed'); });
+    }
+
+    hud.append(status, bar, probe, scrim, sheet, confirmBox);
+
+    // sheet open and close; swipe down on the header closes it
+    const isOpen = () => sheet.classList.contains('open');
+    function close() { confirmBox.hidden = true; sheet.classList.remove('open'); scrim.classList.remove('open'); btn.menu.classList.remove('on'); }
+    function open(card) {
+      sheet.classList.add('open'); scrim.classList.add('open'); btn.menu.classList.add('on');
+      if (card) openCard(card);
+      if (!movesC.classList.contains('collapsed')) movesEl.scrollTop = movesEl.scrollHeight;
+    }
+    scrim.addEventListener('click', close);
+    sheet.querySelector('.psheet-x').addEventListener('click', close);
+    const head = sheet.querySelector('.psheet-head');
+    let drag = null;
+    head.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.psheet-x')) return;
+      drag = { y: e.clientY, dy: 0 };
+      try { head.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      sheet.style.transition = 'none';
+    });
+    head.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      drag.dy = Math.max(0, e.clientY - drag.y);
+      sheet.style.transform = `translateY(${drag.dy}px)`;
+    });
+    const release = () => {
+      if (!drag) return;
+      const far = drag.dy > 70;
+      drag = null;
+      sheet.style.transition = ''; sheet.style.transform = '';
+      if (far) close();
+    };
+    head.addEventListener('pointerup', release);
+    head.addEventListener('pointercancel', release);
+
+    // thumb bar
+    let vi = -1;
+    btn.undo.addEventListener('click', () => { game.undo(); hideBanner(); });
+    // New game: one tap at the start or after the game ended, a small confirm while a game is in progress
+    const startNew = () => { confirmBox.hidden = true; game.newGame(); hideBanner(); close(); };
+    const askNew = () => {
+      const st = game.getState();
+      if (st.moves.length && !st.over) { confirmBox.hidden = !confirmBox.hidden; } else startNew();
+    };
+    confirmBox.querySelector('[data-a=yes]').addEventListener('click', startNew);
+    confirmBox.querySelector('[data-a=no]').addEventListener('click', () => { confirmBox.hidden = true; });
+    btn.new.addEventListener('click', askNew);
+    sheetBody.addEventListener('click', (e) => {
+      if (!e.target.closest('#btn-new')) return;
+      e.stopPropagation();
+      askNew();
+    }, true);
+    btn.flip.addEventListener('click', () => controls.flip());
+    btn.views.addEventListener('click', () => {
+      // the preset after the one in view: the last one picked while the camera is still moving, else the nearest one to the camera
+      if (!controls.animating) {
+        const c = controls.camera;
+        let best = -1, bd = 0.4;
+        controls.presets.forEach((n, i) => {
+          const P = PRESETS[n];
+          const dy = Math.abs(Math.atan2(Math.sin(c.yaw - P.yaw), Math.cos(c.yaw - P.yaw)));
+          const d = dy * Math.max(0.2, Math.cos(P.pitch)) + Math.abs(c.pitch - P.pitch);
+          if (d < bd) { bd = d; best = i; }
+        });
+        vi = best;
+      }
+      vi = (vi + 1) % controls.presets.length;
+      controls.setPreset(controls.presets[vi]);
+      toast(controls.presets[vi], 'info');
+    });
+    btn.menu.addEventListener('click', () => (isOpen() ? close() : open()));
+
+    // free area for the camera
+    function frame() {
+      if (hud.classList.contains('hidden')) { controls.setFrame({}); return; }
+      const r = probe.getBoundingClientRect();
+      const W = document.documentElement.clientWidth, H = document.documentElement.clientHeight;
+      controls.setFrame({ top: r.top, left: r.left, right: W - r.right, bottom: H - r.bottom });
+    }
+    if (window.ResizeObserver) new ResizeObserver(frame).observe(probe);
+    addEventListener('resize', frame);
+    addEventListener('orientationchange', () => setTimeout(frame, 150));
+    frame();
+
+    let lastKey = '';
+    function statusRender(st) {
+      const sub = $('#turn-sub').textContent.trim();
+      const main = $('#turn-main').textContent;
+      const last = st.moves.length ? `Last: ${st.moves[st.moves.length - 1]}` : '';
+      const key = `${st.turn}|${main}|${sub}|${last}|${!!st.check}|${!!st.thinking}`;
+      btn.undo.disabled = !st.canUndo;
+      if (key === lastKey) return;
+      lastKey = key;
+      status.querySelector('.dot').className = 'dot ' + st.turn;
+      status.querySelector('.ps-main').textContent = main;
+      status.querySelector('.ps-sub').textContent = sub;
+      status.querySelector('.ps-last').textContent = last;
+      status.classList.toggle('check', !!st.check && !st.over);
+      status.classList.toggle('think', !!st.thinking);
+    }
+    return {
+      status: statusRender, close, frame,
+      toggleHelp() { if (isOpen() && !helpC.classList.contains('collapsed')) close(); else open(helpC); },
+    };
+  }
+  if (device.phone) {
+    phoneUI = buildPhone();
+    phoneUI.status(game.getState());
   }
 
   return { sync, toast, toggleHud, toggleHelp, render };

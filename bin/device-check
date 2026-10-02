@@ -1,0 +1,108 @@
+#!/usr/bin/env node
+// Build this checkout, serve it on the Tailscale (or LAN) address, show a QR code and
+// send the URL to the owner as a Signal note to self. Ctrl+C stops the server.
+// Usage: bin/device-check [--no-signal] [--port=4173]
+import { spawn, spawnSync } from 'node:child_process';
+import { networkInterfaces } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const outDir = join(root, '.tmp', 'device-dist');
+const vite = join(root, 'node_modules', '.bin', 'vite');
+const TAILSCALE = '/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+
+const args = process.argv.slice(2);
+const noSignal = args.includes('--no-signal');
+const portArg = args.find((a) => a.startsWith('--port='));
+const port = portArg ? Number(portArg.slice(7)) : 4173;
+for (const a of args) {
+  if (a !== '--no-signal' && !a.startsWith('--port=')) {
+    console.error(`device-check: unknown option ${a}\nusage: bin/device-check [--no-signal] [--port=4173]`);
+    process.exit(2);
+  }
+}
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  console.error('device-check: --port needs a number from 1 to 65535');
+  process.exit(2);
+}
+
+function run(cmd, cmdArgs, opts = {}) {
+  return spawnSync(cmd, cmdArgs, { encoding: 'utf8', ...opts });
+}
+
+function findAddress() {
+  const ts = run(TAILSCALE, ['ip', '-4']);
+  const ip = ts.status === 0 && ts.stdout.trim().split('\n')[0].trim();
+  if (ip) return { ip, kind: 'Tailscale' };
+  for (const list of Object.values(networkInterfaces())) {
+    for (const i of list || []) {
+      if (i.family === 'IPv4' && !i.internal) {
+        console.warn('warning: no Tailscale address, using the LAN address. The phone must be on the same Wi-Fi.');
+        return { ip: i.address, kind: 'LAN' };
+      }
+    }
+  }
+  console.error('device-check: no Tailscale or LAN address found');
+  process.exit(1);
+}
+
+console.log('Building into .tmp/device-dist ...');
+const build = run(vite, ['build', '--outDir', outDir, '--emptyOutDir'], { cwd: root, stdio: 'inherit' });
+if (build.status !== 0) {
+  console.error('device-check: build failed');
+  process.exit(1);
+}
+
+const { ip, kind } = findAddress();
+const url = `http://${ip}:${port}/`;
+
+const server = spawn(vite, ['preview', '--outDir', outDir, '--host', '0.0.0.0', '--port', String(port), '--strictPort'], {
+  cwd: root,
+  stdio: ['ignore', 'pipe', 'inherit'],
+});
+let stopping = false;
+function stop(code) {
+  if (stopping) return;
+  stopping = true;
+  server.kill('SIGTERM');
+  setTimeout(() => process.exit(code), 300);
+}
+process.on('SIGINT', () => stop(0));
+process.on('SIGTERM', () => stop(0));
+server.on('exit', (code) => {
+  if (!stopping) {
+    console.error(`device-check: server stopped (${code}). Is port ${port} in use?`);
+    process.exit(1);
+  }
+});
+
+let announced = false;
+server.stdout.on('data', (buf) => {
+  if (announced || !/Local:|Network:/.test(String(buf))) return;
+  announced = true;
+  announce();
+});
+
+function announce() {
+  console.log(`\n${kind} address: ${url}\n`);
+  const qr = run('qrencode', ['-t', 'ansiutf8', url]);
+  if (qr.status === 0) console.log(qr.stdout);
+  else console.warn('warning: qrencode failed or is missing (brew install qrencode)');
+
+  if (noSignal) {
+    console.log('Signal send skipped (--no-signal).');
+  } else {
+    // The account comes from signal-cli at runtime, never from a file.
+    const list = run('signal-cli', ['listAccounts']);
+    const account = (list.stdout || '').match(/\+\d+/)?.[0];
+    if (!account) {
+      console.warn('warning: no signal-cli account found, URL not sent');
+    } else {
+      const sent = run('signal-cli', ['-a', account, 'send', '--note-to-self', '-m', `chess-3d device check: ${url}`]);
+      if (sent.status === 0) console.log('URL sent as a Signal note to self.');
+      else console.warn(`warning: Signal send failed: ${(sent.stderr || '').trim().split('\n').pop()}`);
+    }
+  }
+  console.log('Serving. Ctrl+C to stop.');
+}

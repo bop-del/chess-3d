@@ -155,13 +155,16 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
       update(dt), apply(), onResize(w, h),
       setPreset(name), reset(), levelBoard(), flip(), topDown(), toggleSpin(),
       setGimbal(axis, degrees), setCamera({ yaw, pitch, dist }), nudgeZoom(factor),
+      setFrame({ top, right, bottom, left }), setLocked(bool),
       presets, hooks, onChange(fn),
-      spin, camera, gimbalDeg, animating      // read only
+      spin, camera, gimbalDeg, animating, frame, locked      // read only
     }
     PRESETS   // White view, Black view, Top down, Side, Isometric
 
 - Camera: yaw, pitch and distance around a target just above the board. Pitch is limited to 1.5 to 89.6 degrees, distance to 6 to 40. Drag gives damped inertia. On narrow screens the camera pulls back so the board fits the width.
 - Gimbal: rotation of the `gimbal` group in YXZ order, set by sliders, keys (W S A D Q E) or Shift, Ctrl or right drag.
+- Framing: `setFrame` takes the free canvas area as insets in CSS px (the phone HUD reports it). With insets the camera picks the smallest distance at which the board, its pieces up to king height and both capture trays fit the free area with a small margin, and centres them there; with zero insets the old width fit applies (desktop and tablets).
+- Touch: two fingers pinch to zoom and twist to turn the gimbal yaw at the same time (6 degree dead zone). `setLocked(true)` stops orbit, pinch, twist, wheel and inertia; taps, keys, presets and Reset still work.
 - Presets animate yaw, pitch, distance and the gimbal together on an ease curve, taking the shortest way round for every angle.
 - The floor fades with `stage.setFloorVisibility` once the board tilts more than 8 degrees on X or Z, and is gone at 38.
 - `hooks` is filled by the UI (`undo`, `newGame`, `toggleHud`, `toggleHelp`) so the keyboard handler can reach it.
@@ -170,7 +173,7 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 
     createUI({ game, controls, stage, quality }) -> { sync(), toast(msg), toggleHud(force), toggleHelp(), render(state) }
 
-Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal sliders, lighting and quality selects) and a right column (game buttons, computer opponent settings, SAN move list, captured pieces with the material balance). It also renders the promotion chooser (`#promo`), the game over banner (`#banner`), a toast for check (`#toast`) and the shortcut sheet. Below 900 px width the cards collapse and the left column becomes a sheet opened by the Controls button.
+Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal sliders, lighting and quality selects) and a right column (game buttons, computer opponent settings, SAN move list, captured pieces with the material balance). It also renders the promotion chooser (`#promo`), the game over banner (`#banner`), a toast for check (`#toast`) and the shortcut sheet. Below 900 px width the cards collapse and the left column becomes a sheet opened by the Controls button. On phones (`body.phone`, see device.js) `buildPhone()` adds a different HUD instead: a status line (`.pstatus`: turn, check, computer thinking, last move), a thumb bar (`.pbar`, buttons `.tb[data-act]`: Undo, New game with a confirm during a game, Flip, Views cycling to the next preset, Menu) at the bottom in portrait and on the right in landscape, and a bottom sheet (`.psheet` over `.pscrim`) with accordion sections Game, Moves, View and gimbal (with Lock view), Scene and Help. An invisible `.pframe` element marks the free area; its rectangle goes to `controls.setFrame`. Phones get lite glass (no backdrop blur). Tablets keep the desktop HUD with 44 px targets.
 
 ## Test hooks
 

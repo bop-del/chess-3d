@@ -60,7 +60,7 @@ Sliders and buttons (left panel)
 | New game, Undo, Keys | Game buttons (right panel) |
 | vs computer | On by default (you play white, Easy). Switch, your side (play white or black) and strength (Easy about 900, Normal about 1200, Hard about 1450, estimated, see below) |
 
-Touch: a one finger drag orbits the camera, a tap selects and moves, a two finger pinch zooms. The sliders rotate the board. The panels collapse on narrow screens and a Controls button opens the left panel.
+Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view stops all camera gestures. On a phone the game has a status line on top, a thumb bar with Undo, New game, Flip, Views and Menu, and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
 
 ## Features
 
