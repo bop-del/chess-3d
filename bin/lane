@@ -105,7 +105,13 @@ function close(branch, message) {
   const path = lane ? lane.path : null;
   if (path && run('git', ['status', '--porcelain'], { cwd: path })) die(`lane ${branch} has uncommitted changes: commit them in the lane first`);
   const commits = git('rev-list', `main..${branch}`).split('\n').filter(Boolean);
-  if (!commits.length) die(`lane ${branch} has no commits beyond main`);
+  if (!commits.length) {   // a lane without a merge (research, previews): nothing to squash, just remove it
+    if (lane && lane.open_workspace_id) run('herdr', ['worktree', 'remove', '--workspace', lane.open_workspace_id]);
+    else if (path) git('worktree', 'remove', path);
+    git('branch', '-D', branch);
+    console.log(`lane ${branch} had no commits beyond main: removed it without a merge (its .tmp went with it)`);
+    return;
+  }
   if (!message) {
     if (commits.length > 1) die(`lane ${branch} has ${commits.length} commits: pass -m with the squash commit message`);
     message = git('log', '-1', '--format=%B', branch);
