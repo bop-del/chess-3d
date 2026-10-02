@@ -35,7 +35,7 @@ No golden image diffs: software GL renders differ across machines. Take screensh
 - README before every push to bop-del repos: check whether the commits change anything the README describes (controls, URL flags, features, known issues, test commands) and update it in the same push. Nothing to change: say so in one line.
 - Publishing and pushing only on the owner's explicit go.
 - GitHub account is bop-del: `gh auth switch --user bop-del`. Never the HeyJobs account.
-- Commit trailer line: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
+- Commit trailer line: `Co-Authored-By:` the model that did the work, for example `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`. Never a fixed model name that may not match the session.
 - Commits use the git identity set in this repo's `.git/config`. Do not override it with `-c user.email`.
 
 ## Browser and test hygiene
