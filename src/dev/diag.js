@@ -40,8 +40,8 @@ export function initDiag({ stage }) {
   const box = document.createElement('div');
   box.id = 'diag';
   box.style.cssText = 'position:fixed;left:calc(env(safe-area-inset-left, 0px) + 6px);bottom:calc(env(safe-area-inset-bottom, 0px) + 72px);' +
-    'z-index:9998;max-width:60vw;min-width:150px;padding:5px 8px;font:11px/1.4 ui-monospace,Menlo,monospace;color:#dff;' +
-    'background:rgba(0,0,0,.86);border:1px solid rgba(70,230,210,.6);border-radius:6px;white-space:pre;pointer-events:auto;' +
+    'z-index:9998;max-width:calc(100vw - 12px);min-width:150px;padding:5px 8px;font:11px/1.4 ui-monospace,Menlo,monospace;color:#dff;' +
+    'background:rgba(0,0,0,.86);border:1px solid rgba(70,230,210,.6);border-radius:6px;white-space:pre-wrap;pointer-events:auto;' +
     'touch-action:manipulation;user-select:none;-webkit-user-select:none;';
   box.addEventListener('pointerdown', (e) => e.stopPropagation());
   box.addEventListener('pointerup', (e) => { e.stopPropagation(); expanded = !expanded; draw(); });
@@ -72,7 +72,7 @@ export function initDiag({ stage }) {
   function bootLine() {
     const b = window.__chessBoot;
     if (!b || !b.first) return 'start: measuring';
-    return `start: pieces ${(b.pieces / 1000).toFixed(1)}s  first frame ${(b.first / 1000).toFixed(1)}s  (render ${(b.render / 1000).toFixed(1)}s, ${b.programs} programs)`;
+    return `start: script ${(b.script / 1000).toFixed(1)}s  pieces ${(b.pieces / 1000).toFixed(1)}s  first frame ${(b.first / 1000).toFixed(1)}s  (render ${(b.render / 1000).toFixed(1)}s, ${b.programs} programs)`;
   }
 
   function draw() {

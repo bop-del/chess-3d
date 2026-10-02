@@ -4,6 +4,7 @@ import { device } from './device.js';
 import { t, translateTree, i18n } from './i18n.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
+window.__chessBoot = { script: performance.now() };   // start timings for ?diag=1, ms since navigation (download ends here)
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
 const fillEl = $('loader-fill'), stepEl = $('loader-step'), errEl = $('loader-err'), loaderEl = $('loader');
@@ -64,7 +65,7 @@ async function boot() {
 
   const pieceSet = createPieceSet(materials);
   await pieceSet.buildAll((f, msg) => progress(0.4 + f * 0.52, msg));
-  const boot = window.__chessBoot = { pieces: performance.now() };   // start timings for ?diag=1, ms since navigation
+  const boot = window.__chessBoot; boot.pieces = performance.now();
   progress(0.94, 'Setting up the game');
   await tick();
 
