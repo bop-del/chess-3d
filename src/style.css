@@ -368,3 +368,14 @@ body.phone:not(.portrait) #banner { padding: 0 calc(var(--sr) + var(--barw) + va
 
 /* the sheet itself takes taps (the HUD layer passes them through), so its close button and swipe grip work */
 body.phone .psheet { pointer-events: auto; }
+
+/* theme swatches (Scene card, phone Menu) */
+.field.themes { align-items: flex-start; flex-direction: column; margin-bottom: 12px; }
+.field.themes + .field { margin-top: 0; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.swatch { position: relative; flex: 1 1 0; min-width: 44px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px 4px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); color: var(--dim); cursor: pointer; font: inherit; font-size: 10px; letter-spacing: 0.02em; }
+.swatch i { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, var(--sw-a) 0 50%, var(--sw-b) 50% 100%); border: 1px solid rgba(255, 255, 255, 0.28); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45); }
+.swatch b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.swatch:hover { background: rgba(255, 255, 255, 0.09); color: var(--text); }
+.swatch.on { border-color: var(--gold); color: var(--text); background: rgba(255, 255, 255, 0.1); }
+body.phone .swatch { min-height: 56px; font-size: 11px; }

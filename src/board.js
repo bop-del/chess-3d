@@ -1,6 +1,7 @@
 // chessboard (marble squares, walnut frame, gold inlay, labels, plinth, highlights).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { createSkin } from './themes/apply.js';
 import { marbleWhite, marbleBlack, walnut, maple, brass, felt } from './textures.js';
 
 const RAD = Math.PI / 180;
@@ -400,10 +401,18 @@ export function createBoard() {
   for (const m of squareMeshes) group.add(m);
   group.add(hl.mesh);
 
+  // Theme hooks: the board materials by role, and the classic maps a theme may reuse (so it builds no second copy).
+  const skin = createSkin({ squaresLight: lightMat, squaresDark: darkMat, frame: walnutMat, inlay: mapleMat, gold: goldMat, plinth: plinthMat, labels: labelMat });
+  const maps = (t) => ({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, metalnessMap: t.metalnessMap });
+  const base = { maple: maps(tm), walnut: maps(twn), marbleBlack: maps(tb) };
+
   let time = 0;
   return {
     group,
     squareMeshes,
+    base,
+    /** spec: { squaresLight, squaresDark, frame, inlay, gold, plinth, labels } property specs (see themes/apply.js), null = classic */
+    applyTheme(spec) { skin.apply(spec); },
     squareCenter(file, rank) { return new THREE.Vector3(file - 3.5, 0, 3.5 - rank); },
     setHighlights(list) { hl.set(list); },
     clearHighlights() { hl.set([]); },

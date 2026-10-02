@@ -623,14 +623,48 @@ export function createStage(canvas, opts = {}) {
   }
 
   // ---- public API ----
-  function setLightingPreset(name) {
-    if (!Object.prototype.hasOwnProperty.call(presetStates, name)) return;
-    currentName = name;
+  function startTransition(target) {
     from = cloneState(cur);
-    to = presetStates[name];
+    to = target;
     transT = 0;
     envFrame = 0;
   }
+  function setLightingPreset(name) {
+    if (!Object.prototype.hasOwnProperty.call(presetStates, name)) return;
+    currentName = name;
+    startTransition(presetStates[name]);
+  }
+
+  // Theme layer on top of the presets: a base preset plus overrides, with final values (the lights, environment and exposure
+  // are used as given, without the preset gain trim). setThemeLight(null) goes back to the preset the player picked.
+  function themeState(spec) {
+    const s = cloneState(presetStates[Object.hasOwn(presetStates, spec.preset) ? spec.preset : 'Gallery']);
+    for (const k of ['key', 'fill', 'rim']) {
+      const o = spec[k];
+      if (!o) continue;
+      if (o.color) s[k].color.set(o.color);
+      if (o.intensity != null) s[k].intensity = o.intensity;
+      if (o.dir) s[k].dir.set(o.dir[0], o.dir[1], o.dir[2]).normalize();
+    }
+    if (spec.exposure != null) s.exposure = spec.exposure;
+    if (spec.env != null) s.env.intensity = spec.env;
+    if (spec.floor) s.floorColor.set(spec.floor);
+    if (spec.bg) {
+      for (const k of ['top', 'bottom', 'glow']) if (spec.bg[k]) s.bg[k].set(spec.bg[k]);
+      if (spec.bg.glowAmount != null) s.bg.glowAmount = spec.bg.glowAmount;
+    }
+    const p = spec.post;
+    if (p) {
+      if (p.bloom != null) s.bloom = p.bloom;
+      if (p.vignette != null) s.vignette = p.vignette;
+      if (p.tint) s.tint.set(p.tint);
+    }
+    return s;
+  }
+  function setThemeLight(spec) {
+    startTransition(spec ? themeState(spec) : presetStates[currentName]);
+  }
+  const qualityListeners = [];
 
   function setFloorVisibility(t) {
     floorVisibility = Math.min(1, Math.max(0, t));
@@ -647,6 +681,7 @@ export function createStage(canvas, opts = {}) {
     setupReflectionTarget();
     buildPipeline();
     rebuildEnvironment(cfg.pmrem);
+    qualityListeners.forEach((fn) => fn(q));
   }
 
   // camera aspect only, cheap: used on touch devices while a burst of resize events is still going on
@@ -760,7 +795,7 @@ export function createStage(canvas, opts = {}) {
     setProjection, setOrthoSize,
     lights: { key, fill, rim },
     lightingPresets,
-    setLightingPreset, setFloorVisibility, setQuality, setAspect, resize, render, dispose,
+    setLightingPreset, setThemeLight, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, dispose,
     // extras (beyond the contract, harmless)
     get quality() { return quality; },
     get lightingPreset() { return currentName; },

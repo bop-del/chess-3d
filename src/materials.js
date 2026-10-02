@@ -56,8 +56,63 @@ export function createPieceMaterials() {
     envMapIntensity: 1.2,
   });
 
-  return {
+  const set = {
     white: { body: ivory, accent: goldWhite },
     black: { body: ebony, accent: goldBlack },
+    dark: null, // the knight's inlay material, filled in by pieceset.js when the first knight is built
+    classic: new Map(),
   };
+  set.current = null;
+  set.apply = (spec) => { set.current = spec || null; applyPieceTheme(set, spec); };
+  applyPieceTheme(set, null); // snapshot of Classic
+  return set;
+}
+
+// ---- piece themes: a theme changes material parameters only, geometry is shared. The Classic values are snapshotted on
+// the first call and every theme starts from them, so a switch never inherits the previous theme.
+const SCALARS = ['roughness', 'metalness', 'clearcoat', 'clearcoatRoughness', 'sheen', 'sheenRoughness', 'specularIntensity', 'ior',
+  'envMapIntensity', 'emissiveIntensity', 'transmission', 'thickness', 'attenuationDistance', 'opacity', 'transparent', 'depthWrite'];
+const COLORS = ['color', 'emissive', 'sheenColor', 'specularColor', 'attenuationColor'];
+const MAPS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap'];
+
+function themed(materials) {
+  return [materials.white.body, materials.black.body, materials.white.accent, materials.black.accent, materials.dark].filter(Boolean);
+}
+function snapshot(m) {
+  const s = { scalars: {}, colors: {}, maps: {} };
+  for (const k of SCALARS) if (k in m) s.scalars[k] = m[k];
+  for (const k of COLORS) if (m[k]?.isColor) s.colors[k] = m[k].clone();
+  for (const k of MAPS) if (k in m) s.maps[k] = m[k];
+  return s;
+}
+function restore(m, s) {
+  Object.assign(m, s.scalars);
+  for (const k in s.colors) m[k].copy(s.colors[k]);
+  Object.assign(m, s.maps);
+  m.needsUpdate = true;
+}
+function assign(m, props) {
+  if (!m || !props) return;
+  for (const k in props) {
+    const v = props[k];
+    if (COLORS.includes(k)) m[k].set(v);
+    else m[k] = v;
+  }
+  m.needsUpdate = true;
+}
+
+// spec = what a themes/pieces-<id>.js pieces(ctx) returns: { white: { body, accent }, black: { body, accent }, dark? }.
+// Props are plain material parameters (colours as hex strings, maps as textures the theme owns, null clears a map).
+// null restores Classic. Texture disposal is the caller's job (the theme registry tracks them).
+// The knight inlay (materials.dark) appears with the first knight, so it joins the snapshot whenever it first shows up.
+export function applyPieceTheme(materials, spec) {
+  const mats = themed(materials);
+  for (const m of mats) if (!materials.classic.has(m)) materials.classic.set(m, snapshot(m));
+  for (const m of mats) restore(m, materials.classic.get(m));
+  if (!spec) return;
+  assign(materials.white.body, spec.white?.body);
+  assign(materials.black.body, spec.black?.body);
+  assign(materials.white.accent, spec.white?.accent);
+  assign(materials.black.accent, spec.black?.accent);
+  assign(materials.dark, spec.dark);
 }

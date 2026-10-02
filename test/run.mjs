@@ -1,6 +1,6 @@
 // Test runner: node test/run.mjs [fast|smoke|phone|all]   (default fast; npm test calls it)
 //   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules, novice level
-//   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on port 5303, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes
+//   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on port 5303, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes, themes
 //   phone  phone sizes and real touch: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes

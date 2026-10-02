@@ -88,6 +88,7 @@ Sliders and buttons (left panel)
 | Views | White view, Black view, Top down, Side, Isometric, plus Easy flat (a flat top view with symbols) and Easy 3D (a steep orthographic view, pieces about 1.15 times larger). On phones in portrait also Play, the default there: the board as big as the screen allows, and the camera glides sideways so the selected piece and all its moves, the computer's reply and any hint arrow stay in view. Smooth animated transitions. The choice is remembered per device. Easy views skip the battle scenes |
 | Flip, Spin, Reset | Turn to the other side, toggle auto spin, return to the start view |
 | Board gimbal X, Y, Z | Three sliders from -180 to 180 degrees with a numeric readout, and a Level board button |
+| Theme | Classic, Tournament, Wood, Metal, Glass: board, frame, pieces and lighting change together. Remembered on this device (Scene card, or the Menu on a phone) |
 | Lighting | Studio, Gallery, Sunset, Night |
 | Quality | Low, Medium, High |
 | New game, Undo, Keys | Game buttons (right panel) |
@@ -111,6 +112,7 @@ Rendering
 
 - Board of white and black marble squares in a walnut frame with a gold inlay, coordinate labels, a plinth and a captured-piece tray on each side of the board
 - Sculpted Staunton pieces: a lathe turned pawn, rook, bishop, queen and king and a modelled knight head. 58k to 83k triangles per piece type
+- Five themes (Classic, Tournament, Wood, Metal, Glass), each one bundle of board squares, frame, inlay, pieces and lighting. The piece shapes stay, only materials and colours change. The textures are built on the first pick of a theme and freed again when you leave it. Glass uses real transmission only on the High quality tier; Low and Medium get a tinted lacquer look that costs nothing extra
 - Four studio lighting presets: Studio, Gallery, Sunset and Night, with a smooth transition between them
 - Quality tiers Low, Medium and High that change the shadow map size (1024, 2048 or 4096), the pixel ratio cap and the post chain
 - Shadows, bloom, ambient occlusion (High tier), a vignette and grade pass, and a soft reflection of the pieces in the studio floor
@@ -135,6 +137,7 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `quality` | `low`, `medium`, `high` | Start in this quality tier (default `high`, `medium` on touch devices) |
 | `touch` | `1`, `0` | `1` forces touch mode on (Medium start tier, page gesture blocking), `0` forces it off (desktop behaviour even on a touch device). Without it touch is detected from the primary input. An explicit `quality` wins over the touch start tier |
 | `light` | `Studio`, `Gallery`, `Sunset`, `Night` | Start with this lighting preset |
+| `theme` | `classic`, `tournament`, `wood`, `metal`, `glass` | Start with this theme for this load only (the swatch row remembers the theme you pick, in `localStorage` `chess3d.theme`) |
 | `view` | `white`, `black`, `top`, `side`, `iso`, `easy-flat`, `easy-3d`, `play` | Start in this view for this load only (without it the remembered view, or the device default). `play` only exists on a phone in portrait |
 | `preset` | `White view`, `Black view`, `Top down`, `Side`, `Isometric` | Jump to a view preset |
 | `yaw`, `pitch` | degrees | Set the camera angles |

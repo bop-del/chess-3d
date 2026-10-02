@@ -1,6 +1,8 @@
 // App entry: loads modules with progress, wires stage, board, pieces, game, controls and HUD.
 import * as THREE from 'three';
 import { device } from './device.js';
+import { createThemes, isTheme, storedTheme } from './themes/registry.js';
+import { mountSwatches } from './themes/swatches.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
 
@@ -132,6 +134,13 @@ async function boot() {
   const goodMove = createGoodMove({ game, hint: createHint({ gimbal, persist: false }) });
   ui.bindGoodMove(goodMove);
 
+  // themes: Classic is the start look and builds nothing. A stored or ?theme= choice loads its module now, before the loader goes
+  const themes = createThemes({ stage, board, pieceSet, materials, game });
+  mountSwatches({ themes, ui });
+  const flagTheme = params.get('theme');
+  if (flagTheme && isTheme(flagTheme)) await themes.set(flagTheme, { persist: false });   // this load only
+  else await themes.set(storedTheme(), { persist: false });
+
   symbols.setVisible(false);
   // resize
   const resize = () => {
@@ -157,7 +166,7 @@ async function boot() {
   // scripted states for testing and screenshots
   applyParams({ game, controls, stage, ui, views });
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, goodMove, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, goodMove, themes, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 

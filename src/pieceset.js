@@ -31,7 +31,14 @@ export function createPieceSet(materials) {
         p.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(p);
         heights.set(key, Math.max(0.6, box.max.y));
-        p.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        p.traverse((o) => {
+          if (!o.isMesh) return;
+          o.castShadow = true; o.receiveShadow = true;
+          if (o.material !== materials.white.body && o.material !== materials.white.accent && !materials.dark) {
+            materials.dark = o.material; // knight inlay: joins the Classic snapshot and the active theme
+            materials.apply?.(materials.current);
+          }
+        });
       } else {
         const white = proto(type, 'w');
         p = white.clone(true);

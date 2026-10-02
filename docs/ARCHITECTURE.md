@@ -18,7 +18,8 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
     src/scene.js         stage: renderer, lights, studio environment, floor, post chain, quality
     src/board.js         board, frame, inlay, labels, plinth, square highlights
     src/textures.js      procedural canvas textures (marble, walnut, maple, brass, felt)
-    src/materials.js     ivory, ebony and gold piece materials
+    src/materials.js     ivory, ebony and gold piece materials, and applyPieceTheme
+    src/themes/          theme registry, spec applier, swatch row, one module per theme (see Themes)
     src/pieces/setA.js   pawn, rook, knight geometry
     src/pieces/setB.js   bishop, queen, king geometry
     src/pieceset.js      builds each piece once, hands out clones
@@ -60,6 +61,8 @@ Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.
       lights: { key, fill, rim },  // key is a shadow casting DirectionalLight, frustum radius about 9
       lightingPresets,             // ['Studio', 'Gallery', 'Sunset', 'Night']
       setLightingPreset(name),     // animated transition of lights, environment, backdrop, exposure
+      setThemeLight(spec | null),  // a theme's lighting on top of a base preset (final values, no gain trim); null returns to the picked preset
+      onQuality(fn),               // fn(quality) after every setQuality
       setFloorVisibility(t),       // 0..1, fades the floor and its shadow
       setQuality('low'|'medium'|'high'),
       resize(w, h),                // full reallocation of targets and the post chain
@@ -82,6 +85,25 @@ Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.
 
 - Context loss (every device): the stage listens for `webglcontextlost` on the canvas and calls `preventDefault`, which allows a restore. While the context is lost `render()` draws nothing. On `webglcontextrestored` it rebuilds what the dead context owned (shadow map, reflection target, post chain, environment map) and goes on. `onContext(state)` is called with `'lost'`, `'stalled'` (nothing came back within 4 s), `'ok'` or `'failed'` (the rebuild threw); `src/main.js` shows the `#notice` element, a tap to reload message, for `stalled` and `failed`. Tests force it with the `WEBGL_lose_context` extension.
 - The final pass is a small grade shader: vignette, tint, a gentle contrast curve and a dither against banding.
+
+### Themes: `src/themes/`
+
+    createThemes({ stage, board, pieceSet, materials, game }) -> { list(), current(), set(id, { persist }), on(fn), textureCount }
+    THEMES                       // [{ id, label: { en, de }, swatch: [hex, hex] }] classic, tournament, wood, metal, glass
+    mountSwatches({ themes, ui })  // the swatch row, first in the Scene card (the Menu sheet on a phone)
+    createSkin(materials) -> { apply(specs | null) }   // themes/apply.js
+
+A theme is one bundle: board squares, frame, inlay, pieces, tray and lighting. The Staunton shapes never change, only material parameters, so a switch rebuilds no geometry. Classic is today's look: it has no module and builds nothing, which keeps the start as fast as before. Every other theme is a module loaded with `import()` on its first pick:
+
+    board(ctx)  -> { squaresLight, squaresDark, frame, inlay, gold, plinth, labels, tray }   // property specs
+    pieces(ctx) -> { white: { body, accent }, black: { body, accent }, dark }                // from pieces-<id>.js
+    light(ctx)  -> { preset, key, fill, rim, exposure, env, floor, bg: { top, bottom, glow, glowAmount }, post: { bloom, vignette, tint } }
+
+`ctx = { THREE, quality, base, track(texture) }`. A spec is plain data: scalars as they are, colours as `'#hex'`, `normalScale` as a number, maps as textures, `null` clears a map. `base` holds the classic maps (maple, walnut, black marble) a theme may reuse, so no second copy is made. The materials are shared by all squares and pieces, so applying a spec changes the board, every piece and the captured pieces in the trays at once. `createSkin` snapshots a material's classic values when it is created and every `apply` starts from that snapshot, so a theme never inherits the one before it. The tray slabs are found by mesh name (`tray-slab`) and skinned the same way; the tray trim is the white accent piece material.
+
+`set(id)` builds the next theme's specs, applies them, then disposes the textures the previous theme registered through `track()`, so ten switches leave the renderer at its baseline (`test/themes.mjs` checks `renderer.info.memory`). Picks are queued and the last one wins. `set(id, { persist: false })` is for the `?theme=` flag: this load only. Otherwise the id is stored in `localStorage` `chess3d.theme` and read at the next start (an unknown value means Classic). The lighting goes through `stage.setThemeLight`, which starts the usual animated transition towards the theme's state. Picking a lighting preset in the Scene card afterwards replaces the theme's lighting but keeps its materials; Classic returns to the preset the player picked.
+
+Glass uses real transmission only on the High quality tier (one extra scene pass); Low and Medium get an opaque tinted clearcoat. A quality change while a theme is on rebuilds that theme. Metal keeps bloom at 0.05 or below, because the mirror like metals blow out white above that. Easy flat and the battle scenes keep their own materials.
 
 ### `src/device.js`
 
@@ -271,7 +293,7 @@ Explain mode: walk one of the starter lines on the 3D board.
     mountInstallHint()         // called once after the board is ready, by a dynamic import in main.js
     wantInstallHint(storage)   // the gate, also counts the visit
 
-A bottom sheet with three drawn steps (the Share icon in the Safari bar, the Add to Home Screen row, the installed icon from `apple-touch-icon.png`) and a Later button. `main.js` imports it only when `device.ios` and not `device.standalone`. The gate then needs all of: iOS, not standalone, no URL flag of the app at all (`quality touch light preset yaw pitch dist gx gy gz fen moves select promo ai spin hud help manual diag`), not `navigator.webdriver`, and working `localStorage`. The state is one key, `chess3d.install-hint`, `{ visits, shows, last }`: it shows on the first visit, and then at most twice more, at least 3 visits after the last showing. It appears 2.2 s after the board is ready. Later, a tap on the scrim or Escape closes it at once and nothing waits on it. There is no service worker and no network use.
+A bottom sheet with three drawn steps (the Share icon in the Safari bar, the Add to Home Screen row, the installed icon from `apple-touch-icon.png`) and a Later button. `main.js` imports it only when `device.ios` and not `device.standalone`. The gate then needs all of: iOS, not standalone, no URL flag of the app at all (`quality touch light preset yaw pitch dist gx gy gz fen moves select promo ai spin hud help manual diag theme`), not `navigator.webdriver`, and working `localStorage`. The state is one key, `chess3d.install-hint`, `{ visits, shows, last }`: it shows on the first visit, and then at most twice more, at least 3 visits after the last showing. It appears 2.2 s after the board is ready. Later, a tap on the scrim or Escape closes it at once and nothing waits on it. There is no service worker and no network use.
 
 ### `src/dev/diag.js`
 
@@ -285,7 +307,7 @@ Imported by `main.js` only for exactly `?diag=1` (right after `window.__chess` i
 
 ## Test hooks
 
-`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, views, play, symbols, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
+`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, themes, views, play, symbols, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
 
 `window.__chessReady` becomes `true` once loading is done and `window.__chessError` holds a message if loading failed.
 
