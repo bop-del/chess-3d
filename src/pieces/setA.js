@@ -83,6 +83,10 @@ function accentRing(R, y, tube, major = R) {
   return g;
 }
 
+// Geometry source: G(slot, build) returns the geometry for one mesh slot of a piece. The default builds it. The piece set
+// passes a source that serves cached geometry, so on a cache hit the build closure (all the geometry code) never runs.
+const direct = (slot, build) => build();
+
 function triCount(g) {
   return g.index ? g.index.count / 3 : g.attributes.position.count / 3;
 }
@@ -218,7 +222,7 @@ function loftAlong(path, broad, steps, ringN, shape, poleEnd = true, frontFn = n
 /* PAWN                                                                */
 /* ================================================================== */
 
-export function buildPawn(mat) {
+export function buildPawn(mat, G = direct) {
   const R = 0.285;
   const cy = 0.74, hr = 0.16; // head sphere
   const knots = [
@@ -233,14 +237,13 @@ export function buildPawn(mat) {
     knots.push([hr * Math.cos(t), cy + hr * Math.sin(t)]);
   }
   knots[knots.length - 1][0] = 0;
-  const body = latheFrom(knots, 112);
-  const ring = accentRing(R * 0.765, 0.115, 0.0125);
-  const collarRing = accentRing(0.128, 0.5995, 0.0075);
+  const body = G(0, () => latheFrom(knots, 112));
+  const accent = G(1, () => mergeGeometries([accentRing(R * 0.765, 0.115, 0.0125), accentRing(0.128, 0.5995, 0.0075)]));
 
   const g = new THREE.Group();
   g.name = 'pawn';
   g.add(mesh(body, mat.body));
-  g.add(mesh(mergeGeometries([ring, collarRing]), mat.accent));
+  g.add(mesh(accent, mat.accent));
   return g;
 }
 
@@ -248,7 +251,7 @@ export function buildPawn(mat) {
 /* ROOK                                                                */
 /* ================================================================== */
 
-export function buildRook(mat) {
+export function buildRook(mat, G = direct) {
   const R = 0.31;
   const Ro = 0.268, Ri = 0.196;
   const ringY = 0.878;
@@ -260,49 +263,50 @@ export function buildRook(mat) {
     [Ri + 0.003, ringY - 0.006], [Ri, ringY - 0.02], [Ri - 0.001, 0.81], [Ri - 0.004, 0.785], [Ri - 0.014, 0.768],
     [Ri - 0.04, 0.759], [0.12, 0.756], [0.06, 0.755], [0, 0.755],
   ];
-  const body = latheFrom(knots, 104);
+  const body = G(0, () => latheFrom(knots, 104));
 
   // battlements: real bevelled merlons (creased normals keep curved walls smooth)
-  const MERLONS = 6;
-  const span = (TAU / MERLONS) * 0.6;
-  const bevel = 0.011;
-  const top = 1.0, bottom = ringY - 0.012;
-  const shape = new THREE.Shape();
-  const arcSeg = 36;
-  const ro = Ro - bevel, ri = Ri + bevel, half = span / 2 - bevel / ((ro + ri) / 2);
-  for (let i = 0; i <= arcSeg; i++) {
-    const a = -half + (2 * half * i) / arcSeg;
-    i === 0 ? shape.moveTo(ro * Math.cos(a), ro * Math.sin(a)) : shape.lineTo(ro * Math.cos(a), ro * Math.sin(a));
-  }
-  for (let i = arcSeg; i >= 0; i--) {
-    const a = -half + (2 * half * i) / arcSeg;
-    shape.lineTo(ri * Math.cos(a), ri * Math.sin(a));
-  }
-  shape.closePath();
-  const depth = top - bottom - 2 * bevel;
-  let merlon = new THREE.ExtrudeGeometry(shape, {
-    depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelOffset: 0, bevelSegments: 5,
-    curveSegments: 1, steps: 1,
+  const battlements = G(1, () => {
+    const MERLONS = 6;
+    const span = (TAU / MERLONS) * 0.6;
+    const bevel = 0.011;
+    const top = 1.0, bottom = ringY - 0.012;
+    const shape = new THREE.Shape();
+    const arcSeg = 36;
+    const ro = Ro - bevel, ri = Ri + bevel, half = span / 2 - bevel / ((ro + ri) / 2);
+    for (let i = 0; i <= arcSeg; i++) {
+      const a = -half + (2 * half * i) / arcSeg;
+      i === 0 ? shape.moveTo(ro * Math.cos(a), ro * Math.sin(a)) : shape.lineTo(ro * Math.cos(a), ro * Math.sin(a));
+    }
+    for (let i = arcSeg; i >= 0; i--) {
+      const a = -half + (2 * half * i) / arcSeg;
+      shape.lineTo(ri * Math.cos(a), ri * Math.sin(a));
+    }
+    shape.closePath();
+    const depth = top - bottom - 2 * bevel;
+    let merlon = new THREE.ExtrudeGeometry(shape, {
+      depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelOffset: 0, bevelSegments: 5,
+      curveSegments: 1, steps: 1,
+    });
+    merlon.rotateX(-Math.PI / 2);
+    merlon.translate(0, bottom + bevel, 0);
+    merlon = toCreasedNormals(merlon, 0.62);
+    const merlons = [];
+    for (let m = 0; m < MERLONS; m++) {
+      const c = merlon.clone();
+      c.rotateY((m / MERLONS) * TAU + Math.PI / MERLONS);
+      merlons.push(c);
+    }
+    return mergeGeometries(merlons);
   });
-  merlon.rotateX(-Math.PI / 2);
-  merlon.translate(0, bottom + bevel, 0);
-  merlon = toCreasedNormals(merlon, 0.62);
-  const merlons = [];
-  for (let m = 0; m < MERLONS; m++) {
-    const c = merlon.clone();
-    c.rotateY((m / MERLONS) * TAU + Math.PI / MERLONS);
-    merlons.push(c);
-  }
-  const battlements = mergeGeometries(merlons);
 
-  const ring = accentRing(0.181, 0.672, 0.0115);
-  const baseRing = accentRing(R * 0.765, 0.115, 0.0125);
+  const accent = G(2, () => mergeGeometries([accentRing(0.181, 0.672, 0.0115), accentRing(R * 0.765, 0.115, 0.0125)]));
 
   const g = new THREE.Group();
   g.name = 'rook';
   g.add(mesh(body, mat.body));
   g.add(mesh(battlements, mat.body));
-  g.add(mesh(mergeGeometries([ring, baseRing]), mat.accent));
+  g.add(mesh(accent, mat.accent));
   return g;
 }
 
@@ -559,15 +563,38 @@ function orientRing(pos, normal, radius, tube) {
 
 const HEAD_DEPTH = 0.72, HEAD_SHIFT = 0.04;
 
-export function buildKnight(mat) {
+export function buildKnight(mat, G = direct) {
   const R = 0.30;
   const baseKnots = [
     ...footKnots(R),
     [0.245, 0.182], [0.228, 0.205], [0.224, 0.235], [0.232, 0.256], [0.212, 0.272], [0.15, 0.278], [0.07, 0.279], [0, 0.279],
   ];
-  const base = latheFrom(baseKnots, 64);
-  const baseRing = accentRing(R * 0.765, 0.115, 0.0125);
+  const base = G(0, () => latheFrom(baseKnots, 64));
+  const baseRing = G(1, () => accentRing(R * 0.765, 0.115, 0.0125));
 
+  // the head code is the expensive part: it runs once, and only when one of the head slots misses
+  let headParts = null;
+  const parts = () => headParts || (headParts = buildHeadParts());
+  const bodyGeo = G(2, () => parts().body);
+  const accentGeo = G(3, () => parts().accent);
+  const darkGeo = G(4, () => parts().dark);
+
+  const g = new THREE.Group();
+  g.name = 'knight';
+  g.add(mesh(base, mat.body));
+  g.add(mesh(baseRing, mat.accent));
+  // The knight faces sideways, so the head is squeezed front to back until nose and mane stay inside the base circle.
+  const headGroup = new THREE.Group();
+  headGroup.scale.z = HEAD_DEPTH;
+  headGroup.position.z = HEAD_SHIFT;
+  headGroup.add(mesh(bodyGeo, mat.body));
+  headGroup.add(mesh(accentGeo, mat.accent));
+  headGroup.add(mesh(darkGeo, getDarkMaterial()));
+  g.add(headGroup);
+  return g;
+}
+
+function buildHeadParts() {
   const head = buildHead();
   const mane = buildMane(head);
   const ears = buildEars(head);
@@ -595,19 +622,7 @@ export function buildKnight(mat) {
     darkGeos.push(nos);
   }
 
-  const g = new THREE.Group();
-  g.name = 'knight';
-  g.add(mesh(base, mat.body));
-  g.add(mesh(baseRing, mat.accent));
-  // The knight faces sideways, so the head is squeezed front to back until nose and mane stay inside the base circle.
-  const headGroup = new THREE.Group();
-  headGroup.scale.z = HEAD_DEPTH;
-  headGroup.position.z = HEAD_SHIFT;
-  headGroup.add(mesh(bodyGeo, mat.body));
-  headGroup.add(mesh(mergeGeometries(accentGeos), mat.accent));
-  headGroup.add(mesh(mergeGeometries(darkGeos), getDarkMaterial()));
-  g.add(headGroup);
-  return g;
+  return { body: bodyGeo, accent: mergeGeometries(accentGeos), dark: mergeGeometries(darkGeos) };
 }
 
 export const _debug = { triCount };

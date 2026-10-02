@@ -175,163 +175,184 @@ function indexed(g) {
   return g;
 }
 
-function pieceFrom(mat, bodyGeoms, accentGeoms, name) {
+// Geometry source: G(slot, build) returns the geometry of one mesh slot (0 body, 1 accent). The default builds it. The piece
+// set passes a source that serves cached geometry, so on a hit the closure that builds the piece never runs.
+const direct = (slot, build) => build();
+
+// parts() builds [bodyGeoms, accentGeoms]; it runs at most once, and not at all when both slots come from the cache.
+function pieceFrom(mat, G, parts, name) {
   const g = new THREE.Group();
   g.name = name;
-  const add = (geoms, material, tag) => {
-    if (!geoms.length) return;
-    geoms.forEach(indexed);
-    const geo = geoms.length === 1 ? geoms[0] : mergeGeometries(geoms);
-    geoms.forEach(x => { if (x !== geo) x.dispose(); });
+  let built = null;
+  const lazy = () => built || (built = parts());
+  const add = (slot, material, tag) => {
+    const geo = G(slot, () => {
+      const geoms = lazy()[slot];
+      if (!geoms.length) return null;
+      geoms.forEach(indexed);
+      const merged = geoms.length === 1 ? geoms[0] : mergeGeometries(geoms);
+      geoms.forEach(x => { if (x !== merged) x.dispose(); });
+      return merged;
+    });
+    if (!geo) return;
     const m = new THREE.Mesh(geo, material);
     m.name = `${name}-${tag}`;
     m.castShadow = true; m.receiveShadow = true;
     g.add(m);
   };
-  add(bodyGeoms, mat.body, 'body');
-  add(accentGeoms, mat.accent, 'accent');
+  add(0, mat.body, 'body');
+  add(1, mat.accent, 'accent');
   return g;
 }
 
 /* ------------------------------------------------------------------ */
 /* BISHOP  (height 1.35, base diameter 0.62)                           */
 /* ------------------------------------------------------------------ */
-export function buildBishop(mat) {
-  const R = 0.31;
-  // --- turned lower body: foot, stem, collar, neck
-  const p = new Prof(0, 0);
-  foot(p, R, 0.105);
-  p.spline([[0.099, 0.54], [0.094, 0.6], [0.098, 0.64]], 0.02);
-  collar(p, 0.104, 0.15, 0.678, 0.0155);
-  p.spline([[0.13, 0.706], [0.113, 0.726], [0.106, 0.75], [0.105, 0.77]], 0.014);
-  const lower = lathe(p, SEG);
-  // hidden plug covering any seam between the 192 and 240 segment bodies
-  const plug = new THREE.CylinderGeometry(0.097, 0.097, 0.08, 48, 1);
-  plug.translate(0, 0.77, 0);
+export function buildBishop(mat, G = direct) {
+  const parts = () => {
+    const R = 0.31;
+    // --- turned lower body: foot, stem, collar, neck
+    const p = new Prof(0, 0);
+    foot(p, R, 0.105);
+    p.spline([[0.099, 0.54], [0.094, 0.6], [0.098, 0.64]], 0.02);
+    collar(p, 0.104, 0.15, 0.678, 0.0155);
+    p.spline([[0.13, 0.706], [0.113, 0.726], [0.106, 0.75], [0.105, 0.77]], 0.014);
+    const lower = lathe(p, SEG);
+    // hidden plug covering any seam between the 192 and 240 segment bodies
+    const plug = new THREE.CylinderGeometry(0.097, 0.097, 0.08, 48, 1);
+    plug.translate(0, 0.77, 0);
 
-  // --- mitre (ogive) with diagonal slit, built as real displaced geometry, plus finial
-  const m = new Prof(0.105, 0.77, 1.0);
-  m.spline([[0.108, 0.795], [0.121, 0.83], [0.143, 0.875], [0.163, 0.93], [0.173, 0.995],
-    [0.168, 1.06], [0.148, 1.12], [0.116, 1.172], [0.08, 1.212], [0.05, 1.235], [0.036, 1.244]], 0.0066);
-  m.to(0.028, 1.252, 0.01);
-  m.to(0.028, 1.263, 0.01).corner();
-  m.arc(0, 1.302, 0.048, -Math.acos(0.028 / 0.048), PI / 2, 9);   // finial ball
-  const alpha = 0.62, yc = 1.0, sa = Math.sin(alpha), ca = Math.cos(alpha);
-  const W = 0.0235, D = 0.05;
-  const mitre = lathe(m, 240, {
-    flipFront: true,
-    displace: (x, y, z, r) => {
-      if (y < 0.88 || y > 1.14 || r < 0.05) return 0;
-      const dist = Math.abs(-x * sa + (y - yc) * ca);
-      if (dist > W) return 0;
-      const g = sstep(0.2, 0.7, Math.abs(z) / r);                  // slit on both faces (-z and +z)
-      if (g <= 0) return 0;
-      const s = 1 - sstep(0.0, W, dist);               // rounded groove, a wall the grid can resolve
-      return D * g * s * (r / 0.17);
-    },
-  });
-  const accent = [ring(0.04, 0.0135, 1.248, 128, 14)];
-  return pieceFrom(mat, [lower, plug, mitre], accent, 'bishop');
+    // --- mitre (ogive) with diagonal slit, built as real displaced geometry, plus finial
+    const m = new Prof(0.105, 0.77, 1.0);
+    m.spline([[0.108, 0.795], [0.121, 0.83], [0.143, 0.875], [0.163, 0.93], [0.173, 0.995],
+      [0.168, 1.06], [0.148, 1.12], [0.116, 1.172], [0.08, 1.212], [0.05, 1.235], [0.036, 1.244]], 0.0066);
+    m.to(0.028, 1.252, 0.01);
+    m.to(0.028, 1.263, 0.01).corner();
+    m.arc(0, 1.302, 0.048, -Math.acos(0.028 / 0.048), PI / 2, 9);   // finial ball
+    const alpha = 0.62, yc = 1.0, sa = Math.sin(alpha), ca = Math.cos(alpha);
+    const W = 0.0235, D = 0.05;
+    const mitre = lathe(m, 240, {
+      flipFront: true,
+      displace: (x, y, z, r) => {
+        if (y < 0.88 || y > 1.14 || r < 0.05) return 0;
+        const dist = Math.abs(-x * sa + (y - yc) * ca);
+        if (dist > W) return 0;
+        const g = sstep(0.2, 0.7, Math.abs(z) / r);                  // slit on both faces (-z and +z)
+        if (g <= 0) return 0;
+        const s = 1 - sstep(0.0, W, dist);               // rounded groove, a wall the grid can resolve
+        return D * g * s * (r / 0.17);
+      },
+    });
+    const accent = [ring(0.04, 0.0135, 1.248, 128, 14)];
+    return [[lower, plug, mitre], accent];
+  };
+  return pieceFrom(mat, G, parts, 'bishop');
 }
 
 /* ------------------------------------------------------------------ */
 /* QUEEN  (height 1.60, base diameter 0.66)                            */
 /* ------------------------------------------------------------------ */
-export function buildQueen(mat) {
-  const R = 0.33;
-  const p = new Prof(0, 0);
-  foot(p, R, 0.111);
-  p.spline([[0.103, 0.52], [0.098, 0.6], [0.1, 0.655]], 0.02);
-  collar(p, 0.104, 0.162, 0.697, 0.014);
-  p.to(0.11, 0.711, 0.01);                                        // shelf that carries the pearls
-  p.spline([[0.1, 0.735], [0.098, 0.77], [0.108, 0.83], [0.128, 0.9], [0.152, 0.98],
-    [0.174, 1.06], [0.192, 1.14], [0.205, 1.22], [0.212, 1.3]], 0.02);
-  // crown bowl
-  p.spline([[0.23, 1.318], [0.252, 1.342], [0.26, 1.368]], 0.01);
-  p.arc(0.248, 1.372, 0.012, 0, PI / 2, 10);
-  p.spline([[0.205, 1.4], [0.15, 1.42], [0.1, 1.443], [0.06, 1.462], [0.045, 1.48], [0.038, 1.498]], 0.012).corner();
-  const bc = 1.542, br = 0.058;
-  p.arc(0, bc, br, -Math.acos(0.038 / br), PI / 2, 7);             // large ball
-  const body = [lathe(p, SEG)];
+export function buildQueen(mat, G = direct) {
+  const parts = () => {
+    const R = 0.33;
+    const p = new Prof(0, 0);
+    foot(p, R, 0.111);
+    p.spline([[0.103, 0.52], [0.098, 0.6], [0.1, 0.655]], 0.02);
+    collar(p, 0.104, 0.162, 0.697, 0.014);
+    p.to(0.11, 0.711, 0.01);                                        // shelf that carries the pearls
+    p.spline([[0.1, 0.735], [0.098, 0.77], [0.108, 0.83], [0.128, 0.9], [0.152, 0.98],
+      [0.174, 1.06], [0.192, 1.14], [0.205, 1.22], [0.212, 1.3]], 0.02);
+    // crown bowl
+    p.spline([[0.23, 1.318], [0.252, 1.342], [0.26, 1.368]], 0.01);
+    p.arc(0.248, 1.372, 0.012, 0, PI / 2, 10);
+    p.spline([[0.205, 1.4], [0.15, 1.42], [0.1, 1.443], [0.06, 1.462], [0.045, 1.48], [0.038, 1.498]], 0.012).corner();
+    const bc = 1.542, br = 0.058;
+    p.arc(0, bc, br, -Math.acos(0.038 / br), PI / 2, 7);             // large ball
+    const body = [lathe(p, SEG)];
 
-  // coronet: 14 tapered tines with sphere tips, built once, then placed around the crown
-  const N = 12, tineR = 0.222, tineY = 1.39;
-  const tp = new Prof(0, -0.02);
-  tp.to(0.056, -0.02, 0.02);
-  const tpts = [];
-  for (let k = 1; k <= 12; k++) { const u = k / 12; tpts.push([0.0085 + 0.046 * Math.pow(1 - u, 2.0), -0.02 + 0.17 * u]); }
-  tp.spline(tpts, 0.012);
-  tp.to(0, 0.15, 0.01);
-  const tine = lathe(tp, 20);
-  const lean = 0.14, bend = 0.45;
-  const bendX = y => Math.max(0, y) * lean + bend * Math.max(0, y) * Math.max(0, y);
-  const tv = tine.attributes.position;
-  for (let i = 0; i < tv.count; i++) tv.setX(i, tv.getX(i) + bendX(tv.getY(i)));
-  // bend breaks analytic normals: rebuild from the grid (20 cols, no creases)
-  tine.computeVertexNormals();
-  {
-    const nn = tine.attributes.normal, cols = 21, rows = nn.count / cols;
-    for (let i = 0; i < rows; i++) {
-      const a = i * cols, b = a + 20;
-      const x = nn.getX(a) + nn.getX(b), y = nn.getY(a) + nn.getY(b), z = nn.getZ(a) + nn.getZ(b);
-      const l = Math.hypot(x, y, z) || 1;
-      nn.setXYZ(a, x / l, y / l, z / l); nn.setXYZ(b, x / l, y / l, z / l);
+    // coronet: 14 tapered tines with sphere tips, built once, then placed around the crown
+    const N = 12, tineR = 0.222, tineY = 1.39;
+    const tp = new Prof(0, -0.02);
+    tp.to(0.056, -0.02, 0.02);
+    const tpts = [];
+    for (let k = 1; k <= 12; k++) { const u = k / 12; tpts.push([0.0085 + 0.046 * Math.pow(1 - u, 2.0), -0.02 + 0.17 * u]); }
+    tp.spline(tpts, 0.012);
+    tp.to(0, 0.15, 0.01);
+    const tine = lathe(tp, 20);
+    const lean = 0.14, bend = 0.45;
+    const bendX = y => Math.max(0, y) * lean + bend * Math.max(0, y) * Math.max(0, y);
+    const tv = tine.attributes.position;
+    for (let i = 0; i < tv.count; i++) tv.setX(i, tv.getX(i) + bendX(tv.getY(i)));
+    // bend breaks analytic normals: rebuild from the grid (20 cols, no creases)
+    tine.computeVertexNormals();
+    {
+      const nn = tine.attributes.normal, cols = 21, rows = nn.count / cols;
+      for (let i = 0; i < rows; i++) {
+        const a = i * cols, b = a + 20;
+        const x = nn.getX(a) + nn.getX(b), y = nn.getY(a) + nn.getY(b), z = nn.getZ(a) + nn.getZ(b);
+        const l = Math.hypot(x, y, z) || 1;
+        nn.setXYZ(a, x / l, y / l, z / l); nn.setXYZ(b, x / l, y / l, z / l);
+      }
     }
-  }
-  const cap = new THREE.SphereGeometry(0.0225, 18, 12);
-  cap.translate(bendX(0.151), 0.151 + 0.009, 0);
-  const tineFull = mergeGeometries([tine, cap]);
-  const tines = [];
-  for (let k = 0; k < N; k++) {
-    const a = (k / N) * 2 * PI;
-    const g = tineFull.clone();
-    g.translate(tineR, tineY, 0);
-    g.rotateY(-a);
-    tines.push(g);
-  }
-  body.push(...tines);
-  const accent = [
-    ring(0.2145, 0.0125, 1.296, 160, 14),
-    pearls(30, 0.1305, 0.7275, 0.0112),
-  ];
-  return pieceFrom(mat, body, accent, 'queen');
+    const cap = new THREE.SphereGeometry(0.0225, 18, 12);
+    cap.translate(bendX(0.151), 0.151 + 0.009, 0);
+    const tineFull = mergeGeometries([tine, cap]);
+    const tines = [];
+    for (let k = 0; k < N; k++) {
+      const a = (k / N) * 2 * PI;
+      const g = tineFull.clone();
+      g.translate(tineR, tineY, 0);
+      g.rotateY(-a);
+      tines.push(g);
+    }
+    body.push(...tines);
+    const accent = [
+      ring(0.2145, 0.0125, 1.296, 160, 14),
+      pearls(30, 0.1305, 0.7275, 0.0112),
+    ];
+    return [body, accent];
+  };
+  return pieceFrom(mat, G, parts, 'queen');
 }
 
 /* ------------------------------------------------------------------ */
 /* KING  (height 1.85, base diameter 0.72)                             */
 /* ------------------------------------------------------------------ */
-export function buildKing(mat) {
-  const R = 0.36;
-  const p = new Prof(0, 0);
-  foot(p, R, 0.121);
-  p.spline([[0.112, 0.54], [0.107, 0.62], [0.109, 0.672]], 0.02);
-  collar(p, 0.114, 0.178, 0.714, 0.0155);
-  p.to(0.118, 0.7295, 0.01);
-  p.spline([[0.11, 0.752], [0.107, 0.79], [0.106, 0.822]], 0.012);
-  // small moulding bead above the collar
-  p.arc(0.104, 0.838, 0.016, -PI / 2, PI / 2, 12);
-  p.spline([[0.108, 0.88], [0.122, 0.95], [0.145, 1.03], [0.172, 1.11], [0.2, 1.19],
-    [0.222, 1.27], [0.235, 1.34]], 0.02);
-  // broad crown
-  p.spline([[0.246, 1.362], [0.257, 1.388], [0.258, 1.41]], 0.01);
-  p.arc(0.246, 1.414, 0.012, 0, PI / 2, 10);
-  p.spline([[0.21, 1.45], [0.16, 1.475], [0.11, 1.497], [0.07, 1.512], [0.05, 1.522], [0.034, 1.536], [0.032, 1.55]], 0.012).corner();
-  const oc = 1.59, orr = 0.05;
-  p.arc(0, oc, orr, -Math.acos(0.032 / orr), PI / 2, 7);           // orb
-  const body = [lathe(p, SEG)];
+export function buildKing(mat, G = direct) {
+  const parts = () => {
+    const R = 0.36;
+    const p = new Prof(0, 0);
+    foot(p, R, 0.121);
+    p.spline([[0.112, 0.54], [0.107, 0.62], [0.109, 0.672]], 0.02);
+    collar(p, 0.114, 0.178, 0.714, 0.0155);
+    p.to(0.118, 0.7295, 0.01);
+    p.spline([[0.11, 0.752], [0.107, 0.79], [0.106, 0.822]], 0.012);
+    // small moulding bead above the collar
+    p.arc(0.104, 0.838, 0.016, -PI / 2, PI / 2, 12);
+    p.spline([[0.108, 0.88], [0.122, 0.95], [0.145, 1.03], [0.172, 1.11], [0.2, 1.19],
+      [0.222, 1.27], [0.235, 1.34]], 0.02);
+    // broad crown
+    p.spline([[0.246, 1.362], [0.257, 1.388], [0.258, 1.41]], 0.01);
+    p.arc(0.246, 1.414, 0.012, 0, PI / 2, 10);
+    p.spline([[0.21, 1.45], [0.16, 1.475], [0.11, 1.497], [0.07, 1.512], [0.05, 1.522], [0.034, 1.536], [0.032, 1.55]], 0.012).corner();
+    const oc = 1.59, orr = 0.05;
+    p.arc(0, oc, orr, -Math.acos(0.032 / orr), PI / 2, 7);           // orb
+    const body = [lathe(p, SEG)];
 
-  // sculpted cross: rounded-edge bars with smooth bevels
-  const vbar = new RoundedBoxGeometry(0.06, 0.23, 0.054, 8, 0.021);
-  vbar.translate(0, 1.62 + 0.115, 0);
-  const hbar = new RoundedBoxGeometry(0.17, 0.058, 0.054, 8, 0.021);
-  hbar.translate(0, 1.77, 0);
-  body.push(vbar, hbar);
+    // sculpted cross: rounded-edge bars with smooth bevels
+    const vbar = new RoundedBoxGeometry(0.06, 0.23, 0.054, 8, 0.021);
+    vbar.translate(0, 1.62 + 0.115, 0);
+    const hbar = new RoundedBoxGeometry(0.17, 0.058, 0.054, 8, 0.021);
+    hbar.translate(0, 1.77, 0);
+    body.push(vbar, hbar);
 
-  const accent = [
-    ring(0.2375, 0.0135, 1.3485, 160, 14),
-    ring(0.205, 0.0085, 1.4585, 128, 12),
-    pearls(32, 0.1475, 0.7475, 0.0118),
-    pearls(40, 0.232, 1.445, 0.0088, 0.05),
-  ];
-  return pieceFrom(mat, body, accent, 'king');
+    const accent = [
+      ring(0.2375, 0.0135, 1.3485, 160, 14),
+      ring(0.205, 0.0085, 1.4585, 128, 12),
+      pearls(32, 0.1475, 0.7475, 0.0118),
+      pearls(40, 0.232, 1.445, 0.0088, 0.05),
+    ];
+    return [body, accent];
+  };
+  return pieceFrom(mat, G, parts, 'king');
 }

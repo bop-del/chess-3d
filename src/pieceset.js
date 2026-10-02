@@ -20,16 +20,28 @@ export function createPieceSet(materials) {
   const protos = new Map();
   const heights = new Map();
 
+  // Geometry does not depend on color, so only white is built. Black is a clone that shares the geometry and swaps the
+  // two piece materials (the knight's dark inlay material belongs to neither color and stays).
   function proto(type, color) {
     const key = type + color;
     let p = protos.get(key);
     if (!p) {
-      const mat = color === 'w' ? materials.white : materials.black;
-      p = BUILDERS[type](mat);
-      p.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(p);
-      heights.set(key, Math.max(0.6, box.max.y));
-      p.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      if (color === 'w') {
+        p = BUILDERS[type](materials.white);
+        p.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(p);
+        heights.set(key, Math.max(0.6, box.max.y));
+        p.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      } else {
+        const white = proto(type, 'w');
+        p = white.clone(true);
+        p.traverse((o) => {
+          if (!o.isMesh) return;
+          if (o.material === materials.white.body) o.material = materials.black.body;
+          else if (o.material === materials.white.accent) o.material = materials.black.accent;
+        });
+        heights.set(key, heights.get(type + 'w'));
+      }
       protos.set(key, p);
     }
     return p;
