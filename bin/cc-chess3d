@@ -11,7 +11,7 @@
 # (a worktree, say). With no such argument it starts in the main clone.
 #
 # By default Claude starts with an opening prompt: read the private restart
-# prompt and decisions, then CLAUDE.md, summarise the state, and wait.
+# prompt and the files it lists, summarise the state, and wait.
 #   --fresh     skip the opening prompt and start a plain session
 #   --dry-run   print the final claude command and exit, run nothing
 # Every other argument is passed through to claude. Resume and print modes
@@ -20,7 +20,7 @@
 
 SKILLS="$HOME/code/mattpocock-skills"
 PRIVATE="$HOME/code/chess-3d-private"
-OPENING="Read ~/code/chess-3d-private/RESTART-PROMPT.md and DECISIONS.md, then CLAUDE.md in this repo, summarise the state in five lines, and wait for my instruction. Do not run commands or change files."
+OPENING="Read ~/code/chess-3d-private/RESTART-PROMPT.md and the files it lists, in that order, summarise the state in five lines, and wait for my instruction. Do not run commands or change files."
 
 # A first argument that is not a flag is the directory to start in. It must be
 # absolute: a relative one would resolve against whatever cwd the caller had.

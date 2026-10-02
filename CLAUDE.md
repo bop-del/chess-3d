@@ -29,11 +29,14 @@ No golden image diffs: software GL renders differ across machines. Take screensh
 - URL flags (see the README table): `quality`, `light`, `preset`, `yaw`, `pitch`, `dist`, `gx`, `gy`, `gz`, `fen`, `moves`, `select`, `promo`, `ai`, `spin`, `hud`, `help`, `manual`.
 - The computer opponent is ON by default (you play white, Easy). `?ai=0` turns it off. Any test or script that plays both sides must pass `ai=0`.
 - Architecture and module APIs: docs/ARCHITECTURE.md. Keep it in step with the code.
+- Domain language: CONTEXT.md (a glossary, no implementation detail). Architecture decisions: docs/adr/. Both are created when the first term or decision is settled, not before.
 
 ## Rules
 
 - README before every push to bop-del repos: check whether the commits change anything the README describes (controls, URL flags, features, known issues, test commands) and update it in the same push. Nothing to change: say so in one line.
 - Publishing and pushing only on the owner's explicit go.
+- Work happens on a branch per backlog item or agent round, in its own worktree under ~/code/chess-3d-lanes/<branch>. The owner's checkout stays on main. Land with a squash merge, one clean commit per item, then remove the worktree. Pages deploys every push to main, so unfinished work never sits there.
+- Versions are semver: patch for fixes, minor for a visible feature step, major for a reshaped app. Releases get an annotated tag and a GitHub release after the owner's go.
 - GitHub account is bop-del: `gh auth switch --user bop-del`. Never the HeyJobs account.
 - Commit trailer line: `Co-Authored-By:` the model that did the work, for example `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`. Never a fixed model name that may not match the session.
 - Commits use the git identity set in this repo's `.git/config`. Do not override it with `-c user.email`.
