@@ -1,5 +1,5 @@
 // Test runner: node test/run.mjs [fast|smoke|phone|all]   (default fast; npm test calls it)
-//   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules
+//   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules, novice level
 //   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on port 5303, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes
 //   phone  phone sizes and real touch: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
@@ -37,6 +37,7 @@ if (tier === 'fast' || tier === 'all') {
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
+  run('novice level (test/novice.mjs)', 'test/novice.mjs');
   run('training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs');
 }
 if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((r) => r.ok))) {

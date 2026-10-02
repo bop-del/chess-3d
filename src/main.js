@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { device } from './device.js';
 import { t, translateTree, i18n } from './i18n.js';
+import { LEVELS } from './ai.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 window.__chessBoot = { script: performance.now() };   // start timings for ?diag=1, ms since navigation (download ends here)
@@ -111,6 +112,10 @@ async function boot() {
   const drill = createDrill({ game, hint: openings.hint, store, sweep, onSide: openings.onSide });
   mountDrillPanel({ drill, ui });
   const learn = mountLearn({ ui, openings, store, drill });
+  // Good move?: one good move shown with its own arrow (it does not follow the Explain hint switch)
+  const [{ createGoodMove }, { createHint }] = await Promise.all([import('./goodmove.js'), import('./openings/arrow.js')]);
+  const goodMove = createGoodMove({ game, hint: createHint({ gimbal, persist: false }) });
+  ui.bindGoodMove(goodMove);
 
   // resize
   const resize = () => {
@@ -136,7 +141,7 @@ async function boot() {
   // scripted states for testing and screenshots
   applyParams({ game, controls, stage, ui });
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, goodMove, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
@@ -200,8 +205,14 @@ function applyParams({ game, controls, stage, ui }) {
   const sel = params.get('select');
   if (sel) game.selectSquare(sel);
   const ai = params.get('ai');
-  // vs computer is on by default (you play white, Easy); ?ai=0 turns it off, ?ai=3 or 4 picks a level.
-  if (ai !== '0') game.setVsComputer(true, { color: 'b', depth: +ai || 2 });
+  // vs computer is on by default (you play white, Easy); ?ai=0 turns it off, ?ai=1 to 4 picks a level (Novice, Easy, Normal,
+  // Hard) and beats the remembered one, which lives in localStorage chess3d.level.
+  if (ai !== '0') {
+    let stored = null;
+    try { stored = localStorage.getItem('chess3d.level'); } catch (e) { /* storage may be blocked */ }
+    const level = LEVELS[(+ai || 0) - 1]?.id || (LEVELS.some((l) => l.id === stored) ? stored : 'easy');
+    game.setVsComputer(true, { color: 'b', level });
+  }
   const preset = params.get('preset');
   if (preset) {
     controls.setPreset(preset);

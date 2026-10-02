@@ -23,7 +23,8 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
     src/pieces/setB.js   bishop, queen, king geometry
     src/pieceset.js      builds each piece once, hands out clones
     src/rules.js         chess rules engine, no dependencies, runs in node and the browser
-    src/ai.js            computer opponent (alpha-beta search)
+    src/ai.js            computer opponent (alpha-beta search), the LEVELS table
+    src/goodmove.js      the Good move? helper: one Hard-strength move shown with the hint arrow
     src/game.js          rules plus 3D presentation: selection, animation, undo, captures, trays
     src/controls.js      camera orbit, board gimbal, presets, keyboard, pointer and touch
     src/ui.js            HUD: panels, move list, captured pieces, sliders, banners
@@ -129,9 +130,16 @@ A self contained engine. `class Chess`: `load(fen)`, `fen()`, `moves(fromSq?)`, 
 
 ### `src/ai.js`
 
-    searchMove(fen, depth = 2, margin) -> generator
+    LEVELS = [ { id, depth, elo } ]       // novice, easy, normal, hard
+    searchMove(fen, depth = 2, margin, { level, random = Math.random }) -> generator
 
-A negamax search with alpha-beta pruning, move ordering, material and piece-square evaluation. It is a generator, so the game steps it in slices across frames and the page stays responsive. Every root move is scored with a full window and the move is picked at random among those within `margin` centipawns of the best, so play varies. The levels are depth 2 (Easy, about 900 estimated Elo), 3 (Normal, about 1200) and 4 (Hard, about 1450); see the README for how these were measured.
+A negamax search with alpha-beta pruning, move ordering, material and piece-square evaluation. It is a generator, so the game steps it in slices across frames and the page stays responsive. Every root move is scored with a full window and the move is picked at random among those within `margin` centipawns of the best, so play varies. The levels are Novice (depth 2, about 700 estimated Elo), Easy (depth 2, about 900), Normal (depth 3, about 1200) and Hard (depth 4, about 1450); see the README for how these were measured. `level` wins over `depth`. Novice differs from Easy by two rules: a capture that wins material outright (the captured piece is undefended or worth more than the capturer) is always taken, and otherwise with chance `NOVICE_WEAK` (0.1) it plays a random move from the weaker half of all moves. `random` is injectable so tests are deterministic (test/novice.mjs).
+
+### `src/goodmove.js`
+
+    createGoodMove({ game, hint }) -> { ask(): Promise<move | null>, clear(), state(), move(), canAsk(), on(fn) }
+
+`ask()` runs `searchMove(fen, 4, 0)` in 8 ms slices (timers, not frames) and shows the answer with `hint` (`createHint({ gimbal, persist: false })` from main.js, so it ignores the Explain hint switch). State is `idle`, `thinking` or `showing`. The arrow clears on any move, undo or new game; a move made while it thinks drops the answer. `canAsk()` is false while the computer thinks or moves, in any mode but `play` (Explain, Drill), after the game ended and during a promotion. The page hook is `window.__chess.goodMove`; the UI binds it with `ui.bindGoodMove()` (desktop button `#btn-good`, phone bulb `.pgood`).
 
 ### `src/game.js`
 
@@ -140,7 +148,7 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
       on(event, fn),                       // 'change', 'promotion', 'gameover', 'newgame', 'undo'
       clickSquare(sq), pickSquare(raycaster), hoverAction(raycaster),
       update(dt), newGame(opts), undo(), loadFen(fen),
-      setVsComputer(on, { color, depth }), // color is the computer's side
+      setVsComputer(on, { color, depth, level }), // color is the computer's side; level (an id of LEVELS) wins over depth
       getState(),                          // turn, moves (SAN), captured, advantage, check, over, thinking, fen, ...
       move(from, to, promo), playMoves(list), selectSquare(name), finishAnimations(),
       audit(), busy, pendingPromotion, pieceCount, sqName, nameSq
@@ -148,7 +156,7 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 
 - Moves animate: pieces slide, knights jump in an arc, captured pieces fly to the tray beside the board, a checkmated king topples. Castling moves both pieces, en passant removes the right pawn, promotion swaps the pawn for the chosen piece.
 - `getState().captured.w` lists the white pieces that were lost, `captured.b` the black pieces. `advantage` is positive when white is ahead.
-- The computer opponent is switched on at start (`main.js` calls `setVsComputer(true, { color: 'b', depth: 2 })` unless `?ai=0`). With it on, undo takes back the computer move and the player move together.
+- The computer opponent is switched on at start (`main.js` calls `setVsComputer(true, { color: 'b', level })` unless `?ai=0`; level is `?ai=1` to `4`, else localStorage `chess3d.level`, else `easy`). With it on, undo takes back the computer move and the player move together.
 - `audit()` compares the visual pieces with the engine board and returns a list of problems (empty when consistent). The tests use it.
 - `pickSquare` uses cheap proxies first, then the real meshes, then the square tops, and prefers what the player can actually use when a tall piece hides a smaller one.
 
@@ -174,7 +182,7 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 
 ### `src/ui.js`
 
-    createUI({ game, controls, stage, quality }) -> { sync(), toast(msg), toggleHud(force), toggleHelp(), render(state) }
+    createUI({ game, controls, stage, quality }) -> { sync(), toast(msg), toggleHud(force), toggleHelp(), render(state), bindGoodMove(gm) }
 
 Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal sliders, lighting and quality selects) and a right column (game buttons, computer opponent settings, SAN move list, captured pieces with the material balance). It also renders the promotion chooser (`#promo`), the game over banner (`#banner`), a toast for check (`#toast`) and the shortcut sheet. Below 900 px width the cards collapse and the left column becomes a sheet opened by the Controls button. On phones (`body.phone`, see device.js) `buildPhone()` adds a different HUD instead: a status line (`.pstatus`: turn, check, computer thinking, last move), a thumb bar (`.pbar`, buttons `.tb[data-act]`: Undo, New game with a confirm during a game, Flip, Views cycling to the next preset, Learn (opens the Learn sheet), Menu) at the bottom in portrait and on the right in landscape, and a bottom sheet (`.psheet` over `.pscrim`) with accordion sections Game, Moves, View and gimbal (with Lock view), Scene and Help. An invisible `.pframe` element marks the free area; its rectangle goes to `controls.setFrame`. Phones get lite glass (no backdrop blur). Tablets keep the desktop HUD with 44 px targets.
 

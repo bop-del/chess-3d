@@ -56,9 +56,37 @@ function* negamax(ch, depth, alpha, beta, ply, ctl) {
   return best;
 }
 
+// Playing levels. depth is the search depth, elo the label shown to the player (measured, see the README).
+export const LEVELS = [
+  { id: 'novice', depth: 2, elo: 700 },
+  { id: 'easy', depth: 2, elo: 900 },
+  { id: 'normal', depth: 3, elo: 1200 },
+  { id: 'hard', depth: 4, elo: 1450 },
+];
+export const levelById = (id) => LEVELS.find((l) => l.id === id) || null;
+
+// Novice: the chance of playing a random move from the weaker half of all moves instead of the best pool.
+export const NOVICE_WEAK = 0.1;
+
+// Does this capture win material outright? The captured piece is not defended, or is worth more than the capturer.
+// Returns the material gained (centipawns) or 0.
+function hangingGain(ch, m) {
+  if (!m.captured) return 0;
+  const gain = VAL[m.captured.toLowerCase()];
+  if (gain > VAL[m.piece]) return gain - VAL[m.piece];
+  ch._make(m, false);
+  const defended = ch.moves().some((r) => r.to === m.to && r.captured);
+  ch._unmake();
+  return defended ? 0 : gain;
+}
+
 // Generator: drive with .next() until done; result value is { move, score, nodes }.
 // Every root move is scored with a full window so near-equal moves can be chosen at random (margin in centipawns).
-export function* searchMove(fen, depth = 2, margin = depth <= 2 ? 50 : depth === 3 ? 20 : 8) {
+// opts.level (an id from LEVELS) wins over depth. opts.random is injectable so tests are deterministic.
+export function* searchMove(fen, depth = 2, margin, { level = null, random = Math.random } = {}) {
+  const lv = level ? levelById(level) : null;
+  if (lv) depth = lv.depth;
+  if (margin === undefined) margin = depth <= 2 ? 50 : depth === 3 ? 20 : 8;
   const ch = new Chess(fen);
   ch.trackKeys = false;
   const ctl = { nodes: 0, best: null };
@@ -72,8 +100,22 @@ export function* searchMove(fen, depth = 2, margin = depth <= 2 ? 50 : depth ===
     ch._unmake();
     scored.push({ m, v });
   }
+  if (lv && lv.id === 'novice') {
+    // a piece left hanging is always taken (the biggest gain first)
+    let grab = null, gain = 0;
+    for (const x of scored) {
+      const g = hangingGain(ch, x.m);
+      if (g > gain) { gain = g; grab = x; }
+    }
+    if (grab) return { move: grab.m, score: grab.v, nodes: ctl.nodes };
+    if (random() < NOVICE_WEAK) {
+      const weak = [...scored].sort((a, b) => a.v - b.v).slice(0, Math.max(1, scored.length >> 1));
+      const pick = weak[Math.floor(random() * weak.length)];
+      return { move: pick.m, score: pick.v, nodes: ctl.nodes };
+    }
+  }
   const top = Math.max(...scored.map((x) => x.v));
   const pool = scored.filter((x) => x.v >= top - margin);
-  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const pick = pool[Math.floor(random() * pool.length)];
   return { move: pick.m, score: pick.v, nodes: ctl.nodes };
 }

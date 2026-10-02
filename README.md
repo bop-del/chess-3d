@@ -83,7 +83,7 @@ Sliders and buttons (left panel)
 | Lighting | Studio, Gallery, Sunset, Night |
 | Quality | Low, Medium, High |
 | New game, Undo, Keys | Game buttons (right panel) |
-| vs computer | On by default (you play white, Easy). Switch, your side (play white or black) and strength (Easy about 900, Normal about 1200, Hard about 1450, estimated, see below) |
+| vs computer | On by default (you play white, Easy). Switch, your side (play white or black) and strength (Novice about 700, Easy about 900, Normal about 1200, Hard about 1450, estimated, see below; the choice is remembered on the device). Next to Undo, Good move? shows one good move with the hint arrow (a bulb in the status line on a phone) |
 
 Home Screen: on an iPhone or iPad the game can be added to the Home Screen from Safari (Share, then Add to Home Screen) and then runs full screen with its own icon (a web app manifest, no service worker). In a Safari tab it shows a short reminder with the three steps once after the first load, and at most twice more a few visits later. Later or a tap outside closes it at once. It never shows when the game is already installed, on desktop, or with any URL parameter below. The link preview used by chat apps and social sites is `public/og-image.png`.
 
@@ -96,7 +96,7 @@ Rules
 - Complete rules: castling (both sides, with the usual conditions), en passant, promotion with a chooser for queen, rook, bishop or knight, check, checkmate and stalemate
 - Draws by the fifty-move rule, threefold repetition and insufficient material
 - Move list in standard algebraic notation (SAN), captured pieces with the material balance, undo for any number of moves
-- Play against the computer at three levels (Easy about 900, Normal about 1200, Hard about 1450 estimated Elo), as white or black. The computer opponent is on by default, you play white on Easy. Switch it off in the Game panel (or open `?ai=0`) for two players on one screen
+- Play against the computer at four levels (Novice about 700, Easy about 900, Normal about 1200, Hard about 1450 estimated Elo), as white or black. The computer opponent is on by default, you play white on Easy. Switch it off in the Game panel (or open `?ai=0`) for two players on one screen
 - The rules engine is checked against the standard perft node counts
 
 Rendering
@@ -184,3 +184,5 @@ MIT, see [LICENSE](LICENSE). Uses [three.js](https://threejs.org/), also MIT, co
 ## Computer strength
 
 The ratings shown next to the levels are estimates. Each level was played for 30 games against Stockfish 19 limited to its lowest rating setting (UCI_Elo 1320, 60 ms per move), alternating colours from random openings: Easy scored 2.5/30, Normal 9.5/30 and Hard 20/30, which puts them at roughly 900, 1200 and 1450 on that scale. The error is about 100 points either way, and Stockfish's rating scale is not the same as online or club ratings, so read them as a guide to the ordering and spacing of the levels rather than a rating you would hold on a chess site. Playing against each other the gaps are wider: Hard beat Normal 27 games to 0 with 3 draws.
+
+Novice was measured differently, because there is no Stockfish on the machine it was tuned on: only against Easy, 180 games over three runs of 60 (alternating colours, four random opening plies), where it scored 41 of 180 points (about 23 percent). That is about 210 points below Easy, so about 690 on the scale above. The error is larger than for the others: about 50 points for one standard deviation, 100 for two, on top of the error of Easy's own rating. Novice searches as deep as Easy, plays a random move from the weaker half of its options one time in ten, and always takes a piece left hanging. Hard, Normal and Easy have not been re-measured.

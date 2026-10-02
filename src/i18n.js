@@ -48,9 +48,12 @@ export const DE = {
   'hud.keys': 'Tasten', 'hud.keysTitle': 'Tastenkürzel (?)',
   'hud.vsComputer': 'gegen Computer', 'hud.yourSide': 'Deine Seite',
   'hud.playWhite': 'Als Weiß', 'hud.playBlack': 'Als Schwarz', 'hud.strength': 'Stärke',
-  'hud.easy': 'Leicht 900', 'hud.normal': 'Mittel 1200', 'hud.hard': 'Schwer 1450',
+  'hud.novice': 'Anfänger 700', 'hud.easy': 'Leicht 900', 'hud.normal': 'Mittel 1200', 'hud.hard': 'Schwer 1450',
   'hud.byWhite': 'Von Weiß', 'hud.byBlack': 'Von Schwarz',
   'hud.keyboardMouse': 'Tastatur und Maus',
+
+  // Good move helper
+  'good.label': 'Guter Zug?', 'good.title': 'Einen guten Zug zeigen',
 
   // turn and status
   'turn.white': 'Weiß am Zug', 'turn.black': 'Schwarz am Zug',

@@ -32,7 +32,8 @@ function arrowShape(len, shaft = 0.1, head = 0.3, headLen = 0.38) {
   return s;
 }
 
-export function createHint({ gimbal }) {
+// persist: false keeps this hint out of the stored preference (the Good move helper always shows its arrow).
+export function createHint({ gimbal, persist = true }) {
   const group = new THREE.Group();
   group.name = 'move-hint';
   group.visible = false;
@@ -50,7 +51,7 @@ export function createHint({ gimbal }) {
   for (const m of [fromMesh, toMesh, arrowMesh]) { m.renderOrder = 4; m.position.y = LIFT; group.add(m); }
   arrowMesh.position.y = LIFT * 2;
 
-  let enabled = readPref();
+  let enabled = persist ? readPref() : true;
   let wanted = null;   // { from, to } or null
   let drawn = '';
 
@@ -83,7 +84,7 @@ export function createHint({ gimbal }) {
     show(from, to) { wanted = from == null || to == null ? null : { from, to }; redraw(); },
     hide() { wanted = null; redraw(); },
     get enabled() { return enabled; },
-    set enabled(on) { enabled = !!on; writePref(enabled); redraw(); },
+    set enabled(on) { enabled = !!on; if (persist) writePref(enabled); redraw(); },
     get visible() { return group.visible; },
     dispose() {
       gimbal.remove(group);

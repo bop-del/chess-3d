@@ -20,6 +20,7 @@ const ICON = {
   views: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   learn: '<path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  good: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2v.1h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
 };
 const PIECE_NAME = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
 const pieceName = (p) => t(`piece.${p}`, PIECE_NAME[p]);
@@ -97,10 +98,13 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
           <button class="btn" id="btn-undo" title="Undo (U)" data-i18n="hud.undo" data-i18n-title="hud.undoTitle">Undo</button>
           <button class="btn" id="btn-help" title="Keyboard shortcuts (?)" data-i18n="hud.keys" data-i18n-title="hud.keysTitle">Keys</button>
         </div>
+        <div class="row good">
+          <button class="btn" id="btn-good" title="Show one good move" data-i18n-title="good.title"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON.good}</svg><span data-i18n="good.label">Good move?</span></button>
+        </div>
         <div class="row ai">
           <label class="switch"><input type="checkbox" id="chk-ai"><span class="track"><i></i></span><em data-i18n="hud.vsComputer">vs computer</em></label>
           <select id="sel-ai-color" title="Your side" data-i18n-title="hud.yourSide"><option value="w" data-i18n="hud.playWhite">Play white</option><option value="b" data-i18n="hud.playBlack">Play black</option></select>
-          <select id="sel-ai-level" title="Strength" data-i18n-title="hud.strength"><option value="2" data-i18n="hud.easy">Easy ~900</option><option value="3" data-i18n="hud.normal">Normal ~1200</option><option value="4" data-i18n="hud.hard">Hard ~1450</option></select>
+          <select id="sel-ai-level" title="Strength" data-i18n-title="hud.strength"><option value="novice" data-i18n="hud.novice">Novice ~700</option><option value="easy" data-i18n="hud.easy">Easy ~900</option><option value="normal" data-i18n="hud.normal">Normal ~1200</option><option value="hard" data-i18n="hud.hard">Hard ~1450</option></select>
         </div>
       </div>
     </section>
@@ -203,15 +207,38 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   $('#btn-new').addEventListener('click', () => { game.newGame(); hideBanner(); });
   $('#btn-undo').addEventListener('click', () => { game.undo(); hideBanner(); });
   $('#btn-help').addEventListener('click', toggleHelp);
+  const storeLevel = (v) => { try { localStorage.setItem('chess3d.level', v); } catch (e) { /* storage may be blocked */ } };
+  // "Good move?" helper (src/goodmove.js, bound from main.js): the desktop button and the phone bulb do the same thing
+  let goodMove = null, goodKey = '';
+  const goodBtns = [$('#btn-good')];
+  function syncGood() {
+    if (!goodMove) return;
+    const think = goodMove.state() === 'thinking', can = goodMove.canAsk();
+    const key = `${think}|${can}|${goodMove.state()}`;
+    if (key === goodKey) return;
+    goodKey = key;
+    for (const b of goodBtns) {
+      b.disabled = !can;
+      b.classList.toggle('think', think);
+      b.classList.toggle('on', goodMove.state() === 'showing');
+      b.setAttribute('aria-busy', think ? 'true' : 'false');
+    }
+  }
+  function bindGoodMove(gm) {
+    goodMove = gm;
+    for (const b of goodBtns) b.addEventListener('click', () => gm.ask());
+    gm.on(syncGood);
+    syncGood();
+  }
   const chkAi = $('#chk-ai'), selAiColor = $('#sel-ai-color'), selAiLevel = $('#sel-ai-level');
   function applyAi() {
     const human = selAiColor.value;
-    game.setVsComputer(chkAi.checked, { color: human === 'w' ? 'b' : 'w', depth: +selAiLevel.value });
+    game.setVsComputer(chkAi.checked, { color: human === 'w' ? 'b' : 'w', level: selAiLevel.value });
     if (chkAi.checked) controls.setPreset(human === 'w' ? 'White view' : 'Black view');
   }
   chkAi.addEventListener('change', applyAi);
   selAiColor.addEventListener('change', () => { if (chkAi.checked) applyAi(); });
-  selAiLevel.addEventListener('change', () => { if (chkAi.checked) applyAi(); });
+  selAiLevel.addEventListener('change', () => { storeLevel(selAiLevel.value); if (chkAi.checked) applyAi(); });
 
   // ------------------------------------------------------------ hud visibility / help
   function toggleHud(force) {
@@ -279,6 +306,8 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
     if (st.check && !lastCheck && !st.over) toast(t('turn.check', 'Check'));
     lastCheck = st.check;
     if (chkAi.checked !== st.vsComputer) chkAi.checked = st.vsComputer;
+    if (st.level && selAiLevel.value !== st.level) selAiLevel.value = st.level;
+    syncGood();
     phoneUI?.status(st);
   }
   game.on('change', render);
@@ -327,6 +356,7 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   // ------------------------------------------------------------ per-frame control sync
   let lastSig = '';
   function sync() {
+    syncGood();   // busy and the computer's turn change without a game event
     const d = controls.gimbalDeg;
     const sig = `${d.x.toFixed(0)}|${d.y.toFixed(0)}|${d.z.toFixed(0)}|${controls.spin}`;
     if (sig === lastSig) return;
@@ -402,7 +432,14 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
       c.querySelector('header').addEventListener('click', () => { if (c.classList.contains('collapsed')) openCard(c); else c.classList.add('collapsed'); });
     }
 
-    hud.append(status, bar, probe, scrim, sheet, learnSheet, confirmBox);
+    // the "Good move?" bulb: a 44 px target at the right end of the status line
+    const bulb = el('button', 'pgood', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON.good}</svg>`);
+    bulb.dataset.i18nAria = 'good.title';
+    bulb.setAttribute('aria-label', 'Show one good move');
+    goodBtns.push(bulb);
+    if (goodMove) bulb.addEventListener('click', () => goodMove.ask());
+
+    hud.append(status, bulb, bar, probe, scrim, sheet, learnSheet, confirmBox);
 
     // sheet open and close; swipe down on the header closes it
     const isOpen = () => sheet.classList.contains('open');
@@ -574,5 +611,5 @@ export function createUI({ game, controls, stage, quality = 'high' }) {
   }
 
   // Phone only: the Learn sheet { body, open(), close(), isOpen }, null elsewhere. src/learn fills the body.
-  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings, learnSheet: phoneUI ? phoneUI.learn : null };
+  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings, learnSheet: phoneUI ? phoneUI.learn : null, bindGoodMove };
 }

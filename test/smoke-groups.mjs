@@ -20,7 +20,7 @@ const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
 // longest first: the two fix halves (about 60 s each), then the rest. battle is test/battle.mjs, its own script, on the same server.
 const SMOKE = 'test/smoke.mjs';
-const GROUPS = [['fixes 1/2', SMOKE, ['--group=fixes', '--part=0/2']], ['fixes 2/2', SMOKE, ['--group=fixes', '--part=1/2']], ['battle', 'test/battle.mjs', []], ['learn', SMOKE, ['--group=learn']], ['drill', SMOKE, ['--group=drill']], ['core', SMOKE, ['--group=core']], ['explain', SMOKE, ['--group=explain']]]
+const GROUPS = [['fixes 1/2', SMOKE, ['--group=fixes', '--part=0/2']], ['fixes 2/2', SMOKE, ['--group=fixes', '--part=1/2']], ['battle', 'test/battle.mjs', []], ['learn', SMOKE, ['--group=learn']], ['drill', SMOKE, ['--group=drill']], ['core', SMOKE, ['--group=core']], ['explain', SMOKE, ['--group=explain']], ['goodmove', SMOKE, ['--group=goodmove']]]
   .filter(([n]) => !(flag('skip-fixes') && n.startsWith('fixes')));
 
 let server = null;

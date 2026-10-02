@@ -1,7 +1,7 @@
 // Game controller: rules from ./rules.js plus 3D presentation, animation, undo, optional computer opponent.
 import * as THREE from 'three';
 import { Chess, START_FEN, sqName, nameSq } from './rules.js';
-import { searchMove } from './ai.js';
+import { searchMove, levelById, LEVELS } from './ai.js';
 import { device } from './device.js';
 
 export * from './rules.js';
@@ -51,7 +51,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   let pendingPromo = null;
   let gameOver = null;
   let overTimer = 0;
-  let vsComputer = false, computerColor = 'b', depth = 2;
+  let vsComputer = false, computerColor = 'b', depth = 2, level = null;
   let search = null, thinkDelay = 0;
   let time = 0;
   let lastStatus = { over: false, check: false };
@@ -197,7 +197,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       check: chess.inCheck(),
       over: gameOver,
       thinking: !!search,
-      vsComputer, computerColor, depth,
+      vsComputer, computerColor, depth, level,
       canUndo: records.length > 0,
       busy: busy(),
       fen: chess.fen(),
@@ -523,7 +523,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
 
   function maybeComputer() {
     if (mode === 'play' && vsComputer && !gameOver && !search && chess.turn === computerColor && !pendingPromo) {
-      search = searchMove(chess.fen(), depth);
+      search = searchMove(chess.fen(), depth, undefined, { level });
       thinkDelay = 0.45;
       changed();
     }
@@ -531,7 +531,8 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   function setVsComputer(on, opts = {}) {
     vsComputer = !!on;
     if (opts.color) computerColor = opts.color;
-    if (opts.depth) depth = opts.depth;
+    if (opts.depth) { depth = opts.depth; level = LEVELS.slice(1).find((l) => l.depth === depth)?.id || null; }
+    if (opts.level && levelById(opts.level)) { level = opts.level; depth = levelById(level).depth; }
     if (!vsComputer) search = null;
     selected = -1;
     refreshHighlights();
