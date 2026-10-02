@@ -208,9 +208,73 @@ async function checkTrays(page, baseUrl, log) {
   return out;
 }
 
+// ---------------------------------------------------------------- (d) device: start tier, ?touch, context loss
+// Loads with its own flags (no quality=low unless asked), still manual=1 and ai=0. Small viewport to stay fast.
+async function loadRaw(page, baseUrl, query) {
+  await page.setViewport({ width: 800, height: 500 });
+  await page.goto(`${baseUrl}/?manual=1&ai=0&${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+  return page.evaluate(() => ({ touchClass: document.body.classList.contains('touch'), quality: window.__chess.stage.quality, select: document.querySelector('#sel-quality').value }));
+}
+
+async function checkDevice(page, baseUrl, log) {
+  const out = [];
+  const cases = [
+    ['default load starts on high without the touch class', '', (r) => r.quality === 'high' && !r.touchClass && r.select === 'high'],
+    ['?touch=1 sets the touch class and starts on medium', 'touch=1', (r) => r.quality === 'medium' && r.touchClass && r.select === 'medium'],
+    ['?touch=0 behaves like the default', 'touch=0', (r) => r.quality === 'high' && !r.touchClass],
+    ['?touch=1&quality=low starts on low', 'touch=1&quality=low', (r) => r.quality === 'low' && r.touchClass],
+  ];
+  for (const [name, query, ok] of cases) {
+    const r = await loadRaw(page, baseUrl, query);
+    const pass = !!ok(r);
+    out.push({ name, pass, detail: `quality ${r.quality}, touch class ${r.touchClass}` });
+    log?.(`device ${query || 'default'}: ${pass ? 'ok' : 'FAIL'}`);
+  }
+
+  // forced context loss and restore: the board must render again and nothing may log an error
+  const errs = [];
+  const onErr = (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 160)); };
+  page.on('console', onErr);
+  page.on('pageerror', (e) => errs.push(String(e.message).slice(0, 160)));
+  try {
+    await loadRaw(page, baseUrl, 'quality=low');
+    const readFrame = () => page.evaluate(() => {
+      const { stage } = window.__chess, gl = stage.renderer.getContext();
+      window.__chess.draw();
+      const W = gl.canvas.width, H = gl.canvas.height, buf = new Uint8Array(W * H * 4);
+      gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      let sum = 0, sum2 = 0, n = 0; const seen = new Set();
+      for (let i = 0; i < buf.length; i += 16) { const l = 0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2]; sum += l; sum2 += l * l; n++; seen.add(((buf[i] >> 3) << 10) | ((buf[i + 1] >> 3) << 5) | (buf[i + 2] >> 3)); }
+      const mean = sum / n;
+      return { mean, std: Math.sqrt(Math.max(0, sum2 / n - mean * mean)), colors: seen.size, lost: stage.contextLost };
+    });
+    const before = await readFrame();
+    await page.evaluate(() => {
+      const gl = window.__chess.stage.renderer.getContext();
+      window.__lose = gl.getExtension('WEBGL_lose_context');
+      window.__lose.loseContext();
+    });
+    await page.waitForFunction('window.__chess.stage.contextLost === true', { timeout: 10000 });
+    await page.evaluate(() => { window.__chess.draw(); });   // drawing while lost must be a quiet no-op
+    await page.evaluate(() => window.__lose.restoreContext());
+    await page.waitForFunction('window.__chess.stage.contextLost === false', { timeout: 30000 });
+    await page.evaluate(() => { window.__chess.step(1); });
+    const after = await readFrame();
+    const pass = before.std > 8 && after.std > 8 && after.colors > 40 && after.mean > 8 && !after.lost && errs.length === 0;
+    out.push({
+      name: 'board renders again after a lost and restored WebGL context, no console error',
+      pass,
+      detail: `before std ${before.std.toFixed(0)} colors ${before.colors}, after std ${after.std.toFixed(0)} colors ${after.colors} mean ${after.mean.toFixed(0)}, errors ${errs.length ? errs.join(' | ') : 'none'}`,
+    });
+    log?.(`device context loss: ${pass ? 'ok' : 'FAIL'}`);
+  } finally { page.off('console', onErr); }
+  return out;
+}
+
 export async function runFixChecks({ page, baseUrl, log = () => {} }) {
   const results = [];
-  for (const [name, fn] of [['labels', checkLabels], ['picking', checkPicking], ['trays', checkTrays]]) {
+  for (const [name, fn] of [['labels', checkLabels], ['picking', checkPicking], ['trays', checkTrays], ['device', checkDevice]]) {
     try {
       results.push(...(await fn(page, baseUrl, log)));
     } catch (err) {

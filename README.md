@@ -91,7 +91,8 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 
 | Parameter | Value | Effect |
 |---|---|---|
-| `quality` | `low`, `medium`, `high` | Start in this quality tier (default `high`) |
+| `quality` | `low`, `medium`, `high` | Start in this quality tier (default `high`, `medium` on touch devices) |
+| `touch` | `1`, `0` | `1` forces touch mode on (Medium start tier, page gesture blocking), `0` forces it off (desktop behaviour even on a touch device). Without it touch is detected from the primary input. An explicit `quality` wins over the touch start tier |
 | `light` | `Studio`, `Gallery`, `Sunset`, `Night` | Start with this lighting preset |
 | `preset` | `White view`, `Black view`, `Top down`, `Side`, `Isometric` | Jump to a view preset |
 | `yaw`, `pitch` | degrees | Set the camera angles |

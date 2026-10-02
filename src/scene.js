@@ -632,6 +632,12 @@ export function createStage(canvas, opts = {}) {
     rebuildEnvironment(cfg.pmrem);
   }
 
+  // camera aspect only, cheap: used on touch devices while a burst of resize events is still going on
+  function setAspect(w, h) {
+    camera.aspect = Math.max(1, w) / Math.max(1, h);
+    camera.updateProjectionMatrix();
+  }
+
   function resize(w, h) {
     width = Math.max(1, Math.floor(w)); height = Math.max(1, Math.floor(h));
     applyPixelRatio();
@@ -648,7 +654,40 @@ export function createStage(canvas, opts = {}) {
     syncPostUniforms();
   }
 
+  // ---- WebGL context loss (every device) ----
+  // The browser may take the context away (a phone under memory pressure, a GPU reset). preventDefault on the lost event is what
+  // allows a restore. While it is lost nothing is drawn. When it comes back three.js re-creates its GL state on its own, but the
+  // render targets and the baked environment map hold no data any more, so they are rebuilt. opts.onContext('lost' | 'stalled' |
+  // 'ok' | 'failed') lets the page show a notice; 'stalled' means nothing came back within a few seconds.
+  let lost = false, lostTimer = 0;
+  const notify = (state) => { try { opts.onContext?.(state); } catch (e) { /* the notice is optional */ } };
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    lost = true;
+    console.warn('[stage] webgl context lost');
+    notify('lost');
+    clearTimeout(lostTimer);
+    lostTimer = setTimeout(() => { if (lost) notify('stalled'); }, 4000);
+  }, false);
+  canvas.addEventListener('webglcontextrestored', () => {
+    clearTimeout(lostTimer);
+    try {
+      envTarget = null; reflTarget = null; composer = gtaoPass = bloomPass = gradePass = smaaPass = null; // owned by the dead context
+      applyShadowQuality();
+      setupReflectionTarget();
+      buildPipeline();
+      rebuildEnvironment(cfg.pmrem);
+      lost = false;
+      console.warn('[stage] webgl context restored');
+      notify('ok');
+    } catch (err) {
+      console.error('[stage] rebuild after context loss failed', err);
+      notify('failed');
+    }
+  }, false);
+
   function render(dt = 1 / 60) {
+    if (lost || renderer.getContext().isContextLost()) return;
     dt = Math.min(Math.max(dt, 0), 1);
     time += dt;
     updateTransition(dt);
@@ -677,10 +716,11 @@ export function createStage(canvas, opts = {}) {
     renderer, scene, camera, floor,
     lights: { key, fill, rim },
     lightingPresets,
-    setLightingPreset, setFloorVisibility, setQuality, resize, render, dispose,
+    setLightingPreset, setFloorVisibility, setQuality, setAspect, resize, render, dispose,
     // extras (beyond the contract, harmless)
     get quality() { return quality; },
     get lightingPreset() { return currentName; },
-    get composer() { return composer; }
+    get composer() { return composer; },
+    get contextLost() { return lost; }
   };
 }

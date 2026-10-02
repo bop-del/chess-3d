@@ -5,7 +5,7 @@ Three tiers, from instant to thorough. `npm test` runs the fast tier.
 | Tier | Command | Time | Needs | Checks |
 | --- | --- | --- | --- | --- |
 | fast | `node test/run.mjs fast` (or `npm test`) | about 1 s | Node only | rules (perft, SAN, endings, `test/perft.mjs`), piece geometry contract (`test/geometry.mjs`), text lint (`test/lint.mjs`), audit planner rules (`test/audit-plan.mjs`) |
-| smoke | `node test/run.mjs smoke` | 1 to 2 min | Chrome | `vite build`, `vite preview` on port 5303, a scripted game by real clicks, gimbal, render budgets, pixel checks, regression checks from `test/fixes.mjs` |
+| smoke | `node test/run.mjs smoke` | 1 to 2 min | Chrome | `vite build`, `vite preview` on port 5303, a scripted game by real clicks, gimbal, render budgets, pixel checks, regression checks from `test/fixes.mjs` (labels, picking, trays, device) |
 | all | `node test/run.mjs all` | fast plus smoke | Chrome | both tiers, then a reminder to run the release check |
 | release | `node tools/release-check.mjs` | 5 to 10 min | Chrome, network for `npm ci` | git hygiene, fresh copy build, dist scan, page loads, URL fuzzing, docs, version |
 
@@ -26,6 +26,7 @@ Three tiers, from instant to thorough. `npm test` runs the fast tier.
 - Gimbal: each axis slider, floor fade when tilted, Reset, Level board, keyboard W and R.
 - Budgets: draw calls, triangles, geometries, textures and shader programs of one frame at the start position (`renderer.info`) and the time to `window.__chessReady`, against `tools/budgets.json` (1.5x the measured value). After an intended change to the scene, run `node test/smoke.mjs --write-budgets` and commit the new file.
 - Pixels: not blank, no black frame, no white out, and light plus dark pixels inside the projected board corners, in five view presets and one tilted view.
+- Device checks in `test/fixes.mjs` (a few seconds each, 800x500): default load starts on High with no `touch` class, `?touch=1` sets the class and starts on Medium, `?touch=0` behaves like the default, `?touch=1&quality=low` starts on Low, and a WebGL context lost and restored through `WEBGL_lose_context` leaves the board rendering again (pixel check) with no console error.
 - `test/fixes.mjs` (`runFixChecks({ page, baseUrl, log })`) is called with a fresh page when the file exists.
 - `--dev` uses the vite dev server on port 5302 instead of a build. `--shots` empties `.tmp/smoke-shots/`, saves the screenshots there and adds a contact sheet per screen size (`contact-<w>x<h>.png`).
 
@@ -49,7 +50,7 @@ Git hygiene (clean tree, no scratch or key files, no file over 1.5 MB outside `d
 
 ## URL flags used by the tests
 
-`quality=low|medium|high`, `manual=1` (no render loop, tests call `window.__chess.step(sec)` and `.draw()`), `ai=0` (computer off; default is on, you play white; `ai=3` or `ai=4` raises the level), `fen`, `moves`, `select`, `preset`, `gx` `gy` `gz`, `yaw` `pitch` `dist`, `hud=0`, `help=1`, `light`, `spin=1`, `promo`.
+`quality=low|medium|high`, `touch=1|0`, `manual=1` (no render loop, tests call `window.__chess.step(sec)` and `.draw()`), `ai=0` (computer off; default is on, you play white; `ai=3` or `ai=4` raises the level), `fen`, `moves`, `select`, `preset`, `gx` `gy` `gz`, `yaw` `pitch` `dist`, `hud=0`, `help=1`, `light`, `spin=1`, `promo`.
 
 ## Files
 

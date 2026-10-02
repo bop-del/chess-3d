@@ -5,6 +5,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#07080c">
+<!-- iOS Home Screen: full screen, dark status bar, short name. Desktop browsers ignore these. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chess 3D">
+<meta name="format-detection" content="telephone=no">
 <title>Chess 3D</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='56' fill='%23d8b468'%3E%E2%99%9E%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="./src/style.css">
@@ -27,6 +33,7 @@
 <div id="banner" hidden></div>
 <div id="promo" hidden></div>
 <div id="toast" aria-live="polite"></div>
+<div id="notice" role="alert" hidden onclick="location.reload()"></div>
 
 <script>
   // if the game script never ran (a browser too old to parse it, a failed download), say so instead of loading forever

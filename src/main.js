@@ -1,5 +1,6 @@
 // App entry: loads modules with progress, wires stage, board, pieces, game, controls and HUD.
 import * as THREE from 'three';
+import { device } from './device.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 const params = new URLSearchParams(location.search);
@@ -42,8 +43,9 @@ async function boot() {
   await tick();
 
   const canvas = $('stage');
-  const quality = params.get('quality') || 'high';
-  const stage = createStage(canvas, { quality });
+  // touch devices start on Medium, desktop on High; ?quality= and the quality menu override
+  const quality = params.get('quality') || (device.touch ? 'medium' : 'high');
+  const stage = createStage(canvas, { quality, onContext: showContextNotice });
   const gimbal = new THREE.Group();
   gimbal.name = 'gimbal';
   stage.scene.add(gimbal);
@@ -95,7 +97,19 @@ async function boot() {
     stage.resize(w, h);
     controls.onResize(w, h);
   };
-  window.addEventListener('resize', resize);
+  // touch: rotation and the browser toolbar fire bursts of resize events. The camera follows at once, the render targets
+  // are reallocated once the burst has ended. Desktop reallocates on every event as before.
+  let resizeT = 0;
+  const onResize = () => {
+    if (!device.touch) { resize(); return; }
+    const w = window.innerWidth, h = window.innerHeight;
+    stage.setAspect(w, h);
+    controls.onResize(w, h);
+    clearTimeout(resizeT);
+    resizeT = setTimeout(resize, 160);
+  };
+  window.addEventListener('resize', onResize);
+  if (device.touch) window.addEventListener('orientationchange', onResize);
   resize();
 
   // scripted states for testing and screenshots
@@ -131,6 +145,16 @@ async function boot() {
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
   window.__chessReady = true;
+}
+
+// WebGL context loss (every device): the stage pauses drawing and rebuilds on restore. If the browser does not give the
+// context back, or the rebuild fails, the notice offers a reload.
+function showContextNotice(state) {
+  const el = $('notice');
+  if (!el) return;
+  if (state === 'ok' || state === 'lost') { el.hidden = true; return; }   // a short loss recovers on its own: no notice yet
+  el.textContent = state === 'failed' ? 'Graphics could not be restored. Tap to reload the page.' : 'The browser has not returned the graphics yet. Tap to reload the page.';
+  el.hidden = false;
 }
 
 function applyParams({ game, controls, stage, ui }) {

@@ -14,6 +14,7 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
 
     index.html           canvas, loader, HUD containers, entry script
     src/main.js          boot sequence, wiring, render loop, URL parameters, window.__chess
+    src/device.js        device facts (touch, ios, phone, standalone, portrait), body classes and gesture blocking (the iOS Home Screen meta tags are static in index.html)
     src/scene.js         stage: renderer, lights, studio environment, floor, post chain, quality
     src/board.js         board, frame, inlay, labels, plinth, square highlights
     src/textures.js      procedural canvas textures (marble, walnut, maple, brass, felt)
@@ -48,7 +49,7 @@ Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.
 
 ### `src/scene.js`
 
-    createStage(canvas, { quality = 'high' }) -> {
+    createStage(canvas, { quality = 'high', onContext }) -> {
       renderer, scene, camera,     // PerspectiveCamera(35, aspect, 0.1, 200)
       floor,                       // shadow receiving studio floor, at y = -1.2
       lights: { key, fill, rim },  // key is a shadow casting DirectionalLight, frustum radius about 9
@@ -56,10 +57,11 @@ Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.
       setLightingPreset(name),     // animated transition of lights, environment, backdrop, exposure
       setFloorVisibility(t),       // 0..1, fades the floor and its shadow
       setQuality('low'|'medium'|'high'),
-      resize(w, h),
+      resize(w, h),                // full reallocation of targets and the post chain
+      setAspect(w, h),             // camera aspect only (touch devices use it during a burst of resize events)
       render(dt),                  // draws the frame, post chain included
       dispose(),
-      quality, lightingPreset, composer   // read only
+      quality, lightingPreset, composer, contextLost   // read only
     }
 
 - Tone mapping: ACES filmic, sRGB output. A procedural studio environment (softbox panels on a dome) is built with PMREM and assigned to `scene.environment`.
@@ -73,7 +75,14 @@ Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.
 | medium | 2048 | 1.5 | bloom, SMAA, weaker floor reflection |
 | low | 1024 | 1 | none, plain render |
 
+- Context loss (every device): the stage listens for `webglcontextlost` on the canvas and calls `preventDefault`, which allows a restore. While the context is lost `render()` draws nothing. On `webglcontextrestored` it rebuilds what the dead context owned (shadow map, reflection target, post chain, environment map) and goes on. `onContext(state)` is called with `'lost'`, `'stalled'` (nothing came back within 4 s), `'ok'` or `'failed'` (the rebuild threw); `src/main.js` shows the `#notice` element, a tap to reload message, for `stalled` and `failed`. Tests force it with the `WEBGL_lose_context` extension.
 - The final pass is a small grade shader: vignette, tint, a gentle contrast curve and a dither against banding.
+
+### `src/device.js`
+
+    device = { touch, ios, forced, phone, standalone, portrait }
+
+Read once at start (only `portrait` follows rotation). `touch` is `(pointer: coarse)`, or forced with `?touch=1` (on) and `?touch=0` (off, desktop behaviour even on a touch device). `phone` is touch with a short screen side of 500 CSS px or less. It sets the body classes `touch`, `ios`, `phone`, `portrait` (and `touch` on `<html>`). Only when `touch` is on it blocks the page gestures: `gesturestart`, `gesturechange` and `gestureend`, a multi finger `touchmove` that is not on the canvas, and a double tap on the canvas within 320 ms. The canvas pinch in `src/controls.js` uses Pointer Events and is unaffected. `main.js` also uses `device.touch` to start on Medium instead of High (an explicit `?quality=` wins) and to debounce resize events by about 160 ms (the camera aspect updates at once, the render targets once the burst ends).
 
 ### `src/textures.js`, `src/materials.js`
 

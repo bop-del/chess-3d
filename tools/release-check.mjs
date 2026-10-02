@@ -8,7 +8,7 @@
 //      user names or key like strings, sizes are printed
 //   3. the built site is served with vite preview and loaded in headless Chrome: normal pages and flag combinations must load with no console
 //      error, no page error and no request to a foreign host
-//   4. URL fuzzing: out of range and hostile values of every flag in src/main.js (prototype names, duplicates, null bytes, markup included)
+//   4. URL fuzzing: out of range and hostile values of every flag the app reads (src/main.js, src/device.js) (prototype names, duplicates, null bytes, markup included)
 //      must not throw and must not reach a foreign host, and no request may come back with an HTTP error status
 //   4b. the built site is also served under a sub path (/chess-3d/, like GitHub Pages) and must boot there with no error
 //   5. docs: every URL flag, script, tool, file and relative link mentioned in README.md and docs/*.md exists in the code or the repo
@@ -194,6 +194,7 @@ if (built && !flag('no-browser')) {
       Q + '&light=__proto__&light=Studio&preset=__proto__&preset=Side', Q + '&gx=1&gx=2&gx=NaN&ai=1&ai=2',
       Q + '&fen=%00&moves=%00&select=%00&light=%00&preset=%00', Q + '&light=%3Cscript%3Ealert(1)%3C%2Fscript%3E&preset=%3Cimg%20src%3Dx%3E&help=%3Cb%3E',
       Q + '&fen=__proto__&moves=__proto__,constructor,toString',
+      Q + '&touch=2', Q + '&touch=__proto__', Q + '&touch=1&touch=0', Q + '&touch=%00&quality=constructor', '/?touch=1&manual=1&ai=0',
     ];
     let fuzzBad = 0;
     for (const p of fuzz) {

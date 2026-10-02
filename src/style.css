@@ -18,6 +18,9 @@
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; overflow: hidden; -webkit-font-smoothing: antialiased; }
 canvas#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: grab; touch-action: none; }
 canvas#stage:active { cursor: grabbing; }
+/* touch devices only (class set by src/device.js): no rubber band, no text inflation, no double tap zoom on controls */
+html.touch, body.touch { overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body.touch { touch-action: manipulation; }
 button, select, input { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 
@@ -192,6 +195,7 @@ select option { background: #15161d; color: var(--text); }
 .pbtn:hover { transform: translateY(-3px); background: var(--gold-soft); border-color: rgba(216, 180, 104, 0.7); }
 #toast { position: fixed; left: 50%; top: 18px; transform: translate(-50%, -14px); opacity: 0; z-index: 25; padding: 8px 18px; border-radius: 999px; background: rgba(255, 107, 90, 0.92); color: #fff; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; pointer-events: none; transition: opacity 0.3s, transform 0.3s; box-shadow: 0 8px 30px rgba(255, 107, 90, 0.35); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
+#notice { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; max-width: min(360px, 86vw); padding: 16px 20px; border-radius: var(--r); background: var(--glass-strong); border: 1px solid var(--line-strong); color: var(--text); text-align: center; line-height: 1.45; cursor: pointer; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
 @keyframes pop { from { transform: scale(0.85) translateY(10px); opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
 
