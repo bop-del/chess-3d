@@ -26,7 +26,7 @@ OPENING="Read ~/code/chess-3d-private/RESTART-PROMPT.md and DECISIONS.md, then C
 # absolute: a relative one would resolve against whatever cwd the caller had.
 case "$1" in
   /*) REPO="$1"; shift ;;
-  "") shift; REPO="$HOME/code/chess-3d" ;;
+  "") [ "$#" -gt 0 ] && shift; REPO="$HOME/code/chess-3d" ;;   # shift only if there is an argument to drop
   *)  REPO="$HOME/code/chess-3d" ;;
 esac
 
