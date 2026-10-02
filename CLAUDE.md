@@ -48,7 +48,7 @@ No golden image diffs: software GL renders differ across machines. Take screensh
 The owner's regular Chrome holds their live session. Agents and scripts must never disturb it.
 
 - Never use the claude-in-chrome tools or open tabs in the owner's Chrome for testing. Test with puppeteer-core and a headless Chrome on its own temp profile.
-- At most one headless Chrome at a time, always closed in a `finally` block. No retry loops that relaunch it. Parallel agents must not run the browser tiers at the same time.
+- At most two headless Chromes at a time, always closed in a `finally` block, and always launched through `launchBrowser()` in tools/_lib.mjs, which holds two machine wide slots and makes a third launch wait. No retry loops that relaunch it.
 - Never run `pkill` or `killall` on chrome or "Google Chrome". Kill only a PID you started yourself, and kill your own leftover scripts and dev servers by PID when you finish.
 - Software rendering is slow: use `quality=low&manual=1` for smoke checks, `window.__chess.step()` and `.draw()` for deterministic frames.
 - Each agent gets its own dev port. Stop servers you started.

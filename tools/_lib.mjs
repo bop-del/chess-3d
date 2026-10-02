@@ -2,7 +2,7 @@
 //   ROOT                     repo root
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
 //   launchBrowser(opts)      headless Chrome through puppeteer-core with software GL (swiftshader), so it runs anywhere.
-//                            Waits for a machine wide lock first, so parallel agents and lanes never run two at once.
+//                            Waits for one of two machine wide slots first, so parallel agents and lanes never run more than two.
 //   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted)
 //   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers
 //   build(outDir)            vite build into outDir (inside a folder, never touches dist/)
@@ -38,21 +38,25 @@ export function chromePath() {
   return cands.find((p) => existsSync(p));
 }
 
-// One headless Chrome at a time on this machine, across lanes and agents: a lock directory in the temp folder, holding the
-// owner's pid. A lock whose pid is gone is stale and taken over. Released when the browser closes or the process exits.
-const LOCK = join(tmpdir(), 'chess-3d-chrome.lock');
+// At most two headless Chromes at a time on this machine, across lanes and agents: two lock directories in the temp
+// folder (slot 0 keeps the original single lock name, so older checkouts still count against the limit), each holding
+// its owner's pid. A lock whose pid is gone is stale and taken over. Released when the browser closes or the process
+// exits.
+const SLOTS = [join(tmpdir(), 'chess-3d-chrome.lock'), join(tmpdir(), 'chess-3d-chrome.lock.1')];
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
-let held = false;
-const releaseLock = () => { if (!held) return; held = false; try { rmSync(LOCK, { recursive: true, force: true }); } catch (e) { /* ignore */ } };
+let held = null;
+const releaseLock = () => { if (!held) return; const d = held; held = null; try { rmSync(d, { recursive: true, force: true }); } catch (e) { /* ignore */ } };
 process.on('exit', releaseLock);
 async function acquireLock(maxWaitMs = 15 * 60 * 1000) {
   const t0 = Date.now(); let said = false;
   for (;;) {
-    try { mkdirSync(LOCK); writeFileSync(join(LOCK, 'pid'), String(process.pid)); held = true; return; } catch (e) { /* taken */ }
-    let pid = 0; try { pid = Number(readFileSync(join(LOCK, 'pid'), 'utf8')); } catch (e) { /* being written */ }
-    if (pid && !alive(pid)) { rmSync(LOCK, { recursive: true, force: true }); continue; }
-    if (Date.now() - t0 > maxWaitMs) throw new Error(`headless Chrome lock ${LOCK} held by pid ${pid} for over ${maxWaitMs / 60000} min`);
-    if (!said) { console.log(`      waiting for the headless Chrome lock (pid ${pid || '?'})`); said = true; }
+    for (const lock of SLOTS) {
+      try { mkdirSync(lock); writeFileSync(join(lock, 'pid'), String(process.pid)); held = lock; return; } catch (e) { /* taken */ }
+      let pid = 0; try { pid = Number(readFileSync(join(lock, 'pid'), 'utf8')); } catch (e) { /* being written */ }
+      if (pid && !alive(pid)) rmSync(lock, { recursive: true, force: true });
+    }
+    if (Date.now() - t0 > maxWaitMs) throw new Error(`both headless Chrome locks busy for over ${maxWaitMs / 60000} min`);
+    if (!said) { console.log('      waiting for a headless Chrome slot (two in use)'); said = true; }
     await sleep(1000);
   }
 }
