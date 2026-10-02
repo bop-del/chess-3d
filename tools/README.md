@@ -46,9 +46,13 @@ Lists the files changed since the last tag (committed, staged, unstaged and untr
 
 ## Contact sheets
 
-`node tools/contact-sheet.mjs <dir> [--cols=3] [--width=640]`
+`node tools/contact-sheet.mjs <dir> [--cols=3] [--width=640] [--no-compare]`
 
-Puts every PNG in a folder on one labelled grid per screen size (`<dir>/contact-<w>x<h>.png`), so a visual audit means opening one image instead of each screenshot. `test/smoke.mjs --shots` does this itself with its open browser.
+Puts every PNG in a folder on one labelled grid per screen size (`<dir>/contact-<w>x<h>.png`), so a visual audit means opening one image instead of each screenshot. `test/smoke.mjs --shots` and `tools/phoneshots.mjs` do this themselves with their open browser.
+
+**Change flags.** The previous run's PNGs are kept in the sibling folder `<dir>.prev` (for example `.tmp/smoke-shots.prev/`). Each tile gets a coloured border and a tag: `changed` (orange), `same` (green) or `new` (blue, no previous file of that name), the sheet title counts them and the run prints one line naming the changed shots. It is a pointer for the eye, not a gate: it never fails a run, and it only compares against the last run on this machine (no golden images in git, since software GL differs across machines). After the sheets are written, `<dir>.prev` is replaced by the current PNGs, so each run compares with the one before it; running the CLI a second time on the same folder therefore shows all `same`. `--no-compare` (option `compare: false` in `contactSheets()`) turns it off and leaves `.prev` alone.
+
+A shot counts as `changed` when its size differs or more than 0.05% of its pixels differ, where a pixel differs when any colour channel moves by more than 3 of 255 (`CHANGED_FRACTION` and `PIXEL_TOL` in `contact-sheet.mjs`). Byte identical files are `same` without decoding. Measured noise: two identical software GL runs (smoke --shots, and the same page rendered 3 times in manual mode) came out byte identical, difference 0, so the thresholds only guard against tiny GL variation. Reference signal: a light preset change (?light=Sunset after a 1 s step) moved 0.2% of pixels at tolerance 2, so the thresholds are kept low enough to catch it.
 
 ## Release check
 
