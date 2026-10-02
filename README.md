@@ -141,7 +141,6 @@ The module layout and the APIs between modules are in [docs/ARCHITECTURE.md](doc
 - The knight faces the opponent, so its mane shows from the white side and its nose extends past the base circle.
 - The bishop slit has slightly sawtooth edges at extreme close-up.
 - Frame rate on real GPUs is unmeasured beyond the author's machine. Tested mainly on software and Apple silicon GPUs. Two finger pinch zoom is untested.
-- A fallback timer is used in background tabs, so loading is slower there.
 
 ## Licence
 

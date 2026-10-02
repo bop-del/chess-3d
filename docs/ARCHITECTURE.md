@@ -41,7 +41,7 @@ Everything the player sees on the board lives in one `gimbal` group inside the s
 4. `createGame({ gimbal, board, pieceSet, materials })`, `createControls(...)`, `createUI(...)`.
 5. Apply URL parameters, expose `window.__chess`, start the render loop (or not, with `?manual=1`).
 
-Loading yields to the browser between steps with a helper that races `requestAnimationFrame` against a 50 ms timer, because a background tab never fires `requestAnimationFrame`.
+Loading yields to the browser between steps with a helper that races `requestAnimationFrame` against a 50 ms timer, so the loader repaints. A hidden tab never fires `requestAnimationFrame` and clamps timers to 1 s, so there the helper (in `main.js` and `pieceset.js`) returns at once and loading runs straight through.
 
 Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.sync()`, then `stage.render(dt)`. The step is capped at 50 ms.
 

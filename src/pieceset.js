@@ -7,8 +7,9 @@ const BUILDERS = { p: buildPawn, r: buildRook, n: buildKnight, b: buildBishop, q
 const NAMES = { p: 'pawns', r: 'rooks', n: 'knights', b: 'bishops', q: 'queens', k: 'kings' };
 const TYPES = ['p', 'n', 'b', 'r', 'q', 'k'];
 
-// rAF never fires in a background tab, so race it with a timer.
-const tick = () => new Promise((res) => {
+// rAF never fires in a background tab, so race it with a timer. A hidden tab has nothing to repaint and clamps timers
+// to 1 s, so it does not wait at all.
+const tick = () => document.hidden ? Promise.resolve() : new Promise((res) => {
   let done = false;
   const go = () => { if (!done) { done = true; setTimeout(res, 0); } };
   requestAnimationFrame(go);

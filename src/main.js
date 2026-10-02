@@ -13,8 +13,9 @@ function progress(p, msg) {
   fillEl.style.width = `${Math.round(shownProgress * 100)}%`;
   if (msg) stepEl.textContent = msg;
 }
-// Yield so the loader can repaint. rAF never fires in a background tab, so race it with a timer.
-const tick = () => new Promise((res) => {
+// Yield so the loader can repaint. rAF never fires in a background tab, so race it with a timer. A hidden tab has
+// nothing to repaint and clamps timers to 1 s, so it does not wait at all.
+const tick = () => document.hidden ? Promise.resolve() : new Promise((res) => {
   let done = false;
   const go = () => { if (!done) { done = true; setTimeout(res, 0); } };
   requestAnimationFrame(go);
