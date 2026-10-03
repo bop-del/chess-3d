@@ -10,7 +10,7 @@ const FRAME = 9.3;                                       // frame width in squar
 const MIN_BUILD = 1.2;                                   // the build never plays faster than this, seconds
 const THEMES = {                                         // square light, square dark, frame, frame rim, glint
   classic: ['#e6e1d6', '#14161d', '#5a3a26', '#d8b468'],
-  tournament: ['#f0eed6', '#58863b', '#3a362c', '#d8b468'],
+  tournament: ['#f8e5a6', '#4a7c4f', '#3a362c', '#d8b468'],
   wood: ['#efc687', '#6a2b1c', '#4b2a18', '#d8b468'],
   metal: ['#d9a640', '#9aa1ac', '#3b3f46', '#e8c97a'],
   glass: ['#9fd0ff', '#3a4250', '#2a3342', '#bfe0ff'],

@@ -4,8 +4,8 @@ export { pieces } from './pieces-tournament.js';
 export function board({ base }) {
   const matte = { metalness: 0, roughness: 0.55, clearcoat: 0.12, clearcoatRoughness: 0.4, specularIntensity: 0.5, map: null, normalMap: null, roughnessMap: null, metalnessMap: null };
   return {
-    squaresLight: { ...matte, color: '#f0eed6' },
-    squaresDark: { ...matte, color: '#58863b' },
+    squaresLight: { ...matte, color: '#f8e5a6' },
+    squaresDark: { ...matte, color: '#4a7c4f' },
     // the frame is the maple map tinted down to a plain muted honey brown (the maple map is orange on its own)
     frame: { ...base.maple, color: '#8a7358', clearcoat: 0.12, clearcoatRoughness: 0.4, normalScale: 0.5 },
     inlay: { color: '#b88a55' },

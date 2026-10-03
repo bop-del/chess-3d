@@ -11,7 +11,7 @@ import { createSkin } from './apply.js';
 
 export const THEMES = [
   { id: 'classic', label: { en: 'Classic', de: 'Klassisch' }, swatch: ['#ece2cc', '#0d0f15'] },
-  { id: 'tournament', label: { en: 'Tournament', de: 'Turnier' }, swatch: ['#f0eed6', '#58863b'] },
+  { id: 'tournament', label: { en: 'Tournament', de: 'Turnier' }, swatch: ['#f8e5a6', '#4a7c4f'] },
   { id: 'wood', label: { en: 'Wood', de: 'Holz' }, swatch: ['#efc687', '#6a2b1c'] },
   { id: 'metal', label: { en: 'Metal', de: 'Metall' }, swatch: ['#d9a640', '#9aa1ac'] },
   { id: 'glass', label: { en: 'Glass', de: 'Glas' }, swatch: ['#9fd0ff', '#3a4250'] },
