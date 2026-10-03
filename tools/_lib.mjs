@@ -142,7 +142,11 @@ export async function launchBrowser({ w = 1280, h = 720, args = [], gl = default
         const dir = (proc.spawnargs.find((a) => a.startsWith('--user-data-dir=')) || '').slice(16);
         if (dir && dir.startsWith(tmpdir())) { await sleep(300); try { rmSync(dir, { recursive: true, force: true }); } catch (e) { /* ignore */ } }
       }
-    } finally { clearTimeout(timer); releaseLock(lock); }
+    } finally {
+      clearTimeout(timer); releaseLock(lock);
+      // Chrome's crashpad handler outlives it (parent 1) and holds the inherited stdio pipes, so node saw no EOF on them and the script process stayed alive for minutes after its last row. Destroy our ends.
+      if (proc) { for (const st of [proc.stdin, proc.stdout, proc.stderr]) { try { st?.destroy(); } catch (e) { /* ignore */ } } try { proc.unref(); } catch (e) { /* ignore */ } }
+    }
   };
   browser.on('disconnected', () => releaseLock(lock));
   return browser;
@@ -213,6 +217,11 @@ export function build(outDir, cwd = ROOT) {
   return (log || '') + (hit ? msg + '\n' : '');
 }
 
+// SMOKE_TRACE=1: SIGUSR2 prints what keeps this process alive (test/smoke-groups.mjs sends it to a child that went quiet).
+if (process.env.SMOKE_TRACE) process.on('SIGUSR2', () => {
+  const h = process._getActiveHandles().map((x) => `${x.constructor?.name}${x.pid ? ' pid ' + x.pid : ''}${x.spawnargs ? ' ' + x.spawnargs.slice(0, 2).join(' ').slice(-60) : ''}${x.remotePort ? ' ' + x.remoteAddress + ':' + x.remotePort + ' from :' + x.localPort : ''} fd ${x._handle?.fd ?? '?'}${x === process.stdout ? ' (stdout)' : x === process.stderr ? ' (stderr)' : ''}${x.destroyed ? ' destroyed' : ''}`);
+  console.log(`DIAG active handles (${h.length}): ${h.join(' | ')}; requests ${process._getActiveRequests().length}; resources ${process.getActiveResourcesInfo().join(',')}`);
+});
 const children = new Set();
 const killAll = () => { for (const c of children) { try { c.kill(); } catch (e) { /* ignore */ } } };
 process.on('exit', killAll);

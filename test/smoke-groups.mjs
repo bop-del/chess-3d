@@ -9,7 +9,7 @@
 // (also implied by --shots, --write-budgets and --dev) runs everything for real. Ports: derived from the lane name (tools/_lib.mjs lanePorts).
 // Options: --port=<lane preview port, 5303 in the main checkout> --dev --dev-port=<lane dev port, 5302> --skip-build --write-budgets --shots --skip-fixes, plus --only=<group,group> to run just those groups, --jobs=<n> to set the number of processes at once (default: the free Chrome slots at start, at least 2, so waiting groups do not hit the 15 minute lock timeout).
 // A group that still finds no slot is reported as SKIPPED (slot starvation), not as a failure: run it alone with node test/smoke.mjs --group=<name>.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, startServer, claimPort } from '../tools/_lib.mjs';
@@ -23,6 +23,7 @@ const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); ret
 const flag = (n) => args.includes(`--${n}`);
 const PORTS = lanePorts();
 const PORT = opt('port', '') ? Number(opt('port', '')) : (await claimPort()).port, DEV_PORT = opt('dev-port', '') ? Number(opt('dev-port', '')) : (await claimPort({ kind: 'dev' })).port, OUT = '.tmp/smoke-dist', SHOTS = join(ROOT, '.tmp/smoke-shots');
+const QUIET_MS = Number(process.env.SMOKE_QUIET_MS || 60000);   // a child silent this long after its first output is killed
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
 const GROUPS = ALL_GROUPS
@@ -86,8 +87,30 @@ const runGroup = ({ g: [name, script, extra], key }) => new Promise((resolve) =>
   const tg = Date.now();
   const c = spawn(process.execPath, [script, ...(script === SMOKE ? pass : [`--base=${base}`]), ...extra], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = ''; const trace = (d) => { out += d; if (process.env.SMOKE_TRACE) { mkdirSync(join(ROOT, '.tmp/smoke-trace'), { recursive: true }); appendFileSync(join(ROOT, '.tmp/smoke-trace', name.replace(/\W+/g, '-') + '.log'), String(d).split('\n').filter(Boolean).map((l) => `${((Date.now() - t0) / 1000).toFixed(1)}s ${l}`).join('\n') + '\n'); } };   // SMOKE_TRACE=1: every output line of every group with the time it arrived, in .tmp/smoke-trace/
+  // Safety net: a child silent for QUIET_MS after its first output (so not while it waits for a Chrome slot) is killed, by its own PID only.
+  // A stall after the last check then costs 60 s, not minutes; the group is judged by its rows. With SMOKE_TRACE the process list is saved
+  // first (.tmp/smoke-trace/<group>.stall.txt) and the child is asked for its active handles (SIGUSR2, see tools/_lib.mjs).
+  let killedQuiet = false, quiet;
+  const arm = () => { clearTimeout(quiet); quiet = setTimeout(() => {
+    killedQuiet = true;
+    if (process.env.SMOKE_TRACE) {
+      try { c.kill('SIGUSR2'); } catch (e) { /* ignore */ }
+      let tree = ''; try { tree = 'LSOF\n' + execFileSync('lsof', ['-nP', '-p', String(c.pid)], { encoding: 'utf8' }) + '\nPS\n'; } catch (e) { /* ignore */ }
+      try { tree += execFileSync('ps', ['-axo', 'pid,ppid,stat,etime,command'], { encoding: 'utf8' }).split('\n').filter((l) => /chess-3d|Chrome|node|vite/i.test(l)).join('\n'); } catch (e) { /* ignore */ }
+      mkdirSync(join(ROOT, '.tmp/smoke-trace'), { recursive: true });
+      appendFileSync(join(ROOT, '.tmp/smoke-trace', name.replace(/\W+/g, '-') + '.stall.txt'), `${secs()} quiet for ${QUIET_MS / 1000}s, child pid ${c.pid}\n${tree}\n`);
+    }
+    setTimeout(() => { try { c.kill('SIGKILL'); } catch (e) { /* ignore */ } }, process.env.SMOKE_TRACE ? 1500 : 0);
+  }, QUIET_MS); };
+  const onData = (d) => { if (/waiting for a headless Chrome slot/.test(String(d))) { clearTimeout(quiet); return; } arm(); };   // waiting for a slot is not a stall: the timer starts again at the next line
+  c.stdout.on('data', onData); c.stderr.on('data', onData);
   c.stdout.on('data', trace); c.stderr.on('data', trace);
   c.on('close', (code) => {
+    clearTimeout(quiet);
+    if (killedQuiet) {
+      out += `\nWARN  killed quiet child  group ${name} printed nothing for ${QUIET_MS / 1000}s after its last row, judged by its rows\n`;
+      code = /^PASS  /m.test(out) ? 0 : 1;
+    }
     if (/slots busy for over/.test(out)) {   // never got a Chrome: slot starvation, not a failure of the checks
       skipped.push(name);
       console.log(`--- group ${name} SKIPPED, no headless Chrome slot (${((Date.now() - tg) / 1000).toFixed(1)}s): run ${script === SMOKE ? `node test/smoke.mjs --group=${extra[0].slice(8)}${extra[1] ? ' ' + extra[1] : ''}` : `node ${script}`} --skip-build --base=${base}`);
