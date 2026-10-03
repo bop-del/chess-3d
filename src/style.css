@@ -184,6 +184,17 @@ body.touch .lockrow { display: flex; }
 .switch input:focus-visible + .track { outline: 2px solid var(--gold); outline-offset: 2px; }
 .switch em { font-style: normal; font-size: 12.5px; }
 
+/* music settings: a switch and four sliders under the Mute switch */
+.music-settings { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.music-settings.off .mrow { opacity: 0.45; }
+.mrow { display: grid; grid-template-columns: 78px 1fr 44px; align-items: center; gap: 8px; }
+.mrow label { font-size: 12px; color: var(--dim); }
+.mrow output { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text); }
+body.phone .mrow { grid-template-columns: 92px 1fr 52px; min-height: 44px; }
+body.phone .mrow label { font-size: 13px; }
+body.phone .mrow output { font-size: 13px; }
+body.phone .mrow input[type="range"] { height: 44px; }
+
 /* move list */
 .moves { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; font-variant-numeric: tabular-nums; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
 .moves li { display: grid; grid-template-columns: 30px 1fr 1fr; padding: 4px 6px; border-radius: 7px; font-size: 13px; }

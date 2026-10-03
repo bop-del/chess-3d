@@ -227,6 +227,9 @@ async function boot() {
   battle = createDirector({ game, controls, stage, ui });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
   audio.mountMute(ui);     // the mute switch, right below the Battle scenes setting
+  const [{ createMusic }, { mountMusicSettings }] = await Promise.all([import('./music/player.js'), import('./music/settings.js')]);
+  const music = createMusic({ audio });    // background piano, starts after the first tap or key
+  mountMusicSettings(ui, music);           // Music switch, Volume, Tone, Tempo, Room
   progress(0.96);
   await tick();
   // Openings (Explain mode): its own panel in the HUD, its own hint marks on the board, ticked with the frame
@@ -275,7 +278,7 @@ async function boot() {
   window.addEventListener('resize', onResize);
   if (device.touch) window.addEventListener('orientationchange', onResize);
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, views, play, tokens, puzzles, puzzleProgress, reward, goodMove, themes, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, puzzles, puzzleProgress, reward, goodMove, themes, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 

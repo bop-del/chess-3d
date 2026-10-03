@@ -246,6 +246,21 @@ Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal 
 - The camera close-up blends the normal pose towards the close-up in `controls.apply` (`cine.k` from 0 to 1) instead of changing yaw, pitch and distance, so the way back is exact. On phones the target is centred in the free area, narrow views pull back. Orbit, wheel, keys and spin are ignored while it is held.
 - Scenes are promise driven. Tests use `__chess.stepAsync(seconds)` (awaited, gives the event loop a turn per slice) instead of `__chess.step` wherever a scene may play, and `__chess.battle.ready()` to have every module loaded.
 
+### Music: `src/music/`
+
+    createMusic({ audio }) -> music     // player.js, one per page; started by audio.onUnlock
+    music.settings  { on, vol, klang, tempo, raum }, stored in localStorage `chess3d.music`
+    music.set(partial), music.onChange(fn), music.skip(), music.state ('idle' | 'playing' | 'gap' | 'paused'), music.piece, music.notes
+    mountMusicSettings(ui, music)       // settings.js: Music switch + Volume, Tone, Tempo, Room sliders through ui.mountSettings
+    createPiano(ac, destination, { lite, klang, raum }) -> { note(midi, at, hold, vel), setKlang, setRaum, out, dispose }
+    prepare(piece) / expand(piece, tempoScale)   // score.js: pedal, chord roll, velocity wobble
+
+- Pieces are plain data in `src/music/pieces/*.js` (`{ id, title, composer, bpm, pedal, ring, quarters, notes: [[midi, start, length, velocity], ...] }`, times in quarter notes), one lazy chunk each (`pieces/index.js` lists them). They are generated once by `tools/build-pieces.mjs` from the public domain typesettings of the Mutopia Project (LilyPond sources, each named and credited in the piece's header) with `tools/ly-to-notes.mjs`; the game never fetches anything. Five pieces: Gymnopédie 1 to 3, Prelude in C, Air (the flute and guitar parts merged into one piano).
+- piano.js: two detuned strings per note (a band limited PeriodicWave per register), a low pass that closes after the strike, a two stage decay, a damper release and a felt thump of filtered noise, into a generated stereo room (ConvolverNode). `lite` (phones) has one string, no thump, no pan, a shorter room, 14 voices. Klang is the master low pass (and the per key one for new notes), Raum the wet level.
+- player.js: a 0.8 s timer schedules notes 2.5 s ahead on the audio clock (nothing runs per frame). The playlist shuffles every piece once per round and never repeats one back to back, with 4 to 8 s of silence between pieces. Tempo changes re-anchor the position (the notes already scheduled keep the old tempo). Pausing (tab hidden, Mute, switch off) disposes the piano so no scheduled note sounds later; resuming continues at the same quarter note. The first start fades in over 5 s.
+- Ducking: `audio.bus.music` is a bus like fx and scene. `audio.play()` calls `audio.duckMusic(level, hold)` for every sound (0.5 for 0.55 s, scene voices 0.25 for 1.2 s); `sfx.sceneActive = true` holds it at 0.2 for the whole battle scene and releases when the scene ends. A new puzzle chime or any other voice played through `audio.play` ducks the music with no extra code. Mute: `audio.onMute(fn)`.
+- Test: `test/music.mjs` (fast tier: every piece well formed and in range, expansion, tempo scale), `test/music-page.mjs` (smoke group `music`: starts after a gesture, Mute, the switch and a hidden tab stop and resume it, sliders persist, ducking, German labels, no console errors).
+
 ### `src/openings/explain.js`, `explain-panel.js`, `arrow.js`
 
 Explain mode: walk one of the starter lines on the 3D board.
@@ -318,7 +333,7 @@ Imported by `main.js` only for exactly `?diag=1` (right after `window.__chess` i
 
 ## Test hooks
 
-`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, themes, views, play, tokens, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
+`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, themes, views, play, tokens, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
 
 `window.__chessReady` becomes `true` once loading is done and `window.__chessError` holds a message if loading failed.
 

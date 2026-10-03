@@ -109,7 +109,13 @@ const SCENE_VOICES = new Set(['whoosh', 'swing', 'clang', 'slice', 'splat', 'cra
 export const sfx = {
   names: Object.keys(VOICES),
   voices: VOICES,
-  sceneActive: false,
+  _scene: false,
+  get sceneActive() { return this._scene; },
+  /** While a battle scene runs the background music stays ducked low. */
+  set sceneActive(on) {
+    this._scene = !!on;
+    if (on) audio.duckMusic(0.2, 600); else audio.duckMusic(1);
+  },
   /** Play a voice by name. Scene voices go to the scene bus (skippable), game voices to the fx bus. Returns its length or null. */
   play(name, opts = {}) {
     const v = VOICES[name];

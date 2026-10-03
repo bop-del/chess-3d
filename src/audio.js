@@ -5,10 +5,12 @@
 //                             context really runs (iOS accepts touchend, pointerup, click and keydown, not pointerdown)
 //   audio.muted / setMuted()  mute switch, stored per device (localStorage, guarded)
 //   audio.play(voice, opts)   voice(env) schedules nodes and returns its length in seconds. opts: { at, volume, pitch, bus, name }
+//   audio.duckMusic(level, hold)  dips the background music bus for `hold` seconds (every audio.play does it; src/music/player.js)
+//   audio.onMute(fn)          called when the mute switch changes
 //   audio.stopScene(fade)     fades the scene bus out (skip by tap or key), then it is open again for the next sound
 //   audio.mountMute(ui)       a mute switch in the settings (ui.mountSettings)
 //
-// Graph: voice -> bus ('fx' or 'scene') -> compressor -> limiter -> master (0 when muted) -> destination.
+// Graph: voice -> bus ('fx', 'scene' or 'music') -> compressor -> limiter -> master (0 when muted) -> destination.
 // Phones: navigator.audioSession.type = 'playback' before the context exists, so the ringer switch does not silence the game;
 // the context is suspended while the page is hidden and resumed when it is visible again.
 import { t } from './i18n.js';
@@ -116,6 +118,8 @@ export const audio = {
   _hooked: false,
   _lastResume: 0,
   _listeners: [],
+  _muteListeners: [],
+  _duck: { level: 1, until: 0 },
 
   /** Arm the unlock listeners (idempotent). Safe to call at boot, no context is created before a gesture. */
   init() {
@@ -169,7 +173,7 @@ export const audio = {
     comp.connect(lim); lim.connect(master); master.connect(ac.destination);
     const bus = () => { const g = ac.createGain(); g.gain.value = 1; g.connect(comp); return g; };
     this.master = master;
-    this.bus = { fx: bus(), scene: bus() };
+    this.bus = { fx: bus(), scene: bus(), music: bus() };
   },
 
   /** Call from a user gesture. Resolves to audio.unlocked. */
@@ -191,6 +195,19 @@ export const audio = {
     saveMuted(this.muted);
     if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.8, this.ac.currentTime, 0.02);
     this._switches?.forEach((fn) => fn());
+    this._muteListeners.forEach((fn) => fn(this.muted));
+  },
+  onMute(fn) { this._muteListeners.push(fn); },
+
+  /** Dip the music bus to `level` (0 to 1) for `hold` seconds, then let it back up slowly. A deeper dip that is still running wins. */
+  duckMusic(level = 0.45, hold = 0.6) {
+    if (!this.ac || !this.bus) return;
+    const g = this.bus.music.gain, now = this.ac.currentTime, d = this._duck;
+    if (level >= 1) { d.level = 1; d.until = 0; g.cancelScheduledValues(now); g.setTargetAtTime(1, now, 0.5); return; }   // release
+    if (now < d.until && level > d.level) { d.until = Math.max(d.until, now + hold); level = d.level; } else { d.level = level; d.until = now + hold; }
+    g.cancelScheduledValues(now);
+    g.setTargetAtTime(level, now, 0.04);
+    g.setTargetAtTime(1, d.until, 0.7);
   },
 
   /** Schedule a voice. Returns its length in seconds, or null when nothing was played (locked, muted, too many voices). */
@@ -203,6 +220,7 @@ export const audio = {
       return null;
     }
     if (this.active >= MAX_VOICES) return null;
+    this.duckMusic(bus === 'scene' ? 0.25 : 0.5, bus === 'scene' ? 1.2 : 0.55);
     const out = ac.createGain();
     out.connect(this.bus[bus] || this.bus.fx);
     const env = { ac, out, t: ac.currentTime + 0.005 + Math.max(0, at), v: volume, p: pitch, r: Math.random, name };
