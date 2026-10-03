@@ -115,9 +115,9 @@ export async function proveGpu(page, R, gl = defaultGl()) {
   return r;
 }
 
-export async function launchBrowser({ w = 1280, h = 720, args = [], gl = defaultGl() } = {}) {
-  const executablePath = chromePath();
-  if (!executablePath) { console.error('Chrome not found. Set CHROME_PATH.'); process.exit(2); }
+export async function launchBrowser({ w = 1280, h = 720, args = [], gl = defaultGl(), executablePath: exe = process.env.CHESS_BROWSER } = {}) {
+  const executablePath = exe || chromePath();   // opt in: { executablePath } or CHESS_BROWSER=<path> (for example a chrome-headless-shell), the default stays Chrome
+  if (!executablePath || !existsSync(executablePath)) { console.error('Chrome not found. Set CHROME_PATH.'); process.exit(2); }
   let lock, waited = 0;
   try { ({ lock, waited } = await acquireLock()); } catch (e) { logWait(-1, gl); throw e; }
   logWait(waited, gl);
