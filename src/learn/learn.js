@@ -237,6 +237,8 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
     show(id) { if (TABS.includes(id)) { tab = id; render(); } },
     // Open the puzzle path: the Puzzles tab, and on the phone the Learn sheet. A running puzzle stays as it is until a station is tapped.
     openPath() { tab = 'puzzles'; puzzleProgress.setView(null); render(); sheet?.open(); },
+    // ?open=: the Learn UI on one tab (a locked Practise tab falls back to Openings). Phone: the Learn sheet. Desktop: the card.
+    open(id = 'openings') { this.show(TABS.includes(id) ? id : 'openings'); if (sheet) sheet.open(); else ui.openPanel?.('openings'); },
     get editing() { return editing; },
     export: exportBtn, import: importBtn, file, message: msg,
   };

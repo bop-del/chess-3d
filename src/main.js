@@ -324,7 +324,7 @@ async function boot() {
     await new Promise((res) => { if (window.__loader) window.__loader.finish(res); else res(); });
   }
   boot.ready = performance.now();
-  applyLateParams({ game, ui, stage, controls });   // ?hud, ?help, ?light, ?spin, ?promo: on the finished board
+  applyLateParams({ game, ui, stage, controls, learn });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
   window.__chessReady = true;
@@ -393,7 +393,7 @@ function applyGameParams({ game }) {
 }
 
 // the rest, applied when the start sequence is over
-function applyLateParams({ game, ui, stage, controls }) {
+function applyLateParams({ game, ui, stage, controls, learn }) {
   if (params.get('hud') === '0') ui.toggleHud(true);
   if (params.get('help') === '1') ui.toggleHelp();
   const light = params.get('light');
@@ -401,6 +401,17 @@ function applyLateParams({ game, ui, stage, controls }) {
   if (params.get('spin') === '1') controls.toggleSpin();
   const promo = params.get('promo');
   if (promo) game.clickSquare(game.nameSq(promo.slice(0, 2))), game.clickSquare(game.nameSq(promo.slice(2, 4)));
+  openFlag(params.get('open'), { ui, learn });
+}
+
+// ?open=<id>: one panel or tab, shown when the game is ready. An unknown value does nothing, quietly.
+const LEARN_OPEN = { learn: 'openings', openings: 'openings', mine: 'mine', drill: 'practise', practise: 'practise', puzzles: 'puzzles' };
+function openFlag(id, { ui, learn }) {
+  if (!id) return;
+  try {
+    if (Object.hasOwn(LEARN_OPEN, id)) learn.open(LEARN_OPEN[id]);
+    else ui.openPanel(id);
+  } catch (e) { /* a panel that is missing is not worth a message */ }
 }
 
 boot().catch(fail);

@@ -578,6 +578,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       status: statusRender, close, frame, setLearnBar, resetStatus() { lastKey = ''; },
       learn: { body: learnBody, open: openLearn, close, get isOpen() { return isLearnOpen(); } },
       toggleHelp() { if (isOpen() && !helpC.classList.contains('collapsed')) close(); else open(helpC); },
+      openCard(id) { const c = id ? cardOf(id) : null; if (id && !c) return false; open(c || undefined); return true; },
     };
   }
   if (device.phone) {
@@ -630,6 +631,26 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     return element;
   }
 
+  // ?open=: show one panel and make it usable. Phone: the Menu sheet with that card open. Desktop: the card unfolded and scrolled
+  // into view. 'settings' is the Scene card (or the Menu sheet itself on a phone), 'music' the music block inside it.
+  // Returns false for an id that is not a panel here.
+  function openPanel(id) {
+    const PANELS = { settings: 'scene', menu: 'scene', scene: 'scene', music: 'scene', moves: 'moves', openings: 'openings', drill: 'drill', puzzles: 'puzzles' };
+    if (!Object.hasOwn(PANELS, id)) return false;
+    const card = PANELS[id];
+    if (phoneUI) {
+      if (card === 'openings') return false;   // phone: the Learn sheet, opened by src/learn
+      if (!phoneUI.openCard(id === 'menu' ? null : card)) return false;
+    } else {
+      const c = hud.querySelector(`.card[data-card="${card}"]`);
+      if (!c) return false;
+      c.classList.remove('collapsed');
+    }
+    const target = id === 'music' ? hud.querySelector('.music-settings') : hud.querySelector(`.card[data-card="${card}"]`);
+    target?.scrollIntoView?.({ block: 'nearest' });
+    return true;
+  }
+
   // Phone only: the Learn sheet { body, open(), close(), isOpen }, null elsewhere. src/learn fills the body.
-  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings, learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings, openPanel, learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }
