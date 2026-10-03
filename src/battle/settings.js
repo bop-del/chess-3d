@@ -1,8 +1,10 @@
 // Battle scene settings: "Battle scenes" (On, Short, Off), stored per device.
 // The block is mounted in the Scene card on desktop and in the Menu sheet on phones through ui.mountSettings.
-import { t, onLanguage } from '../i18n.js';
+import { t, addDE, onLanguage } from '../i18n.js';
 import { device } from '../device.js';
 import { chipGroup } from '../panel.js';
+
+addDE({ 'battle.scenes': 'Schlagen', 'battle.on': 'An', 'battle.short': 'Kurz', 'battle.off': 'Aus' });
 
 const KEY = 'chess3d.battle';
 const MODES = ['on', 'short', 'off'];
@@ -42,6 +44,10 @@ export function createSettings({ ui } = {}) {
   if (device.phone) {
     mode = field('sel-battle', t('battle.scenes', 'Battle scenes'), labels().map((o) => [o.value, o.label]));
     el.append(mode.row);
+    onLanguage(() => {
+      mode.row.firstChild.textContent = t('battle.scenes', 'Battle scenes');
+      labels().forEach((o, i) => { mode.sel.options[i].textContent = o.label; });
+    });
   } else {
     // desktop and tablets: visible chips instead of a dropdown, with a value and a change event like the select
     const sel = chipGroup('sel-battle', labels(), { label: t('battle.scenes', 'Battle scenes') });

@@ -30,11 +30,18 @@ export function runLint() {
       if (LOCAL.test(l)) hits.path.push(`${f}:${i + 1}`);
     });
   }
+  // CHE-90: every label of the Battle scenes setting (name and the On, Short, Off values) needs a German text
+  const bs = readFileSync(join(ROOT, 'src/battle/settings.js'), 'utf8');
+  const used = [...bs.matchAll(/\bt\('(battle\.\w+)'/g)].map((m) => m[1]);
+  const de = new Set([...(bs.match(/addDE\(\{([^}]*)\}\)/)?.[1] || '').matchAll(/'(battle\.\w+)':\s*'[^']+'/g)].map((m) => m[1]));
+  const missing = [...new Set(used)].filter((k) => !de.has(k));
+  if (used.length < 4) missing.push('(fewer than 4 battle labels found)');
   const row = (name, list) => ({ name, pass: list.length === 0, detail: list.length ? `${list.length} hits: ${list.slice(0, 6).join(', ')}` : `${files.length} files` });
   return [
     row('no em dashes in text files', hits.dash),
     row('no spaced double hyphen punctuation', hits.dd),
     row('no local absolute paths', hits.path),
+    { name: 'Battle scenes setting labels have German texts', pass: missing.length === 0, detail: missing.length ? `missing: ${missing.join(', ')}` : `${new Set(used).size} labels` },
   ];
 }
 

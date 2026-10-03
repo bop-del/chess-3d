@@ -201,6 +201,38 @@ try {
   await page.evaluate(() => window.__chess.audio.setMuted(false));
   R.expect('settings persist and are mounted in the Scene card', st.m === 'short' && st.ui && st.sel === 'short', JSON.stringify(st), JSON.stringify(st));
 
+  // CHE-90: the desktop size (1440x900), German labels, a scene with the setting On and none with Off, per view
+  await load({ width: 1440, height: 900 });
+  const readLabels = () => page.evaluate(() => ({ opts: [...document.querySelectorAll('#sel-battle option, #sel-battle .chip')].map((o) => o.textContent.trim()).join('/'), name: (document.querySelector('[data-settings="battle"] h4') || document.querySelector('#sel-battle').closest('label').firstChild).textContent }));
+  const lbl = await readLabels();
+  await page.evaluate(() => document.querySelector('[data-lang="de"]').click());
+  const lbl2 = await readLabels();
+  R.expect('Battle scenes labels in English: On/Short/Off', lbl.opts === 'On/Short/Off', lbl.opts, JSON.stringify(lbl));
+  R.expect('Battle scenes labels in German: An/Kurz/Aus', lbl2.opts === 'An/Kurz/Aus' && lbl2.name === 'Schlagen', JSON.stringify(lbl2), JSON.stringify(lbl2));
+  await page.evaluate(() => { localStorage.setItem('chess3d.lang', 'en'); });
+  await load({ width: 1440, height: 900 });
+  const desk = await page.evaluate(async () => {
+    const c = window.__chess, out = {};
+    const cap = async (mode, view) => {
+      c.views.set(view, { remember: false });
+      c.battle.settings.set({ mode });
+      c.game.loadFen('4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1');
+      await c.battle.ready(); await c.stepAsync(0.5);
+      c.game.move('e4', 'd5');
+      let seen = false, t = 0;
+      while (c.game.busy && t < 12) { await c.stepAsync(0.05); t += 0.05; if (c.battle.active) seen = true; }
+      await c.stepAsync(0.6);
+      return seen;
+    };
+    out.white = await cap('on', 'white'); out.whiteShort = await cap('short', 'white'); out.whiteOff = await cap('off', 'white');
+    out.above = await cap('on', 'above'); out.tokens = await cap('on', 'tokens'); out.symbols = await cap('on', 'symbols');
+    c.views.set('white', { remember: false });
+    return out;
+  });
+  R.expect('desktop 1440x900: a capture plays a scene with the setting On, also Short, none with Off', desk.white && desk.whiteShort && !desk.whiteOff, JSON.stringify(desk), JSON.stringify(desk));
+  R.expect('desktop: From above plays a scene, Tokens and Symbols (no 3D pieces) do not', desk.above && !desk.tokens && !desk.symbols, JSON.stringify(desk), JSON.stringify(desk));
+  await load();   // back to the 1280x720 default for the matrix below
+
   }
     // Scene matrix for the pawn, knight and bishop (scenes-a): 15 attacker and victim combinations through the real director,
   // with the real renderer drawing during the scene; Short, skip and Off per attacker.

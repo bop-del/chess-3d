@@ -17,7 +17,6 @@ addDE({
   'panel.views': 'Ansicht wählen (V)', 'panel.viewsList': 'Ansichten', 'panel.viewBar': 'Ansicht der Kamera',
   'panel.keys': 'Tastenkürzel (?)', 'panel.closeHelp': 'Schließen',
   'panel.kind.openings': 'Eröffnung', 'panel.kind.drill': 'Übung', 'panel.kind.puzzles': 'Rätsel',
-  'battle.scenes': 'Schlagen', 'battle.on': 'Kampf', 'battle.short': 'Kurz', 'battle.off': 'Aus',
   'audio.mute': 'Ton aus',
   'key.hDesk': 'Panel ein- und ausklappen',
 });

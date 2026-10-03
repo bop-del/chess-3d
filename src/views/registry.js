@@ -33,9 +33,10 @@ const MIGRATE = Object.assign(Object.create(null), { 'easy-flat': 'tokens' });
 // From above: a slight shift of the look point towards Black keeps the back rank clear of the frame's edge
 const ABOVE_FOCUS = { x: 0, z: -0.3 }, ABOVE_ZOOM = 1;
 
-// The director (battle scenes) asks this before it plays one. Easy views skip every scene: the capture just happens.
+// The director (battle scenes) asks this before it plays one. Tokens and Symbols have no 3D pieces to fight, so the capture just
+// happens there; From above shows the real pieces and plays the scene (CHE-90). Easy 3D is orthographic, the close-up does not work there.
 let current = null;
-export function viewsAllowBattle() { return !(current && current.isEasy()); }
+export function viewsAllowBattle() { return !(current && ['T', 'S', 'B'].includes(current.style())); }
 
 export function createViews({ controls, stage, game, board, device }) {
   const listeners = [];
