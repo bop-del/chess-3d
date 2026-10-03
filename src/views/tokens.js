@@ -236,8 +236,11 @@ export function createTokens({ gimbal, game, materials, stage = null }) {
 
   // The hint arrow and its squares lie flat at the board plane, under the 0.17 high discs: while tokens are on they are
   // drawn without the depth test (their render order is already above the discs), so the arrow runs over the pieces.
+  // Hint groups are direct children of the gimbal and can be made after setVisible (the start sequence turns a stored
+  // Tokens view on before Explain, Drill and Good move exist), so sync() repeats this every frame: a short walk over
+  // the gimbal's children that only touches a material when it is wrong.
   function hintOnTop(v) {
-    gimbal.traverse((o) => { if (o.name === 'move-hint') o.traverse((m) => { if (m.isMesh && m.material.depthTest === v) { m.material.depthTest = !v; m.material.needsUpdate = true; } }); });
+    for (const o of gimbal.children) if (o.name === 'move-hint') o.traverse((m) => { if (m.isMesh && m.material.depthTest === v) { m.material.depthTest = !v; m.material.needsUpdate = true; } });
   }
   const api = {
     setVisible(v) {
@@ -247,6 +250,7 @@ export function createTokens({ gimbal, game, materials, stage = null }) {
       if (on) orient();
     },
     sync() {
+      if (on) hintOnTop(true);
       eachPiece(apply);
       if (on) orient();
     },
