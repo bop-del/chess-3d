@@ -1,11 +1,11 @@
 // Test runner: node test/run.mjs [fast|smoke|phone|all]   (default fast; npm test calls it)
 //   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules, novice level
 //   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on the lane's own port (5303 in the main checkout), only the groups the diff against main affects inside a lane (--all forces every group), cached passes print CACHED, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes, themes
-//   phone  phone sizes and real touch: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
+//   phone  phone sizes and real touch, the three scripts at the same time: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes, --affected, --all, --no-cache
 // Exit codes: 0 all pass, 1 a check failed, 2 usage error, 3 nothing failed but a smoke group was skipped (no Chrome slot).
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,6 +28,19 @@ const run = (name, script, args = [], { show = false } = {}) => {
   }
   return ok;
 };
+
+/** Independent browser steps at the same time (each has its own Chrome slot, port and dist folder): output is held per step and printed when it ends. */
+const runParallel = (steps) => Promise.all(steps.map(([name, script, args = []]) => new Promise((done) => {
+  const t = Date.now();
+  const c = spawn(process.execPath, [script, ...args], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = ''; c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { out += d; });
+  c.on('close', (status) => {
+    const secs = (Date.now() - t) / 1000, ok = status === 0;
+    results.push({ name, ok, secs, status });
+    console.log(`--- ${name}\n${out.trimEnd()}\n${ok ? 'PASS' : status === 3 ? 'INCOMPLETE' : 'FAIL'}  ${name}  ${secs.toFixed(1)}s`);
+    done();
+  });
+})));
 
 const t0 = Date.now();
 if (tier === 'fast' || tier === 'all') {
@@ -54,9 +67,9 @@ if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((
 } else if (tier === 'all') console.log('--- smoke tier skipped because the fast tier failed');
 if (tier === 'phone') {
   console.log('--- phone tier (headless Chrome, phone sizes, real touch)');
-  run('phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', rest, { show: true });
-  run('real touch (test/touch.mjs)', 'test/touch.mjs', rest, { show: true });
-  run('install reminder and manifest (test/install.mjs)', 'test/install.mjs', rest, { show: true });
+  // the three scripts do not share state: one Chrome slot, port and dist folder each, so they run at the same time (the slot lock keeps it to what the machine allows)
+  const shared = rest.filter((a) => !a.startsWith('--port='));   // one port for three servers would clash: each script claims its own
+  await runParallel([['phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', shared], ['real touch (test/touch.mjs)', 'test/touch.mjs', shared], ['install reminder and manifest (test/install.mjs)', 'test/install.mjs', shared]]);
 }
 
 const bad = results.filter((r) => !r.ok).length;

@@ -40,7 +40,7 @@ try {
 
   browser = await launchBrowser({ w: 390, h: 844 });
   // one visit: a fresh page with the given storage seed, user agent, automation flag and standalone flag
-  const visit = async ({ path = '', seed = null, ua = UA, mobile = true, webdriver = false, standalone = false, wait = 4500, act = null } = {}) => {
+  const visit = async ({ path = '', seed = null, ua = UA, mobile = true, webdriver = false, standalone = false, wait = 3000, act = null } = {}) => {
     const page = await browser.newPage();
     try {
       await page.setUserAgent(ua);
@@ -56,7 +56,7 @@ try {
       const watch = await watchPage(page);
       await page.goto(base + path, { waitUntil: 'load', timeout: 120000 });
       await page.waitForFunction('window.__chessReady === true || !!window.__chessError', { timeout: 180000 });
-      await sleep(wait);
+      await page.waitForFunction(() => { const e = document.querySelector('.ih-scrim'); return !!e && e.classList.contains('in'); }, { timeout: wait, polling: 50 }).catch(() => {});   // up as soon as it shows, else the full wait (the sheet comes 2.2 s after ready, then fades in)
       const shown = await page.evaluate(() => { const e = document.querySelector('.ih-scrim'); return !!e && e.classList.contains('in'); });
       const shot = shown ? await page.screenshot({ type: 'png' }) : null;   // before any tap closes the sheet
       let after = null;

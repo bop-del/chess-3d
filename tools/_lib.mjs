@@ -5,6 +5,8 @@
 //                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check's extra software pass does).
 //                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 8, three under 16).
 //                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
+//   pageRenderer(page)       the WebGL renderer the page itself draws with (the app's own context, UNMASKED_RENDERER), logged by the smoke, phone and release tiers as proof of the GPU
+//   proveGpu(page, R)        prints pageRenderer once, a WARN when the GPU was asked for and the page reports software
 //   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted); sets Battle scenes Off for the page unless { scenes: true }
 //   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers. Only reuses a server this process started; a port that answers otherwise is an error (no port given: the next free one is taken)
 //   claimPort(opts)          a port for a server, from the lane name: the first free port from the lane's own, claimed by a lock folder (pid, lane, build hash) so two callers at once never share one; a port that answers without our claim is skipped
@@ -92,6 +94,27 @@ async function logRenderer(browser) {
   } catch (e) { console.log('      WebGL renderer: unknown ' + e.message); }
 }
 
+/** The renderer string of the context the app itself uses (window.__chess.stage.renderer), else a probe canvas. Never throws. Call after the page is ready. */
+export async function pageRenderer(page) {
+  try {
+    return await page.evaluate(() => {
+      const r = window.__chess && window.__chess.stage && window.__chess.stage.renderer;
+      const gl = r && r.getContext ? r.getContext() : document.createElement('canvas').getContext('webgl');
+      if (!gl) return 'no webgl';
+      const x = gl.getExtension('WEBGL_debug_renderer_info');
+      return x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    });
+  } catch (e) { return 'unknown ' + String(e.message).slice(0, 60); }
+}
+
+/** Print the page's renderer once as proof; when the GPU was asked for and the page reports software, a WARN on the reporter R. Returns the string. */
+export async function proveGpu(page, R, gl = defaultGl()) {
+  const r = await pageRenderer(page);
+  if (gl === 'metal' && /swiftshader|software|llvmpipe/i.test(r)) R.warn('page renders on the GPU', `the page reports ${r}`);
+  else console.log(`      page renderer (${gl}): ${r}`);
+  return r;
+}
+
 export async function launchBrowser({ w = 1280, h = 720, args = [], gl = defaultGl() } = {}) {
   const executablePath = chromePath();
   if (!executablePath) { console.error('Chrome not found. Set CHROME_PATH.'); process.exit(2); }
@@ -108,7 +131,19 @@ export async function launchBrowser({ w = 1280, h = 720, args = [], gl = default
     if (gl === 'metal') await logRenderer(browser);
   } catch (e) { releaseLock(lock); throw e; }
   const close = browser.close.bind(browser);
-  browser.close = async () => { try { await close(); } finally { releaseLock(lock); } };
+  // Chrome sometimes needs minutes to quit after a busy GPU run (seen: a group that printed its last line at 45 s and ended at 371 s). After 8 s the browser process this call started is killed by its own PID and its temp profile removed.
+  browser.close = async () => {
+    const proc = browser.process();
+    let timer;
+    try {
+      await Promise.race([close(), new Promise((r) => { timer = setTimeout(r, 8000); })]);
+      if (proc && proc.exitCode === null && !proc.killed) {
+        proc.kill('SIGKILL');
+        const dir = (proc.spawnargs.find((a) => a.startsWith('--user-data-dir=')) || '').slice(16);
+        if (dir && dir.startsWith(tmpdir())) { await sleep(300); try { rmSync(dir, { recursive: true, force: true }); } catch (e) { /* ignore */ } }
+      }
+    } finally { clearTimeout(timer); releaseLock(lock); }
+  };
   browser.on('disconnected', () => releaseLock(lock));
   return browser;
 }

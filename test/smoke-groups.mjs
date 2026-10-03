@@ -10,7 +10,7 @@
 // Options: --port=<lane preview port, 5303 in the main checkout> --dev --dev-port=<lane dev port, 5302> --skip-build --write-budgets --shots --skip-fixes, plus --only=<group,group> to run just those groups, --jobs=<n> to set the number of processes at once (default: the free Chrome slots at start, at least 2, so waiting groups do not hit the 15 minute lock timeout).
 // A group that still finds no slot is reported as SKIPPED (slot starvation), not as a failure: run it alone with node test/smoke.mjs --group=<name>.
 import { spawn } from 'node:child_process';
-import { mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, startServer, claimPort } from '../tools/_lib.mjs';
 import { affectedGroups, changedFiles } from '../tools/affected-groups.mjs';
@@ -85,7 +85,8 @@ for (const { g: [name], hit } of cached) { totals.np += hit.pass; totals.nw += (
 const runGroup = ({ g: [name, script, extra], key }) => new Promise((resolve) => {
   const tg = Date.now();
   const c = spawn(process.execPath, [script, ...(script === SMOKE ? pass : [`--base=${base}`]), ...extra], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
-  let out = ''; c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { out += d; });
+  let out = ''; const trace = (d) => { out += d; if (process.env.SMOKE_TRACE) { mkdirSync(join(ROOT, '.tmp/smoke-trace'), { recursive: true }); appendFileSync(join(ROOT, '.tmp/smoke-trace', name.replace(/\W+/g, '-') + '.log'), String(d).split('\n').filter(Boolean).map((l) => `${((Date.now() - t0) / 1000).toFixed(1)}s ${l}`).join('\n') + '\n'); } };   // SMOKE_TRACE=1: every output line of every group with the time it arrived, in .tmp/smoke-trace/
+  c.stdout.on('data', trace); c.stderr.on('data', trace);
   c.on('close', (code) => {
     if (/slots busy for over/.test(out)) {   // never got a Chrome: slot starvation, not a failure of the checks
       skipped.push(name);

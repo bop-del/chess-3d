@@ -38,7 +38,7 @@ try {
     return { audit: c.game.audit(), cap: { w: s.captured.w.length, b: s.captured.b.length }, trays: s.trays, slabs, ctrl: c.controls.trays, dist: c.stage.camera.position.length(), ortho: c.stage.camera.isOrthographicCamera ? c.stage.camera.top : 0,
       hudRow: { w: document.querySelectorAll('#cap-w i').length, b: document.querySelectorAll('#cap-b i').length }, box: !!document.querySelector('[data-trays]'), checked: document.querySelector('[data-trays]')?.checked, stored: localStorage.getItem('chess3d.trays'), over: window.__chess.game.root.children.filter((o) => o.visible && o.userData.piece).length };
   });
-  const shot = async (name) => { await new Promise((r) => setTimeout(r, 1600)); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
+  const shot = async (name) => { await page.evaluate(() => Promise.race([Promise.all(document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 1000))])); await new Promise((r) => setTimeout(r, 250)); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
   const theme = async (id) => { await page.evaluate((t) => window.__chess.themes.set(t), id); await settle(1); };
 
   // ---- trays on, full tray

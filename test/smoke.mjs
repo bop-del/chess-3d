@@ -20,7 +20,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort } from '../tools/_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort, proveGpu } from '../tools/_lib.mjs';
 import { contactSheets } from '../tools/contact-sheet.mjs';
 
 const args = process.argv.slice(2);
@@ -93,6 +93,7 @@ await guard('page health', async () => {
   readyMs = Date.now() - t;
   const st = await page.evaluate(() => ({ ready: !!window.__chessReady, error: window.__chessError || null, api: ['stage', 'gimbal', 'board', 'game', 'controls', 'step', 'draw'].filter((k) => !window.__chess || !(k in window.__chess)) }));
   ready = st.ready;
+  if (st.ready) await proveGpu(page, R);
   R.expect('page reaches window.__chessReady', st.ready, `${(readyMs / 1000).toFixed(1)}s`, st.error || 'not ready');
   R.expect('test hooks are exposed on window.__chess', st.api.length === 0, 'stage gimbal board game controls step draw', 'missing ' + st.api.join(','));
   await sleep(300);

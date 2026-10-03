@@ -8,7 +8,7 @@
 //                                  calls preventDefault on the second tap of a double tap and on a two finger move off the canvas
 //   HUD buttons                    New game, the Controls drawer and a view preset respond to taps
 // Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 setup error.
-import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort } from '../tools/_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort, proveGpu } from '../tools/_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
@@ -56,6 +56,7 @@ async function runSize(size) {
     await page.setViewport({ width: size.w, height: size.h, deviceScaleFactor: 3, isMobile: true, hasTouch: true, isLandscape: size.w > size.h });
     await page.goto(server.base + URLQ, { waitUntil: 'load', timeout: 60000 });
     await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
+    await proveGpu(page, R);
     const cdp = await page.createCDPSession();
     const ev = (fn, ...a) => page.evaluate(fn, ...a);
     const step = (s) => ev((x) => window.__chess.step(x), s);

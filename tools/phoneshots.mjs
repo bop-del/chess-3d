@@ -13,7 +13,7 @@
 // Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 usage or setup error.
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort } from './_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort, proveGpu } from './_lib.mjs';
 import { contactSheets } from './contact-sheet.mjs';
 
 // M3 switches the tap target audit from WARN to FAIL by flipping this one constant.
@@ -151,11 +151,13 @@ try {
       try { await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { left: inset[0], top: inset[1], right: inset[2], bottom: inset[3] } }); }
       catch (e) { insetOk = false; R.warn(`${name} safe area insets`, 'override not available: ' + String(e.message).slice(0, 80)); }
 
+      let proved = false;
       const load = async (extra = '') => {
         await page.goto(`${server.base}?${QUERY}${extra}`, { waitUntil: 'load', timeout: 120000 });
         await page.waitForFunction('window.__chessReady === true || !!window.__chessError', { timeout: 120000 });
         const err = await page.evaluate(() => window.__chessError);
         if (err) throw new Error('page reported: ' + err);
+        if (!proved) { proved = true; await proveGpu(page, R); }
         await page.evaluate(() => { window.__chess.step(1.5); window.__chess.draw(); });
         await sleep(400);
       };

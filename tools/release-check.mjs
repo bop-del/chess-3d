@@ -24,7 +24,7 @@ import { mkdtempSync, existsSync, readFileSync, readdirSync, statSync, symlinkSy
 import { tmpdir, userInfo } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ROOT, reporter, launchBrowser, watchPage, startServer, sleep, claimPort, waitReady, defaultGl, safeDecode } from './_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, sleep, claimPort, waitReady, defaultGl, safeDecode, proveGpu, pageRenderer } from './_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const a = args.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : dflt; };
@@ -166,10 +166,12 @@ if (built && !flag('no-browser')) {
       } catch (e) { watch.errs.push('NAV ' + String(e.message).slice(0, 100)); }
       await sleep(settleMs);
       const st = await page.evaluate(() => ({ ready: !!window.__chessReady, error: window.__chessError || null })).catch(() => ({ ready: false, error: 'page gone' }));
+      if (!proved && st.ready) { proved = true; await proveGpu(page, R); }
       return { problems: [...watch.errs, ...watch.foreign.map((u) => 'FOREIGN ' + u), ...(st.ready ? [] : ['NOT READY ' + (why || st.error || '')])] };
     };
     /** cases: [url, settleMs]. Resolves the results in case order. A page without manual=1 plays its intro on requestAnimationFrame, which
      *  a background tab never gets: those run first, one at a time, on a tab brought to the front. The manual=1 pages share the tabs. */
+    let proved = false;
     const run = async (cases) => {
       const out = new Array(cases.length);
       const live = cases.map((c, i) => i).filter((i) => !/[?&]manual=1(&|$)/.test(cases[i][0]));
@@ -234,6 +236,7 @@ if (built && !flag('no-browser')) {
         await page.goto(base + '/', { waitUntil: 'load', timeout: SOFT_BUDGET });
         const r = await waitReady(page, { timeout: Math.max(1000, SOFT_BUDGET - (Date.now() - t)) });
         const secs = ((Date.now() - t) / 1000).toFixed(1);
+        console.log(`      page renderer (swiftshader pass): ${await pageRenderer(page)}`);
         if (r.ready && !watch.errs.length) pass('page / loads on the software renderer (SwiftShader)', `${secs}s of ${SOFT_BUDGET / 1000}s budget`);
         else warn('page / on the software renderer (SwiftShader)', `${secs}s of ${SOFT_BUDGET / 1000}s budget: ${r.why || watch.errs.slice(0, 2).join(' | ')}`);
       } catch (e) { warn('page / on the software renderer (SwiftShader)', 'did not finish: ' + String(e.message).slice(0, 200)); }
