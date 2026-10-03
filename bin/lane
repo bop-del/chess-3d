@@ -7,14 +7,15 @@
 //                                       a tab "<name> agent" in the lane's workspace with a visible Claude session
 //                                       (plus, once per lane, a "diff" tab running hunk diff main --watch)
 //                                       (default model sonnet), prompted to read the brief and to send its final
-//                                       report to the lead session (Herdr agent chess-3d-lead)
+//                                       report to the lead session (Herdr agent chess-3d-lead). With the private
+//                                       bin/agent-stop-hook present, the agent also gets a Stop hook that saves its report.
 //   bin/lane list                       open lanes of this repo
 //   bin/lane close <branch> [-m <msg>]  squash merge into main (the main checkout, which must be on main), then remove the
 //                                       workspace, the worktree and the branch. Without -m the lane's only commit message
 //                                       is reused; a lane with several commits needs -m.
 // Exit codes: 0 done, 1 a step failed (nothing after it ran), 2 usage error.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, symlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -73,11 +74,20 @@ function agent(branch, name, brief, model = 'sonnet') {
   const pane = (tab.root_pane || tab.pane || {}).pane_id;
   if (!pane) die(`could not read the new tab's pane from herdr: ${JSON.stringify(tab).slice(0, 200)}`);
   const id = `${branch}-${name}`;
+  // optional private hook: a Stop hook that keeps the agent's final report (settings file per agent, in the lane's gitignored .claude/)
+  const extra = [];
+  { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'agent-stop-hook');
+    if (existsSync(h)) {
+      const f = join(lane.path, '.claude', `agent-${name}.settings.json`);
+      mkdirSync(dirname(f), { recursive: true });
+      writeFileSync(f, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node ${h} ${branch} ${name}` }] }] } }, null, 2));
+      extra.push('--settings', f);
+    } }
   // a fresh tab needs a moment before its shell takes input: retry while herdr says the pane is busy
   for (let i = 0; ; i++) {
     try {
       run('herdr', ['agent', 'start', id, '--kind', 'claude', '--pane', pane, '--timeout', '60000', '--',
-        '--model', model, '--plugin-dir', join(process.env.HOME, 'code', 'mattpocock-skills')]);
+        '--model', model, '--plugin-dir', join(process.env.HOME, 'code', 'mattpocock-skills'), ...extra]);
       break;
     } catch (e) {
       if (i >= 10 || !/agent_pane_busy/.test(String(e.stderr || e.stdout || e.message))) throw e;
