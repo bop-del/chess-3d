@@ -12,11 +12,21 @@ Built with three.js (0.186) and Vite. Everything is procedural: the geometry com
 
 ![Top down view](docs/topdown.jpg)
 
-On a phone, in portrait: the game with its thumb bar, and the Menu sheet.
+The Spielsteine view (named Tokens in English): a flat top view with every piece as a thick gold turned disc.
+
+![Tokens view](docs/tokens.jpg)
+
+The Puzzles tab: a path of ten stations per chapter, gold for a clean solve, silver for one that needed help.
+
+![The puzzle path](docs/puzzles-path.jpg)
+
+On a phone, in portrait: the game with its thumb bar, the Menu sheet, a lesson running with the learning bar, and the puzzle path.
 
 <p>
-  <img src="docs/phone-portrait.jpg" alt="Phone, portrait: status line, board and thumb bar" width="300">
-  <img src="docs/phone-menu.jpg" alt="Phone, portrait: the Menu sheet" width="300">
+  <img src="docs/phone-portrait.jpg" alt="Phone, portrait: status line, board and thumb bar" width="240">
+  <img src="docs/phone-menu.jpg" alt="Phone, portrait: the Menu sheet" width="240">
+  <img src="docs/phone-learning.jpg" alt="Phone, portrait: an opening lesson with the learning bar" width="240">
+  <img src="docs/phone-puzzles.jpg" alt="Phone, portrait: the puzzle path in the Learn sheet" width="240">
 </p>
 
 ## Openings
@@ -98,7 +108,7 @@ Sliders and buttons (left panel)
 
 Home Screen: on an iPhone or iPad the game can be added to the Home Screen from Safari (Share, then Add to Home Screen) and then runs full screen with its own icon (a web app manifest, no service worker). In a Safari tab it shows a short reminder with the three steps once after the first load, and at most twice more a few visits later. Later or a tap outside closes it at once. It never shows when the game is already installed, on desktop, or with any URL parameter below. The link preview used by chat apps and social sites is `public/og-image.png`.
 
-Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view stops all camera gestures. On a phone the game has a status line on top, a thumb bar with big icons and one short word each (Undo, New, Flip, View, Learn, Menu), and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
+Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view stops all camera gestures. On a phone, while a lesson, a drill, a Practise session or a puzzle runs, the thumb bar turns into the learning controls (for example Back, Show me, Hint and End), the view stays on Play and a short text card sits on top; End gives the normal bar back. Otherwise the game has a status line on top, a thumb bar with big icons and one short word each (Undo, New, Flip, View, Learn, Menu), and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
 
 ## Features
 
@@ -112,6 +122,7 @@ Rules
 
 Rendering
 
+- A short start sequence: a king turns slowly, then the board builds itself. Skip it with `?intro=0`; it is also off with the system setting reduce motion
 - Board of white and black marble squares in a walnut frame with a gold inlay, coordinate labels, a plinth and a captured-piece tray on each side of the board
 - Sculpted Staunton pieces: a lathe turned pawn, rook, bishop, queen and king and a modelled knight head. 58k to 83k triangles per piece type
 - Five themes (Classic, Tournament, Wood, Metal, Glass), each one bundle of board squares, frame, inlay, pieces and lighting. The piece shapes stay, only materials and colours change. The textures are built on the first pick of a theme and freed again when you leave it. Glass uses real transmission only on the High quality tier; Low and Medium get a tinted lacquer look that costs nothing extra
