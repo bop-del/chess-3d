@@ -44,7 +44,7 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
     await page.setViewport({ width: 1280, height: 800 });
     errs = await open(page);
     await step(page, 1);
-    ok('learn: Openings lists twelve rows, none marked yet', (await count(page, '.xline.openings')) === 12 && (await count(page, '.xmark')) === 0);
+    ok('learn: Openings lists 27 rows, none marked yet', (await count(page, '.xline.openings')) === 27 && (await count(page, '.xmark')) === 0);
     ok('learn: Practise is greyed before the first adopt', await page.evaluate(() => document.querySelector('.xtab[data-tab="practise"]').disabled));
     await tapTab(page, 'mine');
     ok('learn: Mine is empty with one plain sentence', (await count(page, '.xempty')) === 1 && (await count(page, '.xline.mine')) === 0);

@@ -51,7 +51,7 @@ On a phone, in portrait: the game with its thumb bar, the Menu sheet, a lesson r
 
 ## Openings
 
-The Learn tab (on a computer) and the Learn button (sixth button of the thumb bar on a phone, which opens the Learn sheet) have three tabs: Openings, Mine and Practise. The Openings tab teaches twelve classic opening lines: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
+The Learn tab (on a computer) and the Learn button (sixth button of the thumb bar on a phone, which opens the Learn sheet) have three tabs: Openings, Mine and Practise. The Openings tab teaches 27 lines, twelve classic openings and 15 side lines for the common replies you meet (Queen's Gambit Accepted and Slav, London against ...c5 and ...Bf5, Najdorf, Dragon and Alapin Sicilians, and so on). The twelve openings are: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
 
 Pick a line and the board turns to your side. You play your own moves on the board and the game plays the other side after a short pause. Every move comes with one sentence that says what it is for. Any other move is refused and the card tells you which move the line plays.
 

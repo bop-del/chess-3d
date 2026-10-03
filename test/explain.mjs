@@ -33,7 +33,7 @@ export async function runExplainChecks({ page, baseUrl, log = () => {}, shot = n
     await page.waitForFunction("document.body.classList.contains('ready') && document.getElementById('loader').classList.contains('done')");
     await new Promise((r) => setTimeout(r, 900));   // the loader fades on the real clock
     await shot?.('explain-list');
-    ok('explain: line list has all twelve lines', (await page.evaluate(() => window.__chess.openings.explain.lines.length)) === 12);
+    ok('explain: line list has all 27 lines', (await page.evaluate(() => window.__chess.openings.explain.lines.length)) === 27);
     ok('explain: the Italian Game starts', await page.evaluate(() => window.__chess.openings.explain.start('italian-game')));
     await step(0.3);
     let s = await st();

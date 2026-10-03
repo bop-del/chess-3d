@@ -11,7 +11,7 @@ phone, used by a child, which settles many choices below.
 
 **Line**:
 One concrete sequence of moves that the game teaches, belonging to an opening
-and carrying a text per move. There are twelve; three ship with texts.
+and carrying a text per move. There are 27, all with texts: twelve openings and 15 side lines, each a line of its own that shares the first moves of its opening and deviates at a common reply.
 _Avoid_: opening (means the named idea, not our sequence), variation, repertoire entry
 
 **Opening**:
@@ -26,9 +26,9 @@ is exhaustive, not curated, so it can never be the list a child chooses from.
 _Avoid_: database, dataset, opening list
 
 **Starter list**:
-The twelve lines we hand-picked and wrote ourselves. Curation is the part the
+The 27 lines we hand-picked and wrote ourselves. Curation is the part the
 catalogue cannot do.
-_Avoid_: catalogue, our openings, the twelve
+_Avoid_: catalogue, our openings, the twelve, the 27
 
 **Position key**:
 The first four FEN fields: placement, side to move, castling rights, en

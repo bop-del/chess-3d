@@ -2,7 +2,7 @@
 .xp { display: flex; flex-direction: column; gap: 8px; }
 .xlead { margin: 0 0 4px; color: var(--dim); line-height: 1.45; }
 .xlist { display: flex; flex-direction: column; gap: 6px; }
-/* desktop: twelve lines would push the Moves card out of a short window, so the list scrolls inside its card */
+/* desktop: 27 lines would push the Moves card out of a short window, so the list scrolls inside its card */
 body:not(.phone) .xlist { max-height: 34vh; overflow-y: auto; }
 body:not(.phone) .xtext { max-height: 30vh; overflow-y: auto; }
 .xline {
