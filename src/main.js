@@ -8,6 +8,7 @@ import { LEVELS } from './ai.js';
 import { mountTraysSetting } from './trays-setting.js';
 import { createGameClock } from './clock.js';
 import { initialPreset, mountClock } from './clock-ui.js';
+import { createAdapter } from './adapt.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 window.__chessBoot = { script: performance.now() };   // start timings for ?diag=1, ms since navigation (download ends here)
@@ -148,6 +149,7 @@ async function boot() {
   const boot = window.__chessBoot;
   let advance = (dt) => { controls.update(dt); };
   let last = performance.now();
+  let adapter = null;   // the adaptive quality governor (src/adapt.js), created with the HUD; fed once per rendered frame
   const frameOnce = (dt, raw) => {
     advance(dt);
     if (intro) { try { intro.update(raw); } catch (e) { introFailed(e); } }
@@ -160,6 +162,7 @@ async function boot() {
   };
   function frame(now) {
     const raw = Math.max(0, Math.min(0.25, (now - last) / 1000));   // the sequence runs on the wall clock, the game clock is capped
+    adapter?.feed(now - last, document.hidden);
     last = now;
     requestAnimationFrame(frame);   // first: one throw in a frame must not stop the loop
     const t0 = performance.now();
@@ -320,7 +323,23 @@ async function boot() {
   window.addEventListener('resize', onResize);
   if (device.touch) window.addEventListener('orientationchange', onResize);
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
+  // adaptive quality: touch devices step down when frames stay slow (never up, session only). ?adapt=1 forces it on elsewhere,
+  // ?adapt=0 turns it off; an explicit ?quality= and ?manual=1 turn it off. A quality choice in the HUD locks it.
+  const adaptOn = !manual && !params.get('quality') && (device.touch ? params.get('adapt') !== '0' : params.get('adapt') === '1');
+  let stepping = false;
+  adapter = createAdapter({
+    start: stage.quality,
+    onStep: (q) => {
+      stepping = true;
+      try { stage.setQuality(q); } finally { stepping = false; }
+      adaptToast(ui, q);
+    },
+  });
+  if (!adaptOn) adapter.lock('off');
+  stage.onQuality((q) => { if (!stepping) adapter.lock('user'); });
+  themes.on(() => adapter.hold());   // a theme switch builds textures: its frames are not measured
+
+  window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
   window.__chess.clockUi = clockUi;
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
@@ -352,11 +371,17 @@ async function boot() {
     await new Promise((res) => { if (window.__loader) window.__loader.finish(res); else res(); });
   }
   boot.ready = performance.now();
+  adapter.arm();   // the start sequence is over: the adapter's warm up starts now
   applyLateParams({ game, ui, stage, controls, learn });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
   window.__chessReady = true;
   if (device.ios && !device.standalone) import('./install-hint.js').then((m) => m.mountInstallHint()).catch(() => {});   // iPhone Safari only
+}
+
+// the one calm toast of the adaptive governor (outside boot(): a local `t` there is the game clock)
+function adaptToast(ui, q) {
+  ui.toast(t('adapt.toast', 'Graphics set to {level} so it stays smooth', { level: t(`hud.${q}`, q[0].toUpperCase() + q.slice(1)) }), 'info', 4200);
 }
 
 // WebGL context loss (every device): the stage pauses drawing and rebuilds on restore. If the browser does not give the

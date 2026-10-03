@@ -267,6 +267,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   selLight.addEventListener('change', () => stage.setLightingPreset?.(selLight.value));
   selQuality.value = stage.quality || quality;   // an invalid ?quality= falls back in the stage: show what runs
   selQuality.addEventListener('change', () => stage.setQuality?.(selQuality.value));
+  stage.onQuality?.((q) => { selQuality.value = q; });   // the adaptive governor (src/adapt.js) steps down without the chip: it follows
 
   // ------------------------------------------------------------ game buttons
   $('#btn-new').addEventListener('click', () => { game.newGame(); hideBanner(); });
@@ -453,12 +454,12 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // ------------------------------------------------------------ toast
   const toastEl = document.getElementById('toast');
   let toastT = 0;
-  function toast(msg, kind) {
+  function toast(msg, kind, ms = 1600) {
     toastEl.textContent = msg;
     toastEl.classList.toggle('info', kind === 'info');
     toastEl.classList.add('show');
     clearTimeout(toastT);
-    toastT = setTimeout(() => toastEl.classList.remove('show'), 1600);
+    toastT = setTimeout(() => toastEl.classList.remove('show'), ms);
   }
 
   // ------------------------------------------------------------ a lesson starts: Learn takes the panel

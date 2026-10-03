@@ -168,6 +168,8 @@ Battle scenes and sound
 - Synthesised sound for moves, captures, check and the battle scenes, made in the browser with no audio files. The Mute switch sits next to Battle scenes and is remembered; sound starts only after your first tap or key
 - Quiet piano music in the background, on by default, starting softly after your first tap or key: Satie (Gymnopédie No. 1, 2 and 3) and Bach (Prelude in C, the Air from the Orchestral Suite No. 3) in a random endless playlist with a few seconds of silence between pieces. The piano is synthesized in the browser (no audio files); the notes are public domain scores stored as data. Sound effects and battle scenes dip it, it pauses when the tab is hidden, and Mute silences everything. The Music switch and the sliders Volume, Tone (bright to warm), Tempo (0.8x to 1.1x) and Room (reverb) sit below Mute (Scene card, or Menu on a phone) and are remembered per device. Scores are the public domain typesettings of the Mutopia Project (mutopiaproject.org), credited in the header of each piece in src/music/pieces
 
+- Adaptive quality on phones: if the frame rate stays low (a median frame time over 24 ms in two windows of 90 frames, or over 40 ms in one), the game steps its graphics down one tier, at most twice, and tells you once with a short message. It never steps back up in the same visit and stops measuring as soon as the frames are healthy or you pick a quality yourself. iOS Safari has no Low Power Mode or thermal API, so both are recognised by their effect: a frame rate capped near 30 fps shows as frames of about 33 ms in every window. Nothing is stored: the next visit starts on Medium again
+
 Limits: there is no network play. Two people share one screen (computer off), or you play the computer.
 
 Browser support: needs WebGL 2. The build targets Safari 15 and later, and current Chrome, Edge and Firefox. It was tested in Chrome only. If the script cannot start (an old browser, a failed download), the loading screen says so after 20 seconds instead of waiting forever.
@@ -179,6 +181,7 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | Parameter | Value | Effect |
 |---|---|---|
 | `quality` | `low`, `medium`, `high` | Start in this quality tier (default `high`, `medium` on touch devices) |
+| `adapt` | `1`, `0` | The adaptive quality governor steps the quality down when frames stay slow, never up, once or twice per visit (session only, with a calm toast). It runs on touch devices by default: `0` turns it off there, `1` forces it on for desktop tests. An explicit `quality` or `manual=1` always turns it off, and choosing a quality in the HUD stops it. Tests drive it with `__chess.adapt.feed(ms)` |
 | `touch` | `1`, `0` | `1` forces touch mode on (Medium start tier, page gesture blocking), `0` forces it off (desktop behaviour even on a touch device). Without it touch is detected from the primary input. An explicit `quality` wins over the touch start tier |
 | `light` | `Studio`, `Gallery`, `Sunset`, `Night` | Start with this lighting preset |
 | `theme` | `classic`, `tournament`, `wood`, `metal`, `glass`, `blocks` | Start with this theme for this load only (the swatch row remembers the theme you pick, in `localStorage` `chess3d.theme`) |

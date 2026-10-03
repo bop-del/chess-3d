@@ -61,6 +61,7 @@ if (tier === 'fast' || tier === 'all') {
   run('music data and logic (test/music.mjs)', 'test/music.mjs');
   run('novice level (test/novice.mjs)', 'test/novice.mjs');
   run('chess clock (test/clock.mjs)', 'test/clock.mjs');
+  run('adaptive quality governor (test/adapt.mjs)', 'test/adapt.mjs');
   run('game review core: classification, accuracy, engine (test/review-core.mjs)', 'test/review-core.mjs');
   run('training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs');
 }

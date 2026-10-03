@@ -109,6 +109,7 @@ export const DE = {
   // loader and notices
   'loader.sub': 'Brett und Figuren werden gebildet', 'loader.start': 'Start',
   'loader.error': 'Beim Laden ist etwas schiefgegangen',
+  'adapt.toast': 'Grafik auf {level} gestellt, damit alles flüssig läuft',
   'notice.failed': 'Die Grafik konnte nicht wiederhergestellt werden. Tippe, um die Seite neu zu laden.',
   'notice.stalled': 'Der Browser hat die Grafik noch nicht zurückgegeben. Tippe, um die Seite neu zu laden.',
 };
