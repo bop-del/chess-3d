@@ -762,13 +762,14 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // into view. 'settings' is the Scene card (or the Menu sheet itself on a phone), 'music' the music block inside it.
   // Returns false for an id that is not a panel here.
   function openPanel(id) {
-    const PANELS = { settings: 'scene', menu: 'scene', scene: 'scene', music: 'scene', clock: 'scene', moves: 'moves', daily: 'daily', openings: 'openings', drill: 'drill', puzzles: 'puzzles' };
+    const PANELS = { settings: 'scene', menu: 'scene', scene: 'scene', music: 'scene', clock: 'scene', moves: 'moves', daily: 'daily', openings: 'openings', drill: 'drill', puzzles: 'puzzles', badges: 'badges' };
     if (!Object.hasOwn(PANELS, id)) return false;
     const card = PANELS[id];
     if (phoneUI) {
       if (card === 'daily') { phoneUI.openCard('game'); hud.querySelector('.dailycard')?.scrollIntoView?.({ block: 'nearest' }); return true; }
       if (card === 'openings') return false;   // phone: the Learn sheet, opened by src/learn
       if (!phoneUI.openCard(id === 'menu' ? null : card)) return false;
+      hud.querySelector(`.card[data-card="${card}"]`)?.classList.remove('collapsed');   // a mounted panel card is folded on a phone
     } else if (dsk) {
       // desktop: the panel tab that holds it (Moves on Play, the learning cards on Learn, the rest on Settings), unfolded from the rail
       dsk.setTab(card === 'moves' || card === 'daily' ? 'play' : card === 'scene' ? 'settings' : 'learn');

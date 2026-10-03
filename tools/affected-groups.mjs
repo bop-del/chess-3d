@@ -30,6 +30,7 @@ export const MAP = [
   [/^src\/openings\//, ['explain', 'learn', 'fixes', 'blocks fixes']],
   [/^src\/train\//, ['drill', 'fixes']],
   [/^src\/puzzles\//, ['puzzles', 'fixes']],
+  [/^src\/progress\//, ['open', 'puzzles', 'learn', 'fixes']],
   [/^src\/review\//, ['review', 'fixes', 'blocks fixes']],
   [/^src\/views\//, ['views', 'tokens', 'play', 'fixes']],
   [/^src\/(trays|trays-setting)\.js$/, ['trays', 'fixes', 'blocks fixes']],

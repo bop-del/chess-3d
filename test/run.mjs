@@ -56,6 +56,7 @@ if (tier === 'fast' || tier === 'all') {
   run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
   run('puzzle controller (test/puzzle-controller.mjs)', 'test/puzzle-controller.mjs');
   run('daily puzzle and streak (test/daily.mjs)', 'test/daily.mjs');
+  run('badges: thresholds, wins, storage (test/badges.mjs)', 'test/badges.mjs');
   run('puzzle data is legal and solvable (test/puzzles-data.mjs)', 'test/puzzles-data.mjs');
   run('music data and logic (test/music.mjs)', 'test/music.mjs');
   run('novice level (test/novice.mjs)', 'test/novice.mjs');

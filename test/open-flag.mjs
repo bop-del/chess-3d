@@ -47,6 +47,7 @@ const CASES = [
   ['moves', { see: '.card[data-card="moves"] .body' }],
   ['clock', { see: '.clock-settings #sel-clock' }],
   ['daily', { see: '.dailycard' }],
+  ['badges', { see: '.badges .bdgrid' }],
 ];
 // desktop: the one right panel, so Settings and Moves are tabs, not cards
 const DESKTOP_SEE = { settings: '#tp-settings #presets', scene: '#tp-settings #presets', moves: '#tp-play #moves', clock: '#tp-settings #sel-clock' };
@@ -112,6 +113,61 @@ try {
     }
     seen.errs.push(...watch.errs); seen.foreign.push(...watch.foreign);
     await page.close();
+  }
+  // the badge panel: ?open=badges shows the whole grid at both sizes, and a seeded badge gives one toast, once
+  for (const size of [SIZES[0], SIZES[1]]) {
+    const bp = await browser.newPage();
+    const bw = await watchPage(bp, ['127.0.0.1', 'localhost']);
+    await bp.setViewport({ width: size[1], height: size[2], deviceScaleFactor: 1, isMobile: size[3], hasTouch: size[3] });
+    // a clean slate on every load: no badges, no opening in My openings (the earlier pages of this run share the storage)
+    await bp.evaluateOnNewDocument((w, h, phone) => {
+      try { localStorage.removeItem('chess3d.badges'); localStorage.removeItem('chess3d.train'); localStorage.removeItem('chess3d.puzzles'); localStorage.removeItem('chess3d.daily'); } catch (e) { /* ignore */ }
+      if (phone) for (const [k, v] of [['width', w], ['height', h]]) Object.defineProperty(screen, k, { get: () => v });
+    }, size[1], size[2], size[3]);
+    for (const variant of ['a', 'b', 'c']) {
+      await load(bp, size, `&open=badges&variant=${variant}`);
+      const g = await bp.evaluate(() => {
+        const root = document.querySelector('.badges');
+        const cells = [...document.querySelectorAll('.badges .bdg')];
+        const art = cells.map((c) => c.querySelector('.bd').getBoundingClientRect());
+        const within = cells.every((c) => { const r = c.getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1; });
+        return { variant: root && root.dataset.variant, cells: cells.length, locked: cells.filter((c) => c.dataset.earned === 'false').length, fams: document.querySelectorAll('.badges .bdfam').length,
+          minArt: Math.round(Math.min(...art.map((r) => Math.min(r.width, r.height)))), within, svgs: document.querySelectorAll('.badges svg.bd').length, firstLeft: cells[0] && cells[0].querySelector('.bdsub').textContent };
+      });
+      R.expect(`${size[0]}: badges grid, variant ${variant}`, g.variant === variant && g.cells === 13 && g.locked === 13 && g.fams === 4 && g.svgs === 13 && g.minArt >= 44 && g.within, '13 locked badges in 4 families, art at least 44 px, inside the screen', JSON.stringify(g));
+    }
+    await load(bp, size, '&open=badges');
+    const t = await bp.evaluate(async () => {
+      const toast = document.getElementById('toast'), b = window.__chess.badges;
+      toast.textContent = ''; toast.classList.remove('show');
+      b.earn('daily-3');
+      await Promise.resolve(); await new Promise((r) => setTimeout(r, 30));
+      const first = { text: toast.textContent, shown: toast.classList.contains('show'), earned: document.querySelector('.bdg[data-id="daily-3"]')?.dataset.earned, fresh: document.querySelector('.bdg[data-id="daily-3"]')?.classList.contains('fresh') };
+      toast.textContent = ''; toast.classList.remove('show');
+      b.earn('daily-3'); b.evaluate();
+      await new Promise((r) => setTimeout(r, 30));
+      return { first, again: toast.textContent };
+    });
+    R.expect(`${size[0]}: a seeded badge shows one toast, with a glint, and not a second time`, t.first.text === 'New badge: 3 days in a row' && t.first.shown && t.first.earned === 'true' && t.first.fresh && t.again === '', 'toast once', JSON.stringify(t));
+    seen.errs.push(...bw.errs); seen.foreign.push(...bw.foreign);
+    await bp.close();
+  }
+  // a win at game over: mate in one against the computer records that level and gives the badge; two players give nothing
+  for (const [query, want] of [['the computer on (Easy)', { wins: ['easy'], earned: ['win-easy'] }], ['two players', { wins: [], earned: [] }]]) {
+    const wp = await browser.newPage();
+    await wp.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
+    await wp.evaluateOnNewDocument(() => { try { for (const k of ['chess3d.badges', 'chess3d.train', 'chess3d.puzzles', 'chess3d.daily']) localStorage.removeItem(k); } catch (e) { /* ignore */ } });
+    await load(wp, SIZES[0], `&fen=${encodeURIComponent('k7/8/1K6/8/8/8/8/7R w - - 0 1')}`);
+    const w = await wp.evaluate(async (vs) => {
+      const c = window.__chess, g = c.game;
+      if (vs) g.setVsComputer(true, { color: 'b', level: 'easy' });
+      g.clickSquare(g.nameSq('h1')); g.clickSquare(g.nameSq('h8'));
+      for (let i = 0; i < 12; i++) c.step(0.5);
+      await new Promise((r) => setTimeout(r, 100));
+      return { over: !!g.getState().over, wins: Object.keys(c.badges.store.wins()), earned: Object.keys(c.badges.store.earned()) };
+    }, query !== 'two players');
+    R.expect(`a mate in one, ${query}, ${want.wins.length ? 'records the win and earns the badge' : 'records nothing'}`, w.over && w.wins.join() === want.wins.join() && w.earned.join() === want.earned.join(), JSON.stringify(want), JSON.stringify(w));
+    await wp.close();
   }
   // combines with the other flags
   const page = await browser.newPage();

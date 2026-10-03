@@ -11,7 +11,7 @@ const KEY = 'chess3d.install-hint';
 const MAX_SHOWS = 3;       // the first time plus at most two reminders
 const SPACING = 3;         // visits between two showings
 const DELAY_MS = 2200;     // after the board is ready, so the first look is the board
-const FLAGS = ['quality', 'touch', 'light', 'preset', 'yaw', 'pitch', 'dist', 'gx', 'gy', 'gz', 'fen', 'moves', 'select', 'promo', 'ai', 'spin', 'hud', 'help', 'manual', 'diag', 'theme', 'view', 'intro', 'open', 'clock', 'daily'];
+const FLAGS = ['quality', 'touch', 'light', 'preset', 'yaw', 'pitch', 'dist', 'gx', 'gy', 'gz', 'fen', 'moves', 'select', 'promo', 'ai', 'spin', 'hud', 'help', 'manual', 'diag', 'theme', 'view', 'intro', 'open', 'clock', 'daily', 'variant'];
 const GOLD = '#d8b468';
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter','Segoe UI',system-ui,sans-serif";
 

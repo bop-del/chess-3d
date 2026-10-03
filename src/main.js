@@ -279,6 +279,24 @@ async function boot() {
   mountPuzzlesPanel({ puzzles, ui, progress: puzzleProgress, openPath: () => { if (learn.openPath) learn.openPath(); else { learn.show('puzzles'); ui.learnSheet?.open(); } } });
   const learn = mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress, reward });
   mountDailyCard({ daily, ui, game, puzzles, onStart: () => ui.closeSheets() });   // the card is hidden while Explain, Drill or a puzzle runs
+  // Badges (src/progress): earned from the puzzle path, the openings store, the daily streak and wins against the computer
+  const [{ createBadges, winLevel }, { mountBadgesPanel }, { LINES }] = await Promise.all([import('./progress/badges.js'), import('./progress/badges-panel.js'), import('./openings/lines.js')]);
+  // an opening is learned when it is in My openings or one of its cards has climbed above the first ladder step (best level 2 or more, dormant cards too)
+  let learnedCache = null;
+  store.onChange(() => { learnedCache = null; });
+  const badges = createBadges({
+    storage: puzzleStore,
+    sources: {
+      puzzles: () => Object.values(puzzleProgress.stats().solved).reduce((a, b) => a + b, 0),
+      openings: () => ({ learned: learnedCache ??= LINES.filter((l) => store.isAdopted(l.id) || store.cardsOf(l.id).some((c) => c.best >= 2)).length, total: LINES.length }),
+      daily: () => ({ best: daily.best() }),
+    },
+  });
+  badges.evaluate({ silent: true });   // old progress earns its badges without a toast
+  mountBadgesPanel({ badges, ui });
+  const lookAgain = () => badges.evaluate();
+  puzzleProgress.onChange(lookAgain); store.onChange(lookAgain); daily.onChange(lookAgain);
+  game.on('gameover', (over) => { const lv = winLevel(game.getState(), over, game.mode); if (lv) badges.recordWin(lv); });
   progress(0.98);
   await tick();
   // Good move?: one good move shown with its own arrow (it does not follow the Explain hint switch)
@@ -302,7 +320,7 @@ async function boot() {
   window.addEventListener('resize', onResize);
   if (device.touch) window.addEventListener('orientationchange', onResize);
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, daily, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
   window.__chess.clockUi = clockUi;
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
