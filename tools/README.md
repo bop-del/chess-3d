@@ -104,3 +104,5 @@ Writes `src/puzzles/data.js` from the Lichess puzzle database (CC0). Without `--
 - `phoneshots.mjs`: the phone shots and tap target audit (see Phone tier).
 - `release-check.mjs`: the release tier.
 - `render-assets.mjs`: renders the icons and the link preview (see Icons and link preview).
+
+`node tools/measure-load.mjs --a=<dist dir> --b=<dist dir> [--q=quality=high&intro=0] [--browsers=3] [--warm=3]` is a load time A/B of two built folders (navigation start to the board built, one cold run per fresh Chrome then warm runs, variants alternating, medians and ranges, texture memory). Run it on a quiet machine and print the load next to the numbers.
