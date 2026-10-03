@@ -29,7 +29,7 @@ const SAY = {
 };
 function sentence(s) {
   const m = s.message?.type;
-  if (m === 'solved') return s.clean ? t('puzzles.solved', 'Solved!') : t('puzzles.solvedLater', 'Solved. Play it again from the path for gold.');
+  if (m === 'solved') return s.clean || s.daily ? t('puzzles.solved', 'Solved!') : t('puzzles.solvedLater', 'Solved. Play it again from the path for gold.');
   const k = SAY[m];
   return k ? t(k[0], k[1]) : '';
 }

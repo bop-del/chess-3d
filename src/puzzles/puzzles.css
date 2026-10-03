@@ -62,3 +62,20 @@ body.phone .pzbadge { height: 34px; }
 .pzdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .pzdot.gold { background: #d8b468; } .pzdot.silver { background: #b8bdca; } .pzdot.next { background: #2a2412; border: 1.5px solid #d8b468; }
 @media (prefers-reduced-motion: reduce) { .pzwave .st circle.base, .st.next circle.halo { animation: none; } }
+
+/* the daily puzzle card: top of the Play tab on desktop, top of the Game section of the Menu sheet on a phone */
+.dailycard {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; margin-bottom: 12px; border-radius: 14px; flex: none;
+  border: 1px solid var(--line); background: radial-gradient(120% 90% at 50% 0%, rgba(216, 180, 104, 0.1), transparent 70%), rgba(255, 255, 255, 0.03);
+}
+.dailycard[hidden] { display: none; }
+.dailycard[data-state="done"] { border-color: rgba(216, 180, 104, 0.35); }
+.dchead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.dctitle { font-size: 15px; color: var(--gold); font-weight: 600; }
+.dcstreak { color: var(--dim); font-size: 12.5px; white-space: nowrap; }
+.dctheme { margin: 0; color: var(--text); font-size: 14px; }
+.dcfoot { display: flex; align-items: center; min-height: 40px; }
+.dcstart { width: 100%; min-height: 44px; font-size: 16px; }
+.dcdone { display: inline-flex; align-items: center; color: var(--gold); font-weight: 600; font-size: 14px; }
+.dcdone .pzdot { width: 12px; height: 12px; margin-right: 8px; vertical-align: 0; }
+body.phone .dailycard { margin-bottom: 10px; }

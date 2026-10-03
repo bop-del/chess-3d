@@ -7,7 +7,7 @@
 //   render budgets     draw calls, triangles, geometries, textures against tools/budgets.json (--write-budgets stores 1.5x measured)
 //   pixels             canvas not blank, no black frame, no white out, board region holds light and dark pixels, in every view preset
 //   fix checks         test/fixes.mjs runFixChecks({ page, baseUrl, log }) when that file exists
-//   puzzles            test/puzzles.mjs runPuzzleChecks: open, wrong move and retry, Help, solve, no repeat, band up and down, saved progress, phone strip
+//   puzzles            test/puzzles.mjs runPuzzleChecks and test/daily-page.mjs runDailyChecks (the daily card): open, wrong move and retry, Help, solve, no repeat, band up and down, saved progress, phone strip
 //   good move          test/goodmove.mjs runGoodMoveChecks: level select and memory, the arrow shows and clears, disabled while the computer thinks, in Explain and when over, the phone bulb
 //   game review        test/review.mjs runReviewChecks: the game over button, the strip filling in live, marked moves with the arrow and sentence, stepping, Details, German, closing, the phone layout
 //   drill              test/drill.mjs runDrillChecks: a scheduled session with a miss and a retry, a Practise run that changes no level, the end sweep
@@ -527,6 +527,19 @@ await guard('puzzle checks', async () => {
     ]);
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   } finally { await pp.close().catch(() => {}); }
+}, 'puzzles');
+await guard('daily puzzle checks', async () => {
+  const file = join(ROOT, 'test/daily-page.mjs');
+  const mod = await import(pathToFileURL(file).href + '?t=' + Date.now());
+  const dp = await browser.newPage();
+  try {
+    const shot = flag('shots') ? (name) => dp.screenshot({ path: join(SHOTS, `${name}.png`) }) : null;
+    const res = await Promise.race([
+      mod.runDailyChecks({ page: dp, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), shot }),
+      sleep(240000).then(() => { throw new Error('runDailyChecks timed out after 240 s'); }),
+    ]);
+    for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
+  } finally { await dp.close().catch(() => {}); }
 }, 'puzzles');
 await guard('learning bar checks (puzzles)', async () => {
   const mod = await import(pathToFileURL(join(ROOT, 'test/learnbar.mjs')).href + '?t=' + Date.now());

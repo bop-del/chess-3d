@@ -21,4 +21,7 @@ addDE({
   'puzzles.continue': 'Weiter', 'puzzles.nextChapter': 'Nächstes Kapitel',
   'puzzles.chapterDone': 'Kapitel {n} geschafft!', 'puzzles.levelDone': 'Kapitel {n} geschafft! Eine neue Stufe öffnet sich.',
   'puzzles.empty': 'Keine Rätsel verfügbar.',
+  'daily.title': 'Tagesrätsel', 'daily.start': 'Start', 'daily.done': 'Heute gelöst',
+  'daily.streak': '{n} Tage in Folge', 'daily.streak1': '1 Tag in Folge', 'daily.streak0': 'Starte deine Serie',
+  'daily.mark.g': 'ohne Hilfe gelöst', 'daily.mark.s': 'mit Hilfe gelöst', 'daily.best': 'Bestwert: {n}',
 });

@@ -14,7 +14,7 @@ const sqName = (sq) => 'abcdefgh'[sq & 7] + ((sq >> 3) + 1);
 const SETTLE = 0.8;
 const parseUci = (u) => ({ from: sqOf(u.slice(0, 2)), to: sqOf(u.slice(2, 4)), promo: u[4] || null });
 
-export function createPuzzles({ game, hint = null, sweep = null, progress, reward = null, onChapter = null, pause = 600, onSide = null }) {
+export function createPuzzles({ game, hint = null, sweep = null, progress, reward = null, onChapter = null, pause = 600, onSide = null, onDaily = null }) {
   const listeners = [];
   let puzzle = null;
   let phase = 'idle';        // idle | playing | solved
@@ -27,6 +27,7 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
   let allowed = false;       // the guard said yes to a player move that is about to arrive as a 'move' event
   let deviated = false;      // a mate in two was answered with another first move that still forces mate: the line is the engine's now
   let pendingDev = false;    // the guard accepted a deviating first move that has not been played yet
+  let isDaily = false;       // the open puzzle is the daily one: a solve goes to onDaily, the path marks are never touched
   let lastTo = null, lastDelay = 0;         // the square the player's last move went to: the decisive piece, where the reward bursts
 
   const total = () => (puzzle ? puzzle.moves.length : 0);
@@ -81,7 +82,7 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
   function state() {
     const d = due();
     return {
-      phase, puzzle, band: puzzle ? puzzle.band : progress.band(), theme: puzzle ? puzzle.theme : null,
+      phase, puzzle, daily: isDaily, band: puzzle ? puzzle.band : progress.band(), theme: puzzle ? puzzle.theme : null,
       ply, total: total(), message, misses, helped,
       clean: phase === 'solved' ? misses === 0 && !helped : null,
       own: ownColor(), canHelp: phase === 'playing' && !!d && isOwn(ply) && !helped,
@@ -120,7 +121,8 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
     wait = null;
     say('solved');
     hideHint();
-    progress.finish(puzzle.id, { clean: misses === 0 && !helped });
+    if (isDaily) onDaily?.(misses === 0 && !helped);
+    else progress.finish(puzzle.id, { clean: misses === 0 && !helped });
     emit();
     // the gold sweep runs from the player's edge over the player's own pieces, the same call as in the Drill
     const side = ownColor(), squares = [];
@@ -129,7 +131,7 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
     // the reward: a burst on the decisive piece, the chime and the card with its Next button. A puzzle that needed misses or
     // Help gets the silver one, the same as its station will.
     // a solve that finishes a chapter goes on to the board finale and then onChapter (main.js opens the Learn path)
-    const fin = progress.stats().finished;
+    const fin = isDaily ? null : progress.stats().finished;
     const chapter = fin && onChapter ? { onDone: () => onChapter(fin) } : null;
     reward?.solved?.({ square: lastTo, silver: misses > 0 || helped, delay: lastDelay + SETTLE, theme: puzzle.theme, onNext: () => ctl.next(), chapter, onStart: sweepNow });
     if (!reward) sweepNow();
@@ -211,12 +213,21 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
     start() {
       const p = progress.next();
       if (!p) return false;
+      isDaily = false;
+      load(p);
+      return true;
+    },
+    // The daily puzzle (src/puzzles/daily.js): the same controller, but the path is left alone. A solve calls onDaily(clean)
+    // instead of progress.finish, and skipping or stopping it marks no station.
+    startDaily(p) {
+      if (!p) return false;
+      isDaily = true;
       load(p);
       return true;
     },
     // After a solved puzzle: the same as start. During a puzzle: skip it, which counts as not yet.
     next() {
-      if (phase === 'playing' && puzzle) progress.finish(puzzle.id, { clean: false });
+      if (phase === 'playing' && puzzle && !isDaily) progress.finish(puzzle.id, { clean: false });
       return this.start();
     },
     // The gold arrow for the due move. The puzzle then counts as not yet.
@@ -231,10 +242,10 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
     // Back to the ordinary game on a fresh board.
     stop() {
       if (phase === 'idle') return;
-      if (phase === 'playing' && puzzle && (misses || helped)) progress.finish(puzzle.id, { clean: false });
+      if (phase === 'playing' && puzzle && !isDaily && (misses || helped)) progress.finish(puzzle.id, { clean: false });
       hideHint();
       reward?.dismiss?.();
-      phase = 'idle'; puzzle = null; wait = null; message = null; misses = 0; helped = false;
+      phase = 'idle'; puzzle = null; isDaily = false; wait = null; message = null; misses = 0; helped = false;
       internal++;
       game.setMode('play');
       game.newGame({ instant: true });

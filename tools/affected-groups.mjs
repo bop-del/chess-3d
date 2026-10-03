@@ -44,6 +44,7 @@ export const MAP = [
   [/^test\/blocks-chars-page\.mjs$/, ['blocks chars']],
   [/^test\/blocks-fixes-page\.mjs$/, ['blocks fixes']],
   [/^test\/open-flag\.mjs$/, ['open']],
+  [/^test\/daily-page\.mjs$/, ['puzzles']],
 ];
 
 // test files that belong to a group of another name

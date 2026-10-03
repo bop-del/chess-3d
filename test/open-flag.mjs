@@ -45,6 +45,7 @@ const CASES = [
   ['music', { see: '.music-settings [data-music-on]' }],
   ['scene', { see: '.card[data-card="scene"] .body' }],
   ['moves', { see: '.card[data-card="moves"] .body' }],
+  ['daily', { see: '.dailycard' }],
 ];
 // desktop: the one right panel, so Settings and Moves are tabs, not cards
 const DESKTOP_SEE = { settings: '#tp-settings #presets', scene: '#tp-settings #presets', moves: '#tp-play #moves' };

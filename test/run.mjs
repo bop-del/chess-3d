@@ -55,6 +55,7 @@ if (tier === 'fast' || tier === 'all') {
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
   run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
   run('puzzle controller (test/puzzle-controller.mjs)', 'test/puzzle-controller.mjs');
+  run('daily puzzle and streak (test/daily.mjs)', 'test/daily.mjs');
   run('puzzle data is legal and solvable (test/puzzles-data.mjs)', 'test/puzzles-data.mjs');
   run('music data and logic (test/music.mjs)', 'test/music.mjs');
   run('novice level (test/novice.mjs)', 'test/novice.mjs');

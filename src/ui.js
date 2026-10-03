@@ -733,26 +733,35 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     return element;
   }
 
+  // The daily puzzle card (src/puzzles/daily-card.js): the top of the Play tab on desktop, the top of the Game section on a phone.
+  function mountDaily(element) {
+    const host = dsk ? hud.querySelector('#tp-play') : hud.querySelector('.card[data-card="game"] .body');
+    host?.prepend(element);
+    translateTree(element);
+    return host;
+  }
+
   // ?open=: show one panel and make it usable. Phone: the Menu sheet with that card open. Desktop: the panel tab shown and scrolled
   // into view. 'settings' is the Scene card (or the Menu sheet itself on a phone), 'music' the music block inside it.
   // Returns false for an id that is not a panel here.
   function openPanel(id) {
-    const PANELS = { settings: 'scene', menu: 'scene', scene: 'scene', music: 'scene', moves: 'moves', openings: 'openings', drill: 'drill', puzzles: 'puzzles' };
+    const PANELS = { settings: 'scene', menu: 'scene', scene: 'scene', music: 'scene', moves: 'moves', daily: 'daily', openings: 'openings', drill: 'drill', puzzles: 'puzzles' };
     if (!Object.hasOwn(PANELS, id)) return false;
     const card = PANELS[id];
     if (phoneUI) {
+      if (card === 'daily') { phoneUI.openCard('game'); hud.querySelector('.dailycard')?.scrollIntoView?.({ block: 'nearest' }); return true; }
       if (card === 'openings') return false;   // phone: the Learn sheet, opened by src/learn
       if (!phoneUI.openCard(id === 'menu' ? null : card)) return false;
     } else if (dsk) {
       // desktop: the panel tab that holds it (Moves on Play, the learning cards on Learn, the rest on Settings), unfolded from the rail
-      dsk.setTab(card === 'moves' ? 'play' : card === 'scene' ? 'settings' : 'learn');
+      dsk.setTab(card === 'moves' || card === 'daily' ? 'play' : card === 'scene' ? 'settings' : 'learn');
       if (dsk.rail) dsk.setRail(false, { persist: false });
     } else {
       const c = hud.querySelector(`.card[data-card="${card}"]`);
       if (!c) return false;
       c.classList.remove('collapsed');
     }
-    const target = id === 'music' ? hud.querySelector('.music-settings') : id === 'moves' && dsk ? hud.querySelector('#moves') : hud.querySelector(`.card[data-card="${card}"]`);
+    const target = id === 'daily' ? hud.querySelector('.dailycard') : id === 'music' ? hud.querySelector('.music-settings') : id === 'moves' && dsk ? hud.querySelector('#moves') : hud.querySelector(`.card[data-card="${card}"]`);
     target?.scrollIntoView?.({ block: id === 'music' ? 'start' : 'nearest' });
     if (dsk) setTimeout(() => target?.scrollIntoView?.({ block: id === 'music' ? 'start' : 'nearest' }), 450);   // again once the panel has unfolded and settled
     return true;
@@ -762,5 +771,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   /** px at the bottom of the canvas that something floating covers (the review strip): the desktop camera fits the board above it */
   function setBottomInset(px) { px = Math.max(0, Math.round(px)); if (px === deskBottom) return; deskBottom = px; if (dsk) deskFrame(); }
 
-  return { sync, toast, setBottomInset, toggleHud, toggleHelp, render, mountPanel, mountSettings, openPanel, learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  return { sync, toast, setBottomInset, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }

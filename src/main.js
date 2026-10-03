@@ -252,8 +252,9 @@ async function boot() {
     import('./openings/explain-panel.js'), import('./train/store.js'), import('./train/sweep.js'),
     import('./train/drill.js'), import('./train/drill-panel.js'), import('./learn/learn.js'),
   ]);
-  const [{ createPuzzles }, { createPuzzleProgress }, { PUZZLES }, { mountPuzzlesPanel }, { createReward }] = await Promise.all([
+  const [{ createPuzzles }, { createPuzzleProgress }, { PUZZLES }, { mountPuzzlesPanel }, { createReward }, { createDaily }, { mountDailyCard }] = await Promise.all([
     import('./puzzles/controller.js'), import('./puzzles/progress.js'), import('./puzzles/data.js'), import('./puzzles/panel.js'), import('./puzzles/reward.js'),
+    import('./puzzles/daily.js'), import('./puzzles/daily-card.js'),
   ]);
   // Train and Learn: the store (localStorage), the gold sweep, the drill, and the Learn UI over them
   const store = createStore({});
@@ -266,11 +267,14 @@ async function boot() {
   try { puzzleStore = window.localStorage; } catch (e) { /* storage blocked: progress lives for the session */ }
   const puzzleProgress = createPuzzleProgress({ storage: puzzleStore, puzzles: PUZZLES });
   const reward = createReward({ gimbal, sfx });   // the burst, chime and card of a solve, and the chapter wave (ticked by the controller)
-  puzzles = createPuzzles({ game, hint: openings.hint, sweep, progress: puzzleProgress, reward, onSide: openings.onSide,
+  // the daily puzzle: chosen by the (UTC) date, the streak per device; ?daily=YYYY-MM-DD sets the date for tests
+  const daily = createDaily({ storage: puzzleStore, puzzles: PUZZLES, override: params.get('daily') });
+  puzzles = createPuzzles({ game, hint: openings.hint, sweep, progress: puzzleProgress, reward, onSide: openings.onSide, onDaily: (clean) => daily.finish(clean),
     // a finished chapter: after the board finale the puzzle closes and the Learn path opens on the next chapter
     onChapter: () => { puzzles.stop(); puzzleProgress.ack(); learn.openPath(); } });
   mountPuzzlesPanel({ puzzles, ui, progress: puzzleProgress, openPath: () => { if (learn.openPath) learn.openPath(); else { learn.show('puzzles'); ui.learnSheet?.open(); } } });
   const learn = mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress, reward });
+  mountDailyCard({ daily, ui, game, puzzles, onStart: () => ui.closeSheets() });   // the card is hidden while Explain, Drill or a puzzle runs
   progress(0.98);
   await tick();
   // Good move?: one good move shown with its own arrow (it does not follow the Explain hint switch)
@@ -294,7 +298,7 @@ async function boot() {
   window.addEventListener('resize', onResize);
   if (device.touch) window.addEventListener('orientationchange', onResize);
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, reward, goodMove, review, themes, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, daily, reward, goodMove, review, themes, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 

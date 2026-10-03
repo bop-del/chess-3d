@@ -261,5 +261,37 @@ const two = [sample, ...PUZZLES.filter((p) => p.id !== sample.id).slice(0, 6)];
   ok('an ordinary solve has no chapter finale', !calls[calls.length - 1].chapter);
 }
 
+// ---- the daily puzzle: the same controller, the path is never touched
+{
+  const done = [];
+  const r = rig(two, { onDaily: (clean) => done.push(clean) });
+  const before = JSON.stringify(r.progress.exportData()) + JSON.stringify(r.progress.stats());
+  ok('startDaily needs a puzzle', r.ctl.startDaily(null) === false);
+  r.ctl.startDaily(sample);
+  ok('startDaily opens that puzzle, flagged daily', r.ctl.state().phase === 'playing' && r.ctl.state().puzzle.id === sample.id && r.ctl.state().daily === true && r.ctl.state().ply === 1);
+  solve(r, sample);
+  ok('a daily solve calls onDaily(true) once and marks no station', r.ctl.state().phase === 'solved' && done.join() === 'true' && JSON.stringify(r.progress.exportData()) + JSON.stringify(r.progress.stats()) === before);
+  r.ctl.stop();
+  ok('stop clears the daily flag', r.ctl.state().daily === false);
+  // misses: not clean; skipping and stopping mark nothing
+  const r2 = rig(two, { onDaily: (clean) => done.push(clean) });
+  const b2 = JSON.stringify(r2.progress.exportData());
+  r2.ctl.startDaily(sample);
+  const right = uci(sample.moves[1]);
+  const wrong = r2.game.chess.moves().find((m) => !(sqName(m.from) === right[0] && sqName(m.to) === right[1]) && !/#$/.test(r2.game.chess.san(m)));
+  r2.game.tap(sqName(wrong.from), sqName(wrong.to), wrong.promo);
+  solve(r2, sample);
+  ok('a daily solve after a miss calls onDaily(false)', done.join() === 'true,false' && JSON.stringify(r2.progress.exportData()) === b2);
+  const r3 = rig(two, { onDaily: (c) => done.push(c) });
+  r3.ctl.startDaily(sample);
+  r3.game.tap(sqName(wrong.from), sqName(wrong.to), wrong.promo);
+  r3.ctl.stop();
+  ok('stopping a daily after a miss marks no station and tells onDaily nothing', JSON.stringify(r3.progress.exportData()) === JSON.stringify({ v: 2, marks: {} }) && done.length === 2);
+  const r4 = rig(two, { onDaily: (c) => done.push(c) });
+  r4.ctl.startDaily(sample);
+  r4.ctl.next();
+  ok('skipping the daily goes on with the path, marks nothing and is no longer daily', r4.ctl.state().daily === false && JSON.stringify(r4.progress.exportData().marks) === '{}');
+}
+
 console.log(failed ? `\n${failed} failed` : '\nall puzzle controller checks passed');
 process.exit(failed ? 1 : 0);
