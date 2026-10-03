@@ -142,6 +142,13 @@ A named camera and gimbal arrangement that can be picked in one step, such as a
 side-on or top-down view.
 _Avoid_: camera mode, angle, layout
 
+**Symbol view**:
+The easy view "Symbols" (German "Symbole"): every piece is drawn as a flat chess
+diagram symbol, as in chess books, printed on its square, on a plain board with
+flat square colours from the current theme. Free orbit, no battle scenes. The
+symbols are drawn as paths in code, not text characters.
+_Avoid_: glyph view, icon view, 2D mode
+
 **Quality tier**:
 A named level of rendering detail (for example low) trading looks for speed on
 weaker devices.

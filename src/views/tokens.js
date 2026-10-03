@@ -203,15 +203,16 @@ export function createTokens({ gimbal, game, materials, stage = null }) {
     group.userData.token = token;
     tops.add(token);
   }
-  function body(group, show) {                   // the 3D piece: everything but the pick cylinder and the token
-    for (const ch of group.children) if (!ch.userData.hit && ch.name !== 'token') ch.visible = show;
+  function body(group, show) {                   // the 3D piece: everything but the pick cylinder, the token and a symbol (views/symbols.js)
+    group.userData.tokenHid = !show;
+    for (const ch of group.children) if (!ch.userData.hit && ch.name !== 'token' && ch.name !== 'symbol') ch.visible = show;
   }
   function apply(group) {
     attach(group);
     const t = group.userData.token;
     if (!t) return;
     t.visible = on;
-    body(group, !on);
+    if (on || group.userData.tokenHid) body(group, !on);   // off: leave the body alone unless the tokens hid it (the Symbols view hides it too)
   }
   const eachPiece = (fn) => { for (const ch of root.children) if (ch.userData?.piece) fn(ch); };
 

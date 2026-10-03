@@ -1,6 +1,6 @@
 // Views: the named camera setups the player chooses from (Views button, preset buttons, keys 1 to 5, ?view=). One list is the
 // single source. A view has a kind: 'preset' (a perspective camera preset), 'easy' (style T Tokens: flat top view with turned
-// discs, style V From above: perspective at 65 degrees with the real pieces, style B Easy 3D: steep orthographic) or 'play' (the phone portrait play view: perspective, close, with the follow camera of src/views/play.js).
+// discs, style V From above: perspective at 65 degrees with the real pieces, style B Easy 3D: steep orthographic, style S Symbols: flat chess diagram symbols on a plain board, perspective at 65 degrees, free orbit) or 'play' (the phone portrait play view: perspective, close, with the follow camera of src/views/play.js).
 // The choice is remembered per device under localStorage 'chess3d.view'. See docs/ARCHITECTURE.md (Views).
 import { DE } from '../i18n.js';
 
@@ -14,6 +14,7 @@ export const VIEWS = [
   { id: 'side', label: 'Side', kind: 'preset' },
   { id: 'iso', label: 'Isometric', kind: 'preset' },
   { id: 'tokens', label: 'Tokens', kind: 'easy', style: 'T', pitch: 89.6 * DEG, lock: true },
+  { id: 'symbols', label: 'Symbols', kind: 'easy', style: 'S', pitch: 65 * DEG, persp: true },
   { id: 'above', label: 'From above', kind: 'easy', style: 'V', pitch: 65 * DEG, lock: true, persp: true },
   { id: 'easy-3d', label: 'Easy 3D', kind: 'easy', style: 'B', pitch: 62 * DEG },
   { id: 'play', label: 'Play', kind: 'play', when: 'phone-portrait', dist: 10.3, pitch: 40 },
@@ -25,7 +26,7 @@ export const PIECE_SCALE_B = 1.15;
 // 'Von oben' is the name of From above, so the Top down preset is called Draufsicht in German
 Object.assign(DE, {
   'preset.Top down': 'Draufsicht', 'preset.Tokens': 'Spielsteine', 'preset.From above': 'Von oben', 'preset.Easy 3D': 'Einfach 3D',
-  'preset.Play': 'Spielansicht',
+  'preset.Play': 'Spielansicht', 'preset.Symbols': 'Symbole',
 });
 // A stored id from before Tokens existed
 const MIGRATE = Object.assign(Object.create(null), { 'easy-flat': 'tokens' });
@@ -40,8 +41,8 @@ export function createViews({ controls, stage, game, board, device }) {
   const listeners = [];
   const phonePortrait = () => !!device.phone && !!device.portrait;
   const available = (v) => !v.when || (v.when === 'phone-portrait' && phonePortrait());
-  // On a phone in portrait the cycle starts with the easy views: Play, Tokens, From above, Easy 3D, then the presets
-  const EASY_FIRST = ['play', 'tokens', 'above', 'easy-3d'];
+  // On a phone in portrait the cycle starts with the easy views: Play, Tokens, Symbols, From above, Easy 3D, then the presets
+  const EASY_FIRST = ['play', 'tokens', 'symbols', 'above', 'easy-3d'];
   const list = () => {
     const l = VIEWS.filter(available);
     if (!phonePortrait()) return l;

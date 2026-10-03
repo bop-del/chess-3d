@@ -99,6 +99,22 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
     await step(page, 0.3);
     ok('learn: stopping the run restores the tabs', (await count(page, '.xtab')) === 4 && lvl.length > 0);
 
+    // the Symbols view: a line walks in Explain with the symbols on, the hint arrow is drawn over them (render order above the symbols)
+    await tapTab(page, 'openings');
+    await page.evaluate(() => { window.__chess.views.set('symbols', { remember: false, instant: true }); document.querySelector('.xline.openings[data-id="italian-game"]').click(); });
+    await step(page, 1.5);
+    const sy = await page.evaluate(() => {
+      const c = window.__chess, arrows = [];
+      c.gimbal.children.forEach((o) => { if (o.name === 'move-hint' && o.visible) o.traverse((m) => { if (m.isMesh) arrows.push(m.renderOrder); }); });
+      const sym = c.game.root.children.filter((g) => g.userData.piece && g.userData.sym?.visible).length;
+      return { on: c.symbols.visible, sym, walking: c.openings.explain.state().phase, arrows: Math.min(...arrows, 99), sym_order: c.game.root.children.find((g) => g.userData.sym)?.userData.sym.children[0].renderOrder };
+    });
+    ok('learn: Explain walks a line in the Symbols view, symbols on', sy.on && sy.sym === 32 && sy.walking === 'walking', JSON.stringify(sy));
+    ok('learn: the hint arrow is drawn above the symbols', sy.arrows > sy.sym_order, JSON.stringify(sy));
+    await snap(page, 'learn-symbols-explain');
+    await page.evaluate(() => { window.__chess.openings.explain.stop(); window.__chess.views.set('white', { remember: false, instant: true }); });
+    await step(page, 0.3);
+
     // due cards: one button
     await page.evaluate(() => { const st = window.__chess.train.store; const s = JSON.parse(st.exportJSON()); for (const c of Object.values(s.cards)) c.due = 0; st.importJSON(JSON.stringify(s)); });
     await tapTab(page, 'practise');
