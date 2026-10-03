@@ -233,7 +233,7 @@ async function boot() {
   };
   let t = 0;
   // the frame loop runs the whole game from here on (the modules that follow are optional in it until they exist)
-  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); tokens.sync(); symbols.sync(); battle?.update(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); tokens.sync(); symbols.sync(); themes.update(dt); battle?.update(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   advance(0.001);   // the Play view's first focus and the HUD measure land in the camera now
   intro?.boardGo();
   intro?.setTarget(0.95);

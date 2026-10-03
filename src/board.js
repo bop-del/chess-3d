@@ -446,7 +446,12 @@ export function createBoard() {
       if (lightMesh.castShadow !== cast) lightMesh.castShadow = darkMesh.castShadow = cast;
     },
     /** spec: { squaresLight, squaresDark, frame, inlay, gold, plinth, labels } property specs (see themes/apply.js), null = classic */
-    applyTheme(spec) { skin.apply(spec); },
+    applyTheme(spec) {
+      skin.apply(spec);
+      // a theme with its own board (Blocks) hides the classic meshes; labels may be lifted onto its frame
+      for (const m of [lightMesh, darkMesh, frameMesh, mapleMesh, goldMesh, plinthMesh, feltMesh]) m.visible = !spec?.hide;
+      labelsW.position.y = labelsB.position.y = spec?.labelLift || 0;
+    },
     squareCenter(file, rank) { return new THREE.Vector3(file - 3.5, 0, 3.5 - rank); },
     setHighlights(list) { hl.set(list); },
     clearHighlights() { hl.set([]); },

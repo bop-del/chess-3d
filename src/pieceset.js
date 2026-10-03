@@ -19,6 +19,10 @@ const tick = () => document.hidden ? Promise.resolve() : new Promise((res) => {
 export function createPieceSet(materials) {
   const protos = new Map();
   const heights = new Map();
+  // A piece style (the Blocks theme) replaces the lathe pieces with its own: { make(type, color) -> inner group, height(type, color),
+  // warm(type, color), update(dt, root), dispose() }. null is the classic set, whose pieces only change materials per theme.
+  let style = null;
+  const innerTurn = (type, color) => (color === 'b' && type !== 'n' ? Math.PI : 0);
   const dias = new Map();       // base diameter (the wider of the two footprint sides), board units
 
   // Geometry does not depend on color, so only white is built. Black is a clone that shares the geometry and swaps the
@@ -61,16 +65,33 @@ export function createPieceSet(materials) {
     // Returns a fresh Group: outer wrapper (game owns position/scale), inner clone (black rotated by PI, except knights, which the game turns by file).
     make(type, color) {
       const wrap = new THREE.Group();
-      const inner = proto(type, color).clone(true);
-      inner.rotation.y = color === 'b' && type !== 'n' ? Math.PI : 0;
+      const inner = style ? style.make(type, color) : proto(type, color).clone(true);
+      inner.rotation.y = innerTurn(type, color);
       wrap.add(inner);
       wrap.name = `${color}${type}`;
       wrap.userData.piece = { type, color };
-      wrap.userData.height = heights.get(type + color);
+      wrap.userData.style = style ? style.id : null;
+      wrap.userData.height = style ? style.height(type, color) : heights.get(type + color);
       wrap.userData.dia = dias.get(type + color);
       return wrap;
     },
-    height(type, color) { proto(type, color); return heights.get(type + color); },
+    height(type, color) { if (style) return style.height(type, color); proto(type, color); return heights.get(type + color); },
+    get style() { return style; },
+    setStyle(next) { if (next === style) return; const old = style; style = next || null; old?.dispose?.(); },
+    // The style changed under a piece that is already on the board: swap its inner group (keeps the turn), returns the new height.
+    restyle(wrap) {
+      const { type, color } = wrap.userData.piece;
+      const old = wrap.children[0];
+      const inner = style ? style.make(type, color) : proto(type, color).clone(true);
+      inner.rotation.y = old ? old.rotation.y : innerTurn(type, color);
+      old?.removeFromParent();
+      wrap.userData.style = style ? style.id : null;
+      wrap.add(inner);
+      wrap.children.unshift(wrap.children.pop());   // the inner group stays children[0]: the game, the scenes and picking rely on it
+      wrap.userData.height = style ? style.height(type, color) : heights.get(type + color) ?? this.height(type, color);
+      return wrap.userData.height;
+    },
+    update(dt, root) { style?.update?.(dt, root); },
     // Builds all 12 prototypes, yielding to the event loop between each so the loader can animate.
     async buildAll(onProgress) {
       let i = 0;
@@ -79,7 +100,7 @@ export function createPieceSet(materials) {
         for (const type of TYPES) {
           onProgress?.(i / total, `Turning ${color === 'w' ? 'ivory' : 'ebony'} ${NAMES[type]}`);
           await tick();
-          proto(type, color);
+          if (style) style.warm?.(type, color); else proto(type, color);
           i++;
         }
       }

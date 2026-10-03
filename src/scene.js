@@ -461,7 +461,7 @@ export function createStage(canvas, opts = {}) {
   aoDecal.renderOrder = 0.5;
   scene.add(aoDecal);
 
-  let floorVisibility = 1;
+  let floorVisibility = 1, floorWanted = 1, floorHidden = false;   // wanted: the views; hidden: a theme with a floating world (Blocks)
   function applyFloorVisibility() {
     const t = floorVisibility;
     floor.visible = t > 0.003;
@@ -673,9 +673,15 @@ export function createStage(canvas, opts = {}) {
   const qualityListeners = [];
 
   function setFloorVisibility(t) {
-    floorVisibility = Math.min(1, Math.max(0, t));
+    floorWanted = Math.min(1, Math.max(0, t));
+    floorVisibility = floorHidden ? 0 : floorWanted;
     applyFloorVisibility();
     floorUniforms.reflStrength.value = cfg.reflection > 0 ? cur.reflection * floorVisibility : 0;
+  }
+
+  function setFloorHidden(h) {
+    floorHidden = !!h;
+    setFloorVisibility(floorWanted);
   }
 
   function setQuality(q) {
@@ -801,7 +807,7 @@ export function createStage(canvas, opts = {}) {
     setProjection, setOrthoSize,
     lights: { key, fill, rim },
     lightingPresets,
-    setLightingPreset, setThemeLight, setDim, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, dispose,
+    setLightingPreset, setThemeLight, setFloorHidden, setDim, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, dispose,
     // extras (beyond the contract, harmless)
     get quality() { return quality; },
     get lightingPreset() { return currentName; },

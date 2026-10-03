@@ -71,8 +71,8 @@ export function createDirector({ game, controls, stage, ui }) {
   const sceneCache = new Map();
 
   // ------------------------------------------------------------ loading
-  async function loadScene(type) {
-    const name = NAMES[type];
+  async function loadScene(type, style) {
+    const name = style === 'blocks' ? 'blocks' : NAMES[type];     // the Blocks theme has one scene of its own: the victim falls into cubes
     if (sceneCache.has(name)) return sceneCache.get(name);
     const load = SCENES[`./scenes/${name}.js`];
     let mod = null;
@@ -140,7 +140,7 @@ export function createDirector({ game, controls, stage, ui }) {
 
     try {
       const sub = { short };
-      const [mod, fx, sfx] = await Promise.all([loadScene(info.attacker), loadFx({ ...sub, signal: r.ac.signal }), loadSfx()]);
+      const [mod, fx, sfx] = await Promise.all([loadScene(info.attacker, info.victimObj.group.userData.style), loadFx({ ...sub, signal: r.ac.signal }), loadSfx()]);
       r.fx = fx.fx; r.fxRaw = fx.raw; r.sfx = sfx;
       if (r.ac.signal.aborted) return;
       if (sfx) sfx.sceneActive = true;

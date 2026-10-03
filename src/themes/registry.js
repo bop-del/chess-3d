@@ -2,6 +2,8 @@
 // exports { board(ctx), pieces(ctx), light(ctx) }:
 //   board(ctx)  -> { squaresLight, squaresDark, frame, inlay, gold, plinth, labels, tray } property specs (themes/apply.js)
 //   pieces(ctx) -> { white: { body, accent }, black: { body, accent }, dark } property specs, or null for the classic pieces
+//   world(ctx)  -> { group, update(dt), dispose() } an optional scene of its own (the Blocks island), added to the gimbal
+//   pieceStyle(ctx) -> a piece style for pieceSet.setStyle (block characters), or absent
 //   light(ctx)  -> { preset, key, fill, rim, exposure, env, floor, bg, post } (see stage.setThemeLight), or null
 // ctx = { THREE, quality, base, track(texture) }. Every texture a theme builds goes through track(): it is disposed when the theme
 // is left, so ten switches leave no textures behind. Classic is today's look: no module, nothing built.
@@ -15,12 +17,14 @@ export const THEMES = [
   { id: 'wood', label: { en: 'Wood', de: 'Holz' }, swatch: ['#efc687', '#6a2b1c'] },
   { id: 'metal', label: { en: 'Metal', de: 'Metall' }, swatch: ['#d9a640', '#9aa1ac'] },
   { id: 'glass', label: { en: 'Glass', de: 'Glas' }, swatch: ['#9fd0ff', '#3a4250'] },
+  { id: 'blocks', label: { en: 'Blocks', de: 'Blöcke' }, swatch: ['#62b43a', '#4b515e'] },
 ];
 const LOADERS = {
   tournament: () => import('./tournament.js'),
   wood: () => import('./wood.js'),
   metal: () => import('./metal.js'),
   glass: () => import('./glass.js'),
+  blocks: () => import('./blocks.js'),
 };
 const STORE = 'chess3d.theme';
 
@@ -50,6 +54,7 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
   };
 
   let current = 'classic';
+  let world = null;   // the theme's own scene (Blocks island), in the gimbal
   let tracked = [];
   let want = 'classic';
   let chain = Promise.resolve();
@@ -60,14 +65,20 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
     const fresh = [];
     const ctx = { THREE, quality: stage.quality, base: board.base, track: (tex) => { fresh.push(tex); return tex; } };
     const b = mod?.board?.(ctx) || null;
-    return { fresh, board: b, pieces: mod?.pieces?.(ctx) || null, light: mod?.light?.(ctx) || null };
+    return { fresh, board: b, pieces: mod?.pieces?.(ctx) || null, pieceStyle: mod?.pieceStyle?.(ctx) || null, world: mod?.world?.(ctx) || null, light: mod?.light?.(ctx) || null };
   }
 
   function show(id, built) {
     const old = tracked;
     tracked = built.fresh;
     board.applyTheme(built.board);
+    pieceSet.setStyle?.(built.pieceStyle || null);
     pieceSkin.apply(built.pieces);
+    game?.restyle?.();
+    if (world) { world.group.parent?.remove(world.group); world.dispose(); }
+    world = built.world;
+    if (world) board.group.parent?.add(world.group);
+    stage.setFloorHidden?.(!!built.light?.noFloor);
     traySpec = built.board?.tray ? { tray: built.board.tray } : null;
     trayMaterial()?.apply(traySpec);
     stage.setThemeLight(built.light);
@@ -108,6 +119,8 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
     on(fn) { listeners.push(fn); },
     /** the game was created after the theme was turned on: give its trays the theme too */
     attachGame(g) { game = g; if (traySpec) trayMaterial()?.apply(traySpec); },
+    /** per frame: the theme's own scene (water, clouds) */
+    update(dt) { world?.update(dt); },
     get textureCount() { return tracked.length; },
   };
 }

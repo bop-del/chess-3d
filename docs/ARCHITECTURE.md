@@ -106,7 +106,7 @@ Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.
 ### Themes: `src/themes/`
 
     createThemes({ stage, board, pieceSet, materials, game = null }) -> { list(), current(), set(id, { persist }), on(fn), attachGame(game), textureCount }
-    THEMES                       // [{ id, label: { en, de }, swatch: [hex, hex] }] classic, tournament, wood, metal, glass
+    THEMES                       // [{ id, label: { en, de }, swatch: [hex, hex] }] classic, tournament, wood, metal, glass, blocks
     mountSwatches({ themes, ui })  // the swatch row, first in the Scene card (the Menu sheet on a phone)
     createSkin(materials) -> { apply(specs | null) }   // themes/apply.js
 
@@ -114,13 +114,21 @@ A theme is one bundle: board squares, frame, inlay, pieces, tray and lighting. T
 
     board(ctx)  -> { squaresLight, squaresDark, frame, inlay, gold, plinth, labels, tray }   // property specs
     pieces(ctx) -> { white: { body, accent }, black: { body, accent }, dark }                // from pieces-<id>.js
-    light(ctx)  -> { preset, key, fill, rim, exposure, env, floor, bg: { top, bottom, glow, glowAmount }, post: { bloom, vignette, tint } }
+    light(ctx)  -> { preset, key, fill, rim, exposure, env, floor, bg: { top, bottom, glow, glowAmount }, post: { bloom, vignette, tint }, noFloor }
+    world(ctx)  -> { group, update(dt), dispose() }    // optional: a scene of its own, added to the gimbal (Blocks)
+    pieceStyle(ctx) -> a style for pieceSet.setStyle (Blocks characters), or absent
 
 `ctx = { THREE, quality, base, track(texture) }`. A spec is plain data: scalars as they are, colours as `'#hex'`, `normalScale` as a number, maps as textures, `null` clears a map. `base` holds the classic maps (maple, walnut, black marble) a theme may reuse, so no second copy is made. The materials are shared by all squares and pieces, so applying a spec changes the board, every piece and the captured pieces in the trays at once. `createSkin` snapshots a material's classic values when it is created and every `apply` starts from that snapshot, so a theme never inherits the one before it. The tray slabs are found by mesh name (`tray-slab`) and skinned the same way; the tray trim is the white accent piece material.
 
 `set(id)` builds the next theme's specs, applies them, then disposes the textures the previous theme registered through `track()`, so ten switches leave the renderer at its baseline (`test/themes.mjs` checks `renderer.info.memory`). Picks are queued and the last one wins. `set(id, { persist: false })` is for the `?theme=` flag: this load only. Otherwise the id is stored in `localStorage` `chess3d.theme` and read at the next start (an unknown value means Classic). The lighting goes through `stage.setThemeLight`, which starts the usual animated transition towards the theme's state. Picking a lighting preset in the Scene card afterwards replaces the theme's lighting but keeps its materials; Classic returns to the preset the player picked.
 
 Glass uses real transmission only on the High quality tier (one extra scene pass); Low and Medium get an opaque tinted clearcoat. A quality change while a theme is on rebuilds that theme. Metal keeps bloom at 0.05 or below, because the mirror like metals blow out white above that. `game` may be null at first (the start sequence turns the theme on before the game exists): `attachGame(game)` hands it over later, and the tray material is skinned then. The Tokens view and the battle scenes keep their own materials.
+
+**Blocks** (`src/themes/blocks.js`, files in `src/themes/blocks/`) is the one theme that brings geometry. `board()` returns `hide: true`, which makes `board.applyTheme` hide the classic squares, frame, inlay, gold, plinth and felt (the 64 pick planes and the highlight overlay stay), and `labelLift`, which raises the file and rank labels onto the plank frame; `tray` colours the tray slabs plank brown. `world()` builds the island with `island.js`: terrain blocks with face culling (grass, dirt, stone; one `Mesher` bucket per 16 px texture, `mesher.js`), the 8 x 8 grass and stone squares at exactly the classic square positions (board top y = 0), the plank frame ring with four corner posts, a tree, flowers, rocks, a spring pool with a waterfall at the back right edge and 7 clouds. The columns under the two capture trays are cut 0.3 lower (a stone bed) so the tray slab top does not share a plane with the grass. `kit.js` holds the shared Lambert materials and `toGroup(mesher, kit)`; `textures.js` draws the textures in code and registers them with `track()`. The registry adds the world group next to the board in the gimbal, calls `world.update(dt)` through `themes.update(dt)` (main.js, once per frame: water scroll, foam at the top lip, mist and the slowly drifting clouds), and on leaving removes and disposes it (geometries, materials, textures), so ten switches still leave the renderer at its baseline. The light spec sets `noFloor`, which calls `stage.setFloorHidden(true)`: floor, contact shadow and reflection stay off while the island floats. The characters are in `blocks/chars.js` (`pieceStyle`).
+
+**Block characters** (`blocks/chars.js` exports `pieceStyle(ctx)`; the rest is `blocks/vox.js` and `blocks/rig.js`). A theme module may export `pieceStyle(ctx)`; the registry hands it to `pieceSet.setStyle(style)` and then calls `game.restyle()`, so every piece on the board and in the trays changes in place (a style is `{ id, make(type, color) -> inner group, height(type, color), warm(type, color), update(dt, root), dispose() }`; `setStyle(null)` brings the lathe pieces back). `vox.js` holds the 12 characters as lists of boxes in voxel units (1 voxel = 0.08; heroes are White and blue, the critters Black and red; the knights are a white horse with a hero rider and a red horse with a small critter rider). Each box carries a group tag: `body` stands still, the rest is what moves (`head`, `armN`/`armP`, `legN`/`legP`, horse legs `lgNF`, `lgPF`, `lgNB`, `lgPB`, `tail`, `rider`, `handN`/`handP`). `rig.js` meshes each tag into one mesh whose geometry is centred on its pivot (legs and arms at the top, head and rider at the bottom), builds a template per (type, color) under a group named `rig` turned to face -z like every other piece, and clones it per piece (shared geometry and one shared `MeshStandardMaterial` with vertex colours and an 8 px noise texture). Animation is `update(dt, root)`, called by `game.update` through `pieceSet.update`: a pure function of the rig state, so `?manual=1` tests stay deterministic. Idle: the chest breathes, the head turns slowly (critters turn the whole torso a little), tails swish, the rook hero's hands wave. Walking is detected from how far the piece wrapper moved (`game.js` knows nothing about it): the speed blends in a walk, the stride phase follows the distance travelled, legs and arms swing against each other, the body hops, and the character turns to face where it goes; a jump of more than 20 squares per second (undo, new game) is not a walk. Knights gallop: the four legs in two pairs, head nodding, tail streaming, the rider bouncing.
+
+The capture scene of the theme is `battle/scenes/blocks.js`: the director picks it for every attacker when the victim wrapper has `userData.style === 'blocks'` (set by `pieceSet.make` and `restyle`). The attacker winds up in its own way (the pawn hops, the knight rears, bishop and queen pirouette, the rook backs off and charges, the king rises and stomps), the victim bursts into cubes of about two voxels (at most 260; built from the box list with the current idle pose) that are `fx.body` rigid bodies, tumble over the board and shrink away, with dust and a flash and no blood. Skip, undo and a new game clean up like any other scene.
 
 ### `src/device.js`
 
@@ -171,7 +179,8 @@ The group extends to about +-4.65 including the frame and down to y = -0.6. Squa
 
     createPieceSet(materials) -> {
       make(type, color),            // type 'p' | 'n' | 'b' | 'r' | 'q' | 'k', color 'w' | 'b'
-      buildAll(onProgress)          // builds every prototype with progress callbacks
+      buildAll(onProgress),         // builds every prototype with progress callbacks
+      setStyle(style | null), restyle(wrap) -> height, update(dt, root), style   // a theme's own characters, see the Blocks theme
     }
 
 Each (type, color) is built once and cloned, so clones share geometry. Piece triangle counts: pawn 58k, rook 65.5k, knight 74.4k, bishop 79.0k, queen 69.7k, king 82.8k. Bases, rings and bands use the accent material, the rest uses the body material. Every mesh casts and receives shadows. Knights face sideways along their rank toward the board centre (files a to d look toward h, e to h toward a). The game sets the facing on every landing: moves, undo, new game and loaded positions.
@@ -223,7 +232,7 @@ Tests: `test/review-core.mjs` (fast tier: thresholds, accuracy, the engine on sm
       chess, root,                         // the rules engine and the Group that holds the pieces
       on(event, fn),                       // 'change', 'promotion', 'gameover', 'newgame', 'undo'
       clickSquare(sq), pickSquare(raycaster), hoverAction(raycaster),
-      update(dt), newGame(opts), undo(), loadFen(fen),
+      update(dt), restyle(), newGame(opts), undo(), loadFen(fen),   // restyle(): the piece style changed, swap every piece in place
       setVsComputer(on, { color, depth, level }), // color is the computer's side; level (an id of LEVELS) wins over depth
       getState(),                          // turn, moves (SAN), captured, advantage, check, over, thinking, fen, ...
       move(from, to, promo), playMoves(list), selectSquare(name), finishAnimations(),

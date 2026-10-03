@@ -1,0 +1,200 @@
+// Turns a box list (vox.js) into a rigged character and animates it: idle (breathe, look around), walk with swinging legs,
+// gallop for the knights' mounts. The piece style (createPieceStyle) is what src/pieceset.js asks for pieces while the Blocks
+// theme is on. Animation is a pure function of the rig state and the time given to update(dt), so tests that step the clock
+// (?manual=1) stay deterministic. A walk is detected from how far the piece moved, so game.js needs no animation calls.
+import * as THREE from 'three';
+import { Mesher } from './mesher.js';
+import { buildVox, V } from './vox.js';
+
+const TYPES = ['p', 'n', 'b', 'r', 'q', 'k'];
+
+// ---------------------------------------------------------------- building
+// Where a group turns: legs, arms and tails at their top, head and rider at their bottom, hands in the middle.
+function pivotOf(tag, parts) {
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9;
+  for (const p of parts) {
+    x0 = Math.min(x0, p.x - p.w / 2); x1 = Math.max(x1, p.x + p.w / 2);
+    y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y + p.h);
+    z0 = Math.min(z0, p.z - p.d / 2); z1 = Math.max(z1, p.z + p.d / 2);
+  }
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  if (/^(leg|arm|lg|tail)/.test(tag)) return [cx, y1, cz];
+  if (tag === 'head' || tag === 'rider') return [cx, y0, cz];
+  return [cx, (y0 + y1) / 2, cz];
+}
+
+/** One template: a Group named 'rig' (turned to face -z) with one child mesh group per tag, each placed at its pivot. */
+export function buildTemplate(color, type, material) {
+  const vox = buildVox(color, type);
+  const byTag = new Map();
+  for (const p of vox.parts) { if (!byTag.has(p.g)) byTag.set(p.g, []); byTag.get(p.g).push(p); }
+  const rig = new THREE.Group();
+  rig.name = 'rig';
+  rig.rotation.y = Math.PI;
+  let top = 0;
+  for (const [tag, parts] of byTag) {
+    const m = new Mesher();
+    for (const p of parts) {
+      m.box('vox', (p.x - p.w / 2) * V, p.y * V, (p.z - p.d / 2) * V, p.w * V, p.h * V, p.d * V,
+        { color: p.color, uvUnit: V * 2, off: [((p.x * 7 + p.y * 3) % 5) * 0.37, ((p.z * 5 + p.w) % 7) * 0.29] });
+      top = Math.max(top, (p.y + p.h) * V);
+    }
+    const [px, py, pz] = tag === 'body' ? [0, 0, 0] : pivotOf(tag, parts);
+    const geo = m.geometries().get('vox');
+    geo.translate(-px * V, -py * V, -pz * V);
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    const g = new THREE.Group();
+    g.name = tag;
+    g.position.set(px * V, py * V, pz * V);
+    g.add(mesh);
+    rig.add(g);
+  }
+  return { rig, height: top };
+}
+
+function voxTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 8;
+  const x = c.getContext('2d');
+  let a = 15;
+  const r = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  for (let py = 0; py < 8; py++) for (let px = 0; px < 8; px++) { const v = 240 + Math.round((r() - 0.5) * 18); x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(px, py, 1, 1); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapLinearFilter;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+// ---------------------------------------------------------------- animation
+const rigs = new WeakMap();   // inner group -> rig state
+let seedCounter = 1;
+const wrapPi = (a) => { const T = Math.PI * 2; a = (a + Math.PI) % T; if (a < 0) a += T; return a - Math.PI; };
+const clamp01 = (x) => Math.min(1, Math.max(0, x));
+
+function attach(inner, type) {
+  const rig = inner.children[0];
+  const parts = {};
+  for (const g of rig.children) parts[g.name] = { o: g, p: g.position.clone() };
+  const seed = seedCounter++ * 1.7;
+  rigs.set(inner, { rig, parts, type, seed, t: seed * 3.1, phi: 0, w: 0, yaw: 0, last: null });
+}
+
+function animate(s, dt, speed, dist) {
+  const { parts, type, rig } = s;
+  const knight = type === 'n';
+  s.t += dt;
+  s.w += (clamp01(speed / 0.7) - s.w) * Math.min(1, dt * 9);
+  if (s.w < 0.002) s.w = 0;
+  s.phi += dist * (knight ? 4.2 : 7);
+  const w = s.w, t = s.t, sd = s.seed, phi = s.phi;
+  const idle = 1 - w;
+  const breathe = Math.sin(t * 1.9 + sd);
+  rig.scale.set(1 - 0.007 * breathe, 1 + 0.016 * breathe, 1 - 0.007 * breathe);
+  const legless = !parts.legN && !parts.lgNF;
+  rig.position.y = Math.abs(Math.sin(phi)) * (legless ? 0.05 : knight ? 0.02 : 0.026) * w;
+  rig.rotation.z = Math.sin(phi) * (legless ? 0.09 : 0.035) * w;
+  rig.rotation.x = knight ? Math.sin(phi * 2 + 0.6) * 0.045 * w : 0;
+
+  const critter = !knight && !!parts.legN && !parts.armN;   // critters turn the whole torso, so only a little
+  const look = (0.6 * Math.sin(t * 0.55 + sd) + 0.4 * Math.sin(t * 0.91 + sd * 2)) * idle;
+  const nod = Math.sin(t * 0.7 + sd * 3) * idle;
+  const head = parts.head;
+  if (head) {
+    const amp = critter ? 0.2 : knight ? 0.4 : 0.55;
+    head.o.rotation.y = look * amp;
+    head.o.rotation.x = knight ? (nod * 0.05 + Math.sin(phi + 1) * 0.12 * w) : nod * 0.04 + Math.abs(Math.sin(phi)) * 0.03 * w;
+    head.o.rotation.z = critter ? Math.sin(t * 0.8 + sd) * 0.03 * idle : 0;
+  }
+  // two legged walkers: legs swing against each other, arms against their leg, the foot lifts a little
+  for (const side of ['N', 'P']) {
+    const ph = phi + (side === 'P' ? Math.PI : 0);
+    const leg = parts['leg' + side];
+    if (leg) {
+      const sw = Math.sin(ph), len = leg.p.y / V;                // short legs step more than they turn: a long boot would tip up
+      leg.o.rotation.x = sw * (0.2 + 0.17 * len) * w;
+      leg.o.position.z = leg.p.z + sw * (1.1 - 0.25 * len) * V * w;
+      leg.o.position.y = leg.p.y + Math.max(0, Math.cos(ph)) * 0.45 * V * w;
+    }
+    const arm = parts['arm' + side];
+    if (arm) arm.o.rotation.x = -Math.sin(ph) * 0.65 * w + Math.sin(t * 1.4 + sd + (side === 'P' ? 2 : 0)) * 0.05 * idle;
+    const hand = parts['hand' + side];
+    if (hand) hand.o.position.y = hand.p.y + (0.5 + 0.5 * Math.sin(t * 3.2 + sd + (side === 'P' ? 1.8 : 0))) * 0.9 * V;
+  }
+  // horses: a gallop, front pair and back pair
+  if (parts.lgNF) {
+    const ph = { NF: 0, PF: 0.6, NB: Math.PI, PB: Math.PI + 0.6 };
+    for (const k in ph) {
+      const leg = parts['lg' + k], a = phi + ph[k];
+      leg.o.rotation.x = Math.sin(a) * 0.8 * w;
+      leg.o.position.y = leg.p.y + Math.max(0, Math.cos(a)) * 0.6 * V * w;
+    }
+    if (parts.tail) parts.tail.o.rotation.z = Math.sin(t * 1.3 + sd) * 0.22 * idle + Math.sin(phi) * 0.3 * w;
+    if (parts.tail) parts.tail.o.rotation.x = -0.25 * w + Math.sin(phi + 1) * 0.15 * w;
+    if (parts.rider) {
+      parts.rider.o.position.y = parts.rider.p.y + Math.abs(Math.sin(phi)) * 0.55 * V * w + (0.5 + 0.5 * breathe) * 0.1 * V;
+      parts.rider.o.rotation.x = Math.sin(phi + 0.8) * 0.06 * w;
+      parts.rider.o.rotation.y = -look * 0.35;
+    }
+  }
+}
+
+/** Walks all rigs below root (the game's piece group). dt in seconds. */
+function update(dt, root) {
+  if (!(dt > 0)) return;
+  for (const wrap of root.children) {
+    const inner = wrap.children[0];
+    const s = inner && rigs.get(inner);
+    if (!s) continue;
+    const p = wrap.position;
+    let speed = 0, dist = 0;
+    if (s.last) {
+      const dx = p.x - s.last.x, dz = p.z - s.last.z, d = Math.hypot(dx, dz);
+      if (d < 20 * dt && d > 1e-5) {                     // a jump (undo, a new game) is not a walk
+        dist = d; speed = d / dt;
+        // face the way it goes: relative to the piece's own turn (knights turn with their rank) and the wrapper's
+        if (s.w > 0.3) {
+          const want = wrapPi(Math.atan2(-dx, -dz) - inner.rotation.y - wrap.rotation.y);
+          s.yaw += wrapPi(want - s.yaw) * Math.min(1, dt * 12);
+        }
+      }
+      s.last.set(p.x, p.y, p.z);
+    } else s.last = new THREE.Vector3(p.x, p.y, p.z);
+    if (speed === 0 && s.w < 0.3) s.yaw += wrapPi(0 - s.yaw) * Math.min(1, dt * 8);
+    animate(s, dt, speed, dist);
+    s.rig.rotation.y = Math.PI + s.yaw;
+  }
+}
+
+// ---------------------------------------------------------------- the style
+/** What pieceset.setStyle takes: make(type, color) -> the inner group, height(type, color), update(dt, root), dispose(). */
+export function createPieceStyle({ track } = {}) {
+  const tex = voxTexture();
+  track?.(tex);
+  const material = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.92, metalness: 0, envMapIntensity: 0.8 });
+  const templates = new Map();
+  const tpl = (type, color) => {
+    const k = type + color;
+    if (!templates.has(k)) templates.set(k, buildTemplate(color, type, material));
+    return templates.get(k);
+  };
+  return {
+    id: 'blocks',
+    make(type, color) {
+      const inner = new THREE.Group();
+      inner.add(tpl(type, color).rig.clone(true));
+      attach(inner, type);
+      return inner;
+    },
+    height: (type, color) => Math.max(0.6, tpl(type, color).height),
+    warm(type, color) { tpl(type, color); },
+    update,
+    dispose() {
+      for (const t of templates.values()) t.rig.traverse((o) => o.geometry?.dispose());
+      templates.clear();
+      material.dispose();
+      tex.dispose();
+    },
+  };
+}
+export { TYPES };

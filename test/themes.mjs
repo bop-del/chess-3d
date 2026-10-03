@@ -1,5 +1,5 @@
 // Theme checks: node test/themes.mjs [--port=5351] [--base=<server>]
-// Switches all five themes through the real page (nothing mocked) at quality=low with ?manual=1: the game state, selection, hint
+// Switches all six themes through the real page (nothing mocked) at quality=low with ?manual=1: the game state, selection, hint
 // arrow, trays and highlights survive every switch, each theme looks different, ten switches leave the renderer at its baseline
 // (textures, geometries), the choice is remembered over a reload, ?theme= wins for one load only, a bad flag falls back, the swatch
 // row sits in the Scene card (desktop) and in the phone Menu, Glass uses transmission on High only, no console error or warning.
@@ -14,7 +14,7 @@ const BASE = (args.find((a) => a.startsWith('--base=')) || '').slice(7).replace(
 if (!BASE && !args.includes('--skip-build')) build(OUT);
 const server = BASE ? { stop() {} } : await startServer({ mode: 'preview', port: PORT, outDir: OUT });
 const URL0 = BASE || `http://127.0.0.1:${PORT}`;
-const IDS = ['classic', 'tournament', 'wood', 'metal', 'glass'];
+const IDS = ['classic', 'tournament', 'wood', 'metal', 'glass', 'blocks'];
 const MOVES = 'e2e4,d7d5,e4d5,g8f6,b1c3';
 const browser = await launchBrowser({ w: 1280, h: 720 });
 try {
@@ -61,7 +61,7 @@ try {
     R.expect(`${id}: on, game state kept`, s.theme === id && s.fen === s0.fen && s.selected === s0.selected && s.captured === s0.captured && s.hl === s0.hl && s.hint === s0.hint && s.trays === 2, `${Math.round(ms)} ms`, JSON.stringify(s));
     shots[id] = await shot();
   }
-  R.expect('the five themes look different', new Set(Object.values(shots)).size === 5, '5 distinct frames', JSON.stringify(shots));
+  R.expect('the six themes look different', new Set(Object.values(shots)).size === 6, '6 distinct frames', JSON.stringify(shots));
   R.expect('switching is quick (software GL, set plus one frame)', Math.max(...times) < 4000, `max ${Math.round(Math.max(...times))} ms`);
 
   // the Symbols view takes the plain squares from every theme and gives the theme's own look back when it is left
@@ -70,13 +70,15 @@ try {
   for (const id of IDS) {
     const r = await page.evaluate(async (id) => {
       await window.__chess.themes.set(id); window.__chess.step(0.3); window.__chess.draw();
-      const m = window.__chess.gimbal.getObjectByName('squares-light').material;
-      return { hex: m.color.getHexString(), map: !!m.map, vc: m.vertexColors, on: window.__chess.symbols.visible };
+      const o = window.__chess.gimbal.getObjectByName('squares-light'), m = o.material;
+      return { hex: m.color.getHexString(), map: !!m.map, vc: m.vertexColors, on: window.__chess.symbols.visible, hidden: !o.visible };
     }, id);
-    R.expect(`${id}: the Symbols view has plain squares in the theme's colours`, r.on && !r.map && !r.vc && r.hex === PLAIN_LIGHT[id], JSON.stringify(r));
+    // Blocks hides the classic squares: its island blocks are the plain board, so the symbols sit on those
+    if (id === 'blocks') R.expect('blocks: the Symbols view sits on the island squares (classic squares stay hidden)', r.on && r.hidden, JSON.stringify(r));
+    else R.expect(`${id}: the Symbols view has plain squares in the theme's colours`, r.on && !r.map && !r.vc && r.hex === PLAIN_LIGHT[id], JSON.stringify(r));
     shots['symbols-' + id] = await shot();
   }
-  R.expect('the Symbols view looks different in every theme', new Set(IDS.map((id) => shots['symbols-' + id])).size === 5, '5 distinct frames');
+  R.expect('the Symbols view looks different in every theme', new Set(IDS.map((id) => shots['symbols-' + id])).size === IDS.length, `${IDS.length} distinct frames`);
   await page.evaluate(async () => { window.__chess.views.set('white', { instant: true, remember: false }); await window.__chess.themes.set('classic'); for (let i = 0; i < 40; i++) window.__chess.draw(0.05); });
   R.expect('leaving the Symbols view restores the theme squares', JSON.stringify(await classicLook()) === JSON.stringify(look0), 'identical Classic look');
 
@@ -112,7 +114,7 @@ try {
   await load();
   R.expect('a bad stored value falls back to Classic', (await cur()) === 'classic', 'classic');
 
-  // swatch row, desktop: in the Scene card, first, all five, click switches, the mark follows
+  // swatch row, desktop: in the Scene card, first, all six, click switches, the mark follows
   await page.evaluate(() => localStorage.removeItem('chess3d.theme'));
   await load();
   const sw = await page.evaluate(() => {
@@ -120,14 +122,14 @@ try {
     const btns = row ? [...row.querySelectorAll('.swatch')] : [];
     return { inScene: !!row && !!row.closest('[data-card="scene"]'), first: !!row && row.parentElement.firstElementChild === row, ids: btns.map((b) => b.dataset.theme).join(), on: btns.filter((b) => b.classList.contains('on')).map((b) => b.dataset.theme).join() };
   });
-  R.expect('swatch row in the Scene card, first, five swatches, Classic marked', sw.inScene && sw.first && sw.ids === IDS.join() && sw.on === 'classic', sw.ids, JSON.stringify(sw));
+  R.expect('swatch row in the Scene card, first, six swatches, Classic marked', sw.inScene && sw.first && sw.ids === IDS.join() && sw.on === 'classic', sw.ids, JSON.stringify(sw));
   await page.click('.swatch[data-theme="tournament"]');
   await page.waitForFunction("window.__chess.themes.current() === 'tournament'", { timeout: 20000 });
   const marked = await page.evaluate(() => [...document.querySelectorAll('.swatch.on')].map((b) => b.dataset.theme).join());
   R.expect('clicking a swatch switches the theme and moves the mark', marked === 'tournament', marked);
   await page.evaluate(() => { document.querySelector('.lang-btn[data-lang="de"]').click(); });
   const de = await page.evaluate(() => [...document.querySelectorAll('.swatch')].map((b) => b.title).join());
-  R.expect('swatch names in German', de === 'Klassisch,Turnier,Holz,Metall,Glas', de);
+  R.expect('swatch names in German', de === 'Klassisch,Turnier,Holz,Metall,Glas,Blöcke', de);
   await page.evaluate(() => { document.querySelector('.lang-btn[data-lang="en"]').click(); });
 
   // Glass: real transmission on High only
@@ -145,7 +147,7 @@ try {
   await page.evaluate(() => localStorage.removeItem('chess3d.theme'));
   await load('', { width: 390, height: 844 });
   const ph = await page.evaluate(() => { const row = document.querySelector('[data-settings="themes"]'); return { inSheet: !!row && !!row.closest('.psheet-body'), n: row ? row.querySelectorAll('.swatch').length : 0 }; });
-  R.expect('phone: swatch row in the Menu sheet', ph.inSheet && ph.n === 5, JSON.stringify(ph));
+  R.expect('phone: swatch row in the Menu sheet', ph.inSheet && ph.n === 6, JSON.stringify(ph));
   await page.tap('.tb[data-act="menu"]');
   await page.waitForSelector('.psheet.open', { timeout: 10000 });
   await page.evaluate(() => { const c = document.querySelector('.card[data-card="scene"]'); if (c.classList.contains('collapsed')) c.querySelector('header').click(); });
@@ -160,6 +162,19 @@ try {
   const hit = switched ? '' : await page.evaluate(({ x, y }) => { const e = document.elementFromPoint(x, y); return e ? e.tagName + '.' + e.className : 'nothing'; }, box);
   R.expect('phone: tapping Glass switches it (fake glass on this tier)', switched, 'glass', `no switch, the tap at ${Math.round(box.x)},${Math.round(box.y)} hit ${hit}`);
 
+  // Blocks: its own world (island, clouds, waterfall) in the gimbal, the classic board meshes hidden, water and clouds move, all gone when left
+  await load('&theme=blocks');
+  const bl = await page.evaluate(() => {
+    const { gimbal, board, themes } = window.__chess;
+    const w = gimbal.getObjectByName('blocks-world'), cloud = w?.children.find((o) => o.name === 'cloud');
+    const x0 = cloud?.position.x;
+    themes.update(10);
+    return { world: !!w, hidden: board.group.getObjectByName('squares-light').visible === false && board.group.getObjectByName('frame').visible === false, moved: !!cloud && cloud.position.x !== x0, picks: board.group.children.filter((o) => o.userData.square).length };
+  });
+  R.expect('Blocks: island in the gimbal, classic board hidden, clouds drift, 64 pick squares kept', bl.world && bl.hidden && bl.moved && bl.picks === 64, JSON.stringify(bl));
+  await page.evaluate(async () => { await window.__chess.themes.set('wood', { persist: false }); });
+  const gone = await page.evaluate(() => ({ world: !!window.__chess.gimbal.getObjectByName('blocks-world'), shown: window.__chess.board.group.getObjectByName('squares-light').visible }));
+  R.expect('leaving Blocks removes the island and shows the classic board again', !gone.world && gone.shown, JSON.stringify(gone));
   R.expect('no console error or warning', !w.errs.length && !w.warns.length, 'none', [...w.errs, ...w.warns].slice(0, 5).join(' | '));
   process.exitCode = R.summary().nf ? 1 : 0;
 } finally {

@@ -698,6 +698,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   function update(dt) {
     time += dt;
     updateAnims(dt);
+    pieceSet.update?.(dt, root);
     // selected piece hovers slightly
     for (const o of map.values()) {
       if (o.sq === selected && selected >= 0 && !busy()) {
@@ -731,6 +732,16 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     if (!busy() && !search) maybeComputer();
   }
 
+  // The piece style changed (Blocks theme on or off): every piece on the board and in the trays gets its new look in place.
+  function restyle() {
+    const all = new Set([...map.values(), ...tray.w, ...tray.b]);
+    for (const r of records) if (r.promoPawn) all.add(r.promoPawn);
+    for (const o of all) {
+      const h = pieceSet.restyle(o.group);
+      o.hit.scale.y = h; o.hit.position.y = h / 2;
+    }
+  }
+
   // ---------------------------------------------------------------- scripted play (tests, demos)
   function playMoves(list, { instant = true } = {}) {
     for (const s of list) {
@@ -748,7 +759,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
 
   return {
     chess, root, on(evt, fn) { (listeners[evt] = listeners[evt] || []).push(fn); },
-    clickSquare, pickSquare, hoverAction, update, newGame, undo, loadFen, setVsComputer, getState, playMoves, selectSquare,
+    clickSquare, pickSquare, hoverAction, update, restyle, newGame, undo, loadFen, setVsComputer, getState, playMoves, selectSquare,
     move: (from, to, promo) => doMove({ from: nameSq(from), to: nameSq(to), promo }),
     finishAnimations,
     // CONTRACT stubs (lead): filled in by the Openings (C) and Battle (B) lanes

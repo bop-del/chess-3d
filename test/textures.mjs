@@ -18,7 +18,7 @@ try {
     if (q.includes('touch=1')) await page.evaluateOnNewDocument(() => { for (const [k, v] of [['width', 390], ['height', 844]]) Object.defineProperty(screen, k, { get: () => v }); });   // device.phone reads screen, not the viewport
     await page.evaluateOnNewDocument(() => {
       window.__workers = 0;
-      const W = window.Worker; window.Worker = function (...a) { window.__workers++; return new W(...a); };
+      const W = window.Worker; window.Worker = function (...a) { if (/texture-worker/.test(String(a[0]))) window.__workers++; return new W(...a); };   // the review engine has its own Worker: count only the texture ones
     });
     await page.goto(url(q), { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('document.body.classList.contains("ready")', { timeout: 300000, polling: 200 });
