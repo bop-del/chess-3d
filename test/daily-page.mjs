@@ -163,6 +163,30 @@ export async function runDailyChecks({ page, baseUrl, log = () => {}, shot = nul
     s = await st();
     ok('daily: Start on the phone closes the sheet and loads the puzzle', s.phase === 'playing' && s.daily === true && await page.evaluate(() => !document.querySelector('.psheet.open')), JSON.stringify(s));
     await shot?.('daily-phone-playing');
+    // Export and Import (the Menu) carry the daily streak and the badges; an old file without them still imports
+    await load('daily=2026-03-04');
+    await page.evaluate(() => { const o = URL.createObjectURL.bind(URL); window.__blob = null; URL.createObjectURL = (b) => { window.__blob = b; return o(b); }; });
+    const keep = () => page.evaluate(() => JSON.stringify({ d: window.__chess.daily.exportData(), b: window.__chess.badges.store.exportData() }));
+    await page.evaluate(() => { window.__chess.badges.earn('puzzles-10'); window.__chess.daily.finish(true); });
+    const before = await keep();
+    await page.evaluate(() => document.querySelector('.xdata .xrow button').click());
+    await new Promise((r) => setTimeout(r, 300));
+    const text = await page.evaluate(() => window.__blob.text());
+    const obj = JSON.parse(text);
+    ok('export: the file has daily and badges next to the openings and puzzles', obj.daily?.days?.['2026-03-04'] === 'g' && obj.badges?.earned?.['puzzles-10'] && 'puzzles' in obj, Object.keys(obj).join(','));
+    await page.evaluate(() => { window.__chess.badges.store.reset(); window.__chess.daily.reset(); });
+    const { tmpdir } = await import('node:os'); const { writeFileSync } = await import('node:fs'); const { join } = await import('node:path');
+    const f1 = join(tmpdir(), `chess3d-export-${process.pid}.json`), f2 = join(tmpdir(), `chess3d-old-${process.pid}.json`);
+    writeFileSync(f1, text);
+    await (await page.$('.xdata input[type=file]')).uploadFile(f1);
+    await new Promise((r) => setTimeout(r, 600));
+    ok('import: the daily streak and the badges come back', (await keep()) === before, await keep());
+    const old = { ...obj }; delete old.daily; delete old.badges;
+    writeFileSync(f2, JSON.stringify(old));
+    await (await page.$('.xdata input[type=file]')).uploadFile(f2);
+    await new Promise((r) => setTimeout(r, 600));
+    ok('import: an old file without daily and badges still imports and leaves them alone', (await page.evaluate(() => document.querySelector('.xdatamsg').textContent)) === 'Importiert.' && (await keep()) === before);
+    try { (await import('node:fs')).rmSync(f1); (await import('node:fs')).rmSync(f2); } catch (e) { /* ignore */ }
   } finally {
     page.off('pageerror', onErr);
     page.off('console', onConsole);

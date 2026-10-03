@@ -24,6 +24,9 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   const sheet = ui.learnSheet;                 // null on desktop
   if (sheet) sheet.body.append(idle);
 
+  // the daily store and the badge store are created after this module is mounted (main.js): read them when Export or Import runs
+  const extras = () => { const c = typeof window !== 'undefined' ? window.__chess : null; return { daily: c?.daily || null, badges: c?.badges?.store || null }; };
+
   let tab = 'openings';
   let editing = false;
   let practiseLines = false;                   // the Practise tab shows the lines instead of the start button
@@ -195,7 +198,11 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   const file = el('input');
   file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true;
   const exportBtn = button('', 'small', () => {
-    const blob = new Blob([JSON.stringify({ ...JSON.parse(store.exportJSON()), puzzles: puzzleProgress.exportData() }, null, 2)], { type: 'application/json' });
+    const { daily, badges } = extras();
+    const out = { ...JSON.parse(store.exportJSON()), puzzles: puzzleProgress.exportData() };
+    if (daily) out.daily = daily.exportData();
+    if (badges) out.badges = badges.exportData();
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const a = el('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'chess3d-learning.json';
@@ -213,10 +220,22 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
     let text;
     try { text = await f.text(); } catch (e) { msg.textContent = t('learn.importFailed', 'Import failed: {why}', { why: t('learn.importUnreadable', 'The file could not be read.') }); return; }
     // the openings part goes to the store as before; the puzzle path rides along under "puzzles"
-    let puzzlePart = null, rest = text;
-    try { const o = JSON.parse(text); if (o && typeof o === 'object' && 'puzzles' in o) { puzzlePart = o.puzzles; delete o.puzzles; rest = JSON.stringify(o); } } catch (e) { /* the store reports it */ }
+    // the daily streak and the badges ride along too ("daily", "badges"); an older file without them imports as before
+    let puzzlePart = null, dailyPart = null, badgesPart = null, rest = text;
+    try {
+      const o = JSON.parse(text);
+      if (o && typeof o === 'object') {
+        puzzlePart = o.puzzles ?? null; dailyPart = o.daily ?? null; badgesPart = o.badges ?? null;
+        delete o.puzzles; delete o.daily; delete o.badges; rest = JSON.stringify(o);
+      }
+    } catch (e) { /* the store reports it */ }
     const r = store.importJSON(rest);
-    if (r.ok && puzzlePart) puzzleProgress.importData(puzzlePart);
+    if (r.ok) {
+      if (puzzlePart) puzzleProgress.importData(puzzlePart);
+      const { daily, badges } = extras();
+      if (dailyPart && daily) daily.importData(dailyPart);
+      if (badgesPart && badges) badges.importData(badgesPart);
+    }
     msg.textContent = r.ok ? t('learn.imported', 'Imported.') : t('learn.importFailed', 'Import failed: {why}', { why: r.error });
   });
   const dataRow = el('div', 'xrow');

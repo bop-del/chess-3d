@@ -102,6 +102,11 @@ function buildIsland(kit) {
     m.box('flat', fx, TOP, fz, 0.1, 0.25 + 0.07, 0.1, { color: 0x3f8f2f }); m.box('flat', fx - 0.06, 0.25, fz - 0.06, 0.22, 0.2, 0.22, { color: c });
   }
   for (const [rx, rz, s] of [[5.2, -4.5, 0.7], [-6.1, 3.4, 0.6]]) if (onGrass.has(`${Math.floor(rx)},${Math.floor(rz)}`)) { m.box('stone', rx, TOP, rz, s, s * 0.7, s); m.box('stone', rx + s * 0.6, TOP, rz + 0.2, s * 0.6, s * 0.45, s * 0.6); }
+  // a bush block on the tree's foot cell: inside the trunk while the tree stands, and what the Black view leaves behind when the
+  // tree steps aside, so the corner reads as planned (leaves cannot reach the board: the cell lies far outside the frame)
+  m.box('flat', TREE.x + 0.1, TOP, TREE.z + 0.1, 0.8, 0.55, 0.8, { color: 0x2f8a2a });   // plain colour boxes: a leaf textured block here keeps two textures uploaded after the Symbols view (themes test)
+  m.box('flat', TREE.x + 0.3, TOP + 0.55, TREE.z + 0.3, 0.4, 0.2, 0.4, { color: 0x3ba034 });
+  for (const [dx, dz, c] of [[0.05, 0.9, 0xff5c7a], [0.85, 0.2, 0xffe36a]]) { m.box('flat', TREE.x + dx, TOP, TREE.z + dz, 0.1, 0.25 + 0.07, 0.1, { color: 0x3f8f2f }); m.box('flat', TREE.x + dx - 0.06, 0.25, TREE.z + dz - 0.06, 0.22, 0.2, 0.22, { color: c }); }
   // waterfall: a sheet in three fading segments
   const wx = POOL.x1, wz = POOL.z0, L = -0.6 - FALL_B;
   m.box('fall1', wx - 0.3, -0.6, wz, 0.9, 0.42, 2, { uvUnit: 0.5 });
