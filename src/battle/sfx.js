@@ -7,7 +7,7 @@
 //   sfx.hook(game)                            move, capture and check sounds through game.onMove (landing time of the slide)
 //
 // Scene voices: whoosh swing clang slice splat crack shatter thud magic.
-// Game voices: move capture check. The scenes lean on slice, splat, crack, shatter, clang. Every voice returns its length in seconds. Pitch scales every frequency in it.
+// Game voices: move capture check chime. The scenes lean on slice, splat, crack, shatter, clang. Every voice returns its length in seconds. Pitch scales every frequency in it.
 import { audio, tone as T, noise as N } from '../audio.js';
 
 const VOICES = {
@@ -28,6 +28,16 @@ const VOICES = {
     T(e, { t: e.t + 0.1, dur: 0.34, vol: 0.14, type: 'sine', f0: 1175 });
     T(e, { t: e.t + 0.1, dur: 0.2, vol: 0.04, type: 'triangle', f0: 2350 });
     return 0.45;
+  },
+
+  chime(e) {   // the puzzle reward: three bright rising bell notes (a major triad), the last one rings
+    [1568, 1976, 2349].forEach((f, i) => {
+      const t0 = e.t + i * 0.085, ring = i === 2 ? 0.75 : 0.28;
+      T(e, { t: t0, dur: ring, vol: 0.12, type: 'sine', f0: f });
+      T(e, { t: t0, dur: ring * 0.55, vol: 0.035, type: 'triangle', f0: f * 2.01 });
+      T(e, { t: t0, dur: ring * 0.3, vol: 0.012, type: 'sine', f0: f * 3.02 });
+    });
+    return 1.0;
   },
 
   // ---- swings and cuts ----

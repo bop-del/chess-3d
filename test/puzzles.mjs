@@ -58,6 +58,9 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
     await page.evaluate(() => window.__chess.train.learn.show('puzzles'));
     const tab = await page.evaluate(() => { const b = document.querySelector('.pzstart'); return { text: b && b.textContent, tab: document.querySelector('.xtab[aria-selected="true"]')?.textContent, band: document.querySelector('.pzbandline')?.textContent }; });
     ok('puzzles: the Puzzles tab shows the level and a Start button', tab.text === 'Start' && /Puzzles/.test(tab.tab) && /Starter/.test(tab.band), JSON.stringify(tab));
+    ok('puzzles: first visit draws ten stations, the first one glowing', await page.evaluate(() => document.querySelectorAll('.pztab .st').length === 10 && document.querySelector('.pztab .st').dataset.state === 'next' && document.querySelectorAll('.pztab .st.todo').length === 9));
+    ok('puzzles: on the desktop all four tabs show whole, inside the card', await page.evaluate(() => { const tabs = [...document.querySelectorAll('.xtab')], box = document.querySelector('.xtabs').getBoundingClientRect(); return tabs.length === 4 && tabs.every((b) => { const r = b.getBoundingClientRect(); return b.scrollWidth <= b.clientWidth + 1 && r.left >= box.left - 1 && r.right <= box.right + 1; }); }));
+    ok('puzzles: the path climbs, station 1 at the bottom and 10 at the top, with a straight road', await page.evaluate(() => { const c = [...document.querySelectorAll('.pztab .st circle.base')].map((e) => +e.getAttribute('cy')); const d = document.querySelector('.pztab .pzroad').getAttribute('d'); return c.length === 10 && c[0] > c[9] && c.every((y, i) => i === 0 || y <= c[i - 1]) && !/C/.test(d) && (d.match(/Q/g) || []).length <= 4; }));
     await shot?.('puzzles-tab');
     // ---- open one: the opponent's last move is on the board, the theme line shows
     await page.evaluate(() => document.querySelector('.pzstart').click());
@@ -91,11 +94,11 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
     await shot?.('puzzles-help');
     s = await solve();
     ok('puzzles: the puzzle is solved after a miss and Help', s.phase === 'solved' && s.clean === false, JSON.stringify(s));
-    ok('puzzles: the arrow is gone and the not yet queue holds it', !s.hint && s.stats.queued === 1 && s.stats.solved.starter === 0, JSON.stringify(s.stats));
+    ok('puzzles: the arrow is gone and its station is silver', !s.hint && s.stats.queued === 1 && s.stats.solved.starter === 0, JSON.stringify(s.stats));
     ok('puzzles: Next is on offer', await page.evaluate(() => !!document.querySelector('.pznext')));
     await shot?.('puzzles-solved');
 
-    // ---- Next: another puzzle, never the one just left until others have passed; clean solves count
+    // ---- Next: the path goes on in its fixed order; silver stays silver, clean solves are gold
     const ids = [first.id];
     for (let i = 0; i < 3; i++) {
       await page.evaluate(() => document.querySelector('.pznext').click());
@@ -105,22 +108,51 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
       s = await solve();
       if (!(s.phase === 'solved' && s.clean === true)) ok(`puzzles: clean solve ${i + 1}`, false, JSON.stringify(s));
     }
-    ok('puzzles: nothing solved clean repeats, the not yet puzzle returns after two others', new Set(ids.slice(1)).size === 3 && ids[3] === first.id && ids[1] !== first.id && ids[2] !== first.id, ids.join());
-    ok('puzzles: three clean in a row go up a band', s.band === 'growing' || s.stats.band === 'growing', JSON.stringify(s.stats));
-    await page.evaluate(() => document.querySelector('.pznext').click());
+    const path = s.stats.stations.map((x) => x.id);
+    ok('puzzles: Next serves the stations of the path in order, none twice', ids.join() === path.slice(0, 4).join() && new Set(ids).size === 4, `${ids.join()} vs ${path.slice(0, 4).join()}`);
+    ok('puzzles: the stations are silver, gold, gold, gold and the fifth is next', s.stats.stations.slice(0, 5).map((x) => x.state).join() === 'silver,gold,gold,gold,next', s.stats.stations.map((x) => x.state).join());
+    ok('puzzles: the level does not change by itself', s.stats.band === 'starter' && s.stats.chapter === 0);
+    const store = await page.evaluate(() => JSON.parse(localStorage.getItem('chess3d.puzzles') || 'null'));
+    ok('puzzles: progress is saved under chess3d.puzzles, version 2', store && store.v === 2 && Object.values(store.marks).filter((m) => m === 'g').length === 3 && Object.values(store.marks).filter((m) => m === 's').length === 1, JSON.stringify(store));
+
+    // ---- skipping counts as silver and the path moves on
+    await page.evaluate(() => window.__chess.puzzles.next());   // from the solved card: station 5 opens
+    await step(0.5);
+    await page.evaluate(() => window.__chess.puzzles.next());   // skipped
+    await step(0.5);
+    s = await st();
+    ok('puzzles: skipping a puzzle makes its station silver and goes on', s.stats.stations[4].state === 'silver' && s.id === s.stats.stations[5].id, JSON.stringify(s.stats.stations.slice(3, 7).map((x) => x.state)));
+
+    // ---- the tab: a station replays and can turn gold
+    await page.evaluate(() => window.__chess.puzzles.stop());
+    await step(0.5);
+    await page.evaluate(() => window.__chess.train.learn.show('puzzles'));
+    const tab2 = await page.evaluate(() => ({ st: [...document.querySelectorAll('.pztab .st')].map((e) => e.dataset.state).join(), badges: document.querySelectorAll('.pztab .pzbadge').length, label: document.querySelector('.pzstart')?.textContent, head: document.querySelector('.pzbandline')?.textContent }));
+    ok('puzzles: the tab draws ten stations and ten chapter badges, the button says Continue', tab2.st.startsWith('silver,gold,gold,gold,silver,next') && tab2.st.split(',').length === 10 && tab2.badges === 10 && tab2.label === 'Continue' && /Chapter 1 \/ 10/.test(tab2.head), JSON.stringify(tab2));
+    await shot?.('puzzles-tab-mid');
+    await page.evaluate((id) => document.querySelector(`.pztab .st[data-id="${id}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true })), first.id);
     await step(1.5);
     s = await st();
-    ok('puzzles: the new band serves its own puzzles', s.band === 'growing', JSON.stringify({ band: s.band }));
-    const store = await page.evaluate(() => JSON.parse(localStorage.getItem('chess3d.puzzles') || 'null'));
-    ok('puzzles: progress is saved under chess3d.puzzles', store && store.v === 1 && store.band === 'growing' && store.solved.starter.length === 3, JSON.stringify(store));
+    ok('puzzles: tapping a silver station replays it', s.phase === 'playing' && s.id === first.id, JSON.stringify({ id: s.id, first: first.id }));
+    s = await solve();
+    ok('puzzles: replayed clean it turns gold', s.clean === true && s.stats.stations[0].state === 'gold' && s.stats.queued === 1, JSON.stringify(s.stats.stations.slice(0, 6).map((x) => x.state)));
+    await page.evaluate(() => window.__chess.puzzles.stop());
+    await step(0.5);
+    await page.evaluate(() => document.querySelectorAll('.pztab .pzbadge')[3].click());
+    ok('puzzles: a chapter badge shows that chapter', await page.evaluate(() => /Chapter 4 \/ 10/.test(document.querySelector('.pzbandline').textContent) && document.querySelectorAll('.pztab .st.todo').length === 10));
+    await page.evaluate(() => window.__chess.train.learn.openPath());
+    ok('puzzles: openPath goes back to where the path is', await page.evaluate(() => /Chapter 1 \/ 10/.test(document.querySelector('.pzbandline').textContent)));
 
-    // ---- three misses in a row go down again
-    for (let i = 0; i < 3; i++) {
-      await page.evaluate(() => window.__chess.puzzles.next());   // skipping counts as not clean
-      await step(0.5);
-    }
+    // ---- a finished chapter: the tab shows the wave, the line and Next chapter; then the path is in chapter 2
+    await page.evaluate(() => { const c = window.__chess; for (const x of c.puzzleProgress.stats().stations) c.puzzleProgress.finish(x.id, { clean: x.index % 3 !== 0 }); });
+    await page.evaluate(() => window.__chess.train.learn.show('puzzles'));
+    const done = await page.evaluate(() => ({ wave: !!document.querySelector('.pztab.pzwave'), line: document.querySelector('.pzdone')?.textContent, label: document.querySelector('.pzstart')?.textContent, lit: document.querySelectorAll('.pztab .st.gold, .pztab .st.silver').length }));
+    ok('puzzles: a finished chapter shows the wave, the line and Next chapter', done.wave && /Chapter 1 done/.test(done.line) && done.label === 'Next chapter' && done.lit === 10, JSON.stringify(done));
+    await shot?.('puzzles-tab-finished');
+    await page.evaluate(() => document.querySelector('.pzstart').click());
+    await step(1.5);
     s = await st();
-    ok('puzzles: three puzzles in a row not clean go down a band', s.stats.band === 'starter', JSON.stringify(s.stats));
+    ok('puzzles: Next chapter starts the first station of chapter 2', s.phase === 'playing' && s.stats.chapter === 1 && s.id === s.stats.stations.find((x) => x.state === 'next')?.id && !s.stats.finished, JSON.stringify({ id: s.id, ch: s.stats.chapter }));
 
     // ---- leaving gives the ordinary game back; progress survives a reload
     await page.evaluate(() => window.__chess.puzzles.stop());
@@ -130,7 +162,7 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
     const before = s.stats;
     await load();
     s = await st();
-    ok('puzzles: progress survives a reload', s.stats.solved.starter === before.solved.starter && s.stats.queued === before.queued, JSON.stringify({ before, after: s.stats }));
+    ok('puzzles: progress survives a reload', s.stats.solved.starter === before.solved.starter && s.stats.queued === before.queued && s.stats.chapter === before.chapter, JSON.stringify({ before, after: s.stats }));
 
     // ---- phone: the strip under the status line, big enough to tap
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
@@ -151,6 +183,12 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
     ok('puzzles: phone strip shows inside the top half, no sideways scroll', phone.shown && phone.inside && !phone.hscroll, JSON.stringify(phone));
     ok('puzzles: phone Help is a 44 px target', phone.helpH >= 44 && phone.helpW >= 44, JSON.stringify(phone));
     await shot?.('puzzles-phone-portrait');
+    // ---- solved on the phone: the reward card and the learning bar must not both offer Next
+    s = await solve();
+    await step(3);
+    const nexts = await page.evaluate(() => [...document.querySelectorAll('.pzr-next, .pznext, .plbar .tb[data-act="next"]')].filter((b) => { const r = b.getBoundingClientRect(), cs = getComputedStyle(b); return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden'; }).map((b) => b.className.split(' ')[0] + (b.dataset.act ? ':' + b.dataset.act : '')));
+    ok('puzzles: phone, solved: exactly one Next is visible, the learning bar one', s.phase === 'solved' && nexts.length === 1 && nexts[0] === 'tb:next', JSON.stringify({ phase: s.phase, nexts }));
+    await shot?.('puzzles-phone-solved');
     await page.setViewport({ width: 844, height: 390, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     await new Promise((r) => setTimeout(r, 500));   // touch resizes settle on the real clock
     await step(0.5);

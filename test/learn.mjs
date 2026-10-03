@@ -143,7 +143,7 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
     // German
     await page.evaluate(() => document.querySelector('[data-lang="de"]').click());
     await step(page, 0.2);
-    ok('learn: German tabs and button texts', (await text(page, '.xtab[data-tab="mine"]')) === 'Meine' && (await text(page, '.xdatahead'))?.toLowerCase() === 'deine eröffnungen', await text(page, '.xtab[data-tab="mine"]'));
+    ok('learn: German tabs and button texts', (await text(page, '.xtab[data-tab="mine"]')) === 'Meine' && (await text(page, '.xdatahead'))?.toLowerCase() === 'deine eröffnungen und rätsel', await text(page, '.xtab[data-tab="mine"]'));
     await page.evaluate(() => document.querySelector('[data-lang="en"]').click());
   } catch (e) {
     ok('learn: desktop run completed', false, e && e.stack || e);

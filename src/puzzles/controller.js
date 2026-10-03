@@ -10,9 +10,11 @@
 // the gold arrow for the due move. A puzzle with a miss or with Help counts as "not yet" and comes back later.
 const sqOf = (name) => (name.charCodeAt(1) - 49) * 8 + (name.charCodeAt(0) - 97);
 const sqName = (sq) => 'abcdefgh'[sq & 7] + ((sq >> 3) + 1);
+// the decisive move lands and sits this long before the reward starts (owner: the moment should come later)
+const SETTLE = 0.8;
 const parseUci = (u) => ({ from: sqOf(u.slice(0, 2)), to: sqOf(u.slice(2, 4)), promo: u[4] || null });
 
-export function createPuzzles({ game, hint = null, sweep = null, progress, pause = 600, onSide = null }) {
+export function createPuzzles({ game, hint = null, sweep = null, progress, reward = null, onChapter = null, pause = 600, onSide = null }) {
   const listeners = [];
   let puzzle = null;
   let phase = 'idle';        // idle | playing | solved
@@ -25,6 +27,7 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, pause
   let allowed = false;       // the guard said yes to a player move that is about to arrive as a 'move' event
   let deviated = false;      // a mate in two was answered with another first move that still forces mate: the line is the engine's now
   let pendingDev = false;    // the guard accepted a deviating first move that has not been played yet
+  let lastTo = null, lastDelay = 0;         // the square the player's last move went to: the decisive piece, where the reward bursts
   let hintForced = null;     // the player's hint preference, kept while Help shows the arrow with the preference off
 
   const total = () => (puzzle ? puzzle.moves.length : 0);
@@ -123,13 +126,26 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, pause
     // the gold sweep runs from the player's edge over the player's own pieces, the same call as in the Drill
     const side = ownColor(), squares = [];
     game.chess.board.forEach((pc, sq) => { if (pc && (pc < 'a' ? 'w' : 'b') === side) squares.push(sq); });
-    sweep?.play?.({ side, squares });
+    const sweepNow = () => sweep?.play?.({ side, squares });   // with the reward when there is one, so it starts after the move has landed and sat
+    // the reward: a burst on the decisive piece, the chime and the card with its Next button. A puzzle that needed misses or
+    // Help gets the silver one, the same as its station will.
+    // a solve that finishes a chapter goes on to the board finale and then onChapter (main.js opens the Learn path)
+    const fin = progress.stats().finished;
+    const chapter = fin && onChapter ? { onDone: () => onChapter(fin) } : null;
+    reward?.solved?.({ square: lastTo, silver: misses > 0 || helped, delay: lastDelay + SETTLE, theme: puzzle.theme, onNext: () => ctl.next(), chapter, onStart: sweepNow });
+    if (!reward) sweepNow();
+    if (chapter && !reward) onChapter(fin);
   }
 
   game.onMove((rec) => {
     if (phase !== 'playing' || internal) return;
     if (!allowed) return;
     allowed = false;
+    lastTo = rec.m.to;
+    {   // the slide takes this long to land (the same estimate as the move sounds): the reward waits for it
+      const m = rec.m, dist = Math.hypot((m.to & 7) - (m.from & 7), (m.to >> 3) - (m.from >> 3));
+      lastDelay = m.piece === 'n' ? 0.8 : 0.4 + 0.07 * dist;
+    }
     const dev = pendingDev; pendingDev = false;
     // a promotion is chosen after the guard: the wrong piece is a miss, not a solution
     const d = deviated ? null : due();
@@ -166,6 +182,7 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, pause
 
   // Put the puzzle on the board: the position before the opponent's move, then that move played with its slide.
   function load(p, { keepScore = false } = {}) {
+    reward?.dismiss?.();
     puzzle = p;
     phase = 'playing';
     ply = 0; wait = null; allowed = false; deviated = false; pendingDev = false;
@@ -217,6 +234,7 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, pause
       if (phase === 'idle') return;
       if (phase === 'playing' && puzzle && (misses || helped)) progress.finish(puzzle.id, { clean: false });
       hideHint();
+      reward?.dismiss?.();
       phase = 'idle'; puzzle = null; wait = null; message = null; misses = 0; helped = false;
       internal++;
       game.setMode('play');
@@ -226,6 +244,7 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, pause
     },
     // Every frame, with the frame time: plays the opponent's reply once the pause has run and the board is at rest.
     tick(dt) {
+      reward?.tick?.(dt);
       if (phase !== 'playing') return;
       if (!due() || isOwn(ply)) { wait = null; return; }
       if (game.busy || game.pendingPromotion) return;

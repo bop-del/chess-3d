@@ -1,0 +1,20 @@
+/* The reward card of a solved puzzle (src/puzzles/reward.js). Opacity and --k are set from the frame loop, not by CSS
+   transitions, so a stepped test or a recording sees the same card. */
+.pzreward {
+  position: fixed; z-index: 20; left: 50%; bottom: calc(var(--tb, 84px) + 18px + env(safe-area-inset-bottom, 0px));
+  width: min(86vw, 340px); padding: 16px 18px 18px; border-radius: 20px; text-align: center;
+  background: var(--glass-strong); border: 1px solid rgba(216, 180, 104, 0.55);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55), 0 0 36px rgba(216, 180, 104, 0.28);
+  transform: translateX(-50%) translateY(calc((1 - var(--k, 1)) * 18px)) scale(calc(0.94 + 0.06 * var(--k, 1)));
+  opacity: 0;
+}
+.pzreward.silver { border-color: rgba(223, 231, 242, 0.5); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55), 0 0 28px rgba(223, 231, 242, 0.18); }
+.pzr-title { font-size: 30px; font-weight: 700; letter-spacing: 0.01em; color: var(--gold); text-shadow: 0 0 18px rgba(216, 180, 104, 0.5); }
+.pzreward.silver .pzr-title { color: #dfe7f2; text-shadow: 0 0 14px rgba(223, 231, 242, 0.35); }
+.pzr-theme { margin: 2px 0 14px; color: var(--dim); font-size: 14px; }
+.pzr-next { width: 100%; min-height: 56px; font-size: 18px; }
+body:not(.phone) .pzreward { left: auto; right: 22px; bottom: 28px; width: 320px; transform: translateY(calc((1 - var(--k, 1)) * 18px)) scale(calc(0.94 + 0.06 * var(--k, 1))); }
+@media (prefers-reduced-motion: reduce) { .pzreward { transform: translateX(-50%); } body:not(.phone) .pzreward { transform: none; } }
+
+/* phone learning layout: the learning bar's Next is the only one */
+body.phone.learnbar .pzr-next { display: none; }

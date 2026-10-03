@@ -19,7 +19,7 @@ const pick = (pair) => (pair ? pair[i18n.language] || pair.en || '' : '');
 const sideLabel = (l) => t(l.side === 'w' ? 'explain.forWhite' : 'explain.forBlack', l.side === 'w' ? 'You play White' : 'You play Black');
 const TABS = ['openings', 'mine', 'practise', 'puzzles'];
 
-export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress }) {
+export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress, reward = null }) {
   const { explain, idle } = openings;
   const sheet = ui.learnSheet;                 // null on desktop
   if (sheet) sheet.body.append(idle);
@@ -147,7 +147,7 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
 
   function puzzlesView() {
     return puzzlesTab({
-      puzzles, progress: puzzleProgress,
+      puzzles, progress: puzzleProgress, reward,
       onStart() {
         if (explain.state().phase !== 'list') explain.stop();
         if (drill.state().phase !== 'idle') drill.stop();
@@ -195,10 +195,10 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   const file = el('input');
   file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true;
   const exportBtn = button('', 'small', () => {
-    const blob = new Blob([store.exportJSON()], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ ...JSON.parse(store.exportJSON()), puzzles: puzzleProgress.exportData() }, null, 2)], { type: 'application/json' });
     const a = el('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'chess3d-openings.json';
+    a.download = 'chess3d-learning.json';
     document.body.append(a);
     a.click();
     a.remove();
@@ -212,7 +212,11 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
     if (!f) return;
     let text;
     try { text = await f.text(); } catch (e) { msg.textContent = t('learn.importFailed', 'Import failed: {why}', { why: t('learn.importUnreadable', 'The file could not be read.') }); return; }
-    const r = store.importJSON(text);
+    // the openings part goes to the store as before; the puzzle path rides along under "puzzles"
+    let puzzlePart = null, rest = text;
+    try { const o = JSON.parse(text); if (o && typeof o === 'object' && 'puzzles' in o) { puzzlePart = o.puzzles; delete o.puzzles; rest = JSON.stringify(o); } } catch (e) { /* the store reports it */ }
+    const r = store.importJSON(rest);
+    if (r.ok && puzzlePart) puzzleProgress.importData(puzzlePart);
     msg.textContent = r.ok ? t('learn.imported', 'Imported.') : t('learn.importFailed', 'Import failed: {why}', { why: r.error });
   });
   const dataRow = el('div', 'xrow');
@@ -220,7 +224,7 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   data.append(title, dataRow, msg, file);
   ui.mountSettings('train-data', data);
   const labels = () => {
-    title.textContent = t('learn.data', 'Your openings');
+    title.textContent = t('learn.data', 'Your openings and puzzles');
     exportBtn.textContent = t('learn.export', 'Export');
     importBtn.textContent = t('learn.import', 'Import');
   };
@@ -231,6 +235,8 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
     idle, render,
     get tab() { return tab; },
     show(id) { if (TABS.includes(id)) { tab = id; render(); } },
+    // Open the puzzle path: the Puzzles tab, and on the phone the Learn sheet. A running puzzle stays as it is until a station is tapped.
+    openPath() { tab = 'puzzles'; puzzleProgress.setView(null); render(); sheet?.open(); },
     get editing() { return editing; },
     export: exportBtn, import: importBtn, file, message: msg,
   };

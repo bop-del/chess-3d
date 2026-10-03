@@ -4,8 +4,7 @@ import { addDE } from '../i18n.js';
 
 addDE({
   'puzzles.tab': 'Rätsel', 'learn.tab.puzzles': 'Rätsel',
-  'puzzles.lead': 'Kurze Aufgaben auf dem Brett. Finde den besten Zug. Das geht immer weiter.',
-  'puzzles.start': 'Start', 'puzzles.next': 'Nächstes Rätsel',
+    'puzzles.start': 'Start', 'puzzles.next': 'Nächstes Rätsel',
   'puzzles.band': 'Stufe',
   'puzzles.band.starter': 'Einsteiger', 'puzzles.band.growing': 'Auf dem Weg', 'puzzles.band.tricky': 'Knifflig',
   'puzzles.help': 'Hilfe', 'puzzles.stop': 'Beenden', 'puzzles.close': 'Schließen',
@@ -15,6 +14,11 @@ addDE({
   'puzzles.your': 'Du bist am Zug.',
   'puzzles.helpShown': 'Der goldene Pfeil zeigt den Zug.',
   'puzzles.solved': 'Gelöst!',
-  'puzzles.solvedLater': 'Gelöst. Dieses Rätsel kommt später noch einmal.',
+  'puzzles.solvedLater': 'Gelöst. Spiel es im Pfad noch einmal für Gold.',
+  'puzzles.chapter': 'Kapitel', 'puzzles.chapterN': 'Kapitel {n}', 'puzzles.path': 'Rätselpfad', 'puzzles.station': 'Station {n}',
+  'puzzles.st.gold': 'gelöst', 'puzzles.st.silver': 'mit Hilfe gelöst', 'puzzles.st.next': 'als Nächstes', 'puzzles.st.todo': 'noch nicht gespielt',
+  'puzzles.legend.gold': 'Gelöst', 'puzzles.legend.silver': 'Mit Hilfe', 'puzzles.legend.next': 'Als Nächstes',
+  'puzzles.continue': 'Weiter', 'puzzles.nextChapter': 'Nächstes Kapitel',
+  'puzzles.chapterDone': 'Kapitel {n} geschafft!', 'puzzles.levelDone': 'Kapitel {n} geschafft! Eine neue Stufe öffnet sich.',
   'puzzles.empty': 'Keine Rätsel verfügbar.',
 });

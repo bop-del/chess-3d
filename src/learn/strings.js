@@ -12,7 +12,7 @@ addDE({
   'learn.practiseLead': 'Eine Eröffnung zum Üben wählen. Das ändert nichts an deinem Fortschritt.',
   'learn.practiseStart': 'Üben beginnen', 'learn.practiseNone': 'Du hast noch keine Eröffnung übernommen. Unter Eröffnungen findest du sie.',
   'learn.practiseLocked': 'Üben schaltet sich frei, sobald du die erste Eröffnung übernommen hast.',
-  'learn.data': 'Deine Eröffnungen', 'learn.export': 'Exportieren', 'learn.import': 'Importieren',
+  'learn.data': 'Deine Eröffnungen und Rätsel', 'learn.export': 'Exportieren', 'learn.import': 'Importieren',
   'learn.exported': 'Datei gespeichert.', 'learn.imported': 'Importiert.', 'learn.importFailed': 'Import nicht möglich: {why}',
   'learn.importUnreadable': 'Die Datei konnte nicht gelesen werden.',
   'lb.controls': 'Lernsteuerung', 'lb.back': 'Zurück', 'lb.show': 'Zeig es mir', 'lb.hint': 'Hinweis', 'lb.end': 'Beenden',

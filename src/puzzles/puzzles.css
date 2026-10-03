@@ -3,7 +3,7 @@
 .pzsay[data-kind="wrong"] { color: #ffcfa8; }
 .pzsay[data-kind="solved"] { color: var(--gold); font-weight: 600; }
 .pzband { text-transform: none; }
-.pzbandline { display: flex; justify-content: space-between; align-items: baseline; margin: 2px 0 6px; color: var(--dim); font-size: 13px; }
+.pzbandline { display: flex; justify-content: space-between; align-items: baseline; margin: 2px 0 2px; color: var(--dim); font-size: 13px; }
 .pzbandline b { color: var(--gold); font-weight: 600; }
 .pzstart, .pznext { width: 100%; min-height: 52px; font-size: 17px; }
 .pzhelp { width: 100%; }
@@ -18,3 +18,47 @@ body.phone:not(.portrait) .pzstrip .xtext { order: 2; flex: 1; min-width: 0; max
 body.phone:not(.portrait) .pzstrip .xrow { order: 3; flex: none; width: 128px; }
 body.phone:not(.portrait) .pzstrip .xclose { order: 4; flex: none; }
 body.phone:not(.portrait) .pzstrip { padding: 6px 10px; }
+
+/* the path: header, chapter badges, the winding road of stations, legend, one big button */
+.pzpath { gap: 10px; }
+.pzbadges { display: flex; gap: 5px; }
+.pzbadge {
+  flex: 1 1 0; min-width: 0; height: 26px; padding: 0; border-radius: 13px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.05);
+  color: var(--dim); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.pzbadge.done { background: linear-gradient(180deg, #e9cd86, #b08d45); color: #2a2008; border-color: #f3dfa8; }
+.pzbadge.here { border-color: var(--gold); color: #f3dfa8; background: var(--gold-soft); box-shadow: 0 0 10px rgba(216, 180, 104, 0.45); }
+.pzbadge.done.here { color: #2a2008; background: linear-gradient(180deg, #e9cd86, #b08d45); border-color: #f3dfa8; }
+body.phone .pzbadge { height: 34px; }
+.pzmap { border-radius: 14px; background: radial-gradient(120% 90% at 50% 0%, rgba(216, 180, 104, 0.1), transparent 70%), rgba(255, 255, 255, 0.03); border: 1px solid var(--line); padding: 6px 0; }
+.pzmap svg { display: block; width: 100%; height: auto; overflow: visible; }
+.pzroad { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-width: 7; stroke-linecap: round; }
+.pzroad.lit { stroke: url(#pzg); filter: drop-shadow(0 0 4px rgba(216, 180, 104, 0.6)); }
+.st { cursor: pointer; outline: none; }
+.st circle.base { stroke-width: 2; }
+.st circle.hit { fill: transparent; }
+.st text { font: 700 15px var(--font); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.st.todo circle.base { fill: #1b1d27; stroke: rgba(255, 255, 255, 0.28); }
+.st.todo text { fill: #b4b5c0; }
+.st.gold circle.base { fill: url(#pzgold); stroke: #f3dfa8; }
+.st.gold text { fill: #2a2008; }
+.st.silver circle.base { fill: url(#pzsilver); stroke: #e8eaf0; }
+.st.silver text { fill: #23252c; }
+.st.next circle.base { fill: #2a2412; stroke: var(--gold); }
+.st.next text { fill: #f3dfa8; }
+.st circle.halo { fill: none; stroke: none; transform-box: fill-box; transform-origin: center; }
+.st.next circle.halo { stroke: var(--gold); stroke-width: 2; opacity: 0.6; transform: scale(1.35); animation: pzglow 1.8s ease-in-out infinite; }
+.st:focus-visible circle.base { stroke: #fff; stroke-width: 3; }
+@keyframes pzglow { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.85; } }
+/* the finished chapter: every station lights up in a wave (the reward sets --lit per station, without it the CSS wave runs) */
+.pzwave .st circle.base { filter: drop-shadow(0 0 calc(2px + 6px * var(--lit, 1)) rgba(243, 223, 168, calc(0.9 * var(--lit, 1)))); animation: pzwave 0.9s ease-out both; animation-delay: calc(var(--i, 0) * 0.1s); }
+@keyframes pzwave { 0% { transform: scale(1); } 35% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.pzwave .st:nth-of-type(1) circle.base { --i: 0; } .pzwave .st:nth-of-type(2) circle.base { --i: 1; } .pzwave .st:nth-of-type(3) circle.base { --i: 2; }
+.pzwave .st:nth-of-type(4) circle.base { --i: 3; } .pzwave .st:nth-of-type(5) circle.base { --i: 4; } .pzwave .st:nth-of-type(6) circle.base { --i: 5; }
+.pzwave .st:nth-of-type(7) circle.base { --i: 6; } .pzwave .st:nth-of-type(8) circle.base { --i: 7; } .pzwave .st:nth-of-type(9) circle.base { --i: 8; } .pzwave .st:nth-of-type(10) circle.base { --i: 9; }
+.pzwave .st circle.base { transform-box: fill-box; transform-origin: center; }
+.pzdone { margin: 0; text-align: center; color: var(--gold); font-weight: 600; font-size: 15px; }
+.pzfoot { display: flex; gap: 14px; justify-content: center; color: var(--dim); font-size: 11.5px; }
+.pzdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.pzdot.gold { background: #d8b468; } .pzdot.silver { background: #b8bdca; } .pzdot.next { background: #2a2412; border: 1.5px solid #d8b468; }
+@media (prefers-reduced-motion: reduce) { .pzwave .st circle.base, .st.next circle.halo { animation: none; } }

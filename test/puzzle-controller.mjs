@@ -212,5 +212,54 @@ const two = [sample, ...PUZZLES.filter((p) => p.id !== sample.id).slice(0, 6)];
   ok('stop gives the ordinary game back', r.game.mode === 'play' && r.game.chess.fen() === START_FEN && r.ctl.state().phase === 'idle');
 }
 
+// ---- reward: called once on solve with the decisive square, silver after misses, dismissed by the next puzzle
+{
+  const calls = [];
+  const reward = { solved: (o) => calls.push(o), dismiss: () => calls.push('dismiss'), tick: (dt) => { reward.t = (reward.t || 0) + dt; } };
+  const mk = () => rig(two, { reward });
+  let r = mk();
+  r.ctl.start();
+  const p = r.ctl.state().puzzle;
+  solve(r, p);
+  const last = uci(p.moves[(p.moves.length - 1) % 2 === 1 ? p.moves.length - 1 : p.moves.length - 2]);
+  const o = calls.find((c) => c && c.square !== undefined);
+  ok('a solve calls reward.solved once with the decisive square and the theme', calls.filter((c) => c && c.square !== undefined).length === 1 && o.square === nameSq(last[1]) && o.theme === p.theme, JSON.stringify(o));
+  ok('a clean solve is gold, with a delay for the slide', o.silver === false && o.delay >= 1.2 && typeof o.onNext === 'function');
+  ok('the board sweep waits for the reward: not yet played, played by onStart', r.sweeps.n === 0 && (o.onStart(), r.sweeps.n === 1));
+  const before = calls.length;
+  o.onNext();
+  ok('the card Next button starts the next puzzle and dismisses the reward', r.ctl.state().phase === 'playing' && r.ctl.state().puzzle.id !== p.id && calls.slice(before).includes('dismiss'));
+  r.ctl.tick(0.5);
+  ok('tick reaches the reward even while no puzzle runs', reward.t > 0);
+  calls.length = 0;
+  r = mk();
+  r.ctl.start();
+  const q = r.ctl.state().puzzle;
+  r.ctl.help();
+  solve(r, q);
+  ok('a solve with Help is the silver reward', calls.find((c) => c && c.square !== undefined)?.silver === true);
+}
+
+// ---- a solve that finishes a chapter hands over to the finale, and onChapter runs after it
+{
+  const calls = [], chap = [];
+  const reward = { solved: (o) => calls.push(o), dismiss() {}, tick() {} };
+  const set = PUZZLES.filter((x) => x.band === 'starter').slice(0, 10);
+  const r = rig(set, { reward, onChapter: (f) => chap.push(f) });
+  const st = r.progress.stats().stations;
+  for (let i = 0; i < 9; i++) r.progress.finish(st[i].id, { clean: true });
+  r.ctl.start();
+  const p = r.ctl.state().puzzle;
+  solve(r, p);
+  const o = calls[calls.length - 1];
+  ok('the solve that finishes a chapter passes chapter.onDone to the reward', !!o?.chapter && typeof o.chapter.onDone === 'function' && chap.length === 0, JSON.stringify(Object.keys(o || {})));
+  o?.chapter?.onDone();
+  ok('onChapter runs when the finale is done, with the finished chapter', chap.length === 1 && chap[0].chapter === 0);
+  const r2 = rig(set, { reward });
+  r2.progress.finish(r2.progress.stats().stations[0].id, { clean: true });
+  r2.ctl.start(); solve(r2, r2.ctl.state().puzzle);
+  ok('an ordinary solve has no chapter finale', !calls[calls.length - 1].chapter);
+}
+
 console.log(failed ? `\n${failed} failed` : '\nall puzzle controller checks passed');
 process.exit(failed ? 1 : 0);
