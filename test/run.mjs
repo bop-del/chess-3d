@@ -1,9 +1,9 @@
 // Test runner: node test/run.mjs [fast|smoke|phone|all]   (default fast; npm test calls it)
 //   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules, novice level
-//   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on port 5303, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes, themes
+//   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on the lane's own port (5303 in the main checkout), only the groups the diff against main affects inside a lane (--all forces every group), cached passes print CACHED, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes, themes
 //   phone  phone sizes and real touch: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
-// Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes
+// Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes, --affected, --all, --no-cache
 // Exit codes: 0 all pass, 1 a check failed, 2 usage error, 3 nothing failed but a smoke group was skipped (no Chrome slot).
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
@@ -38,6 +38,7 @@ if (tier === 'fast' || tier === 'all') {
   run('block characters contract (test/blocks-chars.mjs)', 'test/blocks-chars.mjs');
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
+  run('affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
   run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
   run('puzzle controller (test/puzzle-controller.mjs)', 'test/puzzle-controller.mjs');

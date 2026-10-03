@@ -3,7 +3,7 @@
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
 //   launchBrowser(opts)      headless Chrome through puppeteer-core with software GL (swiftshader) by default, so it runs anywhere;
 //                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check does).
-//                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (four with metal).
+//                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 8, three under 16).
 //                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
 //   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted); sets Battle scenes Off for the page unless { scenes: true }
 //   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers
@@ -12,8 +12,8 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { tmpdir, loadavg, homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { tmpdir, loadavg, homedir, freemem, totalmem } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
 
@@ -42,7 +42,7 @@ export function chromePath() {
 }
 
 // Headless Chromes at a time on this machine, across lanes and agents, adaptive by load: two slots always, a third
-// while the 1 minute load is under 12, a fourth under 6 (always four with CHESS_GL=metal, the GPU does the drawing). Each slot is a lock directory in the temp folder holding its
+// while the 1 minute load is under 12, a fourth under 6. With CHESS_GL=metal (the GPU does the drawing): four under load 8, three under 16, else two. Each slot is a lock directory in the temp folder holding its
 // owner's pid (slot 0 keeps the original lock name, so older checkouts still count). A lock whose pid is gone is stale
 // and taken over. Released when the browser closes or the process exits.
 const SLOTS = ['', '.1', '.2', '.3'].map((x) => join(tmpdir(), 'chess-3d-chrome.lock' + x));
@@ -53,7 +53,9 @@ const defaultGl = () => {
   return want === 'metal' ? 'metal' : 'swiftshader';
 };
 const metalOn = () => defaultGl() === 'metal';
-const allowedSlots = () => { const l = loadavg()[0]; return l < 6 || (metalOn() && l < 12) ? 4 : l < 12 ? 3 : 2; };
+/** Slots for a 1 minute load. With Metal (the GPU does the drawing): under 8 gives 4, under 16 gives 3, else 2. Without: under 6 gives 4, under 12 gives 3, else 2. */
+export const slotsFor = (load, metal) => metal ? (load < 8 ? 4 : load < 16 ? 3 : 2) : (load < 6 ? 4 : load < 12 ? 3 : 2);
+const allowedSlots = () => slotsFor(loadavg()[0], metalOn());
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 /** Slots free right now at this load (at least 0). Used by test/smoke-groups.mjs to size its parallelism. */
 export const freeSlots = () => SLOTS.slice(0, allowedSlots()).filter((lock) => { try { return !alive(Number(readFileSync(join(lock, 'pid'), 'utf8'))); } catch (e) { return !existsSync(lock); } }).length;
@@ -79,7 +81,7 @@ const GL_ARGS = {
   swiftshader: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist'],
   metal: ['--enable-gpu', '--use-angle=metal', '--use-gl=angle', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],   // swiftshader stays allowed as a fallback, the renderer log shows which one won
 };
-const logWait = (secs, gl) => { try { mkdirSync(join(ROOT, '.tmp'), { recursive: true }); appendFileSync(join(ROOT, '.tmp', 'chrome-waits.jsonl'), JSON.stringify({ t: new Date().toISOString(), script: process.argv[1] ? process.argv[1].split('/').slice(-2).join('/') : '', waitSecs: Math.round(secs * 10) / 10, load: Math.round(loadavg()[0] * 10) / 10, gl }) + '\n'); } catch (e) { /* ignore */ } };
+const logWait = (secs, gl) => { try { mkdirSync(join(ROOT, '.tmp'), { recursive: true }); appendFileSync(join(ROOT, '.tmp', 'chrome-waits.jsonl'), JSON.stringify({ t: new Date().toISOString(), script: process.argv[1] ? process.argv[1].split('/').slice(-2).join('/') : '', waitSecs: Math.round(secs * 10) / 10, load: Math.round(loadavg()[0] * 10) / 10, freePct: Math.round(freemem() / totalmem() * 100), slots: allowedSlots(), gl }) + '\n'); } catch (e) { /* ignore */ } };
 async function logRenderer(browser) {
   try {
     const pg = await browser.newPage();
@@ -182,6 +184,18 @@ for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { killAll(); proc
 
 /** mode 'preview' serves outDir with vite preview, mode 'dev' runs the dev server. Resolves { base, stop }. */
 export async function startServer({ mode = 'preview', port, outDir = 'dist', cwd = ROOT, subPath = '' }) {
+  if (mode === 'preview') {
+    // Something already answers on the port: serve the same build (reuse it) or refuse. Never test a foreign build silently.
+    const sha = (t) => createHash('sha1').update(t).digest('hex').slice(0, 12);
+    let theirs = null;
+    try { const r = await fetch(`http://127.0.0.1:${port}${subPath || '/'}`, { signal: AbortSignal.timeout(2000) }); theirs = r.ok ? sha(Buffer.from(await r.arrayBuffer())) : 'http-' + r.status; } catch (e) { /* nothing listens: free */ }
+    if (theirs) {
+      let ours = ''; try { ours = sha(readFileSync(join(resolve(cwd, outDir), 'index.html'))); } catch (e) { /* no build */ }
+      if (theirs !== ours) throw new Error(`port ${port} already serves a different build (index.html ${theirs}, expected ${ours || 'none'}): another lane or a stale server owns it. Stop that server or pass another --port; refusing to test it.`);
+      console.log(`      port ${port} already serves this build (index.html ${ours}), reusing it`);
+      return { base: `http://127.0.0.1:${port}${subPath || '/'}`, stop() {} };
+    }
+  }
   const baseArg = subPath ? ['--base', subPath] : [];   // for example '/chess-3d/', like GitHub Pages
   const args = mode === 'dev' ? ['--port', String(port), '--strictPort', '--host', '127.0.0.1', ...baseArg]
     : ['preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1', '--outDir', outDir, ...baseArg];
@@ -197,4 +211,19 @@ export async function startServer({ mode = 'preview', port, outDir = 'dist', cwd
   }
   child.kill();
   throw new Error(`vite ${mode} did not answer on ${base}`);
+}
+
+/** Which lane this checkout is: the worktree directory name, or '' for the main checkout. */
+export function laneName(root = ROOT) {
+  try {
+    const git = (a) => execFileSync('git', a, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return resolve(root, git(['rev-parse', '--git-dir'])) !== resolve(root, git(['rev-parse', '--git-common-dir'])) ? basename(root) : '';
+  } catch (e) { return ''; }
+}
+/** Ports for a checkout: a stable hash of the lane name into 5400 to 5498 (preview) and 5500 to 5598 (dev), the main checkout keeps 5303 and 5302.
+ *  inLane is for tests; by default it is looked up with git. */
+export function lanePorts(root = ROOT, inLane = !!laneName(root)) {
+  if (!inLane) return { preview: 5303, dev: 5302, lane: '' };
+  const h = parseInt(createHash('sha1').update(basename(root)).digest('hex').slice(0, 8), 16) % 99;   // 99, so the release check's PORT + 1 stays below the dev range
+  return { preview: 5400 + h, dev: 5500 + h, lane: basename(root) };
 }

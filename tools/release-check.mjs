@@ -1,5 +1,5 @@
 // Release check: the mechanical part of a public readiness review, no AI involved. Slow (fresh npm ci, headless Chrome), run it before a push.
-// Usage: node tools/release-check.mjs [--port=5303] [--skip-install] [--extra-audit="<shell command>"] [--since=<tag>] [--no-browser]
+// Usage: node tools/release-check.mjs [--port=<lane preview port, 5303 in the main checkout>] [--skip-install] [--extra-audit="<shell command>"] [--since=<tag>] [--no-browser]
 //   1. git hygiene: clean tree, no scratch, log, env or key files tracked, no tracked file over 1.5 MB (docs/ excepted), no wording from the
 //      optional tools/internal-terms.txt (one word or regular expression per line), no em dashes or spaced double hyphens as punctuation
 //      in tracked text and in commit messages since the last tag, no private data (home paths, private network addresses, e-mail
@@ -24,13 +24,13 @@ import { mkdtempSync, existsSync, readFileSync, readdirSync, statSync, symlinkSy
 import { tmpdir, userInfo } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ROOT, reporter, launchBrowser, watchPage, startServer, sleep } from './_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, sleep, lanePorts } from './_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const a = args.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : dflt; };
 const flag = (name) => args.includes(`--${name}`);
 if (flag('help') || flag('h')) { console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 21).join('\n')); process.exit(0); }
-const PORT = Number(opt('port', 5303));
+const PORT = Number(opt('port', lanePorts().preview));
 const sh = (cmd, cwd = ROOT, opts = {}) => execSync(cmd, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, ...opts });
 
 // Patterns are assembled from parts so this file does not match itself.

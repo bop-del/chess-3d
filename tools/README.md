@@ -5,20 +5,24 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 | Tier | Command | Time | Needs | Checks |
 | --- | --- | --- | --- | --- |
 | fast | `node test/run.mjs fast` (or `npm test`) | about 1 s | Node only | rules (perft, SAN, endings, `test/perft.mjs`), piece geometry contract (`test/geometry.mjs`), text lint (`test/lint.mjs`), audit planner rules (`test/audit-plan.mjs`), opening lines (`test/openings.mjs`), puzzles (`test/puzzle-progress.mjs`, `test/puzzle-controller.mjs`, `test/puzzles-data.mjs`), the novice level (`test/novice.mjs`), the training core (`test/train.mjs`) |
-| smoke | `node test/run.mjs smoke` | about 2 min | Chrome | `vite build`, `vite preview` on port 5303, a scripted game by real clicks, gimbal, render budgets, pixel checks, regression checks from `test/fixes.mjs` (labels, picking, trays, device) |
+| smoke | `node test/run.mjs smoke` | about 2 min for every group | Chrome | `vite build`, `vite preview` on the lane's port (5303 in the main checkout), a scripted game by real clicks, gimbal, render budgets, pixel checks, regression checks from `test/fixes.mjs` (labels, picking, trays, device) |
 | all | `node test/run.mjs all` | fast plus smoke | Chrome | both tiers, then a reminder to run the release check |
 | release | `node tools/release-check.mjs` | 5 to 10 min | Chrome, network for `npm ci` | git hygiene, fresh copy build, dist scan, page loads, URL fuzzing, docs, version |
 
 ## Speed: GPU rendering, build cache, slots
 
-- `launchBrowser()` uses the GPU (ANGLE Metal, `--enable-gpu --use-angle=metal`) by default on Apple Silicon and prints the WebGL renderer string once per launch. `CHESS_GL=swiftshader` forces software, `CHESS_GL=metal` forces the GPU. Elsewhere the default is software. The release check always stays on software, whatever the variable says. With metal on, a fourth slot is allowed under load 12.
+- `launchBrowser()` uses the GPU (ANGLE Metal, `--enable-gpu --use-angle=metal`) by default on Apple Silicon and prints the WebGL renderer string once per launch. `CHESS_GL=swiftshader` forces software, `CHESS_GL=metal` forces the GPU. Elsewhere the default is software. The release check always stays on software, whatever the variable says. With metal on, four slots are allowed under load 8 and three under 16.
 - Build cache: `build(outDir)` in `tools/_lib.mjs` hashes `git ls-files -s` plus the content of every build input (src, public, index.html, vite.config, package.json, package-lock.json, tracked or untracked), builds once into `~/.cache/chess-3d/dist-<hash>` and copies it into `outDir` with an APFS clone (`cp -c`). A second run, or the next tier, logs `build cache hit dist-<hash>`. Any input change builds again. The phone tier therefore builds once for its three scripts. Delete old `~/.cache/chess-3d/dist-*` folders any time.
-- Slots: two Chromes always, a third while the 1 minute load is under 12, a fourth under 6. Every launch appends its slot wait to `.tmp/chrome-waits.jsonl` (`waitSecs`, `load`, `gl`).
+- Slots: with metal four Chromes while the 1 minute load is under 8, three under 16, else two. Software: four under 6, three under 12, else two (`slotsFor(load, metal)`, unit tested). Every launch appends its slot wait and the decision inputs to `.tmp/chrome-waits.jsonl` (`waitSecs`, `load`, `freePct`, `slots`, `gl`).
+- Lane ports: `lanePorts()` in `tools/_lib.mjs` derives the preview port (5400 to 5498) and the dev port (5500 to 5598) from a hash of the worktree directory name, so lanes never share one; the main checkout keeps 5303 and 5302. `startServer` in preview mode first asks the port: the same build (same `index.html`) is reused, a different one throws `port N already serves a different build` instead of testing it. The release check gets the same port and the same check.
+- Affected groups: `tools/affected-groups.mjs` holds the one path to group table (`MAP`, with `CORE` paths that run everything: rules, rendering core, package files and the three version, vite config, `tools/_lib.mjs`, the shared test files; a `src/` file no row knows runs everything too). `node tools/affected-groups.mjs` prints the groups of the current diff against the merge base with main; `test/affected-groups.mjs` tests the table. The groups themselves are listed in `test/smoke-group-list.mjs`.
+- Result cache: `tools/result-cache.mjs` stores a passed group in `~/.cache/chess-3d/results` (newest 400 kept), keyed by the group, the build content hash, the content of the group script and its imports, and `CHESS_GL`. A hit prints `CACHED`, uses no Chrome slot and needs no build or server, so a repeat run takes about a second. Any source change changes the build hash and so reruns the selected groups; a changed test script reruns the groups that load it.
 
 ## Fast tier
 
 - `test/perft.mjs`: perft counts for five reference positions, SAN, check, mate, stalemate, repetition, en passant, promotion, castling. Exits 1 on any mismatch.
 - `test/geometry.mjs`: builds all six pieces in both colors with the real materials, headless. Height within 8 percent of the contract (pawn 0.90, rook 1.00, knight 1.20, bishop 1.35, queen 1.60, king 1.85), footprint 0.5 to 0.85, centered within 0.06, sitting on y = 0, 20k to 90k triangles, finite positions and normals, shadow flags on every mesh.
+- `test/affected-groups.mjs`: the path to smoke group table, the Chrome slot rule, lane ports, the port refusal and the result cache keys.
 - `test/audit-plan.mjs`: the audit planner's rules (docs only needs no browser tier, the stylesheet needs smoke, visual and device checks, and so on).
 - `test/openings.mjs`: every opening line is legal on the rules engine. `test/puzzle-progress.mjs`, `test/puzzle-controller.mjs`, `test/puzzles-data.mjs`: the puzzle store, the controller and the shipped data. `test/novice.mjs`: the Novice level rules (injected random). `test/train.mjs`: ladder, store and planner of the training core.
 - `test/lint.mjs`: no em dashes, no spaced double hyphen punctuation and no local absolute paths in text files (tracked, plus untracked files that are not ignored).
@@ -27,7 +31,7 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 
 `node test/smoke.mjs [--skip-build] [--dev] [--skip-fixes] [--write-budgets] [--shots]`
 
-- Builds into `.tmp/smoke-dist` (never touches `dist/`), serves it on port 5303, drives headless Chrome with the GPU on Apple Silicon (ANGLE Metal), software GL (swiftshader) elsewhere or with `CHESS_GL=swiftshader`, `quality=low`, `manual=1`.
+- Builds into `.tmp/smoke-dist` (never touches `dist/`), serves it on the lane's preview port (5303 in the main checkout), drives headless Chrome with the GPU on Apple Silicon (ANGLE Metal), software GL (swiftshader) elsewhere or with `CHESS_GL=swiftshader`, `quality=low`, `manual=1`.
 - The first page load uses no `ai` flag and checks that vs computer is on by default and that black replies to e2e4. Every other run adds `ai=0` so both sides are played by the test.
 - Game: capture, undo, both castles, en passant, promotion chooser (cancel, queen, knight), fool's mate with banner and toppled king, undo of each, new game. Moves are two real mouse clicks on projected square positions that the app's own picking resolves to the right square. After every step the view is compared with the rules through `game.audit()`.
 - Gimbal: each axis slider, floor fade when tilted, Reset, Level board, keyboard W and R.
@@ -35,7 +39,9 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 - Pixels: not blank, no black frame, no white out, and light plus dark pixels inside the projected board corners, in five view presets and one tilted view.
 - Device checks in `test/fixes.mjs` (a few seconds each, 800x500): default load starts on High with no `touch` class, `?touch=1` sets the class and starts on Medium, `?touch=0` behaves like the default, `?touch=1&quality=low` starts on Low, and a WebGL context lost and restored through `WEBGL_lose_context` leaves the board rendering again (pixel check) with no console error.
 - `test/fixes.mjs` (`runFixChecks({ page, baseUrl, log })`) is called when the file exists: 12 independent units (labels, picking, five tray sizes, device and context loss), run in several tabs of the one browser (`--tabs=N`, default 3).
-- `--dev` uses the vite dev server on port 5302 instead of a build. `--shots` empties `.tmp/smoke-shots/`, saves the screenshots there and adds a contact sheet per screen size (`contact-<w>x<h>.png`).
+- `--dev` uses the vite dev server on the lane's dev port (5302 in the main checkout) instead of a build. `--shots` empties `.tmp/smoke-shots/`, saves the screenshots there and adds a contact sheet per screen size (`contact-<w>x<h>.png`).
+
+`node test/run.mjs smoke` runs the parallel groups of `test/smoke-groups.mjs`. Options: `--affected` (default inside a lane worktree: only the groups the diff against main affects, `--since=<ref>` compares with another ref), `--all` (every group; the release check and the full tier before a release stay full), `--no-cache` (ignore cached passes; `--shots`, `--write-budgets` and `--dev` imply it), `--only=<group,group>`, `--jobs=<n>`. Skipped groups are listed in the output, cached ones print `CACHED`.
 
 ## Phone tier
 

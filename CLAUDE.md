@@ -14,7 +14,7 @@ A 3D chess game for the browser (three.js 0.186, Vite, fully procedural, no asse
 | Tier | Command | What it covers |
 |---|---|---|
 | fast | `node test/run.mjs` | rules perft, piece geometry contract, text lint. No browser, seconds |
-| smoke | `node test/run.mjs smoke` | build, serve, drive the real page in headless Chrome (the GPU via ANGLE Metal on Apple Silicon, software GL elsewhere or with `CHESS_GL=swiftshader`; builds come from a content hashed cache in ~/.cache/chess-3d), parallel groups (test/smoke-groups.mjs), one Chrome each, about 2 minutes on a quiet machine |
+| smoke | `node test/run.mjs smoke` | build, serve, drive the real page in headless Chrome (the GPU via ANGLE Metal on Apple Silicon, software GL elsewhere or with `CHESS_GL=swiftshader`; builds come from a content hashed cache in ~/.cache/chess-3d), parallel groups (test/smoke-groups.mjs), one Chrome each. Inside a lane worktree only the groups the diff against main affects run (`--affected`, the default there; core paths run all; `--all` forces every group, always before a release), and a group that passed for the same build and scripts prints CACHED (`--no-cache` to rerun). About 2 minutes for all groups on a quiet machine |
 | phone | `node test/run.mjs phone` | phone sizes (portrait, landscape, short), tap target audit, real multi touch (pinch, twist, thumb bar). A few minutes |
 | release | `node tools/release-check.mjs` | fresh build, page load, hostile URLs, docs and repo hygiene. Run before a release |
 
@@ -49,7 +49,7 @@ No golden image diffs: software GL renders differ across machines. Take screensh
 The owner's regular Chrome holds their live session. Agents and scripts must never disturb it.
 
 - Never use the claude-in-chrome tools or open tabs in the owner's Chrome for testing. Test with puppeteer-core and a headless Chrome on its own temp profile.
-- Headless Chromes are always launched through `launchBrowser()` in tools/_lib.mjs and closed in a `finally` block. It holds machine wide slots, adaptive by load: two always, a third while the 1 minute load is under 12, a fourth under 6 (four with the GPU renderer), the wait of each launch is logged to .tmp/chrome-waits.jsonl; further launches wait. No retry loops that relaunch it.
+- Headless Chromes are always launched through `launchBrowser()` in tools/_lib.mjs and closed in a `finally` block. It holds machine wide slots, adaptive by load: two always, with the GPU renderer four while the 1 minute load is under 8, three under 16, else two (software: four under 6, three under 12, else two), each lane has its own preview and dev port from a hash of its directory name (5400 to 5498 and 5500 to 5598; main checkout 5303 and 5302), a test refuses a port that serves another build, the wait of each launch is logged to .tmp/chrome-waits.jsonl; further launches wait. No retry loops that relaunch it.
 - Never run `pkill` or `killall` on chrome or "Google Chrome". Kill only a PID you started yourself, and kill your own leftover scripts and dev servers by PID when you finish.
 - Software rendering is slow: use `quality=low&manual=1` for smoke checks, `window.__chess.step()` and `.draw()` for deterministic frames.
 - Each agent gets its own dev port. Stop servers you started.
