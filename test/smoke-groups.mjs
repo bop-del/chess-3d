@@ -64,16 +64,17 @@ const runGroup = ([name, script, extra]) => new Promise((resolve) => {
     resolve();
   });
 });
-const queue = GROUPS.slice();
-await Promise.all(Array.from({ length: Math.min(JOBS, queue.length) }, async () => { for (let g; (g = queue.shift());) await runGroup(g); }));
+try {
+  const queue = GROUPS.slice();
+  await Promise.all(Array.from({ length: Math.min(JOBS, queue.length) }, async () => { for (let g; (g = queue.shift());) await runGroup(g); }));
 
-if (flag('shots')) {
-  let b = null;
-  try { b = await launchBrowser({ w: 1280, h: 720 }); for (const f of await contactSheets(b, SHOTS)) console.log(`      contact sheet: ${f.slice(ROOT.length + 1)}`); }
-  catch (e) { console.log('WARN  contact sheet  ' + String(e.message).slice(0, 200)); }
-  finally { try { await b?.close(); } catch (e) { /* ignore */ } }
-}
-server.stop();
+  if (flag('shots')) {
+    let b = null;
+    try { b = await launchBrowser({ w: 1280, h: 720 }); for (const f of await contactSheets(b, SHOTS)) console.log(`      contact sheet: ${f.slice(ROOT.length + 1)}`); }
+    catch (e) { console.log('WARN  contact sheet  ' + String(e.message).slice(0, 200)); }
+    finally { try { await b?.close(); } catch (e) { /* ignore */ } }
+  }
+} finally { server.stop(); }
 console.log(`\nsmoke: ${totals.np + totals.nw + totals.nf} checks: ${totals.np} pass, ${totals.nw} warn, ${totals.nf} fail (${secs()})`);
 for (const n of skipped) console.log(`SKIP  group ${n}: no headless Chrome slot, its checks did not run`);
 const rerun = skipped.map((n) => n.replace(/ \d\/\d$/, '')).filter((n, i, a) => a.indexOf(n) === i).join(', ');

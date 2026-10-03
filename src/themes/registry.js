@@ -78,14 +78,21 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
 
   async function run(id, persist) {
     if (id === current || want !== id) return;
-    const built = await build(id);
+    let built;
+    try { built = await build(id); } catch (e) {
+      // a chunk that failed to load (offline, stale deploy): stay on Classic and keep later switches working
+      console.warn('theme failed to load, using Classic', id, e);
+      if (want === id) want = 'classic';
+      if (current !== 'classic') show('classic', { fresh: [], board: null, pieces: null, light: null });
+      return;
+    }
     if (want !== id) { for (const tex of built.fresh) tex.dispose(); return; }   // a later pick overtook this one
     show(id, built);
     if (persist) try { localStorage.setItem(STORE, id); } catch (e) { /* storage blocked */ }
   }
 
   // a quality change can change a theme (Glass uses real transmission on High only): build it again
-  stage.onQuality?.(() => { if (current !== 'classic') { const id = current; current = ''; chain = chain.then(() => run(id, false)); } });
+  stage.onQuality?.(() => { if (current !== 'classic') { const id = current; current = ''; chain = chain.then(() => run(id, false)).catch(() => {}); } });
 
   return {
     list: () => THEMES,
@@ -95,7 +102,7 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
       if (!isTheme(id)) return Promise.resolve(false);
       if (persist && id === current) { try { localStorage.setItem(STORE, id); } catch (e) { /* storage blocked */ } }
       want = id;
-      chain = chain.then(() => run(id, persist)).then(() => true);
+      chain = chain.then(() => run(id, persist)).catch(() => {}).then(() => true);
       return chain;
     },
     on(fn) { listeners.push(fn); },

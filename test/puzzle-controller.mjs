@@ -44,7 +44,7 @@ function fakeGame() {
   };
   return g;
 }
-const fakeHint = () => { const h = { enabled: true, visible: false, at: null, show(f, t) { h.at = [f, t]; h.visible = h.enabled; }, hide() { h.visible = false; h.at = null; } }; return h; };
+const fakeHint = () => { const h = { enabled: true, forced: false, visible: false, at: null, force(on) { h.forced = !!on; }, show(f, t) { h.at = [f, t]; h.visible = h.enabled || h.forced; }, hide() { h.visible = false; h.at = null; } }; return h; };
 const mem = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) }; };
 const uci = (u) => [u.slice(0, 2), u.slice(2, 4), u[4] || null];
 

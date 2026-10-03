@@ -4,8 +4,8 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 
 | Tier | Command | Time | Needs | Checks |
 | --- | --- | --- | --- | --- |
-| fast | `node test/run.mjs fast` (or `npm test`) | about 1 s | Node only | rules (perft, SAN, endings, `test/perft.mjs`), piece geometry contract (`test/geometry.mjs`), text lint (`test/lint.mjs`), audit planner rules (`test/audit-plan.mjs`) |
-| smoke | `node test/run.mjs smoke` | 1 to 2 min | Chrome | `vite build`, `vite preview` on port 5303, a scripted game by real clicks, gimbal, render budgets, pixel checks, regression checks from `test/fixes.mjs` (labels, picking, trays, device) |
+| fast | `node test/run.mjs fast` (or `npm test`) | about 1 s | Node only | rules (perft, SAN, endings, `test/perft.mjs`), piece geometry contract (`test/geometry.mjs`), text lint (`test/lint.mjs`), audit planner rules (`test/audit-plan.mjs`), opening lines (`test/openings.mjs`), puzzles (`test/puzzle-progress.mjs`, `test/puzzle-controller.mjs`, `test/puzzles-data.mjs`), the novice level (`test/novice.mjs`), the training core (`test/train.mjs`) |
+| smoke | `node test/run.mjs smoke` | about 2 min | Chrome | `vite build`, `vite preview` on port 5303, a scripted game by real clicks, gimbal, render budgets, pixel checks, regression checks from `test/fixes.mjs` (labels, picking, trays, device) |
 | all | `node test/run.mjs all` | fast plus smoke | Chrome | both tiers, then a reminder to run the release check |
 | release | `node tools/release-check.mjs` | 5 to 10 min | Chrome, network for `npm ci` | git hygiene, fresh copy build, dist scan, page loads, URL fuzzing, docs, version |
 
@@ -20,6 +20,7 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 - `test/perft.mjs`: perft counts for five reference positions, SAN, check, mate, stalemate, repetition, en passant, promotion, castling. Exits 1 on any mismatch.
 - `test/geometry.mjs`: builds all six pieces in both colors with the real materials, headless. Height within 8 percent of the contract (pawn 0.90, rook 1.00, knight 1.20, bishop 1.35, queen 1.60, king 1.85), footprint 0.5 to 0.85, centered within 0.06, sitting on y = 0, 20k to 90k triangles, finite positions and normals, shadow flags on every mesh.
 - `test/audit-plan.mjs`: the audit planner's rules (docs only needs no browser tier, the stylesheet needs smoke, visual and device checks, and so on).
+- `test/openings.mjs`: every opening line is legal on the rules engine. `test/puzzle-progress.mjs`, `test/puzzle-controller.mjs`, `test/puzzles-data.mjs`: the puzzle store, the controller and the shipped data. `test/novice.mjs`: the Novice level rules (injected random). `test/train.mjs`: ladder, store and planner of the training core.
 - `test/lint.mjs`: no em dashes, no spaced double hyphen punctuation and no local absolute paths in text files (tracked, plus untracked files that are not ignored).
 
 ## Smoke tier
@@ -84,12 +85,16 @@ Writes `src/puzzles/data.js` from the Lichess puzzle database (CC0). Without `--
 
 ## URL flags used by the tests
 
-`quality=low|medium|high`, `touch=1|0`, `manual=1` (no render loop, tests call `window.__chess.step(sec)` and `.draw()`), `ai=0` (computer off; default is on, you play white; `ai=3` or `ai=4` raises the level), `fen`, `moves`, `select`, `preset`, `gx` `gy` `gz`, `yaw` `pitch` `dist`, `hud=0`, `help=1`, `light`, `spin=1`, `promo`, `diag=1` (diagnostics overlay).
+`quality=low|medium|high`, `touch=1|0`, `manual=1` (no render loop, tests call `window.__chess.step(sec)` and `.draw()`), `ai=0` (computer off; default is on, you play white; `ai=1` to `ai=4` picks Novice, Easy, Normal or Hard), `fen`, `moves`, `select`, `preset`, `gx` `gy` `gz`, `yaw` `pitch` `dist`, `hud=0`, `help=1`, `light`, `spin=1`, `promo`, `diag=1` (diagnostics overlay), `view`, `theme`, `intro` (`0` skips the start sequence, `1` keeps it with `manual=1`).
 
 ## Files
 
 - `_lib.mjs`: shared reporter, Chrome launcher, page watcher, server starter.
+- `audit-plan.mjs`: says which tiers and audits a change needs (see Audit plan).
 - `budgets.json`: render budgets for the smoke tier.
+- `build-catalogue.mjs <dir with a.tsv to e.tsv>`: builds `src/openings/catalogue-data.js`, the position to opening name map (ECO and name), from the lichess-org/chess-openings data (CC0). Author time only.
 - `build-puzzles.mjs`: builds `src/puzzles/data.js` (see Puzzle data).
+- `contact-sheet.mjs`: one labelled grid per screen size from a folder of PNGs (see Contact sheets).
+- `phoneshots.mjs`: the phone shots and tap target audit (see Phone tier).
 - `release-check.mjs`: the release tier.
 - `render-assets.mjs`: renders the icons and the link preview (see Icons and link preview).

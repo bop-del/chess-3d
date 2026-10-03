@@ -141,5 +141,15 @@ const play = (p, clean) => { const x = p.next(); p.finish(x.id, { clean }); retu
   ok('onChange fires', n === 3, String(n));
 }
 
+// ---- a record from a newer version is read only
+{
+  const storage = mem();
+  const raw = JSON.stringify({ v: VERSION + 1, marks: { s1: 'g' } });
+  storage.setItem(STORE_KEY, raw);
+  const p = createPuzzleProgress({ storage, puzzles: mk(10) });
+  p.finish(p.next().id, { clean: true });
+  ok('a newer record is never saved over', storage.getItem(STORE_KEY) === raw);
+}
+
 console.log(failed ? `\n${failed} failed` : '\nall puzzle progress checks passed');
 process.exit(failed ? 1 : 0);

@@ -98,9 +98,10 @@ export function createFx({ stage, parent, signal } = {}) {
 
   if (stage?.renderer) stage.renderer.localClippingEnabled = true;
 
-  const own = (r) => { owned.push(r); return r; };
+  // after dispose() nothing new is kept: a scene that runs on after a skip must not leak or add to the scene
+  const own = (r) => { if (disposed) { try { r.dispose?.(); } catch (e) { /* ignore */ } } else owned.push(r); return r; };
   const cached = (key, make) => { let v = cache.get(key); if (!v) { v = own(make()); cache.set(key, v); } return v; };
-  const add = (obj) => { (parent || stage?.scene).add(obj); objects.add(obj); return obj; };
+  const add = (obj) => { if (disposed) return obj; (parent || stage?.scene).add(obj); objects.add(obj); return obj; };
   const remove = (obj) => { obj.removeFromParent(); objects.delete(obj); };
   const space = (obj) => parent || obj.parent;
 
@@ -423,7 +424,7 @@ export function createFx({ stage, parent, signal } = {}) {
     add(mesh);
     const b = { mesh, ps, o, g: o.gravity ?? -12, drag: o.drag ?? 0, grow: o.grow ?? 0, stain: o.stain ?? true, resolve: null, floor: o.floor ?? 0.01 };
     b.done = new Promise((r) => { b.resolve = r; });
-    bursts.add(b);
+    if (disposed) { mesh.dispose(); b.resolve(); } else bursts.add(b);
     return b;
   }
   const _mat = new THREE.Matrix4(), _pos = new THREE.Vector3(), _scl = new THREE.Vector3(), _idq = new THREE.Quaternion();

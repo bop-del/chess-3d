@@ -158,11 +158,12 @@ async function boot() {
   function frame(now) {
     const raw = Math.max(0, Math.min(0.25, (now - last) / 1000));   // the sequence runs on the wall clock, the game clock is capped
     last = now;
+    requestAnimationFrame(frame);   // first: one throw in a frame must not stop the loop
     const t0 = performance.now();
-    frameOnce(Math.min(0.05, raw), raw);
+    try { frameOnce(Math.min(0.05, raw), raw); } catch (e) { if (!frameFailed) { frameFailed = true; console.error('frame failed', e); } }
     if (boot.loaded && !boot.ready) boot.frameMs = Math.max(boot.frameMs || 0, performance.now() - t0);   // the slowest frame while the sequence plays out
-    requestAnimationFrame(frame);
   }
+  let frameFailed = false;
   // test hook: the sequence's state; in ?manual=1&intro=1 a test also drives it frame by frame (tick) and loading goes on in real time
   if (intro) {
     window.__intro = {
@@ -189,8 +190,10 @@ async function boot() {
   // drop in, so the board never changes colour while it builds
   const themes = createThemes({ stage, board, pieceSet, materials });
   const flagTheme = params.get('theme');
-  if (flagTheme && isTheme(flagTheme)) await themes.set(flagTheme, { persist: false });   // this load only
-  else await themes.set(storedTheme(), { persist: false });
+  try {
+    if (flagTheme && isTheme(flagTheme)) await themes.set(flagTheme, { persist: false });   // this load only
+    else await themes.set(storedTheme(), { persist: false });
+  } catch (e) { console.warn('theme not applied, Classic stays', e); }   // a theme must never stop the boot
 
   await pieceSet.buildAll((f, msg) => progress(0.4 + f * 0.52, msg));
   boot.pieces = performance.now();
@@ -340,16 +343,19 @@ function applyViewParams({ controls, views, stage }) {
     controls.setPreset(preset);
     for (let i = 0; i < 120; i++) controls.update(0.02); // jump to the end of the transition
   }
+  // a URL number that is empty or not finite (?yaw=abc, ?dist=Infinity) is ignored
+  const num = (k) => { const v = params.get(k); return v === null || v.trim() === '' || !Number.isFinite(+v) ? null : +v; };
   for (const a of ['x', 'y', 'z']) {
-    if (params.has('g' + a)) controls.setGimbal(a, +params.get('g' + a));
+    const v = num('g' + a);
+    if (v !== null) controls.setGimbal(a, v);
   }
-  if (params.has('yaw') || params.has('pitch') || params.has('dist')) {
+  if (['yaw', 'pitch', 'dist'].some((k) => num(k) !== null)) {
     const c = controls.camera;
     const DEG = Math.PI / 180;
     controls.setCamera({
-      yaw: params.has('yaw') ? +params.get('yaw') * DEG : c.yaw,
-      pitch: params.has('pitch') ? +params.get('pitch') * DEG : c.pitch,
-      dist: params.has('dist') ? +params.get('dist') : c.dist,
+      yaw: num('yaw') !== null ? num('yaw') * DEG : c.yaw,
+      pitch: num('pitch') !== null ? num('pitch') * DEG : c.pitch,
+      dist: num('dist') !== null ? num('dist') : c.dist,
     });
   }
   return deferred;

@@ -150,6 +150,9 @@ export function roadPath(pts) {
 }
 const stateWord = (s) => ({ gold: t('puzzles.st.gold', 'solved'), silver: t('puzzles.st.silver', 'solved with help'), next: t('puzzles.st.next', 'next'), todo: t('puzzles.st.todo', 'not played yet') }[s]);
 
+// The chapter whose reward last played: a re-render of the tab (a resize, a store change) must not play it again.
+let rewardedChapter = null;
+
 export function puzzlesTab({ puzzles, progress, onStart = () => {}, reward = null }) {
   const box = el('div', 'xlist pztab pzpath');
   const st = progress.stats();
@@ -214,7 +217,11 @@ export function puzzlesTab({ puzzles, progress, onStart = () => {}, reward = nul
   if (st.finished) {
     box.classList.add('pzwave');
     box.append(el('p', 'pzdone', st.finished.level ? t('puzzles.levelDone', 'Chapter {n} done! A new level opens.', { n: st.finished.chapter + 1 }) : t('puzzles.chapterDone', 'Chapter {n} done!', { n: st.finished.chapter + 1 })));
-    reward?.chapter?.({ stations: waveEls, onDone: () => progress.ack() });
+    const key = `${st.finished.band}:${st.finished.chapter}`;
+    if (key !== rewardedChapter) {
+      rewardedChapter = key;
+      reward?.chapter?.({ stations: waveEls, onDone: () => { rewardedChapter = null; progress.ack(); } });
+    }
   }
 
   const foot = el('div', 'pzfoot');

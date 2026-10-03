@@ -53,11 +53,12 @@ export function createHint({ gimbal, persist = true }) {
   arrowMesh.position.y = LIFT * 2;
 
   let enabled = persist ? readPref() : true;
+  let forced = false;  // Help or a wrong move shows the arrow with the switch off, without touching the stored preference
   let wanted = null;   // { from, to } or null
   let drawn = '';
 
   function redraw() {
-    const show = enabled && wanted;
+    const show = (enabled || forced) && wanted;
     group.visible = !!show;
     if (!show) { drawn = ''; return; }
     const key = `${wanted.from}-${wanted.to}`;
@@ -84,6 +85,8 @@ export function createHint({ gimbal, persist = true }) {
     // squares as engine indices, or null to clear
     show(from, to) { wanted = from == null || to == null ? null : { from, to }; redraw(); },
     hide() { wanted = null; redraw(); },
+    /** show the arrow even while the switch is off; never stored. force(false) puts the switch back in charge. */
+    force(on) { forced = !!on; redraw(); },
     get enabled() { return enabled; },
     set enabled(on) { enabled = !!on; if (persist) writePref(enabled); redraw(); },
     get visible() { return group.visible; },

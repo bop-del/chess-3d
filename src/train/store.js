@@ -34,7 +34,10 @@ function migrate(rec) {
 
 const empty = () => ({ version: VERSION, ever: false, adopted: [], cards: {} });
 
-export function createStore({ storage = globalThis.localStorage, now = Date.now, lines = LINES } = {}) {
+// Blocked storage (Safari with site data blocked) throws on the property read itself
+function defaultStorage() { try { return globalThis.localStorage; } catch (e) { return null; } }
+
+export function createStore({ storage = defaultStorage(), now = Date.now, lines = LINES } = {}) {
   const listeners = [];
   const byId = new Map(lines.map((l) => [l.id, l]));
   // own move index: key -> [{ id, san }] over all lines, to derive the accepted siblings of a card
@@ -54,9 +57,12 @@ export function createStore({ storage = globalThis.localStorage, now = Date.now,
   try {
     const raw = storage?.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = sanitize(JSON.parse(raw));
-      if (parsed.ok) rec = parsed.rec;
-      else if (parsed.code === 'version') writable = false;
+      const parsed = sanitize(JSON.parse(raw), true);
+      if (parsed.ok) {
+        rec = parsed.rec;
+        // something was dropped: keep the original once under a backup key before the first save replaces it
+        if (parsed.dropped) { try { storage.setItem(STORAGE_KEY + '.bak', raw); } catch (e) { /* storage full or blocked */ } }
+      } else writable = false;   // newer version or unreadable shape: never overwrite what we could not read
     }
   } catch (e) { /* unreadable or blocked storage: start empty, keep working in memory */ }
 
@@ -66,25 +72,37 @@ export function createStore({ storage = globalThis.localStorage, now = Date.now,
   }
   function changed() { save(); listeners.forEach((fn) => fn()); }
 
-  // Validate a parsed record (storage or import). Returns { ok, rec } or { ok: false, code, detail }.
-  function sanitize(raw) {
+  // Validate a parsed record (storage or import). Returns { ok, rec, dropped } or { ok: false, code, detail }.
+  // lenient (storage): unknown line ids and damaged cards are dropped, the good ones kept. Strict (import): the first one fails.
+  function sanitize(raw, lenient = false) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, code: 'shape' };
     if (Number.isInteger(raw.version) && raw.version > VERSION) return { ok: false, code: 'version' };
     const m = migrate(raw);
     if (!m) return { ok: false, code: 'shape' };
     if (!Array.isArray(m.adopted) || m.adopted.some((id) => typeof id !== 'string')) return { ok: false, code: 'adopted' };
-    for (const id of m.adopted) if (!byId.has(id)) return { ok: false, code: 'unknownLine', detail: { id } };
+    let dropped = false;
+    let adoptedIn = m.adopted;
+    for (const id of m.adopted) {
+      if (byId.has(id)) continue;
+      if (!lenient) return { ok: false, code: 'unknownLine', detail: { id } };
+      dropped = true;
+    }
+    if (lenient) adoptedIn = m.adopted.filter((id) => byId.has(id));
     if (!m.cards || typeof m.cards !== 'object' || Array.isArray(m.cards)) return { ok: false, code: 'shape' };
-    const adopted = [...new Set(m.adopted)];
+    const adopted = [...new Set(adoptedIn)];
     const cards = {};
     for (const [key, c] of Object.entries(m.cards)) {
       const ok = c && typeof c === 'object' && Number.isInteger(c.level) && c.level >= 1 && c.level <= 8
         && Number.isInteger(c.best) && c.best >= 0 && c.best <= 8 && Number.isFinite(c.due) && Array.isArray(c.lines)
         && c.lines.every((id) => typeof id === 'string');
-      if (!ok) return { ok: false, code: 'card', detail: { key: key.slice(0, 40) } };
+      if (!ok) {
+        if (!lenient) return { ok: false, code: 'card', detail: { key: key.slice(0, 40) } };
+        dropped = true;
+        continue;
+      }
       cards[key] = { level: c.level, best: Math.max(c.best, 0), due: c.due, lines: c.lines.filter((id) => adopted.includes(id)) };
     }
-    return { ok: true, rec: { version: VERSION, ever: !!m.ever || adopted.length > 0, adopted, cards } };
+    return { ok: true, dropped, rec: { version: VERSION, ever: !!m.ever || adopted.length > 0, adopted, cards } };
   }
 
   function ensureCards(id) {

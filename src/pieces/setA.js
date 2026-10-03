@@ -83,8 +83,9 @@ function accentRing(R, y, tube, major = R) {
   return g;
 }
 
-// Geometry source: G(slot, build) returns the geometry for one mesh slot of a piece. The default builds it. The piece set
-// passes a source that serves cached geometry, so on a cache hit the build closure (all the geometry code) never runs.
+// Geometry source: G(slot, build) returns the geometry for one mesh slot of a piece. The default builds it, and that is the
+// only source in use: src/pieceset.js calls the builders with the materials alone, so there is no geometry cache. The hook is
+// kept as a seam for one.
 const direct = (slot, build) => build();
 
 function triCount(g) {

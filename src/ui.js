@@ -211,7 +211,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   for (const n of presets) selLight.append(new Option(t(`light.${n}`, n), n));
   selLight.parentElement.hidden = !presets.length;
   selLight.addEventListener('change', () => stage.setLightingPreset?.(selLight.value));
-  selQuality.value = quality;
+  selQuality.value = stage.quality || quality;   // an invalid ?quality= falls back in the stage: show what runs
   selQuality.addEventListener('change', () => stage.setQuality?.(selQuality.value));
 
   // ------------------------------------------------------------ game buttons

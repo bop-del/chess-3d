@@ -150,7 +150,7 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `moves` | `e2e4,e7e5,g1f3` | Play these moves after `fen` (the start position if there is none). Comma separated, from and to square, with a fifth letter for a promotion such as `e7e8q` |
 | `select` | square, for example `e2` | Select the piece on this square |
 | `promo` | four letters, for example `a7a8` | Click this move, which opens the promotion chooser |
-| `ai` | `0`, `2`, `3`, `4` | The computer opponent is on by default (plays black, Easy). `ai=0` turns it off for two players, `ai=3` is Normal, `ai=4` is Hard |
+| `ai` | `0`, `1`, `2`, `3`, `4` | The computer opponent is on by default (plays black, Easy). `ai=0` turns it off for two players, `ai=1` is Novice, `ai=2` Easy, `ai=3` Normal, `ai=4` Hard (a level given here beats the remembered one) |
 | `spin` | `1` | Start with auto spin on |
 | `hud` | `0` | Start with the HUD hidden |
 | `help` | `1` | Open the keyboard shortcut sheet |
@@ -173,8 +173,8 @@ The build uses relative asset paths (`base: './'`), so `dist/` can be hosted fro
 
 Tests come in four tiers:
 
-    node test/run.mjs            # fast, no browser: rules perft, piece geometry contract, text lint (this is npm test)
-    node test/run.mjs smoke      # smoke, a few minutes: build, serve, drive the real page in headless Chrome, then the battle scenes (test/battle.mjs)
+    node test/run.mjs            # fast, no browser: rules perft, piece geometry contract, text lint, audit planner rules, openings, puzzles (progress, controller, data), novice level, training core (this is npm test)
+    node test/run.mjs smoke      # smoke, about 2 minutes on a quiet machine: build, serve, drive the real page in headless Chrome, then the battle scenes (test/battle.mjs)
     node test/run.mjs phone      # phone, several minutes: phone sizes, tap target audit, real multi touch, the Add to Home Screen reminder
     node tools/release-check.mjs # release: fresh build, page load, hostile URLs, docs and repo hygiene
 

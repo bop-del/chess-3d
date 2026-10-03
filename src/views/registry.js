@@ -18,8 +18,8 @@ export const VIEWS = [
   { id: 'easy-3d', label: 'Easy 3D', kind: 'easy', style: 'B', pitch: 62 * DEG },
   { id: 'play', label: 'Play', kind: 'play', when: 'phone-portrait', dist: 10.3, pitch: 40 },
 ];
-const BY_ID = Object.fromEntries(VIEWS.map((v) => [v.id, v]));
-const BY_LABEL = Object.fromEntries(VIEWS.map((v) => [v.label, v.id]));
+const BY_ID = Object.assign(Object.create(null), Object.fromEntries(VIEWS.map((v) => [v.id, v])));
+const BY_LABEL = Object.assign(Object.create(null), Object.fromEntries(VIEWS.map((v) => [v.label, v.id])));
 export const PIECE_SCALE_B = 1.15;
 
 // 'Von oben' is the name of From above, so the Top down preset is called Draufsicht in German
@@ -28,7 +28,7 @@ Object.assign(DE, {
   'preset.Play': 'Spielansicht',
 });
 // A stored id from before Tokens existed
-const MIGRATE = { 'easy-flat': 'tokens' };
+const MIGRATE = Object.assign(Object.create(null), { 'easy-flat': 'tokens' });
 // From above: a slight shift of the look point towards Black keeps the back rank clear of the frame's edge
 const ABOVE_FOCUS = { x: 0, z: -0.3 }, ABOVE_ZOOM = 1;
 

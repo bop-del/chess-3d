@@ -124,7 +124,7 @@ export function mountLoader() {
   const api = {
     progress(p) { target = Math.max(target, Math.min(p, 0.999)); },
     /** Real loading is done: play out the rest of the build, then call cb (the handover). */
-    finish(cb) { target = 1; ended = true; onEnd = cb; if (reduced) { shown = 1; lb.show(1); cb(); } },
+    finish(cb) { target = 1; ended = true; onEnd = cb; if (reduced) { shown = 1; lb.show(1); removeEventListener('resize', fit); cb(); } },
     show(p) { shown = target = p; lb.show(p); },
     boardOnly: lb,
   };
@@ -134,7 +134,7 @@ export function mountLoader() {
     if (!ended && target < 0.3) target += dt * 0.02;
     if (shown < target) shown = Math.min(target, shown + dt / MIN_BUILD * (ended ? 1.15 : 0.9));
     lb.show(shown);
-    if (ended && shown >= 1) { if (onEnd) { const cb = onEnd; onEnd = null; cb(); } return; }
+    if (ended && shown >= 1) { removeEventListener('resize', fit); if (onEnd) { const cb = onEnd; onEnd = null; cb(); } return; }
     raf = requestAnimationFrame(loop);
   };
   if (reduced) { shown = target = 1; lb.show(1); } else raf = requestAnimationFrame(loop);

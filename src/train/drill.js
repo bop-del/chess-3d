@@ -33,7 +33,6 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
   let wait = 0;                // seconds before the next auto move
   let internal = 0;            // > 0 while the drill itself moves, undoes or resets, so game events are its own
   let hintOn = false;          // the player's Hint switch in the learning bar: the arrow for the move that is asked
-  let hintPref = null;         // the player's hint switch, put back when the drill ends
   let lastSide = 'w';
 
   const step = () => steps[idx] || null;
@@ -61,8 +60,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
     const line = lineOf(s);
     const m = on && s && line && game.chess.moveFromSan(line.moves[s.ply].san);
     if (!m) { hint.hide(); return; }
-    if (hintPref === null) hintPref = hint.enabled;
-    if (!hint.enabled) hint.enabled = true;   // a wrong move shows the answer even when the player switched hints off
+    if (!hint.enabled) hint.force(true);   // a wrong move shows the answer even when the player switched hints off
     hint.show(m.from, m.to);
   }
 
@@ -130,8 +128,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
     const wasMine = game.mode === 'drill';
     phase = 'idle'; steps = []; idx = 0; awaiting = false; missed = false; message = null; wait = 0; hintOn = false;
     hint?.hide();
-    if (hint && hintPref !== null) { hint.enabled = hintPref; }
-    hintPref = null;
+    hint?.force(false);
     if (wasMine) {
       internal++;
       game.setMode('play');

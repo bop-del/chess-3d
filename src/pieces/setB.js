@@ -175,11 +175,12 @@ function indexed(g) {
   return g;
 }
 
-// Geometry source: G(slot, build) returns the geometry of one mesh slot (0 body, 1 accent). The default builds it. The piece
-// set passes a source that serves cached geometry, so on a hit the closure that builds the piece never runs.
+// Geometry source: G(slot, build) returns the geometry of one mesh slot (0 body, 1 accent). The default builds it, and that is
+// the only source in use: src/pieceset.js calls the builders with the materials alone, so there is no geometry cache. The hook
+// is kept as a seam for one.
 const direct = (slot, build) => build();
 
-// parts() builds [bodyGeoms, accentGeoms]; it runs at most once, and not at all when both slots come from the cache.
+// parts() builds [bodyGeoms, accentGeoms]; it runs at most once, and not at all when G supplies both slots.
 function pieceFrom(mat, G, parts, name) {
   const g = new THREE.Group();
   g.name = name;

@@ -14,6 +14,7 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
 
     index.html           canvas, loader (gold title and step line), HUD containers, entry script
     src/main.js          boot sequence, wiring, render loop, URL parameters, window.__chess
+    src/i18n.js          interface language: t(key, fallback, vars), the DE table, addDE, sanDisplay (stored data stays English SAN)
     src/device.js        device facts (touch, ios, phone, standalone, portrait), body classes and gesture blocking (the iOS Home Screen meta tags are static in index.html)
     src/scene.js         stage: renderer, lights, studio environment, floor, post chain, quality
     src/board.js         board, frame, inlay, labels, plinth, square highlights; `setDrop(v)` for the start sequence
@@ -34,7 +35,14 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
     src/ui.js            HUD: panels, move list, captured pieces, sliders, banners
     src/install-hint.js  Add to Home Screen reminder for iPhone and iPad Safari (loaded only on iOS outside the installed app)
     src/dev/diag.js      on device diagnostics box, loaded only for ?diag=1
-    src/puzzles/         puzzles from the Lichess database: data, theme lines, progress store, controller, panel (see below)
+    src/audio.js         WebAudio context and plumbing (unlock on the first gesture, buses, Mute switch, stopScene), no audio files
+    src/battle/          capture scenes: director.js, settings.js, fx.js (effects kit), sfx.js (the voices, also the move sounds), scenes/ (see Battle scenes)
+    src/battle/scenes/   one module per attacker (pawn, knight, bishop, rook, queen, king), kit-a.js (helpers of the first three), _kit.js (helpers of the other three)
+    src/openings/        Explain mode: lines.js (the starter lines), pgn.js (PGN with variations into a tree of positions), explain.js, explain-panel.js, arrow.js (the hint arrow); catalogue.js names a position (ECO and name) from catalogue-data.js, a generated lazy chunk (tools/build-catalogue.mjs)
+    src/learn/           the Learn sheet and tabs (learn.js), German strings
+    src/train/           repertoire store, cards, ladder, guesses, planner, drill and its panel, sweep (the gold light)
+    src/views/           view registry, the Play view follow camera, the Tokens view
+    src/puzzles/         puzzles from the Lichess database: data, theme lines, path, progress store, controller, panel, reward (see below)
     src/style.css        HUD styles
     public/              manifest.webmanifest and the PNG icons and link preview, copied to the build as they are
     test/                fast, smoke, phone and install checks (see the README)
@@ -94,7 +102,7 @@ Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.
 
 ### Themes: `src/themes/`
 
-    createThemes({ stage, board, pieceSet, materials, game }) -> { list(), current(), set(id, { persist }), on(fn), textureCount }
+    createThemes({ stage, board, pieceSet, materials, game = null }) -> { list(), current(), set(id, { persist }), on(fn), attachGame(game), textureCount }
     THEMES                       // [{ id, label: { en, de }, swatch: [hex, hex] }] classic, tournament, wood, metal, glass
     mountSwatches({ themes, ui })  // the swatch row, first in the Scene card (the Menu sheet on a phone)
     createSkin(materials) -> { apply(specs | null) }   // themes/apply.js
@@ -109,7 +117,7 @@ A theme is one bundle: board squares, frame, inlay, pieces, tray and lighting. T
 
 `set(id)` builds the next theme's specs, applies them, then disposes the textures the previous theme registered through `track()`, so ten switches leave the renderer at its baseline (`test/themes.mjs` checks `renderer.info.memory`). Picks are queued and the last one wins. `set(id, { persist: false })` is for the `?theme=` flag: this load only. Otherwise the id is stored in `localStorage` `chess3d.theme` and read at the next start (an unknown value means Classic). The lighting goes through `stage.setThemeLight`, which starts the usual animated transition towards the theme's state. Picking a lighting preset in the Scene card afterwards replaces the theme's lighting but keeps its materials; Classic returns to the preset the player picked.
 
-Glass uses real transmission only on the High quality tier (one extra scene pass); Low and Medium get an opaque tinted clearcoat. A quality change while a theme is on rebuilds that theme. Metal keeps bloom at 0.05 or below, because the mirror like metals blow out white above that. Easy flat and the battle scenes keep their own materials.
+Glass uses real transmission only on the High quality tier (one extra scene pass); Low and Medium get an opaque tinted clearcoat. A quality change while a theme is on rebuilds that theme. Metal keeps bloom at 0.05 or below, because the mirror like metals blow out white above that. `game` may be null at first (the start sequence turns the theme on before the game exists): `attachGame(game)` hands it over later, and the tray material is skinned then. The Tokens view and the battle scenes keep their own materials.
 
 ### `src/device.js`
 
@@ -123,7 +131,13 @@ Read once at start (only `portrait` follows rotation). `touch` is `(pointer: coa
     marbleWhite(), marbleBlack(), walnut(), maple(), brass(), felt()
         -> { map, normalMap, roughnessMap, ... }    // the prepared textures (generated on the spot if prepareTextures did not run)
     disposeTextures()
-    createPieceMaterials() -> { white: { body, accent }, black: { body, accent } }
+    createPieceMaterials() -> {
+      white: { body, accent }, black: { body, accent },
+      dark,                        // the knight inlay material, null until the first knight is built (pieceset.js fills it)
+      classic,                     // Map: snapshot of each material's Classic values
+      current,                     // the piece spec of the active theme, or null
+      apply(spec | null)           // applyPieceTheme: a theme's piece spec (null = Classic)
+    }
 
 Marble and walnut are 1024 px, maple and brass 512, felt 256. `body` is a `MeshPhysicalMaterial` (ivory for white, ebony for black, with clearcoat and sheen), `accent` is gold.
 
@@ -132,11 +146,18 @@ Marble and walnut are 1024 px, maple and brass 512, felt 256. `body` is a `MeshP
     createBoard() -> {
       group,                          // board, frame and base, top surface at y = 0
       squareMeshes,                   // 64 pickable meshes, each with userData.square = { file, rank }
+      base,                           // the plinth under the board
+      setDrop(v),                     // the start sequence: 0 nothing built, 1 the finished board; squares cast no shadow below 1
+      applyTheme(spec | null),        // board, frame, inlay, gold, plinth and label specs of a theme (null = Classic)
       squareCenter(file, rank),       // Vector3 in gimbal space, at y = 0
       setHighlights(list),            // [{ file, rank, kind }], kind: select | move | capture | check | last
       clearHighlights(),
       update(dt, time)                // animates the highlight glow
     }
+
+    DROP_SPAN = 0.58, DROP_LEN = 0.42      // exported: square k (0 at a1, 1 at h8) starts at k * DROP_SPAN of the drop and takes DROP_LEN of it
+    dropT(drop, k) -> (drop - k * DROP_SPAN) / DROP_LEN     // the progress of square k, unclamped
+    easeOutBackT(t)                                         // clamps t to 0..1, a gentle overshoot
 
 The group extends to about +-4.65 including the frame and down to y = -0.6. Squares are separate meshes with small per-square tone variation, thin gaps and a gold inlay line. Coordinate labels are on the frame and read from both sides.
 
@@ -186,6 +207,7 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
 
 - Moves animate: pieces slide, knights jump in an arc, captured pieces fly to the tray beside the board, a checkmated king topples. Castling moves both pieces, en passant removes the right pawn, promotion swaps the pawn for the chosen piece.
 - `getState().captured.w` lists the white pieces that were lost, `captured.b` the black pieces. `advantage` is positive when white is ahead.
+- Modes: `game.setMode(m)` (read with `game.mode`) is one of four: `play` (the default), `explain` (Openings), `drill` (Train) and `puzzle`. Anything but `play` stops the computer opponent, drops a pending search and selection, and takes the move guard (`setMoveGuard`) of the running controller; setting `play` clears the guard. Features that belong to ordinary games check `mode === 'play'`: the computer's reply and the two move undo, battle scene staging and the plain capture hooks (sounds), and Good move (`canAsk()`). A mate in `puzzle` mode does not emit `gameover` (it is the answer, not the end of a game).
 - The computer opponent is switched on at start (`main.js` calls `setVsComputer(true, { color: 'b', level })` unless `?ai=0`; level is `?ai=1` to `4`, else localStorage `chess3d.level`, else `easy`). With it on, undo takes back the computer move and the player move together.
 - `audit()` compares the visual pieces with the engine board and returns a list of problems (empty when consistent). The tests use it.
 - `pickSquare` uses cheap proxies first, then the real meshes, then the square tops, and prefers what the player can actually use when a tall piece hides a smaller one.
@@ -201,6 +223,7 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
       setPreset(name), reset(), levelBoard(), flip(), topDown(), toggleSpin(),
       setGimbal(axis, degrees), setCamera({ yaw, pitch, dist }), nudgeZoom(factor),
       setFrame({ top, right, bottom, left }), setLocked(bool),
+      retarget({ pitch, dist }, dur = 0.6),   // change pitch and distance only: a running turn (Flip) keeps its target, the gimbal stays
       presets, hooks, onChange(fn),
       spin, camera, gimbalDeg, animating, frame, locked      // read only
     }
@@ -228,7 +251,13 @@ The follow camera of the Play view (phone portrait). `createPlayView({ controls,
 
 ### `src/ui.js`
 
-    createUI({ game, controls, stage, quality }) -> { sync(), toast(msg), toggleHud(force), toggleHelp(), render(state), bindGoodMove(gm) }
+    createUI({ game, controls, stage, quality = 'high', views }) -> {
+      sync(), toast(msg), toggleHud(force), toggleHelp(), render(state), bindGoodMove(gm),
+      mountPanel(id, element, { title }),   // a card in the HUD (Explain, Drill, Puzzles); on a phone the panels sit in the sheets and strips
+      mountSettings(id, element),           // a block in the Scene card (the Menu sheet on a phone): swatches, Battle scenes, Mute, Export and Import
+      learnSheet,                           // { body, open(), close(), isOpen } on a phone, null elsewhere
+      setLearnBar(owner, spec | null)       // the in-game learning controls that replace the thumb bar while Explain, Drill or a puzzle runs (layout C); a no-op off phones
+    }
 
 Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal sliders, lighting and quality selects) and a right column (game buttons, computer opponent settings, SAN move list, captured pieces with the material balance). It also renders the promotion chooser (`#promo`), the game over banner (`#banner`), a toast for check (`#toast`) and the shortcut sheet. Below 900 px width the cards collapse and the left column becomes a sheet opened by the Controls button. On phones (`body.phone`, see device.js) `buildPhone()` adds a different HUD instead: a status line (`.pstatus`: turn, check, computer thinking, last move), a thumb bar (`.pbar`, buttons `.tb[data-act]`: Undo, New game with a confirm during a game, Flip, Views cycling to the next preset, Learn (opens the Learn sheet), Menu; each shows a 24 px gold icon and one short word from the `tb.*` strings, the full name is the aria-label and title) at the bottom in portrait and on the right in landscape, and a bottom sheet (`.psheet` over `.pscrim`) with accordion sections Game, Moves, View and gimbal (with Lock view), Scene and Help. An invisible `.pframe` element marks the free area; its rectangle goes to `controls.setFrame`. Phones get lite glass (no backdrop blur). Tablets keep the desktop HUD with 44 px targets.
 
@@ -244,6 +273,7 @@ Builds the HUD into `#hud`: a left column (turn indicator, view presets, gimbal 
 - The director runs one scene at a time: it loads the scene module for the attacker (`scenes/<pawn|knight|bishop|rook|queen|king>.js`, default export `{ attacker, cam?, run(ctx) }`) and `fx.js` and `sfx.js` lazily, swoops the camera to a low close-up across the fight, runs the scene, restores every transform and attachment on both pieces, disposes the fx and sends the camera back. A tap or any key skips (aborts `ctx.signal`). A scene longer than 6 s of scene time is skipped. Short runs the scene clock 3 times faster. Until a scene module exists a built in lunge and tumble plays.
 - `ctx` has `stage, attackerObj, victimObj` (the game's piece objects: use `.group`), `square, short, fx, sfx, signal, dir, center, root, gimbal`, and a scene clock: `time()`, `wait(s)`, `tween({ dur, delay, ease, step(e, u) })`, `onFrame(fn(dt, t))`. `wait` and `tween` never resolve after an abort, so a skipped scene just stops.
 - The camera close-up blends the normal pose towards the close-up in `controls.apply` (`cine.k` from 0 to 1) instead of changing yaw, pitch and distance, so the way back is exact. On phones the target is centred in the free area, narrow views pull back. Orbit, wheel, keys and spin are ignored while it is held.
+- Helpers: `scenes/kit-a.js` serves pawn, knight and bishop (`SIZE`, `RADIUS`, `weight(type)`, `pose(...)` to tip and spin a piece around its base rim, `createStage(ctx)` posing the two pieces from plain state numbers, `beam(...)` a lit bolt). `scenes/_kit.js` serves rook, queen and king (`ease`, `WEIGHT`, `rig(ctx)` common facts of a scene, `play(r, total)` a score of timed tracks driven by one `ctx.tween`, `decal`, `glowMesh`). Both stay on the scene clock, so a skip just stops them. `fx.js` is the shared effects kit (`ctx.fx`), `sfx.js` the voices (`ctx.sfx`, also the move and capture sounds through `sfx.hook(game)`), `src/audio.js` the context under them.
 - Scenes are promise driven. Tests use `__chess.stepAsync(seconds)` (awaited, gives the event loop a turn per slice) instead of `__chess.step` wherever a scene may play, and `__chess.battle.ready()` to have every module loaded.
 
 ### Music: `src/music/`
@@ -287,7 +317,7 @@ Explain mode: walk one of the starter lines on the 3D board.
     themes.js      THEMES = { mate1, mate2, hanging, fork }, each { en, de }: the line shown above the board
     path.js        levelOrder(puzzles, band) (rating order, themes mixed per chapter), chaptersOf(order), CHAPTER_SIZE = 10
     progress.js    createPuzzleProgress({ storage, puzzles, bands }) -> { band(), stats(), next(), select(id), setView(band, chapter), ack(), finish(id, { clean }), exportData(), importData(raw), reset(), onChange(fn) }
-    controller.js  createPuzzles({ game, hint, sweep, progress, pause = 600, onSide }) -> { state(), start(), next(), help(), stop(), tick(dt), on(fn) }
+    controller.js  createPuzzles({ game, hint, sweep, progress, reward = null, onChapter = null, pause = 600, onSide }) -> { state(), start(), next(), help(), stop(), tick(dt), on(fn) }   // onChapter(finished) once a finished chapter's finale is over
     panel.js       mountPuzzlesPanel({ puzzles, ui }) (the puzzle in progress), puzzlesTab({ puzzles, progress, onStart, reward }) (the Learn tab: the path)
     strings.js     German texts, puzzles.css the styles
 
@@ -319,7 +349,7 @@ Explain mode: walk one of the starter lines on the 3D board.
     mountInstallHint()         // called once after the board is ready, by a dynamic import in main.js
     wantInstallHint(storage)   // the gate, also counts the visit
 
-A bottom sheet with three drawn steps (the Share icon in the Safari bar, the Add to Home Screen row, the installed icon from `apple-touch-icon.png`) and a Later button. `main.js` imports it only when `device.ios` and not `device.standalone`. The gate then needs all of: iOS, not standalone, no URL flag of the app at all (`quality touch light preset yaw pitch dist gx gy gz fen moves select promo ai spin hud help manual diag theme`), not `navigator.webdriver`, and working `localStorage`. The state is one key, `chess3d.install-hint`, `{ visits, shows, last }`: it shows on the first visit, and then at most twice more, at least 3 visits after the last showing. It appears 2.2 s after the board is ready. Later, a tap on the scrim or Escape closes it at once and nothing waits on it. There is no service worker and no network use.
+A bottom sheet with three drawn steps (the Share icon in the Safari bar, the Add to Home Screen row, the installed icon from `apple-touch-icon.png`) and a Later button. `main.js` imports it only when `device.ios` and not `device.standalone`. The gate then needs all of: iOS, not standalone, no URL flag of the app at all (`quality touch light preset yaw pitch dist gx gy gz fen moves select promo ai spin hud help manual diag theme view intro`), not `navigator.webdriver`, and working `localStorage`. The state is one key, `chess3d.install-hint`, `{ visits, shows, last }`: it shows on the first visit, and then at most twice more, at least 3 visits after the last showing. It appears 2.2 s after the board is ready. Later, a tap on the scrim or Escape closes it at once and nothing waits on it. There is no service worker and no network use.
 
 ### `src/dev/diag.js`
 
@@ -333,7 +363,7 @@ Imported by `main.js` only for exactly `?diag=1` (right after `window.__chess` i
 
 ## Test hooks
 
-`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, themes, views, play, tokens, THREE, pick }`. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
+`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, themes, views, play, tokens, THREE, pick, openings, puzzles, puzzleProgress, reward, goodMove, train }`, plus `diag` when the page was opened with `?diag=1`. `openings` is `{ explain, hint, card, strip, tick }`, `puzzles` the controller, `puzzleProgress` its store, `reward` the solve and chapter reward, `goodMove` the Good move helper, `train` is `{ store, drill, sweep, learn }`, `diag` the diagnostics box handle. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
 
 `window.__chessReady` becomes `true` once loading is done and `window.__chessError` holds a message if loading failed.
 

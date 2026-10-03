@@ -57,14 +57,15 @@ const allowedSlots = () => { const l = loadavg()[0]; return l < 6 || (metalOn() 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 /** Slots free right now at this load (at least 0). Used by test/smoke-groups.mjs to size its parallelism. */
 export const freeSlots = () => SLOTS.slice(0, allowedSlots()).filter((lock) => { try { return !alive(Number(readFileSync(join(lock, 'pid'), 'utf8'))); } catch (e) { return !existsSync(lock); } }).length;
-let held = null;
-const releaseLock = () => { if (!held) return; const d = held; held = null; try { rmSync(d, { recursive: true, force: true }); } catch (e) { /* ignore */ } };
-process.on('exit', releaseLock);
+// one entry per open browser: a process may hold several slots at once, each released with its own browser
+const held = new Set();
+const releaseLock = (lock) => { if (!held.delete(lock)) return; try { rmSync(lock, { recursive: true, force: true }); } catch (e) { /* ignore */ } };
+process.on('exit', () => { for (const lock of [...held]) releaseLock(lock); });
 async function acquireLock(maxWaitMs = 15 * 60 * 1000) {
   const t0 = Date.now(); let said = false;
   for (;;) {
     for (const lock of SLOTS.slice(0, allowedSlots())) {
-      try { mkdirSync(lock); writeFileSync(join(lock, 'pid'), String(process.pid)); held = lock; return (Date.now() - t0) / 1000; } catch (e) { /* taken */ }
+      try { mkdirSync(lock); writeFileSync(join(lock, 'pid'), String(process.pid)); held.add(lock); return { lock, waited: (Date.now() - t0) / 1000 }; } catch (e) { /* taken */ }
       let pid = 0; try { pid = Number(readFileSync(join(lock, 'pid'), 'utf8')); } catch (e) { /* being written */ }
       if (pid && !alive(pid)) rmSync(lock, { recursive: true, force: true });
     }
@@ -91,8 +92,8 @@ async function logRenderer(browser) {
 export async function launchBrowser({ w = 1280, h = 720, args = [], gl = defaultGl() } = {}) {
   const executablePath = chromePath();
   if (!executablePath) { console.error('Chrome not found. Set CHROME_PATH.'); process.exit(2); }
-  let waited = 0;
-  try { waited = await acquireLock(); } catch (e) { logWait(-1, gl); throw e; }
+  let lock, waited = 0;
+  try { ({ lock, waited } = await acquireLock()); } catch (e) { logWait(-1, gl); throw e; }
   logWait(waited, gl);
   let browser;
   try {
@@ -102,10 +103,10 @@ export async function launchBrowser({ w = 1280, h = 720, args = [], gl = default
       defaultViewport: { width: w, height: h, deviceScaleFactor: 1 },
     });
     if (gl === 'metal') await logRenderer(browser);
-  } catch (e) { releaseLock(); throw e; }
+  } catch (e) { releaseLock(lock); throw e; }
   const close = browser.close.bind(browser);
-  browser.close = async () => { try { await close(); } finally { releaseLock(); } };
-  browser.on('disconnected', releaseLock);
+  browser.close = async () => { try { await close(); } finally { releaseLock(lock); } };
+  browser.on('disconnected', () => releaseLock(lock));
   return browser;
 }
 

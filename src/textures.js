@@ -64,6 +64,9 @@ const cacheKey = (key, N) => `v${CACHE_VERSION}:${key}:${N}`;
 
 // ---------------------------------------------------------------- generation
 const cache = {};
+// A cached record must hold N*N RGBA bytes per map, or new ImageData throws and the boot stalls.
+const validPixels = (a, N) => a instanceof Uint8ClampedArray && a.length === N * N * 4;
+const validRecord = (r, N) => !!r && r.N === N && validPixels(r.color, N) && validPixels(r.normal, N) && validPixels(r.rough, N) && (!r.metal || validPixels(r.metal, N));
 const copyOf = (r) => ({ N: r.N, color: r.color.slice(), normal: r.normal.slice(), rough: r.rough.slice(), metal: r.metal ? r.metal.slice() : undefined });
 
 function startWorkers(n) {
@@ -87,7 +90,7 @@ export async function prepareTextures({ cap = 1024, onStep = () => {} } = {}) {
     if (cache[key]) { onStep(++done, total); continue; }
     const N = jobSize(key, cap);
     const hit = cap <= CACHE_CAP ? await cacheGet(cacheKey(key, N)) : null;
-    if (hit && hit.N === N && hit.color && hit.normal && hit.rough) finish(key, hit); else todo.push(key);
+    if (validRecord(hit, N)) finish(key, hit); else todo.push(key);   // a damaged cache record is regenerated, never fed to ImageData
   }
   if (!todo.length) return;
   const workers = typeof Worker === 'function' ? startWorkers(Math.max(1, Math.min(todo.length, (navigator.hardwareConcurrency || 2) - 1, 4))) : null;

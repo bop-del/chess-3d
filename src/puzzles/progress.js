@@ -47,8 +47,11 @@ export function createPuzzleProgress({ storage = null, puzzles, bands = DEFAULT_
     return parse(raw);
   }
   let marks = load();
+  let writable = true;   // false when the stored record is from a newer version: never save over it
+  try { const r = storage && JSON.parse(storage.getItem(key)); if (r && Number.isInteger(r.v) && r.v > VERSION) writable = false; } catch (e) { /* unreadable: treated as empty */ }
 
   function save() {
+    if (!writable) return;
     try { storage?.setItem(key, JSON.stringify({ v: VERSION, marks })); } catch (e) { /* storage may be blocked or full */ }
   }
   const emit = () => listeners.forEach((fn) => fn(stats()));
@@ -135,13 +138,13 @@ export function createPuzzleProgress({ storage = null, puzzles, bands = DEFAULT_
     exportData() { return { v: VERSION, marks: { ...marks } }; },
     importData(raw) {
       if (!raw || typeof raw !== 'object' || (raw.v !== VERSION && raw.v !== 1)) return false;
-      marks = parse(raw); forced = null; finished = null; view = null;
+      marks = parse(raw); writable = true; forced = null; finished = null; view = null;
       save();
       emit();
       return true;
     },
     reset() {
-      marks = {}; forced = null; finished = null; view = null;
+      marks = {}; writable = true; forced = null; finished = null; view = null;
       save();
       emit();
     },

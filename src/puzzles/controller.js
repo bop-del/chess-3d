@@ -28,7 +28,6 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
   let deviated = false;      // a mate in two was answered with another first move that still forces mate: the line is the engine's now
   let pendingDev = false;    // the guard accepted a deviating first move that has not been played yet
   let lastTo = null, lastDelay = 0;         // the square the player's last move went to: the decisive piece, where the reward bursts
-  let hintForced = null;     // the player's hint preference, kept while Help shows the arrow with the preference off
 
   const total = () => (puzzle ? puzzle.moves.length : 0);
   const emit = () => listeners.forEach((fn) => fn(state()));
@@ -70,12 +69,12 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
 
   function hideHint() {
     hint?.hide();
-    if (hintForced !== null && hint) { hint.enabled = hintForced; hintForced = null; }
+    hint?.force(false);
   }
   function showHint() {
     const d = due();
     if (!hint || !d || !isOwn(ply)) return;
-    if (!hint.enabled) { hintForced = false; hint.enabled = true; }   // Help is the player asking: it shows even with the hint switch off
+    if (!hint.enabled) hint.force(true);   // Help is the player asking: it shows even with the hint switch off
     hint.show(d.from, d.to);
   }
 

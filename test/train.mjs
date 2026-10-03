@@ -206,5 +206,22 @@ const ownCount = (l) => l.moves.filter((_, i) => isOwn(l, i)).length;
   check(store.exportJSON() === before, 'planning practice touches nothing');
 }
 
+// --- a record that fails sanitising is not lost (R12)
+{
+  const storage = memory();
+  const good = { level: 2, best: 2, due: clock, lines: ['italian-game'] };
+  const raw = JSON.stringify({ version: VERSION, ever: true, adopted: ['italian-game', 'gone-line'], cards: { ok: good, broken: { level: 'x' } } });
+  storage.setItem(STORAGE_KEY, raw);
+  const { store } = mk(storage);
+  check(store.isAdopted('italian-game') && !store.isAdopted('gone-line'), 'storage load keeps the good line, drops the unknown one');
+  check(storage.getItem(STORAGE_KEY + '.bak') === raw, 'the original record is kept under a backup key when something was dropped');
+  const shape = memory(); shape.setItem(STORAGE_KEY, '[1,2]');
+  const { store: s2 } = mk(shape); s2.adopt('italian-game');
+  check(shape.getItem(STORAGE_KEY) === '[1,2]', 'an unreadable shape is never overwritten');
+  const blocked = { get getItem() { throw new Error('SecurityError'); } };
+  let made = true; try { const s3 = createStore({ storage: blocked, now: () => clock }); s3.adopt('italian-game'); } catch (e) { made = false; }
+  check(made, 'a throwing storage works in memory');
+}
+
 console.log(bad ? `\n${bad} check(s) failed` : 'train: all checks passed');
 process.exit(bad ? 1 : 0);
