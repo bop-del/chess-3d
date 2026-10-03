@@ -32,6 +32,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
   let message = null;          // { type: 'prompt' | 'move' | 'miss', lineId, ply }
   let wait = 0;                // seconds before the next auto move
   let internal = 0;            // > 0 while the drill itself moves, undoes or resets, so game events are its own
+  let hintOn = false;          // the player's Hint switch in the learning bar: the arrow for the move that is asked
   let hintPref = null;         // the player's hint switch, put back when the drill ends
   let lastSide = 'w';
 
@@ -43,7 +44,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
   function state() {
     const s = step();
     const line = phase === 'idle' ? null : lineOf(s) || lineOf(steps[steps.length - 1]);
-    return { phase, mode, line, ply: s ? s.ply : (line ? line.moves.length : 0), message, awaiting };
+    return { phase, mode, line, ply: s ? s.ply : (line ? line.moves.length : 0), message, awaiting, hint: hintOn };
   }
 
   function acceptable(s) {
@@ -127,7 +128,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
   function stop() {
     if (phase === 'idle') return;
     const wasMine = game.mode === 'drill';
-    phase = 'idle'; steps = []; idx = 0; awaiting = false; missed = false; message = null; wait = 0;
+    phase = 'idle'; steps = []; idx = 0; awaiting = false; missed = false; message = null; wait = 0; hintOn = false;
     hint?.hide();
     if (hint && hintPref !== null) { hint.enabled = hintPref; }
     hintPref = null;
@@ -207,12 +208,22 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
       return true;
     },
     stop,
+    // The Hint switch: the arrow for the move that is asked stays on while it is on.
+    setHint(on) { hintOn = !!on; if (!hintOn && !missed) hint?.hide(); emit(); },
+    // Show me: the asked move is played for the player. The card counts as missed, like a wrong first try.
+    showMe() {
+      const s = step();
+      if (phase !== 'running' || !awaiting || !s || game.busy || game.pendingPromotion) return false;
+      missed = true;
+      game.finishAnimations();
+      return !!game.playSan(lineOf(s).moves[s.ply].san, { animate: true });
+    },
 
     // Every frame (or __chess.step): plays the next auto move once the board is at rest and the pause has run.
     tick(dt) {
       if (phase !== 'running') return;
       const s = step();
-      if (awaiting && s && !game.busy && !game.pendingPromotion) { showHint(missed); return; }
+      if (awaiting && s && !game.busy && !game.pendingPromotion) { showHint(missed || hintOn); return; }
       if (awaiting || game.busy || game.pendingPromotion) return;
       wait -= dt;
       if (wait <= 0) { wait = 0; advance(); }

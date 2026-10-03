@@ -212,6 +212,11 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     vel.yaw = vel.pitch = 0;
     tw = { t: 0, dur, from, end };
   }
+  // Change pitch and distance without touching where the yaw is going: a running turn (Flip) keeps its target, the gimbal stays.
+  function retarget({ pitch, dist }, dur = 0.6) {
+    if (tw) { tw.end.pitch = pitch ?? tw.end.pitch; tw.end.dist = dist ?? tw.end.dist; return; }
+    animateTo({ yaw: cam.yaw, pitch: pitch ?? cam.pitch, dist: dist ?? cam.dist, gx: gim.x, gy: gim.y, gz: gim.z }, dur);
+  }
   function setPreset(name) {
     if (!Object.hasOwn(PRESETS, name)) return;
     const p = PRESETS[name];
@@ -495,7 +500,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   return {
     cinematic, restore,
     setProjection, setFocus, setOrbitLock, setEdgeToEdge,
-    update, apply, setPreset, reset, levelBoard, flip, topDown, toggleSpin, setGimbal, nudgeZoom, setCamera, onResize, setFrame, setLocked,
+    update, apply, setPreset, reset, levelBoard, flip, topDown, toggleSpin, setGimbal, nudgeZoom, setCamera, onResize, setFrame, setLocked, retarget,
     get locked() { return locked; },
     get frame() { return { ...frame }; },
     presets: Object.keys(PRESETS),

@@ -144,7 +144,7 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
     await page.evaluate(() => document.querySelector('.psheet.plearn .pzstart').click());
     await step(1.5);
     const phone = await page.evaluate(() => {
-      const strip = document.querySelector('.pzstrip'), r = strip && strip.getBoundingClientRect(), h = strip && strip.querySelector('.pzhelp');
+      const strip = document.querySelector('.pzstrip'), r = strip && strip.getBoundingClientRect(), h = document.querySelector('.plbar .tb[data-act=help]');   // layout C: Help is in the learning bar
       const hr = h && h.getBoundingClientRect();
       return { shown: !!strip && !strip.hidden && r.height > 0, inside: r && r.left >= 0 && r.right <= innerWidth && r.bottom < innerHeight * 0.5, helpH: hr && hr.height, helpW: hr && hr.width, hscroll: document.documentElement.scrollWidth > innerWidth };
     });

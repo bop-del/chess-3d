@@ -100,16 +100,28 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
     const head = el('div', 'xhead');
     const title = el('div', 'xtitle');
     title.append(el('b', '', pick(s.line.name)), el('span', 'xside', sideLabel(s.line)));
-    head.append(title, button(compact ? '✕' : t('explain.all', 'All openings'), 'xclose', () => explain.stop()));
-    if (compact) head.lastChild.setAttribute('aria-label', t('explain.all', 'All openings'));
+    head.append(title);
+    if (!compact) head.append(button(t('explain.all', 'All openings'), 'xclose', () => explain.stop()));   // phone: Beenden sits in the learning bar
     const text = el('p', 'xtext', sentence(s));
     text.dataset.kind = s.message?.type || '';
     const meta = el('div', 'xmeta');
     meta.append(el('span', '', status(s)), el('span', '', `${Math.min(s.ply, s.total)} / ${s.total}`));
-    box.append(head, text, meta, controlsRow(s));
+    box.append(head, text, meta);
+    if (!compact) box.append(controlsRow(s));
     if (s.phase === 'finished' && store) box.append(adoptControl(s));
-    if (s.phase === 'finished') box.append(button(t('explain.another', 'Choose another line'), 'xmore', () => explain.stop()));
+    if (s.phase === 'finished' && !compact) box.append(button(t('explain.another', 'Choose another line'), 'xmore', () => explain.stop()));
     return box;
+  }
+
+  // phone: the thumb bar becomes the controls (Back, Show me, Hint, End), the card keeps only the text
+  function learnBar(s) {
+    const fin = s.phase === 'finished';
+    const out = [{ id: 'back', icon: 'undo', label: t('lb.back', 'Back'), aria: t('explain.back', 'Back'), disabled: !s.canBack, run: () => explain.back() }];
+    out.push(fin ? { id: 'again', icon: 'show', label: t('lb.again', 'Again'), aria: t('explain.again', 'Again'), primary: true, run: () => explain.restart() }
+      : { id: 'show', icon: 'show', label: t('lb.show', 'Show me'), aria: t('explain.showMe', 'Show me'), primary: true, run: () => explain.next() });
+    if (!fin) out.push({ id: 'hint', icon: 'good', label: t('lb.hint', 'Hint'), aria: t(s.hint ? 'explain.hintOff' : 'explain.hintOn', s.hint ? 'Hide the hint' : 'Show the hint'), on: s.hint, pressed: s.hint, run: () => explain.setHint(!s.hint) });
+    out.push({ id: 'end', icon: 'end', label: t('lb.end', 'End'), aria: t('explain.all', 'All openings'), run: () => explain.stop() });
+    return out;
   }
 
   // ------------------------------------------------------------ render
@@ -121,6 +133,7 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
     }
     document.body.classList.toggle('explaining', s.phase !== 'list');
     if (!strip) return;
+    ui.setLearnBar?.('explain', s.phase === 'list' ? null : learnBar(s));
     strip.hidden = s.phase === 'list';
     if (s.phase !== 'list') {
       strip.replaceChildren(walking(s, { compact: true }));

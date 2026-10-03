@@ -462,6 +462,15 @@ await guard('drill checks', async () => {
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   } finally { await dp.close().catch(() => {}); }
 }, 'drill');
+await guard('learning bar checks (drill)', async () => {
+  const mod = await import(pathToFileURL(join(ROOT, 'test/learnbar.mjs')).href + '?t=' + Date.now());
+  const res = await Promise.race([
+    mod.runLearnBarChecks({ browser, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), part: 'drill', shotsDir: flag('shots') ? SHOTS : null }),
+    sleep(240000).then(() => { throw new Error('runLearnBarChecks timed out after 240 s'); }),
+  ]);
+  for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
+}, 'drill');
+
 
 // ------------------------------------------------------------------ learn UI (test/learn.mjs)
 await guard('learn checks', async () => {
@@ -476,6 +485,15 @@ await guard('learn checks', async () => {
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   }
 }, 'learn');
+await guard('learning bar checks (explain)', async () => {
+  const mod = await import(pathToFileURL(join(ROOT, 'test/learnbar.mjs')).href + '?t=' + Date.now());
+  const res = await Promise.race([
+    mod.runLearnBarChecks({ browser, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), part: 'explain', shotsDir: flag('shots') ? SHOTS : null }),
+    sleep(240000).then(() => { throw new Error('runLearnBarChecks timed out after 240 s'); }),
+  ]);
+  for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
+}, 'learn');
+
 
 // ------------------------------------------------------------------ puzzles (test/puzzles.mjs)
 await guard('puzzle checks', async () => {
@@ -492,5 +510,14 @@ await guard('puzzle checks', async () => {
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   } finally { await pp.close().catch(() => {}); }
 }, 'puzzles');
+await guard('learning bar checks (puzzles)', async () => {
+  const mod = await import(pathToFileURL(join(ROOT, 'test/learnbar.mjs')).href + '?t=' + Date.now());
+  const res = await Promise.race([
+    mod.runLearnBarChecks({ browser, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), part: 'puzzles', shotsDir: flag('shots') ? SHOTS : null }),
+    sleep(240000).then(() => { throw new Error('runLearnBarChecks timed out after 240 s'); }),
+  ]);
+  for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
+}, 'puzzles');
+
 
 await finish();

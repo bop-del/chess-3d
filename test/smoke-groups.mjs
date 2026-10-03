@@ -52,7 +52,7 @@ const runGroup = ([name, script, extra]) => new Promise((resolve) => {
   c.on('close', (code) => {
     if (/slots busy for over/.test(out)) {   // never got a Chrome: slot starvation, not a failure of the checks
       skipped.push(name);
-      console.log(`--- group ${name} SKIPPED, no headless Chrome slot (${((Date.now() - tg) / 1000).toFixed(1)}s): run node test/smoke.mjs --group=${extra[0].slice(8)}${extra[1] ? ' ' + extra[1] : ''} --skip-build --base=${server.base}`);
+      console.log(`--- group ${name} SKIPPED, no headless Chrome slot (${((Date.now() - tg) / 1000).toFixed(1)}s): run node test/smoke.mjs --group=${(extra[0] || "").slice(8)}${extra[1] ? ' ' + extra[1] : ''} --skip-build --base=${server.base}`);
       return resolve();
     }
     const rows = (s) => (out.match(new RegExp(`^${s}  `, 'gm')) || []).length;   // count the result rows, battle.mjs prints no summary line

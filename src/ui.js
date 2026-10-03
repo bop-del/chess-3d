@@ -19,6 +19,10 @@ const ICON = {
   views: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   learn: '<path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  show: '<path d="M7 4.5v15l12-7.5z"/>',
+  end: '<path d="M6 6l12 12M18 6 6 18"/>',
+  next: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  path: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M6 16c0-7 12-2 12-8"/>',
   good: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2v.1h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
 };
 const PIECE_NAME = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
@@ -399,6 +403,26 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       bar.append(b);
       btn[id] = b;
     }
+    // learning bar: while Explain, Drill, Practise or a Puzzle runs it takes the place of the thumb bar (the panels call setLearnBar)
+    const lbar = el('nav', 'pbar plbar');
+    lbar.setAttribute('aria-label', 'Learning controls');
+    lbar.dataset.i18nAria = 'lb.controls';
+    const lbars = new Map();
+    function setLearnBar(owner, spec) {
+      if (spec) lbars.set(owner, spec); else lbars.delete(owner);
+      const cur = [...lbars.values()][0] || null;
+      document.body.classList.toggle('learnbar', !!cur);
+      lbar.replaceChildren();
+      for (const b of cur || []) {
+        const x = el('button', `tb${b.primary ? ' primary' : ''}${b.on ? ' on' : ''}`, `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[b.icon]}</svg><span></span>`);
+        x.querySelector('span').textContent = b.label;
+        x.type = 'button'; x.dataset.act = b.id; x.disabled = !!b.disabled;
+        x.setAttribute('aria-label', b.aria || b.label);
+        if (b.pressed != null) x.setAttribute('aria-pressed', String(!!b.pressed));
+        x.addEventListener('click', b.run);
+        lbar.append(x);
+      }
+    }
     const confirmBox = el('div', 'pconfirm');
     confirmBox.hidden = true;
     confirmBox.setAttribute('role', 'alertdialog');
@@ -449,7 +473,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     goodBtns.push(bulb);
     if (goodMove) bulb.addEventListener('click', () => goodMove.ask());
 
-    hud.append(status, bulb, bar, probe, scrim, sheet, learnSheet, confirmBox);
+    hud.append(status, bulb, bar, lbar, probe, scrim, sheet, learnSheet, confirmBox);
 
     // sheet open and close; swipe down on the header closes it
     const isOpen = () => sheet.classList.contains('open');
@@ -551,7 +575,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       status.classList.toggle('think', !!st.thinking);
     }
     return {
-      status: statusRender, close, frame, resetStatus() { lastKey = ''; },
+      status: statusRender, close, frame, setLearnBar, resetStatus() { lastKey = ''; },
       learn: { body: learnBody, open: openLearn, close, get isOpen() { return isLearnOpen(); } },
       toggleHelp() { if (isOpen() && !helpC.classList.contains('collapsed')) close(); else open(helpC); },
     };
@@ -607,5 +631,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   }
 
   // Phone only: the Learn sheet { body, open(), close(), isOpen }, null elsewhere. src/learn fills the body.
-  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings, learnSheet: phoneUI ? phoneUI.learn : null, bindGoodMove };
+  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings, learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }

@@ -129,7 +129,7 @@ async function boot() {
   try { puzzleStore = window.localStorage; } catch (e) { /* storage blocked: progress lives for the session */ }
   const puzzleProgress = createPuzzleProgress({ storage: puzzleStore, puzzles: PUZZLES });
   const puzzles = createPuzzles({ game, hint: openings.hint, sweep, progress: puzzleProgress, onSide: openings.onSide });
-  mountPuzzlesPanel({ puzzles, ui });
+  mountPuzzlesPanel({ puzzles, ui, progress: puzzleProgress, openPath: () => { if (learn.openPath) learn.openPath(); else { learn.show('puzzles'); ui.learnSheet?.open(); } } });
   const learn = mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress });
   // Good move?: one good move shown with its own arrow (it does not follow the Explain hint switch)
   const [{ createGoodMove }, { createHint }] = await Promise.all([import('./goodmove.js'), import('./openings/arrow.js')]);

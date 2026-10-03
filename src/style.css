@@ -290,6 +290,14 @@ body.phone .tb svg { width: 20px; height: 20px; fill: none; stroke: currentColor
 body.phone .tb span { font-size: 11px; line-height: 1.1; font-weight: 550; letter-spacing: 0.01em; }
 body.phone .tb:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.14); }
 body.phone .tb:disabled { opacity: 0.35; }
+/* learning bar: replaces the thumb bar while Explain, Drill, Practise or a Puzzle runs; the gold button is the primary action */
+body.phone nav.plbar { display: none; }
+body.phone.learnbar nav.plbar { display: flex; }
+body.phone.learnbar nav.pbar:not(.plbar) { display: none; }
+body.phone .tb.primary { background: linear-gradient(180deg, #e6c987, #c9a24f); border-color: rgba(255, 236, 190, 0.7); color: #1b1608; }
+body.phone .tb.primary:active { background: #d8b868; }
+body.phone .tb.primary svg { stroke: #1b1608; }
+body.phone .tb.primary:disabled { opacity: 0.45; }
 body.phone .tb.on { background: var(--gold-soft); border-color: rgba(216, 180, 104, 0.6); color: #f3dfa8; }
 
 body.phone .pframe { position: fixed; z-index: -1; visibility: hidden; pointer-events: none; top: calc(var(--st) + var(--stat) + var(--gap)); bottom: calc(var(--sb) + var(--bar) + var(--gap)); left: var(--sl); right: var(--sr); }

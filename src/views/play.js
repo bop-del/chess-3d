@@ -10,6 +10,9 @@ const MARGIN = 26;           // px kept free around the squares that must stay o
 const PIECE_H = 1.9;         // a king is 1.85 tall: its head must not end up under the HUD
 const HOLD = 0.55;           // seconds a finished move stays framed before the camera settles
 const GLIDE = 0.55;
+const LEARN_PITCH = 60 * Math.PI / 180;   // steeper than the Play view's 40 degrees while learning
+const FRAME_REF = 19;       // controls.js: the neutral distance the framed fit is made for
+const LEARNING = ['explaining', 'drilling', 'puzzling'];   // body classes while Explain, Drill, Practise or a Puzzle runs
 export const HOME_FOCUS = { x: 0, z: 0.8 };   // the Play view's resting look point: towards the player's side, so his pieces fill the lower half
 const HOME_LIFT = 2.2;   // plus a lift along the view's up axis: the board slides down into the band above the thumb bar
 
@@ -87,6 +90,7 @@ export function createPlayView({ controls, game, views, device, stage = null, hi
   let shownKey = '';            // what the camera was last sent to
   let at = { ...HOME_FOCUS };   // where the camera focus is (commanded)
   let wasActive = false, entered = false;
+  let before = null;            // the camera pose before a learning mode took over: { pitch, dist }
 
   const isPlay = () => views.current() === 'play';
   const canvasSize = () => size?.() || { w: window.innerWidth, h: window.innerHeight };
@@ -126,13 +130,34 @@ export function createPlayView({ controls, game, views, device, stage = null, hi
     controls.setFocus?.({ x: to.x, z: to.z }, { dur, zoom: to.zoom || 1, lift: HOME_LIFT });
   }
   function settle(dur) { shownKey = ''; follow = null; setFocus(null, dur); }
-  function leave() { shownKey = ''; follow = null; at = { ...HOME_FOCUS }; controls.setFocus?.(null, { dur: GLIDE }); }
+  function leave() { before = null; shownKey = ''; follow = null; at = { ...HOME_FOCUS }; controls.setFocus?.(null, { dur: GLIDE }); }
 
   function update(dt) {
     const active = isPlay();
     if (!active) { if (wasActive) { wasActive = false; leave(); } return; }
     if (!wasActive) { wasActive = true; settle(entered ? GLIDE : 0); entered = true; }   // the first entry is instant: no glide at load
     if (follow && !game.busy) { follow.t += dt; if (follow.t > HOLD) follow = null; }
+    // learning: the whole board between the text card and the learning bar (the frame insets say where), the camera straight and
+    // still, no follow. The framed fit puts the whole board in the free area at the neutral distance; a steeper pitch spends the
+    // height the card leaves on a bigger board. Leaving gives the Play view's own pose back.
+    if (LEARNING.some((c) => document.body.classList.contains(c))) {
+      follow = null;
+      if (!before) {
+        const c = controls.camera;
+        before = { pitch: c.pitch, dist: c.dist };
+        shownKey = 'L';
+        at = { x: 0, z: 0 };
+        controls.retarget({ pitch: LEARN_PITCH, dist: FRAME_REF }, GLIDE);
+        controls.setFocus?.({ x: 0, z: 0 }, { dur: GLIDE, zoom: 1, lift: 0 });
+      }
+      return;
+    }
+    if (before) {
+      controls.retarget({ pitch: before.pitch, dist: before.dist }, GLIDE);
+      before = null; shownKey = ''; at = { ...HOME_FOCUS };
+      controls.setFocus?.(null, { dur: GLIDE });
+      controls.setFocus?.({ ...HOME_FOCUS }, { dur: GLIDE, zoom: 1, lift: HOME_LIFT });
+    }
     st = game.getState();     // polled: a scripted select (selectSquare) raises no change event
     const sq = wanted();
     const key = sq.join(',');

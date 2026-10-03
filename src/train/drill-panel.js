@@ -61,16 +61,19 @@ export function mountDrillPanel({ drill, ui = null, onClose = null, onAgain = nu
     const head = el('div', 'xhead');
     const title = el('div', 'xtitle');
     title.append(el('b', '', pick(s.line.name)), el('span', 'xside', sideLabel(s.line)));
-    const close = button(compact ? '✕' : t('drill.stop', 'Stop'), 'xclose', () => (onClose ? onClose() : drill.stop()));
-    close.setAttribute('aria-label', t('drill.stop', 'Stop'));
-    head.append(title, close);
+    head.append(title);
+    if (!compact) {   // phone: Beenden sits in the learning bar
+      const close = button(t('drill.stop', 'Stop'), 'xclose', () => (onClose ? onClose() : drill.stop()));
+      close.setAttribute('aria-label', t('drill.stop', 'Stop'));
+      head.append(close);
+    }
     const text = el('p', 'xtext', sentence(s));
     text.dataset.kind = s.message?.type === 'miss' ? 'refused' : s.message?.type || '';
     const meta = el('div', 'xmeta');
     const status = s.phase === 'finished' ? '' : s.awaiting ? t('drill.yourMove', 'Your move.') : t('drill.watch', 'Watch.');
     meta.append(el('span', '', status));
     box.append(head, text, meta);
-    if (s.phase === 'finished') {
+    if (s.phase === 'finished' && !compact) {
       const row = el('div', 'xrow');
       if (s.mode === 'practise') row.append(button(t('drill.again', 'Again'), '', () => (onAgain ? onAgain(s.line.id) : drill.startPractise(s.line.id))));
       row.append(button(t('drill.close', 'Close'), 'primary', () => (onClose ? onClose() : drill.stop())));
@@ -79,8 +82,23 @@ export function mountDrillPanel({ drill, ui = null, onClose = null, onAgain = nu
     return box;
   }
 
+  // phone: the thumb bar becomes the controls (Show me, Hint, End); finished: Again (practise) and End
+  function learnBar(s) {
+    const end = { id: 'end', icon: 'end', label: t('lb.end', 'End'), aria: t('drill.stop', 'Stop'), run: () => (onClose ? onClose() : drill.stop()) };
+    if (s.phase === 'finished') {
+      const again = s.mode === 'practise' ? [{ id: 'again', icon: 'show', label: t('lb.again', 'Again'), aria: t('drill.again', 'Again'), run: () => (onAgain ? onAgain(s.line.id) : drill.startPractise(s.line.id)) }] : [];
+      return [...again, { ...end, primary: true }];
+    }
+    return [
+      { id: 'show', icon: 'show', label: t('lb.show', 'Show me'), aria: t('explain.showMe', 'Show me'), primary: true, disabled: !s.awaiting, run: () => drill.showMe() },
+      { id: 'hint', icon: 'good', label: t('lb.hint', 'Hint'), aria: t(s.hint ? 'explain.hintOff' : 'explain.hintOn', s.hint ? 'Hide the hint' : 'Show the hint'), on: s.hint, pressed: s.hint, run: () => drill.setHint(!s.hint) },
+      end,
+    ];
+  }
+
   function render() {
     const s = drill.state();
+    ui?.setLearnBar?.('drill', strip && s.phase !== 'idle' ? learnBar(s) : null);
     const live = s.phase !== 'idle';
     if (card) { card.hidden = !live || !!strip; card.querySelector('h2').textContent = t('drill.title', 'Drill'); }
     document.body.classList.toggle('drilling', live);

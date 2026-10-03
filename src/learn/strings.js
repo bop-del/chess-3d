@@ -15,5 +15,7 @@ addDE({
   'learn.data': 'Deine Eröffnungen', 'learn.export': 'Exportieren', 'learn.import': 'Importieren',
   'learn.exported': 'Datei gespeichert.', 'learn.imported': 'Importiert.', 'learn.importFailed': 'Import nicht möglich: {why}',
   'learn.importUnreadable': 'Die Datei konnte nicht gelesen werden.',
+  'lb.controls': 'Lernsteuerung', 'lb.back': 'Zurück', 'lb.show': 'Zeig es mir', 'lb.hint': 'Hinweis', 'lb.end': 'Beenden',
+  'lb.help': 'Hilfe', 'lb.next': 'Nächstes', 'lb.path': 'Pfad', 'lb.again': 'Nochmal',
   'explain.addMine': 'Zu meinen Eröffnungen', 'explain.inMine': 'In meinen Eröffnungen',
 });

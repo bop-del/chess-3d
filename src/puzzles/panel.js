@@ -34,7 +34,7 @@ function sentence(s) {
   return k ? t(k[0], k[1]) : '';
 }
 
-export function mountPuzzlesPanel({ puzzles, ui = null, onClose = null }) {
+export function mountPuzzlesPanel({ puzzles, ui = null, onClose = null, progress = null, openPath = () => {} }) {
   const root = el('div', 'xp pzp');
   const card = ui?.mountPanel ? ui.mountPanel('puzzles', root, { title: t('puzzles.tab', 'Puzzles') }) : null;
   const strip = device.phone ? el('section', 'xstrip pzstrip') : null;
@@ -58,12 +58,16 @@ export function mountPuzzlesPanel({ puzzles, ui = null, onClose = null }) {
     const head = el('div', 'xhead');
     const title = el('div', 'xtitle');
     title.append(el('b', 'pztheme', themeLine(s.theme)), el('span', 'xside pzband', bandName(s.band)));
-    const x = button(compact ? '✕' : t('puzzles.stop', 'Stop'), 'xclose', close);
-    x.setAttribute('aria-label', t('puzzles.stop', 'Stop'));
-    head.append(title, x);
+    head.append(title);
+    if (!compact) {   // phone: Beenden sits in the learning bar
+      const x = button(t('puzzles.stop', 'Stop'), 'xclose', close);
+      x.setAttribute('aria-label', t('puzzles.stop', 'Stop'));
+      head.append(x);
+    }
     const text = el('p', 'xtext pzsay', sentence(s));
     text.dataset.kind = s.message?.type === 'wrong' || s.message?.type === 'again' ? 'wrong' : s.message?.type || '';
     box.append(head, text);
+    if (compact) return box;
     const row = el('div', 'xrow');
     if (s.phase === 'solved') row.append(button(t('puzzles.next', 'Next puzzle'), 'primary pznext', () => puzzles.next()));
     else row.append(button(t('puzzles.help', 'Help'), 'pzhelp', () => puzzles.help()));
@@ -72,8 +76,20 @@ export function mountPuzzlesPanel({ puzzles, ui = null, onClose = null }) {
     return box;
   }
 
+  // phone: the thumb bar becomes the controls: Help, Next (gold, once solved), Path, End. A finished chapter makes Next open the path.
+  function learnBar(s) {
+    const solved = s.phase === 'solved';
+    const done = !!progress?.stats?.().finished;
+    const out = [{ id: 'help', icon: 'good', label: t('lb.help', 'Help'), aria: t('puzzles.help', 'Help'), disabled: !s.canHelp, run: () => puzzles.help() }];
+    if (solved) out.push({ id: 'next', icon: 'next', label: t('lb.next', 'Next'), aria: t('puzzles.next', 'Next puzzle'), primary: true, run: () => (done ? openPath() : puzzles.next()) });
+    out.push({ id: 'path', icon: 'path', label: t('lb.path', 'Path'), aria: t('lb.path', 'Path'), run: () => openPath() });
+    out.push({ id: 'end', icon: 'end', label: t('lb.end', 'End'), aria: t('puzzles.stop', 'Stop'), run: close });
+    return out;
+  }
+
   function render() {
     const s = puzzles.state();
+    ui?.setLearnBar?.('puzzles', strip && s.phase !== 'idle' ? learnBar(s) : null);
     const live = s.phase !== 'idle';
     if (card) { card.hidden = !live || !!strip; card.querySelector('h2').textContent = t('puzzles.tab', 'Puzzles'); }
     document.body.classList.toggle('puzzling', live);

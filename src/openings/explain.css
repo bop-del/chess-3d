@@ -34,9 +34,11 @@ body.phone .xstrip {
   display: block; position: fixed; z-index: 11; left: var(--sl); right: var(--sr); top: calc(var(--st) + var(--stat) + var(--gap));
   padding: 10px 12px; border-radius: 12px; background: var(--glass-strong); border: 1px solid var(--line); pointer-events: auto;
 }
-body.phone .xstrip .xtext { max-height: 22vh; overflow-y: auto; font-size: 14px; }
+body.phone .xstrip .xtext { max-height: none; overflow: visible; font-size: 14px; }   /* the whole text, never cut: the camera frame follows the strip height */
 body.phone .xstrip .btn, body.phone .xline { min-height: 44px; }
 body.phone .xstrip .xclose { min-width: 44px; padding: 0; }
 body.phone .xstrip .xside { display: none; }
+body.phone .xstrip .xmeta { color: #c9cad3; font-size: 12px; }   /* the card's secondary text: readable on the dark glass */
+body.phone.learnbar .pstatus .ps-sub, body.phone.learnbar .pstatus .ps-last { display: none; }   /* learning: one short phrase, no Last: */
 body.phone.explaining .pframe { top: calc(var(--st) + var(--stat) + var(--gap) * 2 + var(--xh, 0px)); }
 body.phone:not(.portrait) .xstrip { right: calc(var(--sr) + var(--barw) + var(--gap)); }
