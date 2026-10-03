@@ -9,11 +9,12 @@
 //   fix checks         test/fixes.mjs runFixChecks({ page, baseUrl, log }) when that file exists
 //   puzzles            test/puzzles.mjs runPuzzleChecks: open, wrong move and retry, Help, solve, no repeat, band up and down, saved progress, phone strip
 //   good move          test/goodmove.mjs runGoodMoveChecks: level select and memory, the arrow shows and clears, disabled while the computer thinks, in Explain and when over, the phone bulb
+//   game review        test/review.mjs runReviewChecks: the game over button, the strip filling in live, marked moves with the arrow and sentence, stepping, Details, German, closing, the phone layout
 //   drill              test/drill.mjs runDrillChecks: a scheduled session with a miss and a retry, a Practise run that changes no level, the end sweep
 //   explain mode       test/explain.mjs runExplainChecks: wrong move refused, reply after the pause, Back, the Italian Game to its end, the Scandinavian opens with e4
 // vs computer is the default in the app: the page health run uses no ai flag and checks it, all other runs add ai=0.
 // --skip-fixes leaves out test/fixes.mjs. --dev serves the vite dev server on the dev port instead of building. --shots saves screenshots to .tmp/smoke-shots/ (emptied first) and a contact sheet of them, contact-<w>x<h>.png.
-// --group=core|fixes|explain|drill|learn|puzzles|goodmove|all (default all) runs one part of the checks, --part=i/n runs every n-th fix unit, --base=URL uses a server that is already up.
+// --group=core|fixes|explain|drill|learn|puzzles|goodmove|review|all (default all) runs one part of the checks, --part=i/n runs every n-th fix unit, --base=URL uses a server that is already up.
 //   test/smoke-groups.mjs (the entry point of node test/run.mjs smoke) builds once, serves once and runs the groups in parallel, one headless Chrome each.
 // Exit codes: 0 pass (warnings allowed), 1 at least one check failed, 2 setup error.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -446,6 +447,22 @@ await guard('good move checks', async () => {
     for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
   } finally { await gp.close().catch(() => {}); }
 }, 'goodmove');
+
+// ------------------------------------------------------------------ game review (test/review.mjs)
+await guard('review checks', async () => {
+  const file = join(ROOT, 'test/review.mjs');
+  if (!existsSync(file)) { R.warn('review checks', 'test/review.mjs not found, skipped'); return; }
+  const mod = await import(pathToFileURL(file).href + '?t=' + Date.now());
+  const rp = await browser.newPage();
+  try {
+    const shot = flag('shots') ? (name) => rp.screenshot({ path: join(SHOTS, `${name}.png`) }) : null;
+    const res = await Promise.race([
+      mod.runReviewChecks({ page: rp, baseUrl: base.replace(/\/$/, ''), log: (m) => console.log('      ' + m), shot }),
+      sleep(240000).then(() => { throw new Error('runReviewChecks timed out after 240 s'); }),
+    ]);
+    for (const r of res || []) R.expect(r.name, !!r.pass, '', r.detail || '');
+  } finally { await rp.close().catch(() => {}); }
+}, 'review');
 
 // ------------------------------------------------------------------ drill (test/drill.mjs, needs window.__chess.train)
 await guard('drill checks', async () => {

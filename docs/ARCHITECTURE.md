@@ -30,6 +30,7 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
     src/rules.js         chess rules engine, no dependencies, runs in node and the browser
     src/ai.js            computer opponent (alpha-beta search), the LEVELS table
     src/goodmove.js      the Good move? helper: one Hard-strength move shown with the hint arrow
+    src/review/          the game review: classify.js, analyze.js, worker.js, engine.js, review.js (controller and strip), strings.js, review.css
     src/game.js          rules plus 3D presentation: selection, animation, undo, captures, trays
     src/controls.js      camera orbit, board gimbal, presets, keyboard, pointer and touch
     src/ui.js            HUD: panels, move list, captured pieces, sliders, banners
@@ -191,6 +192,28 @@ A negamax search with alpha-beta pruning, move ordering, material and piece-squa
     createGoodMove({ game, hint }) -> { ask(): Promise<move | null>, clear(), state(), move(), canAsk(), on(fn) }
 
 `ask()` runs `searchMove(fen, 4, 0)` in 8 ms slices (timers, not frames) and shows the answer with `hint` (`createHint({ gimbal, persist: false })` from main.js, so it ignores the Explain hint switch). State is `idle`, `thinking` or `showing`. The arrow clears on any move, undo or new game; a move made while it thinks drops the answer. `canAsk()` is false while the computer thinks or moves, in any mode but `play` (Explain, Drill), after the game ended and during a promotion. The page hook is `window.__chess.goodMove`; the UI binds it with `ui.bindGoodMove()` (desktop button `#btn-good`, phone bulb `.pgood`).
+
+### `src/review/` (game review)
+
+A finished game, replayed on the 3D board with its mistakes marked. Loaded by main.js (one call, `mountReview({ game, gimbal, createHint })`, after the Good move helper), exposed as `window.__chess.review`. Nothing else in the UI knows about it: the Review the game button is added to the game over card by the review itself, from its own `gameover` listener (it runs after the HUD's and appends to `#banner .banner-card .row`).
+
+    classify.js   pure: winPercent(cp), winDrop(best, reply), classify(drop, isBest), moveAccuracy, accuracy, reviewGame(positions, moves), sentenceFacts(...)
+    analyze.js    pure: analyzePosition(fen, depth), analyzeSteps (generator), bestLine(fen, first, plies), analyzeMany(fens, opts), MATE, DEPTH
+    worker.js     the Web Worker around analyzeMany and bestLine (in { type: 'analyze' | 'line' | 'cancel' }, out { type: 'pos' | 'done' | 'line' })
+    engine.js     createEngine() -> { analyze(fens, { depth, onPosition, onDone }), line(fen, first, plies), cancel(), dispose() }: the Worker, or the same code time sliced on the main thread when Workers are missing
+    review.js     createReview({ game, hint, engine }) -> { open({ at }), close({ restore }), next(), prev(), go(i), goMove(n), setDetails(on), canOpen(), state(), on(fn) } and mountReview (the DOM)
+
+**Engine.** Hard's search (`searchMove(fen, 4, 0)`, no randomness) on every position of the game, one after the other, about 0.1 to 0.3 s each. A position's analysis is `{ fen, turn, score, best }`, the score in centipawns for the side to move (mate is plus or minus 100000 minus the ply; a mated or stalemated position has no best move). `analyzeMany` yields to the event loop every 20 ms, so a `cancel` message reaches the Worker mid search. The best line is asked for lazily, only for the position on screen with Details open: the stored best move, then three more plies at depth 3.
+
+**Classification.** The unit is win chance, not centipawns, so a lost game stays quiet: `winPercent(cp) = 50 + 50 * (2 / (1 + exp(-0.004 cp)) - 1)` (cp capped at 1000). A move gives away `drop = max(0, winPercent(best before) - winPercent(-score after))` points. The engine's own move is `best`; a drop of 10 or more (about a pawn from an equal game) is a `mistake` (orange), 25 or more (a bit under a knight) a `blunder` (red), anything less `good`. Accuracy per move is `103.1668 exp(-0.04354 drop) - 3.1669` clamped to 0 to 100, per side the mean. A move is classified once both its positions are analysed. The sentence is made from facts (`sentenceFacts`: the better move is mate, the played move allows mate, the better move wins a piece, the played move leaves a piece to be taken, the better move gives check, else generic) and spoken in German or English from `strings.js` (keys `review.*`).
+
+**Steps.** The cursor is `{ ply, suggest }`. `ply` is the position on the board (0 the start, n after n moves). A marked move has an extra step in front of it, `{ ply: n - 1, suggest: true }`: the board before the move, the gold arrow (its own `createHint`, not the Explain one) on the better move, the sentence. A strip chip or graph point for a marked move lands on that step; forward plays the real move. Opening starts at ply 0.
+
+**Borrowing the game.** While the review is open the computer is switched off (`setVsComputer(false)`), `setMoveGuard(() => false)` refuses every move, positions are set with `loadFen` (any jump), `playMoves` (one step forward, instant, so no battle scene) or `undo` (one step back), and the HUD banner is kept hidden. `close()` plays the game back from its start FEN (`loadFen` then `playMoves`), puts the computer back and re-emits the game over card; `close({ restore: false })` is used when the player starts a new game in the middle of a review (the `newgame` event). `review.active` also sets `body.reviewing`.
+
+**Layout.** One `section.rv` fixed at the bottom: sentence, optional Details box (graph, best line, accuracy), the move strip, then the controls (start, back, position, forward, Details, close). Desktop: bottom centre between the two columns. Phone: above the thumb bar (`--bar`), 44 px targets. Under 900 px wide on a tablet it takes the whole bottom and hides the right column while it is open.
+
+Tests: `test/review-core.mjs` (fast tier: thresholds, accuracy, the engine on small positions and a scripted game) and `test/review.mjs` (smoke group `review`: the whole flow in the real page on desktop and phone; `node test/review.mjs --shots` writes shots and a contact sheet to `.tmp/review/`).
 
 ### `src/game.js`
 
@@ -363,7 +386,7 @@ Imported by `main.js` only for exactly `?diag=1` (right after `window.__chess` i
 
 ## Test hooks
 
-`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, themes, views, play, tokens, THREE, pick, openings, puzzles, puzzleProgress, reward, goodMove, train }`, plus `diag` when the page was opened with `?diag=1`. `openings` is `{ explain, hint, card, strip, tick }`, `puzzles` the controller, `puzzleProgress` its store, `reward` the solve and chapter reward, `goodMove` the Good move helper, `train` is `{ store, drill, sweep, learn }`, `diag` the diagnostics box handle. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
+`window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, themes, views, play, tokens, review, THREE, pick, openings, puzzles, puzzleProgress, reward, goodMove, train }`, plus `diag` when the page was opened with `?diag=1`. `openings` is `{ explain, hint, card, strip, tick }`, `puzzles` the controller, `puzzleProgress` its store, `reward` the solve and chapter reward, `goodMove` the Good move helper, `train` is `{ store, drill, sweep, learn }`, `diag` the diagnostics box handle. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
 
 `window.__chessReady` becomes `true` once loading is done and `window.__chessError` holds a message if loading failed.
 

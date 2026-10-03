@@ -265,6 +265,7 @@ async function boot() {
   const [{ createGoodMove }, { createHint }] = await Promise.all([import('./goodmove.js'), import('./openings/arrow.js')]);
   const goodMove = createGoodMove({ game, hint: createHint({ gimbal, persist: false }) });
   ui.bindGoodMove(goodMove);
+  const review = (await import('./review/review.js')).mountReview({ game, gimbal, createHint });   // the game over card gets its Review the game button
   mountSwatches({ themes, ui });
 
   // touch: rotation and the browser toolbar fire bursts of resize events. The camera follows at once, the render targets
@@ -281,7 +282,7 @@ async function boot() {
   window.addEventListener('resize', onResize);
   if (device.touch) window.addEventListener('orientationchange', onResize);
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, puzzles, puzzleProgress, reward, goodMove, themes, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, puzzles, puzzleProgress, reward, goodMove, review, themes, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
