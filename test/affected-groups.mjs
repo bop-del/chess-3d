@@ -3,7 +3,7 @@
 import { affectedGroups, MAP } from '../tools/affected-groups.mjs';
 import { FAMILIES, GROUPS } from './smoke-group-list.mjs';
 import { groupKey, groupFiles } from '../tools/result-cache.mjs';
-import { slotsFor, lanePorts, startServer } from '../tools/_lib.mjs';
+import { slotsFor, lanePorts, startServer, claimPort, portAnswers, safeDecode } from '../tools/_lib.mjs';
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -63,18 +63,53 @@ try {
   check('a group lists its script and imports', groupFiles('test/a.mjs', [], rt).length === 2);
 } finally { rmSync(rt, { recursive: true, force: true }); }
 
-// A foreign build on the port fails loudly, the same build is reused: a throwaway server stands in for another lane's preview.
+// startServer never reuses a server this process did not start: a throwaway server stands in for another lane's preview.
 const dir = mkdtempSync(join(tmpdir(), 'chess-port-'));
 const serve = (html) => new Promise((ok) => { const srv = createServer((q, r) => { r.setHeader('content-type', 'text/html'); r.end(html); }); srv.listen(0, '127.0.0.1', () => ok(srv)); });
+const refused = async (port) => { try { await startServer({ mode: 'preview', port, outDir: 'dist', cwd: dir }); return ''; } catch (e) { return e.message; } };
+const servers = [];
 try {
   mkdirSync(join(dir, 'dist')); writeFileSync(join(dir, 'dist', 'index.html'), '<html>build A</html>');
   const other = await serve('<html>build B</html>'), same = await serve('<html>build A</html>');
-  let msg = ''; try { await startServer({ mode: 'preview', port: other.address().port, outDir: 'dist', cwd: dir }); } catch (e) { msg = e.message; }
-  check('a different build on the port is refused, with a message that says so', /already serves a different build/.test(msg));
-  let reused = null; try { reused = await startServer({ mode: 'preview', port: same.address().port, outDir: 'dist', cwd: dir }); } catch (e) { /* checked below */ }
-  check('the same build on the port is reused, not tested twice', reused && typeof reused.stop === 'function');
-  other.close(); same.close();
-} finally { rmSync(dir, { recursive: true, force: true }); }
+  servers.push(other, same);
+  const mOther = await refused(other.address().port), mSame = await refused(same.address().port);
+  check('a different build on the port is refused, naming the port', mOther.includes(`port ${other.address().port} `) && /did not start/.test(mOther));
+  check('the very same build on the port is refused too, never reused', mSame.includes(`port ${same.address().port} `) && /refusing to reuse/.test(mSame));
+  // a server this process started is reused on a second call; no port given: the next free port, never an occupied one
+  const probe = await serve(''); const busy = probe.address().port; servers.push(probe);
+  const first = await startServer({ mode: 'preview', outDir: join(dir, 'dist') });
+  const again = await startServer({ mode: 'preview', port: first.port, outDir: join(dir, 'dist') });
+  check('a server this run started is reused on a second call', again.base === first.base);
+  const other2 = await startServer({ mode: 'preview', outDir: join(dir, 'dist') });
+  check('no port given: the next free port, a different one each time', other2.port !== first.port && !(await portAnswers(busy) && other2.port === busy));
+  try { await startServer({ mode: 'preview', port: first.port, outDir: join(dir, 'dist'), subPath: '/x/' }); check('same port with other settings is refused', false); }
+  catch (e) { check('same port with other settings is refused', /other settings/.test(e.message)); }
+  first.stop(); other2.stop();
+  let freed = false; for (let i = 0; i < 20 && !freed; i++) { freed = !(await portAnswers(first.port)); if (!freed) await new Promise((r) => setTimeout(r, 250)); }
+  check('a stopped server frees its port', freed);
+} finally { for (const sv of servers) sv.close(); rmSync(dir, { recursive: true, force: true }); }
+
+// claimPort: concurrent callers get different ports, a port that answers is skipped, release frees it
+{
+  const [c1, c2, c3] = await Promise.all([claimPort(), claimPort(), claimPort()]);
+  check('three concurrent claims get three different ports', new Set([c1.port, c2.port, c3.port]).size === 3);
+  check('a claim starts at the lane port or above', c1.port >= lanePorts().preview && c1.lane === lanePorts().lane);
+  const dev = await claimPort({ kind: 'dev' });
+  check('a dev claim starts in the dev range', dev.port >= lanePorts().dev);
+  const p1 = c1.port; c1.release();
+  const again = await claimPort();
+  check('a released port is claimable again', again.port === p1);
+  again.release();
+  // a program we did not start answers on the next port: it is skipped, the claim moves on
+  const squat = await new Promise((ok) => { const srv = createServer((q, r) => r.end('')); srv.listen(p1, '127.0.0.1', () => ok(srv)); });
+  const skip = await claimPort();
+  check('a port that answers without our claim is skipped', skip.port !== p1 && skip.port > p1);
+  squat.close(); skip.release();
+  for (const c of [c2, c3, dev]) c.release();
+}
+
+// hostile URLs in a message must not throw (the release check printed "URI malformed" for %%% once)
+check('safeDecode survives a malformed escape', safeDecode('/?help=%%%') === '/?help=%%%' && safeDecode('/?a=%41') === '/?a=A' && safeDecode('/?hud=%ff') === '/?hud=%ff');
 
 for (const c of cases) console.log(`${c.ok ? 'ok  ' : 'FAIL'} ${c.name}`);
 process.exit(cases.every((c) => c.ok) ? 0 : 1);

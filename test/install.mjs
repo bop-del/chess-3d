@@ -1,5 +1,5 @@
 // Install reminder test: the Add to Home Screen sheet (src/install-hint.js) and the manifest, in headless Chrome as an iPhone Safari tab.
-// Usage: node test/install.mjs [--port=5362] [--skip-build]
+// Usage: node test/install.mjs [--port=<default: claimed from the lane name>] [--skip-build]
 // Checks: the manifest and every icon it names load and have the stated size; the sheet shows once on a first visit and closes with
 // Later, with a tap outside and with Escape; the visit counter keeps it away on the next visits and brings it back after a few,
 // never more than three times in all; it never shows on a desktop browser, under automation (navigator.webdriver), with any URL flag
@@ -7,11 +7,11 @@
 // Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, build, launchBrowser, reporter, sleep, startServer, watchPage } from '../tools/_lib.mjs';
+import { ROOT, build, launchBrowser, reporter, sleep, startServer, watchPage, claimPort } from '../tools/_lib.mjs';
 import { pngSize } from '../tools/contact-sheet.mjs';
 
 const arg = (n, d) => { const a = process.argv.slice(2).find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
-const PORT = Number(arg('port', 5362));
+const PORT = arg('port', '') ? Number(arg('port', '')) : (await claimPort()).port;
 const DIST = '.tmp/install-dist';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 const KEY = 'chess3d.install-hint';

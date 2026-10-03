@@ -1,5 +1,5 @@
 // Real touch tier: build, serve, drive the page as an iPhone with CDP Input.dispatchTouchEvent (real touch events, no synthetic DOM events).
-// Usage: node test/touch.mjs [--port=5305] [--skip-build]
+// Usage: node test/touch.mjs [--port=<default: claimed from the lane name>] [--skip-build]
 //   per size (portrait 390x844, landscape 844x390; dpr 3, isMobile, hasTouch, iPhone user agent, ?touch=1, quality=low, manual=1, ai=0):
 //   tap to select and tap to move  a few legal moves by finger taps on projected squares, checked against window.__chess.game
 //   illegal tap                    a tap on an illegal target moves nothing
@@ -8,11 +8,11 @@
 //                                  calls preventDefault on the second tap of a double tap and on a two finger move off the canvas
 //   HUD buttons                    New game, the Controls drawer and a view preset respond to taps
 // Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 setup error.
-import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep } from '../tools/_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort } from '../tools/_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
-const PORT = Number(opt('port', 5305));
+const PORT = opt('port', '') ? Number(opt('port', '')) : (await claimPort()).port;
 const OUT = '.tmp/touch-dist';
 const SIZES = [{ name: 'portrait', w: 390, h: 844 }, { name: 'landscape', w: 844, h: 390 }];
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';

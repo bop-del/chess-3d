@@ -12,7 +12,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, startServer } from '../tools/_lib.mjs';
+import { ROOT, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, startServer, claimPort } from '../tools/_lib.mjs';
 import { affectedGroups, changedFiles } from '../tools/affected-groups.mjs';
 import { getResult, groupKey, putResult } from '../tools/result-cache.mjs';
 import { GROUPS as ALL_GROUPS, SMOKE, family } from './smoke-group-list.mjs';
@@ -22,7 +22,7 @@ const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
 const flag = (n) => args.includes(`--${n}`);
 const PORTS = lanePorts();
-const PORT = Number(opt('port', PORTS.preview)), DEV_PORT = Number(opt('dev-port', PORTS.dev)), OUT = '.tmp/smoke-dist', SHOTS = join(ROOT, '.tmp/smoke-shots');
+const PORT = opt('port', '') ? Number(opt('port', '')) : (await claimPort()).port, DEV_PORT = opt('dev-port', '') ? Number(opt('dev-port', '')) : (await claimPort({ kind: 'dev' })).port, OUT = '.tmp/smoke-dist', SHOTS = join(ROOT, '.tmp/smoke-shots');
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
 const GROUPS = ALL_GROUPS

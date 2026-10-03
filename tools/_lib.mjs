@@ -2,14 +2,17 @@
 //   ROOT                     repo root
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
 //   launchBrowser(opts)      headless Chrome through puppeteer-core with software GL (swiftshader) by default, so it runs anywhere;
-//                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check does).
+//                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check's extra software pass does).
 //                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 8, three under 16).
 //                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
 //   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted); sets Battle scenes Off for the page unless { scenes: true }
-//   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers
+//   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers. Only reuses a server this process started; a port that answers otherwise is an error (no port given: the next free one is taken)
+//   claimPort(opts)          a port for a server, from the lane name: the first free port from the lane's own, claimed by a lock folder (pid, lane, build hash) so two callers at once never share one; a port that answers without our claim is skipped
+//   waitReady(page, opts)    the ready signal of every tier (window.__chessReady or window.__chessError), with what it still waited for when it times out
 //   build(outDir)            vite build into outDir (inside a folder, never touches dist/), through a content hashed cache in ~/.cache/chess-3d/dist-<hash>
 // Exit codes used by the tools: 0 pass (warnings allowed), 1 a check failed, 2 usage or setup error.
 import { spawn, execFileSync } from 'node:child_process';
+import { connect } from 'node:net';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir, loadavg, homedir, freemem, totalmem } from 'node:os';
@@ -46,9 +49,7 @@ export function chromePath() {
 // owner's pid (slot 0 keeps the original lock name, so older checkouts still count). A lock whose pid is gone is stale
 // and taken over. Released when the browser closes or the process exits.
 const SLOTS = ['', '.1', '.2', '.3'].map((x) => join(tmpdir(), 'chess-3d-chrome.lock' + x));
-// the release check always renders in software, whatever CHESS_GL says
-const defaultGl = () => {
-  if (/release-check\.mjs$/.test(process.argv[1] || '')) return 'swiftshader';
+export const defaultGl = () => {
   const want = process.env.CHESS_GL || (process.platform === 'darwin' && process.arch === 'arm64' ? 'metal' : 'swiftshader');   // GPU by default on Apple Silicon, CHESS_GL=swiftshader opts out
   return want === 'metal' ? 'metal' : 'swiftshader';
 };
@@ -182,35 +183,88 @@ const killAll = () => { for (const c of children) { try { c.kill(); } catch (e) 
 process.on('exit', killAll);
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { killAll(); process.exit(130); });
 
-/** mode 'preview' serves outDir with vite preview, mode 'dev' runs the dev server. Resolves { base, stop }. */
-export async function startServer({ mode = 'preview', port, outDir = 'dist', cwd = ROOT, subPath = '' }) {
-  if (mode === 'preview') {
-    // Something already answers on the port: serve the same build (reuse it) or refuse. Never test a foreign build silently.
-    const sha = (t) => createHash('sha1').update(t).digest('hex').slice(0, 12);
-    let theirs = null;
-    try { const r = await fetch(`http://127.0.0.1:${port}${subPath || '/'}`, { signal: AbortSignal.timeout(2000) }); theirs = r.ok ? sha(Buffer.from(await r.arrayBuffer())) : 'http-' + r.status; } catch (e) { /* nothing listens: free */ }
-    if (theirs) {
-      let ours = ''; try { ours = sha(readFileSync(join(resolve(cwd, outDir), 'index.html'))); } catch (e) { /* no build */ }
-      if (theirs !== ours) throw new Error(`port ${port} already serves a different build (index.html ${theirs}, expected ${ours || 'none'}): another lane or a stale server owns it. Stop that server or pass another --port; refusing to test it.`);
-      console.log(`      port ${port} already serves this build (index.html ${ours}), reusing it`);
-      return { base: `http://127.0.0.1:${port}${subPath || '/'}`, stop() {} };
+const started = new Map();   // port -> child of a server this process started: the only kind startServer may reuse
+/** True when something accepts connections on the port (any server, whatever it serves). */
+export const portAnswers = (port) => new Promise((ok) => {
+  const sock = connect({ port, host: '127.0.0.1' });
+  const done = (v) => { sock.destroy(); ok(v); };
+  sock.setTimeout(2000, () => done(true));   // a listener that never answers still owns the port
+  sock.on('connect', () => done(true)); sock.on('error', () => done(false));
+});
+/** The first free port from `from` upward (the caller passed no port). */
+export async function freePort(from = lanePorts().preview) {
+  for (let p = from; p < from + 200; p++) if (!(await portAnswers(p))) return p;
+  throw new Error(`no free port from ${from} to ${from + 199}`);
+}
+
+/** Claim a port for a server this process is about to start. Starts at the lane's own port (lanePorts: preview, or dev with
+ *  { kind: 'dev' }) and takes the first one that neither answers nor is claimed by a live process. The claim is a lock folder in the
+ *  temp folder holding { pid, lane, build, port }, taken atomically, so concurrent callers (also in one process) get different ports.
+ *  Released with release() or when the process exits. Pass the port to startServer. */
+export async function claimPort({ kind = 'preview', root = ROOT, span = 200 } = {}) {
+  const lp = lanePorts(root), from = kind === 'dev' ? lp.dev : lp.preview;
+  let build = ''; try { build = buildHash(root); } catch (e) { /* not a git checkout */ }
+  for (let port = from; port < from + span; port++) {
+    const lock = join(tmpdir(), `chess-3d-port.${port}`);
+    try { mkdirSync(lock); } catch (e) {
+      let pid = 0; try { pid = JSON.parse(readFileSync(join(lock, 'claim.json'), 'utf8')).pid; } catch (e2) { /* being written */ }
+      if (pid && !alive(pid)) { rmSync(lock, { recursive: true, force: true }); port--; }   // stale: take it over on the next round
+      continue;
     }
+    if (await portAnswers(port)) { rmSync(lock, { recursive: true, force: true }); continue; }   // something we did not start owns it
+    writeFileSync(join(lock, 'claim.json'), JSON.stringify({ pid: process.pid, lane: lp.lane, build, port }));
+    claimed.add(lock);
+    return { port, lane: lp.lane, build, release() { if (claimed.delete(lock)) rmSync(lock, { recursive: true, force: true }); } };
   }
+  throw new Error(`no free ${kind} port from ${from} to ${from + span - 1}`);
+}
+const claimed = new Set();
+process.on('exit', () => { for (const lock of claimed) { try { rmSync(lock, { recursive: true, force: true }); } catch (e) { /* ignore */ } } });
+
+/** mode 'preview' serves outDir with vite preview, mode 'dev' runs the dev server. Resolves { base, port, stop }.
+ *  A port that answers is reused only when this process started that server; anything else on it (another lane, a stale
+ *  server, a foreign program) is an error naming the port. Without a port the next free one is taken. */
+export async function startServer({ mode = 'preview', port, outDir = 'dist', cwd = ROOT, subPath = '' }) {
+  const explicit = port !== undefined && port !== null;
+  if (!explicit) port = await freePort(mode === 'dev' ? lanePorts().dev : lanePorts().preview);
+  const base = `http://127.0.0.1:${port}${subPath || '/'}`;
+  const mine = started.get(port);
+  if (mine && mine.child.exitCode === null && !mine.child.killed) {
+    if (mine.mode !== mode || mine.outDir !== resolve(cwd, outDir) || mine.subPath !== subPath) throw new Error(`port ${port} is held by a server this run started with other settings (${mine.mode} ${mine.outDir}${mine.subPath}); stop it first or use another port.`);
+    return { base, port, stop() {} };   // the owner of the first start stops it
+  }
+  if (await portAnswers(port)) throw new Error(`port ${port} is already in use by a server this run did not start (another lane, a stale server or another program). Stop it or pass another port; refusing to reuse it.`);
   const baseArg = subPath ? ['--base', subPath] : [];   // for example '/chess-3d/', like GitHub Pages
   const args = mode === 'dev' ? ['--port', String(port), '--strictPort', '--host', '127.0.0.1', ...baseArg]
     : ['preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1', '--outDir', outDir, ...baseArg];
   const child = spawn(VITE(cwd), args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
   children.add(child);
+  started.set(port, { child, mode, outDir: resolve(cwd, outDir), subPath });
+  const forget = () => { children.delete(child); if (started.get(port)?.child === child) started.delete(port); };
   let log = ''; child.stdout.on('data', (d) => { log += d; }); child.stderr.on('data', (d) => { log += d; });
-  let exited = false; child.on('exit', () => { exited = true; });
-  const base = `http://127.0.0.1:${port}${subPath || '/'}`;
+  let exited = false; child.on('exit', () => { exited = true; forget(); });
   for (let i = 0; i < 80; i++) {
     if (exited) throw new Error(`vite ${mode} exited early (port ${port} busy?): ${log.trim().split('\n').slice(-3).join(' | ')}`);
-    try { const r = await fetch(base); if (r.ok) return { base, stop() { try { child.kill(); } catch (e) { /* ignore */ } children.delete(child); } }; } catch (e) { /* not up yet */ }
+    try { const r = await fetch(base); if (r.ok) return { base, port, stop() { try { child.kill(); } catch (e) { /* ignore */ } forget(); } }; } catch (e) { /* not up yet */ }
     await sleep(250);
   }
-  child.kill();
+  child.kill(); forget();
   throw new Error(`vite ${mode} did not answer on ${base}`);
+}
+
+/** Wait for the app's ready signal (window.__chessReady, or window.__chessError when boot failed), the one every tier uses.
+ *  Resolves { ready, error, ms, why }: why is empty when ready, else what it still waited for at the timeout. Never throws. */
+export async function waitReady(page, { timeout = 120000 } = {}) {
+  const t = Date.now();
+  let timedOut = false;
+  try { await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout, polling: 100 }); } catch (e) { timedOut = true; }
+  const ms = Date.now() - t;
+  const st = await page.evaluate(() => ({
+    ready: !!window.__chessReady, error: window.__chessError || null, doc: document.readyState, hook: !!window.__chess,
+    step: (document.getElementById('loader-step') || {}).textContent || '', loaderDone: !!(document.getElementById('loader') || { classList: { contains: () => false } }).classList.contains('done'),
+  })).catch(() => ({ ready: false, error: 'page gone', doc: '?', hook: false, step: '', loaderDone: false }));
+  const why = st.ready ? '' : `${timedOut ? `no __chessReady after ${Math.round(ms / 1000)}s` : 'boot failed'}: document ${st.doc}, loader step "${st.step.slice(0, 60)}"${st.loaderDone ? ' (loader done)' : ''}, __chess ${st.hook ? 'present' : 'missing'}${st.error ? ', error ' + st.error.slice(0, 120) : ''}`;
+  return { ready: st.ready, error: st.error, ms, why };
 }
 
 /** Which lane this checkout is: the worktree directory name, or '' for the main checkout. */
@@ -227,3 +281,6 @@ export function lanePorts(root = ROOT, inLane = !!laneName(root)) {
   const h = parseInt(createHash('sha1').update(basename(root)).digest('hex').slice(0, 8), 16) % 99;   // 99, so the release check's PORT + 1 stays below the dev range
   return { preview: 5400 + h, dev: 5500 + h, lane: basename(root) };
 }
+
+/** decodeURIComponent that never throws: a hostile URL such as %%% comes back as it is. */
+export function safeDecode(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }

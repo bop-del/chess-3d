@@ -1,5 +1,5 @@
 // Smoke tier: build, serve, drive the real page in headless Chrome (software GL), about a minute.
-// Usage: node test/smoke.mjs [--port=5303] [--dev] [--dev-port=5302] [--skip-build] [--write-budgets] [--shots]
+// Usage: node test/smoke.mjs [--port=<default: claimed from the lane name>] [--dev] [--dev-port=<default: claimed>] [--skip-build] [--write-budgets] [--shots]
 //   page health        loads and reaches window.__chessReady, no console error, no page error, no foreign host, time to ready
 //   scripted game      real pointer clicks on projected squares: capture, castling both sides, en passant, promotion chooser (cancel,
 //                      queen, knight), fool's mate with the game over banner, undo of each, new game, vs computer reply
@@ -20,13 +20,13 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep } from '../tools/_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort } from '../tools/_lib.mjs';
 import { contactSheets } from '../tools/contact-sheet.mjs';
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
 const flag = (n) => args.includes(`--${n}`);
-const PORT = Number(opt('port', 5303)), DEV_PORT = Number(opt('dev-port', 5302));
+const PORT = opt('port', '') ? Number(opt('port', '')) : (await claimPort()).port, DEV_PORT = opt('dev-port', '') ? Number(opt('dev-port', '')) : (await claimPort({ kind: 'dev' })).port;
 const OUT = '.tmp/smoke-dist', SHOTS = join(ROOT, '.tmp/smoke-shots'), BUDGETS = join(ROOT, 'tools/budgets.json');
 const GROUP = opt('group', 'all'), BASE = opt('base', ''), PART = opt('part', '');
 const G = (g) => GROUP === 'all' || GROUP === g;

@@ -1,6 +1,6 @@
 // Phone tier, part 1: screenshots and layout audits at five iPhone sizes (headless Chrome, touch emulation, software GL).
-// Usage: node tools/phoneshots.mjs [--skip-build] [--port=5306] [--only=portrait,se] [--dpr=3]
-//   Builds into .tmp/phone-dist, serves it on port 5306 and, for each size, loads the page with quality=low&manual=1&ai=0&touch=1
+// Usage: node tools/phoneshots.mjs [--skip-build] [--port=<default: claimed from the lane name>] [--only=portrait,se] [--dpr=3]
+//   Builds into .tmp/phone-dist, serves it on a claimed port and, for each size, loads the page with quality=low&manual=1&ai=0&touch=1
 //   and takes five shots into .tmp/phone-shots/<size>/ : start, selected (a real tap on e2), menu (the Menu sheet opened by tap), help, promo.
 //   Simulated safe area insets (portrait 47 top 34 bottom, landscape 47 left and right 21 bottom, the short sizes keep the side
 //   insets and drop the bottom one) go through CDP Emulation.setSafeAreaInsetsOverride. One contact sheet per size follows.
@@ -13,7 +13,7 @@
 // Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 usage or setup error.
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep } from './_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort } from './_lib.mjs';
 import { contactSheets } from './contact-sheet.mjs';
 
 // M3 switches the tap target audit from WARN to FAIL by flipping this one constant.
@@ -36,10 +36,10 @@ const flag = (n) => args.includes(`--${n}`);
 const known = /^--(skip-build|port=\d+|only=[a-z0-9,]+|dpr=\d+)$/;
 const names = opt('only', '') ? opt('only').split(',') : Object.keys(SIZES);
 if (args.some((a) => !known.test(a)) || names.some((n) => !SIZES[n])) {
-  console.error(`usage: node tools/phoneshots.mjs [--skip-build] [--port=5306] [--only=${Object.keys(SIZES).join(',')}] [--dpr=3]`);
+  console.error(`usage: node tools/phoneshots.mjs [--skip-build] [--port=<default: claimed>] [--only=${Object.keys(SIZES).join(',')}] [--dpr=3]`);
   process.exit(2);
 }
-const PORT = Number(opt('port', 5306)), DPR = Number(opt('dpr', 3));
+const PORT = opt('port', '') ? Number(opt('port', '')) : (await claimPort()).port, DPR = Number(opt('dpr', 3));
 const DIST = '.tmp/phone-dist', SHOTS = join(ROOT, '.tmp/phone-shots');
 const R = reporter();
 const t0 = Date.now();

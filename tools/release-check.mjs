@@ -6,7 +6,7 @@
 //      addresses other than the commit trailer address) in tracked text
 //   2. a fresh copy of HEAD (git archive) is installed with npm ci and built; the build must succeed, dist must not contain local paths,
 //      user names or key like strings, sizes are printed
-//   3. the built site is served with vite preview and loaded in headless Chrome: normal pages and flag combinations must load with no console
+//   3. the built site is served with vite preview and loaded in headless Chrome (the GPU like the other tiers, plus one extra software pass over / alone that can only WARN): normal pages and flag combinations must load with no console
 //      error, no page error and no request to a foreign host
 //   4. URL fuzzing: out of range and hostile values of every flag the app reads (src/main.js, src/device.js) (prototype names, duplicates, null bytes, markup included)
 //      must not throw and must not reach a foreign host, and no request may come back with an HTTP error status
@@ -24,13 +24,14 @@ import { mkdtempSync, existsSync, readFileSync, readdirSync, statSync, symlinkSy
 import { tmpdir, userInfo } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ROOT, reporter, launchBrowser, watchPage, startServer, sleep, lanePorts } from './_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, sleep, claimPort, waitReady, defaultGl, safeDecode } from './_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const a = args.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : dflt; };
 const flag = (name) => args.includes(`--${name}`);
 if (flag('help') || flag('h')) { console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 21).join('\n')); process.exit(0); }
-const PORT = Number(opt('port', lanePorts().preview));
+const PORT = opt('port', '') ? Number(opt('port', '')) : (await claimPort()).port;
+const SUB_PORT = opt('port', '') ? PORT + 1 : (await claimPort()).port;
 const sh = (cmd, cwd = ROOT, opts = {}) => execSync(cmd, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, ...opts });
 
 // Patterns are assembled from parts so this file does not match itself.
@@ -158,18 +159,24 @@ if (built && !flag('no-browser')) {
     const visit = async (tab, url, settleMs = 600) => {
       const { page, watch } = tab;
       watch.errs.length = 0; watch.foreign.length = 0;
+      let why = '';
       try {
         await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-        await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
+        why = (await waitReady(page)).why;
       } catch (e) { watch.errs.push('NAV ' + String(e.message).slice(0, 100)); }
       await sleep(settleMs);
       const st = await page.evaluate(() => ({ ready: !!window.__chessReady, error: window.__chessError || null })).catch(() => ({ ready: false, error: 'page gone' }));
-      return { problems: [...watch.errs, ...watch.foreign.map((u) => 'FOREIGN ' + u), ...(st.ready ? [] : ['NOT READY ' + (st.error || '')])] };
+      return { problems: [...watch.errs, ...watch.foreign.map((u) => 'FOREIGN ' + u), ...(st.ready ? [] : ['NOT READY ' + (why || st.error || '')])] };
     };
-    /** cases: [url, settleMs]. Resolves the results in case order. */
+    /** cases: [url, settleMs]. Resolves the results in case order. A page without manual=1 plays its intro on requestAnimationFrame, which
+     *  a background tab never gets: those run first, one at a time, on a tab brought to the front. The manual=1 pages share the tabs. */
     const run = async (cases) => {
-      const out = new Array(cases.length); let next = 0;
-      await Promise.all(tabs.map(async (tab) => { for (;;) { const i = next++; if (i >= cases.length) return; out[i] = await visit(tab, cases[i][0], cases[i][1]); } }));
+      const out = new Array(cases.length);
+      const live = cases.map((c, i) => i).filter((i) => !/[?&]manual=1(&|$)/.test(cases[i][0]));
+      for (const i of live) { await tabs[0].page.bringToFront(); out[i] = await visit(tabs[0], cases[i][0], cases[i][1]); }
+      const rest = cases.map((c, i) => i).filter((i) => !live.includes(i));
+      let next = 0;
+      await Promise.all(tabs.map(async (tab) => { for (;;) { const k = next++; if (k >= rest.length) return; out[rest[k]] = await visit(tab, cases[rest[k]][0], cases[rest[k]][1]); } }));
       return out;
     };
 
@@ -202,7 +209,7 @@ if (built && !flag('no-browser')) {
     ];
     // the same build under a sub path, as GitHub Pages serves it: a second server, its case runs in the same batch
     const SUB = '/chess-3d/';
-    const subServer = await startServer({ mode: 'preview', port: PORT + 1, outDir: 'dist', cwd: copy, subPath: SUB });
+    const subServer = await startServer({ mode: 'preview', port: SUB_PORT, outDir: 'dist', cwd: copy, subPath: SUB });
     try {
       const all = await run([...pages.map((p) => [base + p, 600]), ...fuzz.map((p) => [base + p, 400]), [subServer.base + '?quality=low&manual=1&ai=0', 400]]);
       const rp = all.slice(0, pages.length), rf = all.slice(pages.length, pages.length + fuzz.length), rs = all[all.length - 1];
@@ -210,10 +217,28 @@ if (built && !flag('no-browser')) {
       pages.forEach((p, i) => { if (rp[i].problems.length) { bad++; fail(`page ${p.slice(0, 90)} loads clean`, rp[i].problems.slice(0, 2).join(' | ')); } });
       if (!bad) pass('normal pages and flag combinations load clean', `${pages.length} pages, no console error, page error or foreign request`);
       let fuzzBad = 0;
-      fuzz.forEach((p, i) => { if (rf[i].problems.length) { fuzzBad++; fail(`hostile URL ${decodeURIComponent(p).slice(0, 70)}`, rf[i].problems.slice(0, 2).join(' | ')); } });
+      fuzz.forEach((p, i) => { if (rf[i].problems.length) { fuzzBad++; fail(`hostile URL ${safeDecode(p).slice(0, 70)}`, rf[i].problems.slice(0, 2).join(' | ')); } });
       if (!fuzzBad) pass('hostile and out of range URL parameters', `${fuzz.length} cases, no error, no foreign request, no HTTP error`);
       rs.problems.length ? fail(`built site works under ${SUB}`, rs.problems.slice(0, 3).join(' | ')) : pass(`built site works under ${SUB}`, 'boots, no error, no HTTP error');
     } finally { subServer.stop(); }
+    // One extra pass on the software renderer (SwiftShader) for the default page only: a machine without a GPU must still load it in
+    // a sane time. Never a FAIL, a slow or failed load is a WARN with the load time.
+    if (defaultGl() === 'metal') {
+      const SOFT_BUDGET = 180000;
+      let soft = null;
+      try {
+        soft = await launchBrowser({ w: 1280, h: 720, gl: 'swiftshader' });
+        const page = await soft.newPage();
+        const watch = await watchPage(page, ['127.0.0.1', 'localhost']);
+        const t = Date.now();
+        await page.goto(base + '/', { waitUntil: 'load', timeout: SOFT_BUDGET });
+        const r = await waitReady(page, { timeout: Math.max(1000, SOFT_BUDGET - (Date.now() - t)) });
+        const secs = ((Date.now() - t) / 1000).toFixed(1);
+        if (r.ready && !watch.errs.length) pass('page / loads on the software renderer (SwiftShader)', `${secs}s of ${SOFT_BUDGET / 1000}s budget`);
+        else warn('page / on the software renderer (SwiftShader)', `${secs}s of ${SOFT_BUDGET / 1000}s budget: ${r.why || watch.errs.slice(0, 2).join(' | ')}`);
+      } catch (e) { warn('page / on the software renderer (SwiftShader)', 'did not finish: ' + String(e.message).slice(0, 200)); }
+      finally { try { await soft?.close(); } catch (e) { /* ignore */ } }
+    } else pass('software pass', 'the main pass already renders in software on this machine');
   } catch (e) {
     fail('serve and load the built site', String(e.message).slice(0, 300));
   }

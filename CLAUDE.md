@@ -16,7 +16,7 @@ A 3D chess game for the browser (three.js 0.186, Vite, fully procedural, no asse
 | fast | `node test/run.mjs` | rules perft, piece geometry contract, text lint. No browser, seconds |
 | smoke | `node test/run.mjs smoke` | build, serve, drive the real page in headless Chrome (the GPU via ANGLE Metal on Apple Silicon, software GL elsewhere or with `CHESS_GL=swiftshader`; builds come from a content hashed cache in ~/.cache/chess-3d), parallel groups (test/smoke-groups.mjs), one Chrome each. Inside a lane worktree only the groups the diff against main affects run (`--affected`, the default there; core paths run all; `--all` forces every group, always before a release), and a group that passed for the same build and scripts prints CACHED (`--no-cache` to rerun). About 2 minutes for all groups on a quiet machine |
 | phone | `node test/run.mjs phone` | phone sizes (portrait, landscape, short), tap target audit, real multi touch (pinch, twist, thumb bar). A few minutes |
-| release | `node tools/release-check.mjs` | fresh build, page load, hostile URLs, docs and repo hygiene. Run before a release |
+| release | `node tools/release-check.mjs` | fresh build, page load on the GPU plus one software (SwiftShader) pass over `/` that only warns, hostile URLs, docs and repo hygiene. Run before a release |
 
 `node tools/audit-plan.mjs` says which tiers and audits a change needs. `node test/run.mjs smoke --shots` writes a contact sheet per screen size: open that instead of each screenshot.
 
