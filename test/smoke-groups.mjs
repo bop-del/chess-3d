@@ -3,7 +3,7 @@
 // launchBrowser(). The machine wide slot lock (2 to 4, adaptive by load) decides how many run at the same time, the rest wait their
 // turn, so two free slots still work, only slower. Same checks as a plain `node test/smoke.mjs`, same --shots contact sheets.
 // Exit codes: 0 every group ran and passed, 1 a check failed, 3 nothing failed but a group was skipped for slot starvation.
-// Options: --port=5303 --dev --dev-port=5302 --skip-build --write-budgets --shots --skip-fixes, plus --jobs=<n> to set the number of processes at once (default: the free Chrome slots at start, at least 2, so waiting groups do not hit the 15 minute lock timeout).
+// Options: --port=5303 --dev --dev-port=5302 --skip-build --write-budgets --shots --skip-fixes, plus --only=<group,group> to run just those groups, --jobs=<n> to set the number of processes at once (default: the free Chrome slots at start, at least 2, so waiting groups do not hit the 15 minute lock timeout).
 // A group that still finds no slot is reported as SKIPPED (slot starvation), not as a failure: run it alone with node test/smoke.mjs --group=<name>.
 import { spawn } from 'node:child_process';
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
@@ -20,8 +20,9 @@ const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
 // longest first: the two fix halves (about 60 s each), then the rest. battle, views, tokens and play are their own scripts (test/battle.mjs, views.mjs, tokens.mjs, play.mjs), on the same server.
 const SMOKE = 'test/smoke.mjs';
-const GROUPS = [['fixes 1/2', SMOKE, ['--group=fixes', '--part=0/2']], ['fixes 2/2', SMOKE, ['--group=fixes', '--part=1/2']], ['battle', 'test/battle.mjs', []], ['themes', 'test/themes.mjs', []], ['textures', 'test/textures.mjs', []], ['learn', SMOKE, ['--group=learn']], ['drill', SMOKE, ['--group=drill']], ['core', SMOKE, ['--group=core']], ['explain', SMOKE, ['--group=explain']], ['views', 'test/views.mjs', []], ['tokens', 'test/tokens.mjs', []], ['play', 'test/play.mjs', []], ['goodmove', SMOKE, ['--group=goodmove']], ['puzzles', SMOKE, ['--group=puzzles']]]
-  .filter(([n]) => !(flag('skip-fixes') && n.startsWith('fixes')));
+const GROUPS = [['fixes 1/2', SMOKE, ['--group=fixes', '--part=0/2']], ['fixes 2/2', SMOKE, ['--group=fixes', '--part=1/2']], ['battle', 'test/battle.mjs', []], ['themes', 'test/themes.mjs', []], ['textures', 'test/textures.mjs', []], ['intro', 'test/intro.mjs', []], ['learn', SMOKE, ['--group=learn']], ['drill', SMOKE, ['--group=drill']], ['core', SMOKE, ['--group=core']], ['explain', SMOKE, ['--group=explain']], ['views', 'test/views.mjs', []], ['tokens', 'test/tokens.mjs', []], ['play', 'test/play.mjs', []], ['goodmove', SMOKE, ['--group=goodmove']], ['puzzles', SMOKE, ['--group=puzzles']]]
+  .filter(([n]) => !(flag('skip-fixes') && n.startsWith('fixes')))
+  .filter(([n]) => !opt('only', '') || opt('only', '').split(',').includes(n));   // --only=textures,views runs just those groups
 
 let server = null;
 const fail = (m) => { console.log('FAIL  ' + m); console.log('SMOKE FAILED'); process.exit(1); };
@@ -52,7 +53,7 @@ const runGroup = ([name, script, extra]) => new Promise((resolve) => {
   c.on('close', (code) => {
     if (/slots busy for over/.test(out)) {   // never got a Chrome: slot starvation, not a failure of the checks
       skipped.push(name);
-      console.log(`--- group ${name} SKIPPED, no headless Chrome slot (${((Date.now() - tg) / 1000).toFixed(1)}s): run node test/smoke.mjs --group=${(extra[0] || "").slice(8)}${extra[1] ? ' ' + extra[1] : ''} --skip-build --base=${server.base}`);
+      console.log(`--- group ${name} SKIPPED, no headless Chrome slot (${((Date.now() - tg) / 1000).toFixed(1)}s): run ${script === SMOKE ? `node test/smoke.mjs --group=${extra[0].slice(8)}${extra[1] ? ' ' + extra[1] : ''}` : `node ${script}`} --skip-build --base=${server.base}`);
       return resolve();
     }
     const rows = (s) => (out.match(new RegExp(`^${s}  `, 'gm')) || []).length;   // count the result rows, battle.mjs prints no summary line

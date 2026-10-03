@@ -152,7 +152,8 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `hud` | `0` | Start with the HUD hidden |
 | `help` | `1` | Open the keyboard shortcut sheet |
 | `diag` | `1` | Show the on device diagnostics box (frames per second, frame times, quality tier, pixel ratio, an estimated graphics memory figure, touch mode). Tap it to expand or collapse. Off by default and nothing of it loads without the flag. `bin/device-check --diag` adds it to the URL it prints |
-| `manual` | `1` | No render loop. Tests step time with `__chess.step(seconds)` and draw with `__chess.draw()` |
+| `manual` | `1` | No render loop. Tests step time with `__chess.step(seconds)` and draw with `__chess.draw()`. Also switches the start sequence off |
+| `intro` | `0`, `1` | `0` skips the start sequence (the turning king and the board building itself). `1` keeps it with `manual=1`, where a test drives it with `__intro.tick(seconds)`. It is also off with the system setting reduce motion, then the finished board shows at once |
 
 Example: `?ai=0&preset=Isometric&light=Sunset&moves=e2e4,e7e5,g1f3,b8c6`
 

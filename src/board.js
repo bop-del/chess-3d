@@ -237,6 +237,12 @@ function createHighlights() {
 }
 
 // ------------------------------------------------------------------ board
+// Start sequence (src/intro.js): the squares drop in one by one as a diagonal wave from a1 to h8. Square k (0 at a1, 1 at h8)
+// starts at k * DROP_SPAN of the drop value and takes DROP_LEN of it, so drop 0 is nothing built and drop 1 is the finished board.
+export const DROP_SPAN = 0.58, DROP_LEN = 0.42;
+export const dropT = (drop, k) => (drop - k * DROP_SPAN) / DROP_LEN;
+export const easeOutBackT = (t) => { t = Math.min(1, Math.max(0, t)); return 1 + 2.1 * Math.pow(t - 1, 3) + 1.1 * Math.pow(t - 1, 2); };
+
 export function createBoard() {
   const group = new THREE.Group();
   group.name = 'board';
@@ -257,6 +263,27 @@ export function createBoard() {
     roughnessMap: tb.roughnessMap, metalnessMap: tb.metalnessMap, roughness: 1, metalness: 1, vertexColors: true,
     clearcoat: 0.6, clearcoatRoughness: 0.05, envMapIntensity: 1.1,
   });
+  // vertex shader hook for the start sequence: while uDrop < 1 each square falls in from above (positions are absolute in the
+  // board group, so the square a vertex belongs to follows from x and z). At 1 the branch is skipped and nothing changes.
+  const dropUniform = { value: 1 };
+  const dropHook = (m) => {
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.uDrop = dropUniform;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uDrop;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+        if (uDrop < 0.9999) {
+          vec2 sc = vec2(floor(position.x) + 0.5, floor(position.z) + 0.5);
+          float k = (sc.x - sc.y + 7.0) / 14.0;
+          float t = (uDrop - k * ${DROP_SPAN.toFixed(3)}) / ${DROP_LEN.toFixed(3)};
+          float tc = clamp(t, 0.0, 1.0);
+          float e = 1.0 + 2.1 * pow(tc - 1.0, 3.0) + 1.1 * pow(tc - 1.0, 2.0);
+          transformed.xz = sc + (transformed.xz - sc) * smoothstep(0.0, 0.2, t);
+          transformed.y += (1.0 - e) * 3.2;
+        }`);
+    };
+    m.customProgramCacheKey = () => 'square-drop';
+  };
   const walnutMat = new THREE.MeshPhysicalMaterial({
     name: 'walnut', map: twn.map, normalMap: twn.normalMap, normalScale: new THREE.Vector2(0.6, 0.6),
     roughnessMap: twn.roughnessMap, roughness: 1, metalness: 0,
@@ -298,6 +325,7 @@ export function createBoard() {
     addQuadUp(B, cx - (HALF - BEV), cz - (HALF - BEV), cx + (HALF - BEV), cz + (HALF - BEV), 0,
       (x, z) => uvAt(x - cx, z - cz), tint);
   }
+  dropHook(lightMat); dropHook(darkMat);
   const lightMesh = new THREE.Mesh(BL.build(), lightMat); lightMesh.name = 'squares-light';
   const darkMesh = new THREE.Mesh(BD.build(), darkMat); darkMesh.name = 'squares-dark';
 
@@ -411,6 +439,12 @@ export function createBoard() {
     group,
     squareMeshes,
     base,
+    /** the start sequence: 0 nothing built, 1 the finished board. Squares do not cast shadows while it is below 1. */
+    setDrop(v) {
+      dropUniform.value = v;
+      const cast = v >= 1;
+      if (lightMesh.castShadow !== cast) lightMesh.castShadow = darkMesh.castShadow = cast;
+    },
     /** spec: { squaresLight, squaresDark, frame, inlay, gold, plinth, labels } property specs (see themes/apply.js), null = classic */
     applyTheme(spec) { skin.apply(spec); },
     squareCenter(file, rank) { return new THREE.Vector3(file - 3.5, 0, 3.5 - rank); },

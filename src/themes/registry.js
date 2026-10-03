@@ -32,11 +32,14 @@ export function storedTheme() {
   try { const id = localStorage.getItem(STORE); return isTheme(id) ? id : 'classic'; } catch (e) { return 'classic'; }
 }
 
-export function createThemes({ stage, board, pieceSet, materials, game }) {
+// game may be null at first (the start sequence turns the theme on before the game exists): attachGame(game) follows.
+export function createThemes({ stage, board, pieceSet, materials, game = null }) {
   const pieceSkin = materials;   // materials.apply(spec | null), see materials.js
   let trayMats = null;
   let trayRoot = null;
+  let traySpec = null;
   const trayMaterial = () => {
+    if (!game) return null;
     if (!trayMats) {
       let slab = null;
       game.root.traverse((o) => { if (!slab && o.name === 'tray-slab') slab = o.material; });
@@ -65,7 +68,8 @@ export function createThemes({ stage, board, pieceSet, materials, game }) {
     tracked = built.fresh;
     board.applyTheme(built.board);
     pieceSkin.apply(built.pieces);
-    trayMaterial().apply(built.board?.tray ? { tray: built.board.tray } : null);
+    traySpec = built.board?.tray ? { tray: built.board.tray } : null;
+    trayMaterial()?.apply(traySpec);
     stage.setThemeLight(built.light);
     for (const tex of old) tex.dispose();
     current = id;
@@ -95,6 +99,8 @@ export function createThemes({ stage, board, pieceSet, materials, game }) {
       return chain;
     },
     on(fn) { listeners.push(fn); },
+    /** the game was created after the theme was turned on: give its trays the theme too */
+    attachGame(g) { game = g; if (traySpec) trayMaterial()?.apply(traySpec); },
     get textureCount() { return tracked.length; },
   };
 }

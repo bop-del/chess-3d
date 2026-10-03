@@ -589,14 +589,20 @@ export function createStage(canvas, opts = {}) {
 
   // ---- applying animated state ----
   const _v = new THREE.Vector3();
-  function applyState() {
+  // dim scales the three lights and the environment: 1 is the real look, the start sequence (src/intro.js) lowers it
+  let dim = 1;
+  function applyLights() {
     _v.copy(cur.key.dir).normalize().multiplyScalar(LIGHT_DIST);
-    key.position.copy(_v); key.color.copy(cur.key.color); key.intensity = cur.key.intensity;
+    key.position.copy(_v); key.color.copy(cur.key.color); key.intensity = cur.key.intensity * dim;
     _v.copy(cur.fill.dir).normalize().multiplyScalar(LIGHT_DIST);
-    fill.position.copy(_v); fill.color.copy(cur.fill.color); fill.intensity = cur.fill.intensity;
+    fill.position.copy(_v); fill.color.copy(cur.fill.color); fill.intensity = cur.fill.intensity * dim;
     _v.copy(cur.rim.dir).normalize().multiplyScalar(LIGHT_DIST);
-    rim.position.copy(_v); rim.color.copy(cur.rim.color); rim.intensity = cur.rim.intensity;
-    scene.environmentIntensity = cur.env.intensity;
+    rim.position.copy(_v); rim.color.copy(cur.rim.color); rim.intensity = cur.rim.intensity * dim;
+    scene.environmentIntensity = cur.env.intensity * dim;
+  }
+  function setDim(k) { dim = k; applyLights(); }
+  function applyState() {
+    applyLights();
     renderer.toneMappingExposure = cur.exposure;
     floorMat.color.copy(cur.floorColor);
     floorUniforms.reflStrength.value = cfg.reflection > 0 ? cur.reflection * floorVisibility : 0;
@@ -795,7 +801,7 @@ export function createStage(canvas, opts = {}) {
     setProjection, setOrthoSize,
     lights: { key, fill, rim },
     lightingPresets,
-    setLightingPreset, setThemeLight, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, dispose,
+    setLightingPreset, setThemeLight, setDim, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, dispose,
     // extras (beyond the contract, harmless)
     get quality() { return quality; },
     get lightingPreset() { return currentName; },

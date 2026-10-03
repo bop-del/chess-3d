@@ -1,6 +1,6 @@
 // Board texture start-up checks: node test/textures.mjs [--port=5360] [--base=url]
 // Phone (touch, 390x844): textures are 512 px, the first load makes them in Workers and fills the IndexedDB cache, the second
-// load is a cache hit (no Worker started), and the loader bar moves in steps while they are made. Desktop: 1024 px, Workers, no cache.
+// load is a cache hit (no Worker started), and the loading progress moves in steps while they are made. Desktop: 1024 px, Workers, no cache.
 // Exit codes: 0 pass, 1 a check failed.
 import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
 const args = process.argv.slice(2);
@@ -17,15 +17,14 @@ try {
   const load = async (page, q) => {
     if (q.includes('touch=1')) await page.evaluateOnNewDocument(() => { for (const [k, v] of [['width', 390], ['height', 844]]) Object.defineProperty(screen, k, { get: () => v }); });   // device.phone reads screen, not the viewport
     await page.evaluateOnNewDocument(() => {
-      window.__workers = 0; window.__bar = new Set();
+      window.__workers = 0;
       const W = window.Worker; window.Worker = function (...a) { window.__workers++; return new W(...a); };
-      new MutationObserver(() => { const f = document.getElementById('loader-fill'); if (f) window.__bar.add(f.style.width); }).observe(document, { subtree: true, attributes: true, attributeFilter: ['style'] });
     });
     await page.goto(url(q), { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('document.body.classList.contains("ready")', { timeout: 300000, polling: 200 });
     return page.evaluate(() => {
       let size = 0; window.__chess.gimbal.traverse((o) => { const m = o.material; if (m && m.name === 'marble-white') size = m.map.image.width; });
-      return { size, workers: window.__workers, bar: [...window.__bar].map((x) => parseInt(x)).filter((x) => x >= 30 && x <= 40) };
+      return { size, workers: window.__workers, bar: [...new Set(window.__chessProgress)].filter((x) => x >= 30 && x <= 40) };
     });
   };
   // phone, first visit
@@ -35,7 +34,7 @@ try {
   let r = await load(page, 'quality=medium&touch=1');
   R.expect('phone: textures are 512 px', r.size === 512, `${r.size}`);
   R.expect('phone, first load: Workers made them', r.workers > 0, `${r.workers} workers`);
-  R.expect('phone, first load: the bar moves while they are made', r.bar.length >= 4, `bar values 30..40: ${r.bar.join(',')}`);
+  R.expect('phone, first load: the progress moves while they are made', r.bar.length >= 4, `bar values 30..40: ${r.bar.join(',')}`);
   R.expect('phone, first load: the cache holds all six', (await page.evaluate(idbCount)) === 6, 'six entries');
   R.expect('phone: no console error or foreign request', !w.errs.length && !w.foreign.length, '', [...w.errs, ...w.foreign].join(' | '));
   await page.close();

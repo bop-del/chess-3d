@@ -12,11 +12,13 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
 
 ## Layout
 
-    index.html           canvas, loader, HUD containers, entry script
+    index.html           canvas, loader (gold title and step line), HUD containers, entry script
     src/main.js          boot sequence, wiring, render loop, URL parameters, window.__chess
     src/device.js        device facts (touch, ios, phone, standalone, portrait), body classes and gesture blocking (the iOS Home Screen meta tags are static in index.html)
     src/scene.js         stage: renderer, lights, studio environment, floor, post chain, quality
-    src/board.js         board, frame, inlay, labels, plinth, square highlights
+    src/board.js         board, frame, inlay, labels, plinth, square highlights; `setDrop(v)` for the start sequence
+    src/intro.js         the start sequence: a turning king, then the board builds itself on the real renderer
+    src/loader-board.js  the fallback loading screen (a CSS 3D board), loaded only when the sequence cannot run
     src/textures.js      board textures: cache, Worker pool, canvas textures (marble, walnut, maple, brass, felt)
     src/texture-gen.js   the pure pixel generators (no three, no DOM), also run by src/texture-worker.js
     src/materials.js     ivory, ebony and gold piece materials, and applyPieceTheme
@@ -42,11 +44,14 @@ Everything the player sees on the board lives in one `gimbal` group inside the s
 
 ## Boot order (`src/main.js`)
 
-1. Import the modules in parallel, with a progress bar over a loading screen.
-2. `createStage(canvas, { quality })`, then a `gimbal` Group added to `stage.scene`.
-3. `createPieceMaterials()`, `createBoard()` (added to the gimbal), `createPieceSet(materials).buildAll(progress)`.
-4. `createGame({ gimbal, board, pieceSet, materials })`, `createControls(...)`, `createUI(...)`.
-5. Apply URL parameters, expose `window.__chess`, start the render loop (or not, with `?manual=1`).
+1. Start loading everything in parallel. Await what the king needs first: stage, materials, piece set, controls, views and `intro.js`.
+2. `createStage(canvas, { quality })`, a `gimbal` Group in `stage.scene`, `createPieceMaterials()`, `createPieceSet(materials)`.
+3. `createControls(...)` and `createViews(...)` now, then the camera part of the URL flags (`applyViewParams`: `view`, `preset`, gimbal, `yaw`, `pitch`, `dist`). The camera is then where the game starts.
+4. `createIntro(...)` (the king on e1) and the render loop start here: the king turns while the rest loads. Progress feeds `intro.setTarget` through `introTarget()`.
+5. `prepareTextures`, `createBoard()` (`intro.attachBoard` hides it), the stored theme (`createThemes` without a game, `attachGame` later), `pieceSet.buildAll`, `createGame` (`applyGameParams`: `fen`, `moves`, `select`, `ai`; then `intro.attachGame` hides the pieces) and `createUI`. The HUD is built this early on purpose: on a phone it measures the free area and tells the camera, so the sequence ends in the right pose.
+6. `intro.boardGo()`: the squares drop, the frame settles, the pieces rise and the camera pulls back to the pose the controls hold, while the rest of boot (battle, Openings, Train, Puzzles, Learn, Good move) loads. `intro.finish` plays out the remainder within half a second, `body.intro` is removed (the HUD fades in), `applyLateParams` (`hud`, `help`, `light`, `spin`, `promo`) runs and `__chessReady` is set.
+
+The start sequence (`src/intro.js`) shows on the real canvas and renderer, so there is no handover. Its progress `shown` follows the real progress at a fixed speed (never faster than 1.2 s from 0 to 1) and, once loading is done, must reach 1 within 0.45 s. Timeline: 0 to 0.12 the king lights up, 0.12 to 0.30 the king alone, 0.30 to 0.70 squares drop (`board.setDrop`, a vertex shader hook, a1 to h8), 0.62 to 0.80 frame, inlays and labels settle, 0.72 to 0.96 the other pieces rise (the king hands over from a hero copy to the game's king), the camera pulls back over 0.30 to 1. It scales hidden meshes to 0.001 instead of hiding them so their shaders compile up front (`renderer.compileAsync`). `stage.setDim(k)` scales the stage lights, two gold rim lights do the work. Everything is put back as the game made it (`restore`). It is off with `?intro=0`, `prefers-reduced-motion` and `?manual=1` (then `?intro=1` turns it on and a test drives `__intro.tick(dt)`). If it throws, `main.js` mounts the CSS board of `loader-board.js` and boots as before. Test: `test/intro.mjs`.
 
 Loading yields to the browser between steps with a helper that races `requestAnimationFrame` against a 50 ms timer, so the loader repaints. A hidden tab never fires `requestAnimationFrame` and clamps timers to 1 s, so there the helper (in `main.js` and `pieceset.js`) returns at once and loading runs straight through.
 
