@@ -3,19 +3,25 @@
 import { analyzeMany, bestLine } from './analyze.js';
 
 export function createEngine({ useWorker = true } = {}) {
-  let worker = null;
-  if (useWorker && typeof Worker === 'function') {
-    try { worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }); } catch (e) { worker = null; }
-  }
+  let worker = null, started = false;
   let id = 0;
   const handlers = new Map();   // request id -> fn(message)
-  if (worker) {
-    worker.onmessage = (e) => handlers.get(e.data.id)?.(e.data);
-    worker.onerror = () => { /* the review keeps what it has */ };
+  // the Worker starts on the first request, so a page that never opens a review never starts one
+  function start() {
+    if (started) return;
+    started = true;
+    if (useWorker && typeof Worker === 'function') {
+      try { worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }); } catch (e) { worker = null; }
+    }
+    if (worker) {
+      worker.onmessage = (e) => handlers.get(e.data.id)?.(e.data);
+      worker.onerror = () => { /* the review keeps what it has */ };
+    }
   }
   let stop = null;
 
   function analyze(fens, { depth, onPosition, onDone }) {
+    start();
     const mine = ++id;
     stop?.();
     if (worker) {
@@ -34,6 +40,7 @@ export function createEngine({ useWorker = true } = {}) {
   }
 
   function line(fen, first, plies = 4) {
+    start();
     if (!worker) return Promise.resolve(bestLine(fen, first, plies));
     const mine = ++id;
     return new Promise((resolve) => {

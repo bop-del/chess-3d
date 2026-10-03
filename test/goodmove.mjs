@@ -37,11 +37,12 @@ export async function runGoodMoveChecks({ page, baseUrl, log = () => {}, shot = 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.goodMove');
     await page.waitForFunction("document.getElementById('loader').classList.contains('done')");
-    const opts = await page.evaluate(() => [...document.querySelectorAll('#sel-ai-level option')].map((o) => o.value + ':' + o.textContent));
-    ok('level: the select offers Novice, Easy, Normal, Hard with the Elo labels', opts.join('|') === 'novice:Novice ~700|easy:Easy ~900|normal:Normal ~1200|hard:Hard ~1450', opts.join('|'));
+    const opts = await page.evaluate(() => [...document.querySelectorAll('#sel-ai-level .chip')].map((o) => o.dataset.value + ':' + o.textContent));
+    ok('level: the chips offer Novice, Easy, Normal, Hard with the Elo labels', opts.join('|') === 'novice:Novice~700|easy:Easy~900|normal:Normal~1200|hard:Hard~1450', opts.join('|'));
     let s = await info();
     ok('level: a new visitor gets Easy, the computer is on', s.level === 'easy' && await page.evaluate(() => document.getElementById('sel-ai-level').value) === 'easy', JSON.stringify(s));
-    await page.select('#sel-ai-level', 'novice');
+    await page.evaluate(() => document.querySelector('#tab-play')?.click());
+    await page.click('#sel-ai-level [data-value="novice"]');
     ok('level: the choice is remembered in localStorage chess3d.level', (await page.evaluate(() => localStorage.getItem('chess3d.level'))) === 'novice' && (await info()).level === 'novice');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.goodMove');

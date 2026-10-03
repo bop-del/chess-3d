@@ -46,6 +46,8 @@ const CASES = [
   ['scene', { see: '.card[data-card="scene"] .body' }],
   ['moves', { see: '.card[data-card="moves"] .body' }],
 ];
+// desktop: the one right panel, so Settings and Moves are tabs, not cards
+const DESKTOP_SEE = { settings: '#tp-settings #presets', scene: '#tp-settings #presets', moves: '#tp-play #moves' };
 const SIZES = [['desktop', 1280, 720, false], ['phone portrait', 390, 844, true], ['phone landscape', 844, 390, true]];
 
 // seeded: one adopted opening, so the Practise tab is not locked
@@ -90,7 +92,7 @@ try {
       if (phoneRun && size[0] === 'phone landscape' && ['learn', 'mine', 'drill'].includes(id)) continue;   // same code path as portrait: keep the group short
       await load(page, size, `&open=${id}`);
       const scope = phoneRun ? '.psheet.open ' : '';   // other panels keep hidden copies of cards and tabs: look only inside the open sheet
-      const s = await shown(page, scope + want.see);
+      const s = await shown(page, phoneRun ? scope + want.see : (DESKTOP_SEE[id] || want.see));
       const tab = want.tab ? await page.evaluate((q) => document.querySelector(q)?.dataset.tab, scope + '.xtab[aria-selected="true"]') : null;
       const ok = s === 'ok' && (!want.tab || tab === want.tab);
       R.expect(`${size[0]}: open=${id}`, ok, want.tab ? `tab ${tab}` : 'visible', `${s}${want.tab ? `, tab ${tab}` : ''}`);

@@ -1,0 +1,224 @@
+/* The one-panel layout for desktops and tablets (style A, Studio Gold): today's dark glass and gold, calmer. Gold marks the one
+   main action and the current choice, everything else is quiet. Phones never build this markup (src/ui.js keeps the thumb bar).
+   Tokens come from style.css (--glass-strong, --line, --text, --dim, --gold, --gold-soft); the rest are local. */
+#hud {
+  --pw: clamp(340px, 29vw, 380px);
+  --p-bg: rgba(16, 17, 22, 0.94); --p-well: rgba(8, 9, 12, 0.7); --p-btn: rgba(255, 255, 255, 0.05); --p-line: rgba(255, 255, 255, 0.09);
+  --p-soft: rgba(216, 180, 104, 0.14); --p-gold-text: #ecd193;
+}
+#hud.rail { --pw: 60px; }
+#hud.hidden > .panel, #hud.hidden > .viewbar { opacity: 0; pointer-events: none !important; }
+
+/* ---------------------------------------------------------------- panel frame */
+.panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: var(--pw); display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  pointer-events: auto; container-type: inline-size; background: var(--p-bg); border-left: 1px solid var(--p-line);
+  backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4); box-shadow: -18px 0 50px rgba(0, 0, 0, 0.28);
+  transition: width 0.3s ease, opacity 0.35s ease; padding-right: env(safe-area-inset-right);
+}
+.panel h4 { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.panel .sec:empty, .panel .stack:empty { display: none; }
+.panel .sec { min-width: 0; }
+
+/* header: logo, status, New game / Undo / Fold */
+.phead { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px 16px 12px; border-bottom: 1px solid var(--p-line); }
+.panel .logo { width: 36px; height: 36px; border-radius: 10px; font-size: 22px; }
+.panel .turn { margin: 0; padding: 0; background: none; border: 0; border-radius: 0; display: flex; align-items: center; gap: 9px; min-width: 0; }
+.panel .turn .dot { width: 14px; height: 14px; }
+.panel .turn .status { min-width: 0; }
+.panel .turn b { font-size: 15.5px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel .turn small { margin: 1px 0 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel .turn.check { background: none; border: 0; }
+.hbtns { display: flex; gap: 6px; }
+.ib {
+  appearance: none; width: 38px; height: 38px; padding: 0; display: grid; place-items: center; border-radius: 9px; border: 1px solid var(--p-line);
+  background: var(--p-btn); color: var(--text); cursor: pointer; transition: background 0.18s, border-color 0.18s, transform 0.12s;
+}
+.ib:hover { background: rgba(255, 255, 255, 0.11); }
+.ib:active { transform: scale(0.96); }
+.ib:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+.ib svg { width: 18px; height: 18px; }
+.ib.gold { background: var(--gold); color: #1d170b; border-color: transparent; }
+.ib.gold:hover { background: #e4c37d; }
+.ib.on { background: var(--p-soft); border-color: var(--gold); color: var(--p-gold-text); }
+.panel :focus-visible, .viewbar :focus-visible, .kbov :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* tabs */
+.tabs { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--p-line); }
+.tab {
+  appearance: none; display: flex; gap: 6px; justify-content: center; align-items: center; min-width: 0; padding: 9px 4px; border: 0; border-radius: 9px;
+  background: none; color: var(--dim); font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.18s, color 0.18s;
+}
+.tab span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab svg { width: 16px; height: 16px; flex: none; }
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--p-gold-text); background: var(--p-soft); }
+@container (max-width: 372px) {
+  .tab svg { display: none; }
+  .tab { font-size: 13px; }
+  .phead { gap: 10px; padding-inline: 14px; }
+  .tabs, .tp { padding-inline: 14px; }
+  .panel .logo { width: 30px; height: 30px; font-size: 19px; }
+  .ib { width: 34px; height: 34px; }
+  .hbtns { gap: 5px; }
+}
+
+/* body: one scrolling pane per tab */
+.pbody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.tp { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 16px; }
+.tp .sec.grow { flex: 1 1 auto; min-height: 110px; display: flex; flex-direction: column; }
+.tp .sec.grow .moves { flex: 1 1 0; min-height: 80px; }
+
+/* chips and switches */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips.grid2 { display: grid; grid-template-columns: 1fr 1fr; }
+.chip {
+  appearance: none; flex: 1 1 0; min-width: 0; height: 36px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--p-line); border-radius: 9px; background: var(--p-btn); color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+.chip:hover { background: rgba(255, 255, 255, 0.1); }
+.chip small { font-size: 11px; font-weight: 500; color: var(--dim); }
+.chip.on { background: var(--p-soft); border-color: var(--gold); color: var(--p-gold-text); }
+.chip.on small { color: inherit; opacity: 0.8; }
+.chip span:empty, .chip small:empty { display: none; }
+.opp { display: grid; gap: 8px; margin-top: 10px; transition: opacity 0.2s; }
+.opp.off { opacity: 0.45; }
+.row-switch { flex: none; min-height: 28px; }
+.row-switch em, .panel .switch em { font-size: 13.5px; }
+.ghost {
+  appearance: none; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 38px; border-radius: 9px; border: 1px dashed var(--line-strong);
+  background: none; color: var(--dim); font-size: 13px; font-weight: 600; cursor: pointer; flex: none;
+}
+.ghost:hover:not(:disabled) { color: var(--text); border-color: rgba(255, 255, 255, 0.3); }
+.ghost:disabled { opacity: 0.4; cursor: default; }
+.ghost.on { color: var(--p-gold-text); border-color: var(--gold); border-style: solid; background: var(--p-soft); }
+.ghost.think svg { animation: pulse 1s ease-in-out infinite; }
+.ghost svg { width: 16px; height: 16px; flex: none; }
+.ghost.think span::after { content: '...'; }
+
+/* moves and captured */
+.panel .moves { background: var(--p-well); border-radius: 9px; padding: 6px; }
+.panel .moves li:nth-child(odd) { background: none; }
+.panel .moves li .n { color: var(--dim); }
+.panel .cap { grid-template-columns: 70px 1fr auto; }
+.panel .cap + .cap { border-top-color: var(--p-line); }
+.foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--dim); flex: none; }
+.linkbtn { appearance: none; border: 0; border-bottom: 1px dotted var(--dim); border-radius: 0; background: none; padding: 2px 0; color: var(--dim); font-size: 12px; cursor: pointer; }
+.linkbtn:hover { color: var(--text); border-bottom-color: var(--text); }
+
+/* Learn: the mounted lesson cards lose their glass, the tab is the card */
+.lhost { display: flex; flex-direction: column; gap: 14px; }
+.lcard { background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; overflow: visible; border-radius: 0; }
+.lcard > header { display: none; }
+.lcard .body { padding: 0; }
+.lcard .xp { gap: 12px; }
+@container (min-width: 372px) { .xtabs { grid-template-columns: repeat(4, 1fr) !important; } }
+
+/* Settings */
+.views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.view {
+  appearance: none; display: grid; justify-items: center; align-content: center; gap: 4px; min-width: 0; padding: 8px 2px 7px; border: 1px solid var(--p-line); border-radius: 9px;
+  background: var(--p-btn); color: var(--text); font-size: 11.5px; font-weight: 500; cursor: pointer; transition: background 0.18s, border-color 0.18s;
+}
+.view span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.view svg { width: 20px; height: 20px; color: var(--dim); }
+.view:hover { background: rgba(255, 255, 255, 0.1); }
+.view.on { border-color: var(--gold); background: var(--p-soft); color: var(--p-gold-text); }
+.view.on svg { color: var(--p-gold-text); }
+.panel .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(54px, 1fr)); gap: 6px; }
+.panel .swatch { min-width: 0; padding: 7px 2px 6px; border-radius: 9px; border-color: transparent; background: none; font-size: 11.5px; }
+.panel .swatch b { font-weight: 500; }
+.panel .swatch.on { border-color: var(--gold); background: var(--p-soft); color: var(--p-gold-text); }
+.panel .field.themes { margin: 0; gap: 0; }
+.panel .field.themes > span { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.panel .battle-settings h4 { margin-bottom: 8px; }
+.panel .stack + .stack { margin-top: 8px; }
+.panel .stack > .switch, .panel .stack > .music-settings .switch { min-height: 30px; }
+.panel .music-settings { margin-top: 4px; }
+.panel .lang { margin: 0; display: flex; padding: 2px; }
+.panel .lang-btn { flex: 1; min-height: 32px; }
+.fold { border-top: 1px solid var(--p-line); padding-top: 10px; flex: none; }
+.fold summary { list-style: none; display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--dim); min-height: 28px; }
+.fold summary::-webkit-details-marker { display: none; }
+.fold summary small { margin-left: auto; font-size: 11.5px; font-weight: 500; opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold summary svg { width: 16px; height: 16px; flex: none; transition: transform 0.2s; }
+.fold[open] summary svg { transform: rotate(90deg); }
+.fold summary:hover { color: var(--text); }
+.fold-body { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; }
+.panel .sliders .btn.small { width: 100%; }
+
+/* rail: the panel folded to a 60 px icon strip */
+.rail-icons { display: none; flex-direction: column; gap: 8px; align-items: center; padding-top: 14px; }
+.panel.rail .phead, .panel.rail .tabs, .panel.rail .pbody { display: none; }
+.panel.rail .rail-icons { display: flex; }
+.rail-icons .ib { width: 40px; height: 40px; }
+
+/* ---------------------------------------------------------------- view bar (floats over the board area) */
+.viewbar {
+  position: absolute; bottom: 22px; left: calc((100% - var(--panel-w, 0px)) / 2); transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px;
+  border-radius: 14px; background: rgba(20, 21, 27, 0.82); border: 1px solid var(--p-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); pointer-events: auto; transition: opacity 0.5s ease;
+}
+.viewbar.idle { opacity: 0; }
+.vb {
+  appearance: none; height: 36px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.18s, color 0.18s;
+}
+.vb:hover { background: rgba(255, 255, 255, 0.09); }
+.vb svg { width: 18px; height: 18px; flex: none; }
+.vb.ico { width: 36px; padding: 0; }
+.vb.primary { background: var(--p-soft); color: var(--p-gold-text); }
+.vb.toggle.on { background: var(--p-soft); color: var(--p-gold-text); }
+.vb .vcaret { display: inline-grid; transition: transform 0.2s; }
+.vb .vcaret svg { width: 14px; height: 14px; }
+.viewbar.menu .vcaret { transform: rotate(180deg); }
+.vsep { width: 1px; align-self: stretch; margin: 6px 2px; background: var(--p-line); }
+.vpick { position: relative; }
+.vmenu {
+  position: absolute; bottom: calc(100% + 12px); left: 0; min-width: 210px; display: grid; gap: 2px; padding: 5px; border-radius: 12px;
+  background: rgba(20, 21, 27, 0.96); border: 1px solid var(--p-line); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+}
+.vm-item { appearance: none; display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font-size: 13px; font-weight: 500; text-align: left; cursor: pointer; }
+.vm-item svg { width: 18px; height: 18px; color: var(--dim); flex: none; }
+.vm-item:hover { background: rgba(255, 255, 255, 0.08); }
+.vm-item.on { background: var(--p-soft); color: var(--p-gold-text); }
+.vm-item.on svg { color: var(--p-gold-text); }
+
+/* ---------------------------------------------------------------- keyboard help overlay */
+.kbov { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 16px; background: rgba(5, 6, 9, 0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); pointer-events: auto; animation: fade 0.2s ease; }
+.kbcard { width: min(660px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 18px 22px 22px; border-radius: 16px; background: #12131a; border: 1px solid var(--line-strong); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: pop 0.35s cubic-bezier(0.2, 1.2, 0.3, 1); }
+.kbcard header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.kbcard h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.kbcard dl { margin: 0; display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 9px 14px; align-items: center; }
+.kbcard dt { justify-self: start; padding: 2px 9px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 7px; background: rgba(255, 255, 255, 0.05); color: var(--p-gold-text); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.kbcard dd { margin: 0; color: var(--text); font-size: 13px; }
+@media (max-width: 560px) { .kbcard dl { grid-template-columns: max-content 1fr; } }
+
+/* ---------------------------------------------------------------- the rest of the page follows the panel */
+body:not(.phone) #banner, body:not(.phone) #promo { padding-right: var(--panel-w, 0px); }
+body:not(.phone) #toast { left: calc((100% - var(--panel-w, 0px)) / 2); }
+
+/* tablets (touch, wider than a phone): 44 px targets */
+body.touch:not(.phone) .chip, body.touch:not(.phone) .tab, body.touch:not(.phone) .vb, body.touch:not(.phone) .view, body.touch:not(.phone) .ghost,
+body.touch:not(.phone) .vm-item, body.touch:not(.phone) .fold summary, body.touch:not(.phone) .linkbtn, body.touch:not(.phone) .lang-btn { min-height: 44px; }
+body.touch:not(.phone) .ib, body.touch:not(.phone) .vb.ico { min-width: 44px; min-height: 44px; }
+body.touch:not(.phone) .swatch { min-height: 56px; }
+body.touch:not(.phone) .panel .switch { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .panel, .viewbar { transition: none; } .kbov, .kbcard { animation: none; } }
+
+/* the lists in the Learn tab grow with the content, the tab itself scrolls */
+body:not(.phone) .lhost .xlist, body:not(.phone) .lhost .xtext { max-height: none; overflow: visible; }
+.vmenu { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+/* a running lesson shows only its own card; the idle lists (the Openings card) step aside, the live card comes first */
+.lcard[data-card="drill"], .lcard[data-card="puzzles"] { order: -1; }
+body.puzzling .lcard[data-card="openings"], body.drilling .lcard[data-card="openings"] { display: none; }
+
+/* the live lesson: one big card (title, the sentence, Help / Next / Path, End) */
+.lcard .xwalk { padding: 14px; border: 1px solid var(--p-line); border-radius: 14px; background: rgba(255, 255, 255, 0.04); gap: 10px; }
+.lcard .xtitle b { font-size: 19px; letter-spacing: -0.01em; }
+.lcard .xtext { font-size: 14px; line-height: 1.5; }
+.lcard .xrow { flex-wrap: wrap; }
+.lcard .xrow .btn { flex: 1 1 40%; min-height: 40px; }
+.lcard .xclose { align-self: flex-start; }
+body.touch:not(.phone) .panel .turn b { white-space: normal; line-height: 1.2; }

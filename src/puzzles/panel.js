@@ -72,6 +72,7 @@ export function mountPuzzlesPanel({ puzzles, ui = null, onClose = null, progress
     if (s.phase === 'solved') row.append(button(t('puzzles.next', 'Next puzzle'), 'primary pznext', () => puzzles.next()));
     else row.append(button(t('puzzles.help', 'Help'), 'pzhelp', () => puzzles.help()));
     row.lastChild.disabled = s.phase === 'solved' ? false : !s.canHelp;
+    row.append(button(t('lb.path', 'Path'), 'pzpathbtn', () => openPath()));
     box.append(row);
     return box;
   }

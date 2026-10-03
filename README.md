@@ -31,7 +31,7 @@ On a phone, in portrait: the game with its thumb bar, the Menu sheet, a lesson r
 
 ## Openings
 
-The Learn card (right column on a computer) and the Learn button (sixth button of the thumb bar on a phone, which opens the Learn sheet) have three tabs: Openings, Mine and Practise. The Openings tab teaches twelve classic opening lines: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
+The Learn tab (on a computer) and the Learn button (sixth button of the thumb bar on a phone, which opens the Learn sheet) have three tabs: Openings, Mine and Practise. The Openings tab teaches twelve classic opening lines: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
 
 Pick a line and the board turns to your side. You play your own moves on the board and the game plays the other side after a short pause. Every move comes with one sentence that says what it is for. Any other move is refused and the card tells you which move the line plays.
 
@@ -45,7 +45,7 @@ At the end of a line the button Add to my openings puts the line into your reper
 - Practise (greyed until you have added your first line) is one thing: when positions are ready to be repeated it starts a session over them, otherwise it offers your lines for a whole run. You play your own moves, the other side is played for you. A wrong move slides back, the hint shows the right move and the sentence says what it is for, and you play it yourself. A session ends with the same gold light. A run of a whole line changes no progress.
 - Your repertoire and progress are stored in the browser (one record, `chess3d.train`). Export and Import in the Menu (on a computer, in the Scene card) save and load it as a JSON file; an import that does not fit says what is wrong and changes nothing.
 
-The line texts, names and the card are written in English and German. The EN and DE switch sits in the left panel (at the top of the Menu sheet on a phone). The language defaults to the browser's language and your choice is stored in the browser, not in the link. In German the move list and the line texts use the German piece letters (K, D, T, L, S).
+The line texts, names and the card are written in English and German. The EN and DE switch sits in the Settings tab (at the top of the Menu sheet on a phone). The language defaults to the browser's language and your choice is stored in the browser, not in the link. In German the move list and the line texts use the German piece letters (K, D, T, L, S).
 
 ## Puzzles
 
@@ -89,27 +89,30 @@ Keyboard
 | Space | Auto spin on and off |
 | U | Undo |
 | N | New game |
-| H | Hide and show the HUD |
-| ? or / | Keyboard shortcut sheet |
-| Esc | Close the sheet, the game over banner or the promotion chooser |
+| H | Fold the panel to the rail and unfold it (on a phone: hide and show the HUD) |
+| ? or / | Keyboard shortcut overlay |
+| Esc | Close the overlay, the game over banner or the promotion chooser |
 
-Sliders and buttons (left panel)
+The panel (computers and tablets): one panel on the right with the tabs Play, Learn and Settings, a header with the game status, New game and Undo, and a floating view bar over the board. The rail button (or H) folds the panel to a 60 px icon strip so the board gets the screen; the choice is remembered, and a window under 900 px wide starts as the rail. Starting a lesson or puzzle switches the panel to Learn. Choices are visible chips and swatches, not dropdowns. Phones keep the thumb bar and the Menu sheet.
+
+Sliders and buttons (Settings tab; Flip, Spin, Reset and Lock are on the view bar)
 
 | Control | What it does |
 |---|---|
 | Views | White view, Black view, Top down, Side, Isometric, plus four easy views: Symbols (flat chess diagram symbols as in chess books, cream and black with an outline, printed on a plain flat board in the theme's colours; free orbit), Tokens (a flat top view, every piece a thick turned disc with its Staunton silhouette in gold), From above (the real 3D pieces, perspective camera steeply from above at 65 degrees) and Easy 3D (a steep orthographic view, pieces about 1.15 times larger). The easy views show the board in the theme's full colour and as large as the screen allows (on a phone in portrait edge to edge); Tokens and From above lock the tilt and turn (Symbols and Easy 3D orbit freely), Flip, zoom and Reset still work. On phones in portrait also Play, the default there: the board as big as the screen allows, and the camera glides sideways so the selected piece and all its moves, the computer's reply and any hint arrow stay in view. Smooth animated transitions. The choice is remembered per device (a stored Easy flat from an older version becomes Tokens). The Views button on a phone cycles Play, Tokens, Symbols, From above, Easy 3D, then the presets. Easy views skip the battle scenes |
 | Flip, Spin, Reset | Turn to the other side, toggle auto spin, return to the start view |
-| Board gimbal X, Y, Z | Three sliders from -180 to 180 degrees with a numeric readout, and a Level board button |
-| Theme | Classic, Tournament, Wood, Metal, Glass, Blocks: board, frame, pieces and lighting change together. Remembered on this device (Scene card, or the Menu on a phone) |
+| Board gimbal X, Y, Z | Three sliders from -180 to 180 degrees with a numeric readout, and a Level board button (Settings, under Advanced) |
+| Theme | Classic, Tournament, Wood, Metal, Glass, Blocks: board, frame, pieces and lighting change together. Remembered on this device (Settings tab, or the Menu on a phone) |
 | Lighting | Studio, Gallery, Sunset, Night |
 | Quality | Low, Medium, High |
-| New game, Undo, Keys | Game buttons (right panel) |
-| vs computer | On by default (you play white, Easy). Switch, your side (play white or black) and strength (Novice about 700, Easy about 900, Normal about 1200, Hard about 1450, estimated, see below; the choice is remembered on the device). Next to Undo, Good move? shows one good move with the hint arrow (a bulb in the status line on a phone) |
+| New game, Undo, Keyboard shortcuts | Header buttons and the link at the foot of the Play tab (on a phone: the thumb bar and the Menu) |
+| vs computer | On by default (you play white, Easy). Switch, your side (play white or black) and strength (Novice about 700, Easy about 900, Normal about 1200, Hard about 1450, estimated, see below; the choice is remembered on the device). In the Play tab, Good move? shows one good move with the hint arrow (a bulb in the status line on a phone) |
 | Review the game | When a game ends, the card has a Review the game button (German: Partie ansehen) next to New game. Step back and forward through the whole game on a move strip under the board (above the thumb bar on a phone, arrow keys on a desktop); mistakes are orange, blunders red. On a marked move the board shows the position before it, the gold arrow shows a better move and one friendly sentence says why. Details adds an evaluation graph (tap or drag to jump), the best line in notation and the accuracy of each side. The analysis is Hard's search in a Web Worker, so the strip fills in while you look |
 
 Home Screen: on an iPhone or iPad the game can be added to the Home Screen from Safari (Share, then Add to Home Screen) and then runs full screen with its own icon (a web app manifest, no service worker). In a Safari tab it shows a short reminder with the three steps once after the first load, and at most twice more a few visits later. Later or a tap outside closes it at once. It never shows when the game is already installed, on desktop, or with any URL parameter below. The link preview used by chat apps and social sites is `public/og-image.png`.
 
-Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view stops all camera gestures. On a phone, while a lesson, a drill, a Practise session or a puzzle runs, the thumb bar turns into the learning controls (for example Back, Show me, Hint and End), the view stays on Play and a short text card sits on top; End gives the normal bar back. Otherwise the game has a status line on top, a thumb bar with big icons and one short word each (Undo, New, Flip, View, Learn, Menu), and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
+Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view (the lock on the view bar, a switch in the Menu on a phone) stops all camera gestures. On a phone, while a lesson, a drill, a Practise session or a puzzle runs, the thumb bar turns into the learning controls (for example Back, Show me, Hint and End), the view stays on Play and a short text card sits on top; End gives the normal bar back. Otherwise the game has a status line on top, a thumb bar with big icons and one short word each (Undo, New, Flip, View, Learn, Menu), and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
+
 
 ## Features
 
@@ -118,7 +121,7 @@ Rules
 - Complete rules: castling (both sides, with the usual conditions), en passant, promotion with a chooser for queen, rook, bishop or knight, check, checkmate and stalemate
 - Draws by the fifty-move rule, threefold repetition and insufficient material
 - Move list in standard algebraic notation (SAN), captured pieces with the material balance, undo for any number of moves
-- Play against the computer at four levels (Novice about 700, Easy about 900, Normal about 1200, Hard about 1450 estimated Elo), as white or black. The computer opponent is on by default, you play white on Easy. Switch it off in the Game panel (or open `?ai=0`) for two players on one screen
+- Play against the computer at four levels (Novice about 700, Easy about 900, Normal about 1200, Hard about 1450 estimated Elo), as white or black. The computer opponent is on by default, you play white on Easy. Switch it off in the Play tab (or open `?ai=0`) for two players on one screen
 - The rules engine is checked against the standard perft node counts
 
 Rendering

@@ -205,7 +205,7 @@ async function checkTrays(page, baseUrl, log, [width, height]) {
         }
         return { side: b.min.x < 0 ? 'left' : 'right', l, t, r: rr, b: bt };
       });
-      const cards = [...document.querySelectorAll('#hud .card')].map((e) => {
+      const cards = [...document.querySelectorAll('#hud .card, #hud .panel')].map((e) => {
         const q = e.getBoundingClientRect();
         return { name: e.dataset.card || e.className, l: q.left, t: q.top, r: q.right, b: q.bottom, w: q.width, h: q.height };
       }).filter((c) => c.w > 0 && c.h > 0);

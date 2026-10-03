@@ -4,6 +4,7 @@
 import { device } from './device.js';
 import './learn/strings.js';
 import { t, setLanguage, onLanguage, translateTree, sanDisplay, i18n } from './i18n.js';
+import { createDesktop, chipGroup, VIEW_ICONS } from './panel.js';
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const g = (t) => GLYPH[t] + '︎';
 const VAL = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
@@ -35,7 +36,10 @@ const KEYS = [
   ['key.v', 'V', 'Top down'], ['key.1to5', '1 to 5', 'View presets'], ['key.space', 'Space', 'Auto spin'], ['key.u', 'U', 'Undo'],
   ['key.n', 'N', 'New game'], ['key.h', 'H', 'Hide / show HUD'],
 ];
-const keyRows = (rows) => rows.map(([k, kf, df]) => `<dt>${t(k, kf)}</dt><dd>${t(k + 'D', df)}</dd>`).join('');
+// the H key folds the panel on desktop and tablets, and hides the whole HUD on phones (which have no key)
+const deskKeys = () => KEYS.map((r) => (r[0] === 'key.h' ? ['key.h', 'H', 'Fold / unfold the panel'] : r));
+const keyRows = (rows) => rows.map(([k, kf, df]) => `<dt>${t(k, kf)}</dt><dd>${k === 'key.h' && df.startsWith('Fold') ? t('key.hDesk', df) : t(k + 'D', df)}</dd>`).join('');
+const LIGHT_COLOR = { Studio: '#f5ead2', Gallery: '#cfd6e6', Sunset: '#e9a25b', Night: '#5b6fb3' };
 
 function el(tag, cls, html) {
   const e = document.createElement(tag);
@@ -47,9 +51,21 @@ function el(tag, cls, html) {
 export function createUI({ game, controls, stage, quality = 'high', views }) {
   const hud = document.getElementById('hud');
   hud.innerHTML = '';
+  // Desktops and tablets get the one panel of src/panel.js. Phones keep the columns' cards, which buildPhone() below moves
+  // into the Menu sheet. Both layouts use the same ids, so the wiring below serves either.
+  const desk = !device.phone;
+  const manual = new URLSearchParams(location.search).get('manual') === '1';
+  let left = null, right = null, help = null, drawerBtn = null, dsk = null;
+  const showBtn = el('button', 'show-btn', 'Show HUD');
+  showBtn.dataset.i18n = 'hud.show';
+  showBtn.hidden = true;
 
+  if (desk) {
+    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => controls.setFrame(w ? { right: w } : {}), fade: !manual });
+    hud.append(showBtn);
+  } else {
   // ------------------------------------------------------------ left column
-  const left = el('aside', 'col left');
+  left = el('aside', 'col left');
   left.innerHTML = `
     <section class="card brand">
       <div class="brand-row">
@@ -91,7 +107,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     </div>`;
 
   // ------------------------------------------------------------ right column
-  const right = el('aside', 'col right');
+  right = el('aside', 'col right');
   right.innerHTML = `
     <section class="card" data-card="game">
       <header><h2 data-i18n="hud.game">Game</h2><span class="chev"></span></header>
@@ -127,60 +143,81 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       </div>
     </section>`;
 
-  const help = el('div', 'help card');
+  help = el('div', 'help card');
   help.hidden = true;
   help.innerHTML = `<header><h2 data-i18n="hud.keyboardMouse">Keyboard and mouse</h2></header><dl id="help-keys">${keyRows(KEYS)}</dl>`;
 
-  const showBtn = el('button', 'show-btn', 'Show HUD');
-  showBtn.dataset.i18n = 'hud.show';
-  showBtn.hidden = true;
-  const drawerBtn = el('button', 'drawer-btn', 'Controls');
+  drawerBtn = el('button', 'drawer-btn', 'Controls');
   drawerBtn.dataset.i18n = 'hud.controls';
 
   hud.append(left, right, help, showBtn, drawerBtn);
+  }
 
   const $ = (sel, root = hud) => root.querySelector(sel);
 
   // ------------------------------------------------------------ collapsible cards
   const narrow = () => window.matchMedia('(max-width: 900px)').matches;
-  if (!device.phone) hud.querySelectorAll('.card[data-card] > header').forEach((h) => {
+  if (!desk && !device.phone) hud.querySelectorAll('.card[data-card] > header').forEach((h) => {
     h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
   });
-  if (narrow() && !device.phone) right.querySelectorAll('.card[data-card]').forEach((c) => { if (c.dataset.card !== 'game') c.classList.add('collapsed'); });
-  drawerBtn.addEventListener('click', () => { $('#tools').style.bottom = `${right.offsetHeight + 20}px`; left.classList.toggle('open'); drawerBtn.classList.toggle('on', left.classList.contains('open')); });
+  if (!desk && narrow() && !device.phone) right.querySelectorAll('.card[data-card]').forEach((c) => { if (c.dataset.card !== 'game') c.classList.add('collapsed'); });
+  if (drawerBtn) drawerBtn.addEventListener('click', () => { $('#tools').style.bottom = `${right.offsetHeight + 20}px`; left.classList.toggle('open'); drawerBtn.classList.toggle('on', left.classList.contains('open')); });
   // expose toolbox on narrow screens as a sheet
 
   let phoneUI = null;   // set by buildPhone() on phones
 
   // ------------------------------------------------------------ presets and view buttons
   const presetBox = $('#presets');
+  // desktop: the same list also fills the picker on the view bar, and the bar shows the current view's name
+  const vmenu = dsk ? dsk.vmenu : null;
+  const viewName = (v) => t(`preset.${v.label}`, v.label);
   const buildViewButtons = () => {
     presetBox.textContent = '';
+    if (vmenu) vmenu.textContent = '';
     for (const v of views.list()) {
-      const b = el('button', 'btn preset', t(`preset.${v.label}`, v.label));
+      const b = el('button', desk ? 'view' : 'btn preset');
+      b.type = 'button';
+      if (desk) b.innerHTML = `${VIEW_ICONS[v.id] || ''}<span>${viewName(v)}</span>`; else b.textContent = viewName(v);
       b.dataset.preset = v.label;
       b.dataset.view = v.id;
       b.addEventListener('click', () => views.set(v.id));
       presetBox.append(b);
+      if (vmenu) {
+        const m = el('button', 'vm-item', `${VIEW_ICONS[v.id] || ''}<span>${viewName(v)}</span>`);
+        m.type = 'button'; m.setAttribute('role', 'menuitemradio'); m.dataset.vview = v.id;
+        m.addEventListener('click', () => views.set(v.id));
+        vmenu.append(m);
+      }
     }
     markView();
   };
-  const markView = () => presetBox.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === views.current()));
+  const markView = () => {
+    presetBox.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === views.current()));
+    if (!dsk) return;
+    vmenu.querySelectorAll('[data-vview]').forEach((b) => { const on = b.dataset.vview === views.current(); b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+    const cur = views.list().find((v) => v.id === views.current());
+    if (cur) dsk.viewsName.textContent = viewName(cur);
+  };
   views.on(() => { buildViewButtons(); });
   buildViewButtons();
   $('#btn-flip').addEventListener('click', () => controls.flip());
   $('#btn-reset').addEventListener('click', () => controls.reset());
   $('#btn-spin').addEventListener('click', () => controls.toggleSpin());
 
-  // Lock view (touch only, the row is hidden by CSS otherwise): stops orbit, pinch, twist and wheel. Remembered per device.
+  // Lock view: stops orbit, pinch, twist and wheel, taps still move pieces. Remembered per device. Phone: a switch in the View
+  // card. Desktop: the lock button on the view bar, which drives the same (hidden) checkbox.
   const chkLock = $('#chk-lock');
   try { chkLock.checked = localStorage.getItem('chess3d.lockView') === '1'; } catch (e) { /* storage blocked */ }
   const applyLock = () => controls.setLocked?.(chkLock.checked);
+  const lockBtn = $('#btn-lock');
+  const markLock = () => { if (lockBtn) { lockBtn.classList.toggle('on', chkLock.checked); lockBtn.setAttribute('aria-pressed', String(chkLock.checked)); } };
   chkLock.addEventListener('change', () => {
-    applyLock();
+    applyLock(); markLock();
     try { localStorage.setItem('chess3d.lockView', chkLock.checked ? '1' : '0'); } catch (e) { /* storage blocked */ }
   });
-  if (device.touch) applyLock();
+  if (lockBtn) lockBtn.addEventListener('click', () => { chkLock.checked = !chkLock.checked; chkLock.dispatchEvent(new Event('change')); });
+  markLock();
+  if (device.touch || desk) applyLock();
 
   // ------------------------------------------------------------ gimbal sliders
   const sliderBox = $('#sliders');
@@ -205,11 +242,24 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   resetG.addEventListener('click', () => controls.levelBoard());
   sliderBox.append(resetG);
 
-  // ------------------------------------------------------------ scene selects
-  const selLight = $('#sel-light'), selQuality = $('#sel-quality');
+  // ------------------------------------------------------------ scene choices
+  // Phone: the two selects in the Scene card. Desktop: visible choices (swatches for the light, chips for the quality).
   const presets = stage.lightingPresets || [];
-  for (const n of presets) selLight.append(new Option(t(`light.${n}`, n), n));
-  selLight.parentElement.hidden = !presets.length;
+  let selLight, selQuality;
+  const lightItems = () => presets.map((n) => ({ value: n, label: t(`light.${n}`, n), color: LIGHT_COLOR[n] || '#d8b468' }));
+  const qualityItems = () => ['low', 'medium', 'high'].map((q) => ({ value: q, label: t(`hud.${q}`, q[0].toUpperCase() + q.slice(1)) }));
+  if (desk) {
+    selLight = chipGroup('sel-light', lightItems(), { cls: 'swatches', label: t('hud.lighting', 'Lighting') });
+    selLight.value = stage.lightingPreset;
+    $('#light-slot').append(selLight);
+    selLight.hidden = !presets.length;
+    selQuality = chipGroup('sel-quality', qualityItems(), { label: t('hud.quality', 'Quality') });
+    $('#quality-slot').append(selQuality);
+  } else {
+    selLight = $('#sel-light'); selQuality = $('#sel-quality');
+    for (const n of presets) selLight.append(new Option(t(`light.${n}`, n), n));
+    selLight.parentElement.hidden = !presets.length;
+  }
   selLight.addEventListener('change', () => stage.setLightingPreset?.(selLight.value));
   selQuality.value = stage.quality || quality;   // an invalid ?quality= falls back in the stage: show what runs
   selQuality.addEventListener('change', () => stage.setQuality?.(selQuality.value));
@@ -241,7 +291,21 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     gm.on(syncGood);
     syncGood();
   }
-  const chkAi = $('#chk-ai'), selAiColor = $('#sel-ai-color'), selAiLevel = $('#sel-ai-level');
+  const chkAi = $('#chk-ai');
+  // Desktop: your side and the strength are chips (they keep a value and fire change, like the phone's selects)
+  const levelItems = () => ['novice', 'easy', 'normal', 'hard'].map((k) => {
+    const full = t(`hud.${k}`, { novice: 'Novice ~700', easy: 'Easy ~900', normal: 'Normal ~1200', hard: 'Hard ~1450' }[k]);
+    const m = /^(.*\S)\s+(~?\d+)$/.exec(full);
+    return { value: k, label: m ? m[1] : full, small: m ? m[2] : '' };
+  });
+  const sideItems = () => [{ value: 'w', label: t('hud.playWhite', 'Play white') }, { value: 'b', label: t('hud.playBlack', 'Play black') }];
+  let selAiColor, selAiLevel;
+  if (desk) {
+    selAiColor = chipGroup('sel-ai-color', sideItems(), { label: t('hud.yourSide', 'Your side') });
+    selAiLevel = chipGroup('sel-ai-level', levelItems(), { label: t('hud.strength', 'Strength'), cls: 'chips grid2' });
+    selAiColor.value = 'w'; selAiLevel.value = 'easy';
+    $('#opp').append(selAiColor, selAiLevel);
+  } else { selAiColor = $('#sel-ai-color'); selAiLevel = $('#sel-ai-level'); }
   function applyAi() {
     const human = selAiColor.value;
     game.setVsComputer(chkAi.checked, { color: human === 'w' ? 'b' : 'w', level: selAiLevel.value });
@@ -252,21 +316,30 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   selAiLevel.addEventListener('change', () => { storeLevel(selAiLevel.value); if (chkAi.checked) applyAi(); });
 
   // ------------------------------------------------------------ hud visibility / help
+  // toggleHud(true) hides everything (?hud=0, the legacy close button) and the Show HUD button brings it back. The H key
+  // (toggleHud() without an argument) folds the panel to the rail on desktop and tablets, and hides the HUD on phones.
   function toggleHud(force) {
+    if (dsk && force === undefined) { dsk.setRail(!dsk.rail); return; }
     const hide = force ?? !hud.classList.contains('hidden');
     hud.classList.toggle('hidden', hide);
     showBtn.hidden = !hide;
-    if (hide) { help.hidden = true; phoneUI?.close(); }
+    if (hide) { if (help) help.hidden = true; dsk?.helpApi.hide(); phoneUI?.close(); }
     phoneUI?.frame();
+    dsk?.layout();
   }
-  function toggleHelp() { if (phoneUI) phoneUI.toggleHelp(); else help.hidden = !help.hidden; }
-  $('#btn-hide').addEventListener('click', () => toggleHud(true));
+  function toggleHelp() { if (phoneUI) phoneUI.toggleHelp(); else if (dsk) dsk.helpApi.toggle(); else help.hidden = !help.hidden; }
+  $('#btn-hide')?.addEventListener('click', () => toggleHud(true));
   showBtn.addEventListener('click', () => toggleHud(false));
   controls.hooks.undo = () => { game.undo(); hideBanner(); };
   controls.hooks.newGame = () => { game.newGame(); hideBanner(); };
   controls.hooks.toggleHud = () => toggleHud();
   controls.hooks.toggleHelp = toggleHelp;
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { help.hidden = true; phoneUI?.close(); hideBanner(); game.pendingPromotion && promoCancel?.(); } });
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (dsk?.helpApi.open) { dsk.helpApi.hide(); return; }
+    if (help) help.hidden = true;
+    phoneUI?.close(); hideBanner(); game.pendingPromotion && promoCancel?.();
+  });
 
   // ------------------------------------------------------------ state rendering
   const movesEl = $('#moves');
@@ -286,6 +359,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     } else if (st.thinking) { sub = t('turn.thinking', 'Computer is thinking'); }
     else if (st.check) sub = t('turn.check', 'Check');
     else if (st.vsComputer) sub = st.turn === st.computerColor ? t('turn.computerMove', 'Computer to move') : t('turn.yourMove', 'Your move');
+    // desktop: while a lesson runs the status line names it (the board position is still the lesson's)
+    const kind = dsk ? [['explaining', 'openings', 'Opening'], ['drilling', 'drill', 'Drill'], ['puzzling', 'puzzles', 'Puzzle']].find(([c]) => document.body.classList.contains(c)) : null;
+    if (kind) sub = [t(`panel.kind.${kind[1]}`, kind[2]), sub.trim()].filter(Boolean).join(' \u00b7 ');
     $('#turn-main').textContent = main;
     $('#turn-sub').textContent = sub;
     $('.turn').classList.toggle('check', !!st.check && !st.over);
@@ -317,6 +393,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     if (st.check && !lastCheck && !st.over) toast(t('turn.check', 'Check'));
     lastCheck = st.check;
     if (chkAi.checked !== st.vsComputer) chkAi.checked = st.vsComputer;
+    $('#opp')?.classList.toggle('off', !st.vsComputer);
     if (st.level && selAiLevel.value !== st.level) selAiLevel.value = st.level;
     syncGood();
     phoneUI?.status(st);
@@ -362,6 +439,20 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     toastEl.classList.add('show');
     clearTimeout(toastT);
     toastT = setTimeout(() => toastEl.classList.remove('show'), 1600);
+  }
+
+  // ------------------------------------------------------------ a lesson starts: Learn takes the panel
+  // Explain, Drill and Puzzles set a class on <body> while they run (the phone layout uses the same classes). The moment one
+  // of them starts, the panel shows the Learn tab and unfolds if it was a rail; the other tabs stay reachable.
+  if (dsk) {
+    const LESSON = ['explaining', 'drilling', 'puzzling'];
+    let running = false;
+    const watch = () => {
+      const now = LESSON.some((c) => document.body.classList.contains(c));
+      if (now && !running) { dsk.setTab('learn'); if (dsk.rail) dsk.setRail(false, { persist: false }); }
+      if (now !== running) { running = now; render(game.getState()); }
+    };
+    new MutationObserver(watch).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
 
   // ------------------------------------------------------------ per-frame control sync
@@ -597,11 +688,17 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   });
   function applyLanguage() {
     langBox.querySelectorAll('[data-lang]').forEach((b) => b.classList.toggle('on', b.dataset.lang === i18n.language));
-    $('#help-keys').innerHTML = keyRows(KEYS);
+    $('#help-keys').innerHTML = keyRows(desk ? deskKeys() : KEYS);
     const pk = $('#phone-keys');
     if (pk) pk.innerHTML = keyRows(PHONE_KEYS);
-    presetBox.querySelectorAll('[data-preset]').forEach((b) => { b.textContent = t(`preset.${b.dataset.preset}`, b.dataset.preset); });
-    [...selLight.options].forEach((o) => { o.textContent = t(`light.${o.value}`, o.value); });
+    if (desk) {
+      buildViewButtons();
+      selLight.relabel(lightItems()); selQuality.relabel(qualityItems());
+      selAiColor.relabel(sideItems()); selAiLevel.relabel(levelItems());
+    } else {
+      presetBox.querySelectorAll('[data-preset]').forEach((b) => { b.textContent = t(`preset.${b.dataset.preset}`, b.dataset.preset); });
+      [...selLight.options].forEach((o) => { o.textContent = t(`light.${o.value}`, o.value); });
+    }
     translateTree(hud);
     phoneUI?.resetStatus();
     lastMovesKey = null;
@@ -610,9 +707,10 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   onLanguage(applyLanguage);
   applyLanguage();
 
-  // CONTRACT (lead): other modules mount their own panels and settings blocks. Desktop: a panel goes into the right
-  // column above the move list, a settings block into the Scene card. Phone: both become sections of the Menu sheet.
+  // CONTRACT (lead): other modules mount their own panels and settings blocks. Desktop: a panel goes into the Learn tab, a
+  // settings block into its slot of the Settings tab (by id, unknown ids land at the end). Phone: both become sections of the Menu sheet.
   function mountPanel(id, element, { title = id } = {}) {
+    if (dsk) { const c = dsk.mountPanel(id, element, { title }); translateTree(c); return c; }
     const card = el('section', 'card');
     card.dataset.card = id;
     card.innerHTML = `<header><h2>${title}</h2><span class="chev"></span></header><div class="body"></div>`;
@@ -626,12 +724,13 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   }
   function mountSettings(id, element) {
     element.dataset.settings = id;
+    if (dsk) { dsk.mountSettings(id, element); return element; }
     const scene = hud.querySelector('.card[data-card="scene"] .body') || hud.querySelector('.card[data-card="scene"]');
     scene.append(element);
     return element;
   }
 
-  // ?open=: show one panel and make it usable. Phone: the Menu sheet with that card open. Desktop: the card unfolded and scrolled
+  // ?open=: show one panel and make it usable. Phone: the Menu sheet with that card open. Desktop: the panel tab shown and scrolled
   // into view. 'settings' is the Scene card (or the Menu sheet itself on a phone), 'music' the music block inside it.
   // Returns false for an id that is not a panel here.
   function openPanel(id) {
@@ -641,13 +740,18 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     if (phoneUI) {
       if (card === 'openings') return false;   // phone: the Learn sheet, opened by src/learn
       if (!phoneUI.openCard(id === 'menu' ? null : card)) return false;
+    } else if (dsk) {
+      // desktop: the panel tab that holds it (Moves on Play, the learning cards on Learn, the rest on Settings), unfolded from the rail
+      dsk.setTab(card === 'moves' ? 'play' : card === 'scene' ? 'settings' : 'learn');
+      if (dsk.rail) dsk.setRail(false, { persist: false });
     } else {
       const c = hud.querySelector(`.card[data-card="${card}"]`);
       if (!c) return false;
       c.classList.remove('collapsed');
     }
-    const target = id === 'music' ? hud.querySelector('.music-settings') : hud.querySelector(`.card[data-card="${card}"]`);
-    target?.scrollIntoView?.({ block: 'nearest' });
+    const target = id === 'music' ? hud.querySelector('.music-settings') : id === 'moves' && dsk ? hud.querySelector('#moves') : hud.querySelector(`.card[data-card="${card}"]`);
+    target?.scrollIntoView?.({ block: id === 'music' ? 'start' : 'nearest' });
+    if (dsk) setTimeout(() => target?.scrollIntoView?.({ block: id === 'music' ? 'start' : 'nearest' }), 450);   // again once the panel has unfolded and settled
     return true;
   }
 

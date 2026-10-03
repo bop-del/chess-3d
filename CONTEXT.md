@@ -153,3 +153,21 @@ _Avoid_: glyph view, icon view, 2D mode
 A named level of rendering detail (for example low) trading looks for speed on
 weaker devices.
 _Avoid_: graphics setting, resolution, LOD
+
+### The interface
+
+**Panel**:
+The one column on the right of a desktop or tablet screen that holds everything the
+player operates: the header, the tabs Play, Learn and Settings, and their content.
+Phones have no panel; they have the thumb bar and the Menu sheet.
+_Avoid_: sidebar, HUD (the HUD is everything drawn over the board, panel included), column, card
+
+**Rail**:
+The panel folded to a 60 px strip of icons, so the board gets the screen. Opened by
+the fold button or the H key, remembered per browser.
+_Avoid_: collapsed panel, minimised, drawer
+
+**View bar**:
+The small floating bar over the board with the view picker, Flip, Spin, Reset and the
+lock. It fades when nothing moves and wakes on any input.
+_Avoid_: toolbar, camera bar, view buttons

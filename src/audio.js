@@ -246,7 +246,9 @@ export const audio = {
     const row = document.createElement('label');
     row.className = 'switch';
     row.innerHTML = '<input type="checkbox" data-audio-mute><span class="track"><i></i></span><em></em>';
-    row.querySelector('em').textContent = t('audio.mute', 'Mute sound');
+    const em = row.querySelector('em');
+    em.textContent = t('audio.mute', 'Mute sound');
+    em.dataset.i18n = 'audio.mute';
     const box = row.querySelector('input');
     const sync = () => { box.checked = this.muted; };
     sync();

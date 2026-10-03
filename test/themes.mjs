@@ -120,15 +120,16 @@ try {
   const sw = await page.evaluate(() => {
     const row = document.querySelector('[data-settings="themes"]');
     const btns = row ? [...row.querySelectorAll('.swatch')] : [];
-    return { inScene: !!row && !!row.closest('[data-card="scene"]'), first: !!row && row.parentElement.firstElementChild === row, ids: btns.map((b) => b.dataset.theme).join(), on: btns.filter((b) => b.classList.contains('on')).map((b) => b.dataset.theme).join() };
+    return { inScene: !!row && !!row.closest('[data-card="scene"], [data-slot="themes"]'), first: !!row && row.parentElement.firstElementChild === row, ids: btns.map((b) => b.dataset.theme).join(), on: btns.filter((b) => b.classList.contains('on')).map((b) => b.dataset.theme).join() };
   });
   R.expect('swatch row in the Scene card, first, six swatches, Classic marked', sw.inScene && sw.first && sw.ids === IDS.join() && sw.on === 'classic', sw.ids, JSON.stringify(sw));
+  await page.evaluate(() => document.querySelector('#tab-settings')?.click());
   await page.click('.swatch[data-theme="tournament"]');
   await page.waitForFunction("window.__chess.themes.current() === 'tournament'", { timeout: 20000 });
-  const marked = await page.evaluate(() => [...document.querySelectorAll('.swatch.on')].map((b) => b.dataset.theme).join());
+  const marked = await page.evaluate(() => [...document.querySelectorAll('[data-settings="themes"] .swatch.on')].map((b) => b.dataset.theme).join());
   R.expect('clicking a swatch switches the theme and moves the mark', marked === 'tournament', marked);
   await page.evaluate(() => { document.querySelector('.lang-btn[data-lang="de"]').click(); });
-  const de = await page.evaluate(() => [...document.querySelectorAll('.swatch')].map((b) => b.title).join());
+  const de = await page.evaluate(() => [...document.querySelectorAll('[data-settings="themes"] .swatch')].map((b) => b.title).join());
   R.expect('swatch names in German', de === 'Klassisch,Turnier,Holz,Metall,Glas,Blöcke', de);
   await page.evaluate(() => { document.querySelector('.lang-btn[data-lang="en"]').click(); });
 

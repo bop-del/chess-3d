@@ -1,6 +1,8 @@
 // Battle scene settings: "Battle scenes" (On, Short, Off), stored per device.
 // The block is mounted in the Scene card on desktop and in the Menu sheet on phones through ui.mountSettings.
-import { t } from '../i18n.js';
+import { t, onLanguage } from '../i18n.js';
+import { device } from '../device.js';
+import { chipGroup } from '../panel.js';
 
 const KEY = 'chess3d.battle';
 const MODES = ['on', 'short', 'off'];
@@ -35,10 +37,21 @@ export function createSettings({ ui } = {}) {
     row.append(name, sel);
     return { row, sel };
   };
-  const mode = field('sel-battle', t('battle.scenes', 'Battle scenes'), [
-    ['on', t('battle.on', 'On')], ['short', t('battle.short', 'Short')], ['off', t('battle.off', 'Off')],
-  ]);
-  el.append(mode.row);
+  const labels = () => [{ value: 'on', label: t('battle.on', 'On') }, { value: 'short', label: t('battle.short', 'Short') }, { value: 'off', label: t('battle.off', 'Off') }];
+  let mode;
+  if (device.phone) {
+    mode = field('sel-battle', t('battle.scenes', 'Battle scenes'), labels().map((o) => [o.value, o.label]));
+    el.append(mode.row);
+  } else {
+    // desktop and tablets: visible chips instead of a dropdown, with a value and a change event like the select
+    const sel = chipGroup('sel-battle', labels(), { label: t('battle.scenes', 'Battle scenes') });
+    const head = document.createElement('h4');
+    head.textContent = t('battle.scenes', 'Battle scenes');
+    head.dataset.i18n = 'battle.scenes';
+    mode = { sel };
+    el.append(head, sel);
+    onLanguage(() => { sel.relabel(labels()); });
+  }
 
   const sync = () => { mode.sel.value = state.mode; };
   function set(partial = {}) {
