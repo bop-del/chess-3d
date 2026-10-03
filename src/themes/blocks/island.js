@@ -193,7 +193,7 @@ function buildAnim(parent, kit, isl, clouds) {
   };
 }
 
-const approach = (cur, target, step) => (cur < target ? Math.min(target, cur + step) : Math.max(target, cur - step));
+export const approach = (cur, target, step) => (cur < target ? Math.min(target, cur + step) : Math.max(target, cur - step));
 
 /**
  * Keeps the tree and the clouds out of the way. view() gives { camera, w, h, rects } (the camera, the canvas size in px and the UI
@@ -201,11 +201,11 @@ const approach = (cur, target, step) => (cur < target ? Math.min(target, cur + s
  * and grows back when the view moves on; a cloud fades out while it would pass behind a control. Each test runs on the full size
  * tree and the full cloud, so nothing flickers. `state` is read by the smoke tests.
  */
-function buildAvoid(group, tree, clouds, view) {
+export function buildAvoid(group, tree, clouds, view, edge = EDGE) {
   const hullTmp = [], state = { treeHidden: false, treeCovers: false, cloudsHidden: 0 };
   // the board and its frame (10 x 10) up to the height of the pieces, in world space, as the hull of the corners on screen
   const ground = [];
-  for (const y of [0, 1.2]) for (const [x, z] of [[-EDGE, -EDGE], [EDGE, -EDGE], [EDGE, EDGE], [-EDGE, EDGE]]) ground.push(new THREE.Vector3(x, y, z));
+  for (const y of [0, 1.2]) for (const [x, z] of [[-edge, -edge], [edge, -edge], [edge, edge], [-edge, edge]]) ground.push(new THREE.Vector3(x, y, z));
   const cornerPts = [], corner = new THREE.Vector3();
   let grow = 1, lastKey = '', wpts = [];
   return {

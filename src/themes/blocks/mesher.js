@@ -12,9 +12,11 @@ const F = {
 const UVS = [[0, 0], [1, 0], [1, 1], [0, 1]];
 const NAMES = Object.keys(F);
 const col = new THREE.Color();
+// Fixed per face brightness (Pixelwelt): top brightest, two side pairs darker, bottom darkest. No smooth gradients.
+export const SHADE = { py: 1, pz: 0.8, nz: 0.8, px: 0.6, nx: 0.6, ny: 0.5 };
 
 export class Mesher {
-  constructor() { this.buckets = new Map(); this.quads = 0; }
+  constructor({ shade = false } = {}) { this.buckets = new Map(); this.quads = 0; this.shade = shade; }
   bucket(k) {
     if (!this.buckets.has(k)) this.buckets.set(k, { pos: [], nor: [], uv: [], col: [], idx: [] });
     return this.buckets.get(k);
@@ -32,7 +34,7 @@ export class Mesher {
         const ks = o.keys;
         k = ks[f] || (f === 'py' ? ks.top : f === 'ny' ? ks.bottom : ks.side) || key;
       }
-      const B = this.bucket(k), face = F[f], base = B.pos.length / 3;
+      const B = this.bucket(k), face = F[f], base = B.pos.length / 3, sh = this.shade ? SHADE[f] : 1;
       const a = (f === 'px' || f === 'nx') ? d : w, bb = (f === 'py' || f === 'ny') ? d : h;
       let nx = face.n[0], nz = face.n[2];
       const rnx = nx * cs + nz * sn, rnz = -nx * sn + nz * cs;
@@ -42,7 +44,7 @@ export class Mesher {
         B.pos.push(cx + lx * cs + lz * sn, y + c[1] * h, cz - lx * sn + lz * cs);
         B.nor.push(rnx, face.n[1], rnz);
         B.uv.push(UVS[i][0] * a / unit + off[0], UVS[i][1] * bb / unit + off[1]);
-        B.col.push(col.r, col.g, col.b);
+        B.col.push(col.r * sh, col.g * sh, col.b * sh);
       }
       B.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
       this.quads++;

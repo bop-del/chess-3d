@@ -72,7 +72,7 @@ export function createDirector({ game, controls, stage, ui }) {
 
   // ------------------------------------------------------------ loading
   async function loadScene(type, style) {
-    const name = style === 'blocks' ? 'blocks' : NAMES[type];     // the Blocks theme has one scene of its own: the victim falls into cubes
+    const name = style === 'blocks' || style === 'pixel' ? 'blocks' : NAMES[type];     // the Blocks and Pixelwelt themes share one scene: the victim falls into cubes
     if (sceneCache.has(name)) return sceneCache.get(name);
     const load = SCENES[`./scenes/${name}.js`];
     let mod = null;

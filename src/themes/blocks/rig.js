@@ -24,8 +24,8 @@ function pivotOf(tag, parts) {
 }
 
 /** One template: a Group named 'rig' (turned to face -z) with one child mesh group per tag, each placed at its pivot. */
-export function buildTemplate(color, type, material) {
-  const vox = buildVox(color, type);
+export function buildTemplate(color, type, material, build = buildVox, mesherOpts) {
+  const vox = build(color, type), U = vox.unit || V;
   const byTag = new Map();
   for (const p of vox.parts) { if (!byTag.has(p.g)) byTag.set(p.g, []); byTag.get(p.g).push(p); }
   const rig = new THREE.Group();
@@ -33,24 +33,24 @@ export function buildTemplate(color, type, material) {
   rig.rotation.y = Math.PI;
   let top = 0;
   for (const [tag, parts] of byTag) {
-    const m = new Mesher();
+    const m = new Mesher(mesherOpts);
     for (const p of parts) {
-      m.box('vox', (p.x - p.w / 2) * V, p.y * V, (p.z - p.d / 2) * V, p.w * V, p.h * V, p.d * V,
-        { color: p.color, uvUnit: V * 2, off: [((p.x * 7 + p.y * 3) % 5) * 0.37, ((p.z * 5 + p.w) % 7) * 0.29] });
-      top = Math.max(top, (p.y + p.h) * V);
+      m.box('vox', (p.x - p.w / 2) * U, p.y * U, (p.z - p.d / 2) * U, p.w * U, p.h * U, p.d * U,
+        { color: p.color, uvUnit: U * 2, off: [((p.x * 7 + p.y * 3) % 5) * 0.37, ((p.z * 5 + p.w) % 7) * 0.29] });
+      top = Math.max(top, (p.y + p.h) * U);
     }
     const [px, py, pz] = tag === 'body' ? [0, 0, 0] : pivotOf(tag, parts);
     const geo = m.geometries().get('vox');
-    geo.translate(-px * V, -py * V, -pz * V);
+    geo.translate(-px * U, -py * U, -pz * U);
     const mesh = new THREE.Mesh(geo, material);
     mesh.castShadow = true; mesh.receiveShadow = true;
     const g = new THREE.Group();
     g.name = tag;
-    g.position.set(px * V, py * V, pz * V);
+    g.position.set(px * U, py * U, pz * U);
     g.add(mesh);
     rig.add(g);
   }
-  return { rig, height: top };
+  return { rig, height: top, unit: U };
 }
 
 function voxTexture() {
@@ -72,16 +72,16 @@ let seedCounter = 1;
 const wrapPi = (a) => { const T = Math.PI * 2; a = (a + Math.PI) % T; if (a < 0) a += T; return a - Math.PI; };
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
-function attach(inner, type) {
+function attach(inner, type, unit = V) {
   const rig = inner.children[0];
   const parts = {};
   for (const g of rig.children) parts[g.name] = { o: g, p: g.position.clone() };
   const seed = seedCounter++ * 1.7;
-  rigs.set(inner, { rig, parts, type, seed, t: seed * 3.1, phi: 0, w: 0, yaw: 0, last: null });
+  rigs.set(inner, { rig, parts, type, unit, seed, t: seed * 3.1, phi: 0, w: 0, yaw: 0, last: null });
 }
 
 function animate(s, dt, speed, dist) {
-  const { parts, type, rig } = s;
+  const { parts, type, rig, unit: V } = s;
   const knight = type === 'n';
   s.t += dt;
   s.w += (clamp01(speed / 0.7) - s.w) * Math.min(1, dt * 9);
@@ -168,22 +168,23 @@ function update(dt, root) {
 
 // ---------------------------------------------------------------- the style
 /** What pieceset.setStyle takes: make(type, color) -> the inner group, height(type, color), update(dt, root), dispose(). */
-export function createPieceStyle({ track } = {}) {
+export function createPieceStyle({ track } = {}, { id = 'blocks', build = buildVox, mesher, makeMaterial, decorate } = {}) {
   const tex = voxTexture();
   track?.(tex);
-  const material = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.92, metalness: 0, envMapIntensity: 0.8 });
+  const material = makeMaterial ? makeMaterial(tex) : new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.92, metalness: 0, envMapIntensity: 0.8 });
   const templates = new Map();
   const tpl = (type, color) => {
     const k = type + color;
-    if (!templates.has(k)) templates.set(k, buildTemplate(color, type, material));
+    if (!templates.has(k)) templates.set(k, buildTemplate(color, type, material, build, mesher));
     return templates.get(k);
   };
   return {
-    id: 'blocks',
+    id,
     make(type, color) {
       const inner = new THREE.Group();
       inner.add(tpl(type, color).rig.clone(true));
-      attach(inner, type);
+      attach(inner, type, tpl(type, color).unit);
+      decorate?.(inner, type, color);
       return inner;
     },
     height: (type, color) => Math.max(0.6, tpl(type, color).height),

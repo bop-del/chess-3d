@@ -19,6 +19,7 @@ export const THEMES = [
   { id: 'metal', label: { en: 'Metal', de: 'Metall' }, swatch: ['#d9a640', '#9aa1ac'] },
   { id: 'glass', label: { en: 'Glass', de: 'Glas' }, swatch: ['#9fd0ff', '#3a4250'] },
   { id: 'blocks', label: { en: 'Blocks', de: 'Blöcke' }, swatch: ['#62b43a', '#4b515e'] },
+  { id: 'pixel', label: { en: 'Pixel world', de: 'Pixelwelt' }, swatch: ['#e3d49a', '#7a7a7a'] },
 ];
 const LOADERS = {
   tournament: () => import('./tournament.js'),
@@ -26,6 +27,7 @@ const LOADERS = {
   metal: () => import('./metal.js'),
   glass: () => import('./glass.js'),
   blocks: () => import('./blocks.js'),
+  pixel: () => import('./pixel.js'),
 };
 const STORE = 'chess3d.theme';
 

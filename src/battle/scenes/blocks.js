@@ -1,10 +1,11 @@
 // Capture scene of the Blocks theme, about 3 s, for every attacker. No blood: the attacker's own move (hop, rear and lunge,
 // pirouette, charge, stomp), then the victim bursts into cubes that tumble over the board and shrink away. The director picks
-// this module instead of the per type scene when the pieces are block characters (info.style === 'blocks'). Staging, time,
+// this module instead of the per type scene when the pieces are block characters (info.style === 'blocks' or 'pixel'). Staging, time,
 // skip and cleanup come from the director and ctx.fx; the cubes are fx bodies, so a skip puts everything back.
 import * as THREE from 'three';
 import { createStage, lerp, bump } from './kit-a.js';
 import { buildVox, V } from '../../themes/blocks/vox.js';
+import { buildPixelVox } from '../../themes/pixel/figures.js';
 
 const outQuad = (k) => 1 - (1 - k) * (1 - k);
 const inQuad = (k) => k * k;
@@ -18,7 +19,8 @@ const STYLE = { p: { back: 1.1 }, n: { back: 1.05 }, b: { back: 1.0 }, r: { back
 // The victim's boxes as cubes of about two voxels, in the space of ctx.root, with the colour of the box.
 function cubesOf(victim, root, seedRand) {
   const inner = victim.group.children[0], rig = inner.children[0];
-  const vox = buildVox(victim.color, victim.type);
+  const px = victim.group.userData.style === 'pixel';
+  const vox = px ? buildPixelVox(victim.color, victim.type) : buildVox(victim.color, victim.type), U = vox.unit || V;
   root.updateWorldMatrix(true, false);
   victim.group.updateWorldMatrix(true, true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
@@ -38,8 +40,8 @@ function cubesOf(victim, root, seedRand) {
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++) {
       // voxel point of the cube centre, then into the tag group's local frame (its origin is the pivot), then into the root
       const vx = p.x - p.w / 2 + (i + 0.5) * cw, vy = p.y + (j + 0.5) * ch, vz = p.z - p.d / 2 + (k + 0.5) * cd;
-      _p.set(vx * V - g.position.x, vy * V - g.position.y, vz * V - g.position.z).applyMatrix4(rel);
-      out.push({ pos: _p.clone(), quat: quat.clone(), size: [cw * V * 0.96, ch * V * 0.96, cd * V * 0.96], color: p.color, r: seedRand() });
+      _p.set(vx * U - g.position.x, vy * U - g.position.y, vz * U - g.position.z).applyMatrix4(rel);
+      out.push({ pos: _p.clone(), quat: quat.clone(), size: [cw * U * 0.96, ch * U * 0.96, cd * U * 0.96], color: p.color, r: seedRand() });
     }
   }
   return out;
@@ -51,7 +53,7 @@ async function crumble(ctx) {
   const heavy = type === 'q' || type === 'k' || type === 'r';
 
   // the plank frame stays out of the picture while the low camera is on the fight: no plank wall on the horizon
-  const frame = ctx.gimbal?.getObjectByName?.('blocks-world')?.userData.frame;
+  const frame = (ctx.gimbal?.getObjectByName?.('blocks-world') || ctx.gimbal?.getObjectByName?.('pixel-world'))?.userData.frame;
   if (frame) {
     ctx.signal.addEventListener('abort', () => frame(1), { once: true });
     ctx.tween({ dur: 0.3, step: (e) => frame(1 - e) });

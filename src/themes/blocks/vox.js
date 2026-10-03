@@ -5,7 +5,7 @@
 export const V = 0.08;
 
 export class Vox {
-  constructor() { this.parts = []; this.g = 'body'; }
+  constructor(unit) { this.parts = []; this.g = 'body'; if (unit) this.unit = unit; }   // unit: world size of one voxel, V when absent
   /** x,z centre, y bottom, sizes in voxels. The group tag is this.g unless o.g is given. */
   add(x, y, z, w, h, d, color, o = {}) { this.parts.push({ x, y, z, w, h, d, color, g: o.g || this.g, ry: o.ry || 0 }); return this; }
 }
