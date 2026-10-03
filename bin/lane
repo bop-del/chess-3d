@@ -80,7 +80,10 @@ function agent(branch, name, brief, model = 'sonnet') {
     if (existsSync(h)) {
       const f = join(lane.path, '.claude', `agent-${name}.settings.json`);
       mkdirSync(dirname(f), { recursive: true });
-      writeFileSync(f, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node ${h} ${branch} ${name}` }] }] } }, null, 2));
+      // land agents (bin/land-all --land) may run exactly the local landing: the land lock and bin/lane close (owner, 2026-10-03)
+      const root = join(process.env.HOME, 'code', 'chess-3d'), lock = join(root, '.tmp', 'land.lock');
+      const permissions = name === 'land' ? { allow: [`Bash(mkdir ${lock}*)`, `Bash(rmdir ${lock}*)`, `Bash(${root}/bin/lane close *)`, `Bash(bin/lane close *)`] } : undefined;
+      writeFileSync(f, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node ${h} ${branch} ${name}` }] }] }, ...(permissions ? { permissions } : {}) }, null, 2));
       extra.push('--settings', f);
     } }
   // a fresh tab needs a moment before its shell takes input: retry while herdr says the pane is busy
