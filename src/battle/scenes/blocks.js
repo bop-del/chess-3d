@@ -50,6 +50,13 @@ async function crumble(ctx) {
   const type = ctx.attacker, st = STYLE[type] || STYLE.p;
   const heavy = type === 'q' || type === 'k' || type === 'r';
 
+  // the plank frame stays out of the picture while the low camera is on the fight: no plank wall on the horizon
+  const frame = ctx.gimbal?.getObjectByName?.('blocks-world')?.userData.frame;
+  if (frame) {
+    ctx.signal.addEventListener('abort', () => frame(1), { once: true });
+    ctx.tween({ dur: 0.3, step: (e) => frame(1 - e) });
+  }
+
   // step back (the knights rear, the rook backs off further)
   await s.tw(0.35, (k) => { a.d = lerp(-run0, -st.back, k); a.y = 0.2 * bump(k); a.yaw = s.yawG * k; }, inOut);
   if (!s.live()) return;
@@ -109,6 +116,7 @@ async function crumble(ctx) {
   sfx.thud?.();
   await s.tw(0.8, () => {});
   await s.tw(0.4, (k) => { a.d = lerp(-0.92, -run0, k); a.yaw = s.yawG * (1 - k); a.spin = 0; }, inOut);
+  frame?.(1);
 }
 
 export default {

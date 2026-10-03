@@ -183,6 +183,80 @@ try {
   R.expect('Blocks: the Ready line sits on a dark pill', pb.world === 'blocks' && /rgba\(14, 16, 22, 0\.78\)/.test(pb.bg), JSON.stringify(pb));
   for (const t of ['classic', 'wood', 'metal', 'glass', 'tournament']) { const p = await pill(t); R.expect(`${t}: the Ready line is unchanged (no backing)`, p.world === t && /rgba\(0, 0, 0, 0\)|transparent/.test(p.bg), JSON.stringify(p)); }
 
+  // ---- the Blocks look (N1, review rounds 16 and 17): a bigger board on a smaller island, wooden crates, bevelled squares, one colour family
+  await load(DESK, '&theme=blocks&trays=1');
+  const look = await page.evaluate(() => {
+    const c = window.__chess, T = c.THREE, world = c.themes.world, kit = world.kit.mats, isl = world.group.children.find((o) => o.name === 'island');
+    const terrain = new Set([kit.grassTop, kit.dirt, kit.stone, kit.grassSide, kit.boardL, kit.boardD]);
+    // footprint of the terrain seen from above: area and extent
+    const G = 0.05, cells = new Set(); let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (const m of isl.children) {
+      if (!terrain.has(m.material)) continue;
+      const p = m.geometry.attributes.position, n = m.geometry.attributes.normal, idx = m.geometry.index.array;
+      for (let i = 0; i < p.count; i++) { x0 = Math.min(x0, p.getX(i)); x1 = Math.max(x1, p.getX(i)); z0 = Math.min(z0, p.getZ(i)); z1 = Math.max(z1, p.getZ(i)); }
+      for (let t = 0; t < idx.length; t += 6) {
+        if (Math.abs(n.getY(idx[t])) < 0.9) continue;
+        let ax0 = 1e9, ax1 = -1e9, az0 = 1e9, az1 = -1e9;
+        for (const k of [0, 1, 2, 5]) { const v = idx[t + k]; ax0 = Math.min(ax0, p.getX(v)); ax1 = Math.max(ax1, p.getX(v)); az0 = Math.min(az0, p.getZ(v)); az1 = Math.max(az1, p.getZ(v)); }
+        for (let x = Math.ceil(ax0 / G); x < ax1 / G - 0.5; x++) for (let z = Math.ceil(az0 / G); z < az1 / G - 0.5; z++) cells.add(x * 4000 + z);
+      }
+    }
+    // crates: the boxes of the crate material on each side
+    const crate = isl.children.find((o) => o.material === kit.crate), cp = crate.geometry.attributes.position, sides = { l: [1e9, -1e9], r: [1e9, -1e9] };
+    for (let i = 0; i < cp.count; i++) { const k = cp.getX(i) < 0 ? 'l' : 'r'; sides[k][0] = Math.min(sides[k][0], cp.getX(i)); sides[k][1] = Math.max(sides[k][1], cp.getX(i)); }
+    // squares: a vertical ray over every square centre lands at y = 0, over the foot of the bevel one step lower
+    const rc = new T.Raycaster(), tops = [], feet = [], meshes = isl.children.filter((o) => o.material === kit.boardL || o.material === kit.boardD);
+    const hitY = (x, z) => { rc.set(new T.Vector3(x, 5, z), new T.Vector3(0, -1, 0)); const h = rc.intersectObjects(meshes, false)[0]; return h ? h.point.y : null; };
+    isl.updateWorldMatrix(true, true);
+    for (let f = 0; f < 8; f++) for (let r = 0; r < 8; r++) { const cx = f - 3.5, cz = 3.5 - r; tops.push(hitY(cx, cz)); feet.push(hitY(cx + 0.46, cz)); }
+    // colour family: mean colour of the grass top and of the leaves (opaque texels), hue and brightness
+    const mean = (tex) => { const cv = tex.image, d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } return [r / n, g / n, b / n]; };
+    const hue = ([r, g, b]) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; return (mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60; };
+    const grass = mean(world.kit.T.grassTop), leaf = mean(world.kit.T.leaves);
+    return {
+      width: x1 - x0, depth: z1 - z0, area: cells.size * G * G, crateL: sides.l, crateR: sides.r, crateMat: !!crate,
+      tops, feet, grass, leaf, grassHue: hue(grass), leafHue: hue(leaf), lumG: 0.3 * grass[0] + 0.59 * grass[1] + 0.11 * grass[2], lumL: 0.3 * leaf[0] + 0.59 * leaf[1] + 0.11 * leaf[2],
+      slabs: c.game.root.children.filter((o) => o.name === 'tray-slab').map((o) => o.position.x),
+    };
+  });
+  // before: island 14 x 14, 164 square units of terrain (board 64: 0.39); the limits keep the gain
+  R.expect('Blocks g1: the board fills clearly more of the island (area ratio at least 0.44, depth ratio at least 0.68; was 0.39 and 0.57)', 64 / look.area >= 0.44 && 8 / look.depth >= 0.68, `area ${look.area.toFixed(0)} (${(64 / look.area).toFixed(3)}), ${look.width.toFixed(1)} x ${look.depth.toFixed(1)} (depth ${(8 / look.depth).toFixed(3)})`);
+  R.expect('Blocks g2: a wooden crate stands around each tray slab', look.crateMat && look.crateL[0] < -6.3 && look.crateL[1] > -5.1 && look.crateR[0] < 5.1 && look.crateR[1] > 6.3 && look.slabs.length === 2, `left ${look.crateL.map((v) => v.toFixed(2))}, right ${look.crateR.map((v) => v.toFixed(2))}`);
+  R.expect('Blocks g4: every square top is at y = 0 and its bevel foot one step lower', look.tops.every((y) => y !== null && Math.abs(y) < 0.005) && look.feet.every((y) => y !== null && y < -0.02 && y > -0.05), `tops ${Math.min(...look.tops).toFixed(3)}..${Math.max(...look.tops).toFixed(3)}, feet ${Math.min(...look.feet).toFixed(3)}..${Math.max(...look.feet).toFixed(3)}`);
+  R.expect('Blocks: the canopy is a little darker and cooler than the grass (one colour family)', look.lumL < look.lumG - 8 && look.leafHue > look.grassHue + 6 && look.leafHue < look.grassHue + 60, `hue ${look.grassHue.toFixed(0)} to ${look.leafHue.toFixed(0)}, brightness ${look.lumG.toFixed(0)} to ${look.lumL.toFixed(0)}`);
+  // markers sit on the bevelled squares: the selection and move overlay is a plane 5 mm over the square tops (y = 0), with a depth bias
+  await load(DESK, '&theme=blocks&select=e2');
+  await settle(1);
+  const marks = await page.evaluate(() => { const hl = window.__chess.board.group.getObjectByName('highlights'); const p = hl.geometry.getAttribute('position'); let y = 0; for (let i = 0; i < p.count; i++) y = Math.max(y, Math.abs(p.getY(i))); return { n: hl.visible ? hl.geometry.instanceCount : 0, y }; });
+  R.expect('Blocks g4: the move markers lie just over the square tops (no z-fighting, nothing floating)', marks.n >= 3 && marks.y > 0.001 && marks.y < 0.02, JSON.stringify(marks));
+  if (SHOTS) { await settle(1); await page.screenshot({ path: `${SHOTS}/look-desktop.png` }); }
+
+  // ---- the plank frame steps aside in the Blocks capture scene (no plank wall on the horizon), and is back afterwards
+  await load(DESK, '&theme=blocks&view=above');
+  const frame = () => page.evaluate(() => { const c = window.__chess, f = c.themes.world.group.children.find((o) => o.name === 'island').children.filter((o) => o.material === c.themes.world.kit.mats.plank || o.material === c.themes.world.kit.mats.bark); return { n: f.length, shown: f.filter((o) => o.visible && o.scale.y > 0.5).length, hidden: f.filter((o) => !o.visible).length }; });
+  const f0 = await frame();
+  await page.evaluate(async () => {
+    const c = window.__chess; c.battle.settings.set({ mode: 'on' }); await c.battle.ready();
+    c.game.loadFen('4k3/8/8/3p4/4P3/8/8/R3K3 w - - 0 1'); await c.stepAsync(1);
+    c.game.move('e4', 'd5');
+    for (let i = 0; i < 40 && !c.battle.active; i++) await c.stepAsync(0.1);
+    await c.stepAsync(1.2);
+  });
+  const f1 = await frame();
+  if (SHOTS) { await page.screenshot({ path: `${SHOTS}/battle-no-wall.png` }); }
+  await page.evaluate(async () => { const c = window.__chess; for (let i = 0; i < 120 && (c.battle.active || c.game.busy); i++) await c.stepAsync(0.1); await c.stepAsync(0.5); });
+  const f2 = await frame();
+  R.expect('Blocks g2: the plank wall is gone in the capture scene (frame and posts stepped aside) and back after it', f0.n > 0 && f0.shown === f0.n && f1.hidden === f1.n && f2.shown === f2.n, `before ${f0.shown}/${f0.n} shown, during ${f1.hidden}/${f1.n} hidden, after ${f2.shown}/${f2.n} shown`);
+  // a skipped scene puts it back too
+  await page.evaluate(async () => {
+    const c = window.__chess; c.game.loadFen('4k3/8/8/3p4/4P3/8/8/R3K3 w - - 0 1'); await c.stepAsync(1);
+    c.game.move('e4', 'd5');
+    for (let i = 0; i < 40 && !c.battle.active; i++) await c.stepAsync(0.1);
+    await c.stepAsync(1); c.battle.skip(); await c.stepAsync(1);
+  });
+  const f3 = await frame();
+  R.expect('Blocks g2: skipping the scene brings the frame back', f3.shown === f3.n, `${f3.shown}/${f3.n} shown`);
+
   R.expect('no console error or warning', !w.errs.length && !w.warns.length, 'none', [...w.errs, ...w.warns].slice(0, 5).join(' | '));
   process.exitCode = R.summary().nf ? 1 : 0;
 } finally {

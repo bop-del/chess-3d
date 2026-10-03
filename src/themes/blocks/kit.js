@@ -7,7 +7,7 @@ export function makeKit(track = (t) => t) {
   const T = blockTextures(track);
   const lam = (map, extra = {}) => new THREE.MeshLambertMaterial({ map, vertexColors: true, ...extra });
   const mats = {};
-  for (const k of ['grassTop', 'boardL', 'boardD', 'dirt', 'grassSide', 'stone', 'plank', 'tileL', 'tileD', 'bark', 'barkTop']) mats[k] = lam(T[k]);
+  for (const k of ['grassTop', 'boardL', 'boardD', 'dirt', 'grassSide', 'stone', 'plank', 'crate', 'tileL', 'tileD', 'bark', 'barkTop']) mats[k] = lam(T[k]);
   mats.leaves = lam(T.leaves, { alphaTest: 0.5 });
   mats.water = lam(T.water, { transparent: true, opacity: 0.85 });
   mats.fall1 = lam(T.waterfall, { transparent: true, opacity: 0.88, depthWrite: false });

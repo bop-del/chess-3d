@@ -75,21 +75,22 @@ function heroPawn(P) {
   return b;
 }
 function heroRook(P) {
-  const b = new Vox();
-  b.add(0, 0, 0, 8, 1, 8, P.stone2);                                       // plinth
-  b.add(0, 1, 0, 7, 6, 7, P.stone);                                        // tower
-  b.add(0, 3.2, 0, 7.2, 0.5, 7.2, P.stone2);                               // band
-  b.add(0, 1.2, 3.55, 3.4, 5, 0.3, P.cape);                                // banner
-  b.add(0, 4.6, 3.6, 1.4, 0.9, 0.3, P.trim); b.add(0, 3.2, 3.6, 1.6, 0.8, 0.3, P.gold);
-  b.add(0, 5.3, 3.56, 1.2, 1.6, 0.3, 0x2c2f3d);                            // arrow slit
-  b.add(0, 7, 0, 8, 1, 8, P.stone2);                                       // top ring
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.add(sx * 3, 8, sz * 3, 2, 1.8, 2, P.stone);   // merlons
-  for (const s of [-1, 1]) { b.add(s * 3, 8, 0, 2, 1.2, 2, P.stone); b.add(0, 8, s * 3, 2, 1.2, 2, P.stone); }
+  const S = { ...P, stone: 0xb9bdc7, stone2: 0x858b98 }, b = new Vox();                  // a grey stone tower: the only grey hero
+  b.add(0, 0, 0, 9.4, 1.2, 9.4, S.stone2);                                                 // plinth
+  b.add(0, 1.2, 0, 8.4, 6.2, 8.4, S.stone);                                                // tower
+  for (const y of [3.0, 5.0]) b.add(0, y, 0, 8.6, 0.4, 8.6, S.stone2);                     // brick bands
+  b.add(0, 1.2, 4.3, 3.2, 3.4, 0.3, 0x6a4524); b.add(0, 4.2, 4.3, 2.2, 0.6, 0.3, 0x6a4524);   // wooden door
+  b.add(0, 2.0, 4.5, 0.5, 0.5, 0.3, P.gold);
+  b.add(0, 4.9, 4.35, 1.2, 2.4, 0.3, 0x2c2f3d);                                            // arrow slit
+  for (const s of [-1, 1]) { b.add(s * 4.3, 1.2, 0, 0.3, 4.2, 2.4, P.cape); }              // blue pennants on the sides
+  b.add(0, 7.4, 0, 9.6, 1, 9.6, S.stone2);                                                 // top ring
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.add(sx * 3.7, 8.4, sz * 3.7, 2.2, 2, 2.2, S.stone);   // merlons
+  for (const s of [-1, 1]) { b.add(s * 3.7, 8.4, 0, 2.2, 1.2, 2.2, S.stone); b.add(0, 8.4, s * 3.7, 2.2, 1.2, 2.2, S.stone); }
   b.g = 'head';
-  b.add(0, 8, 0, 4.6, 4.4, 4.2, P.skin);                                   // head peeking out
-  b.add(0, 11.5, 0, 5, 1.1, 4.6, P.armor); b.add(0, 11.9, 0, 2, 1.1, 2, P.acc);
-  face(b, 8, 4.4, 4.2);
-  for (const s of [-1, 1]) { b.g = sideTag('hand', s); b.add(s * 3.7, 9.8, 2.3, 1.4, 1.2, 1.2, P.skin); }   // waving hands
+  b.add(0, 8.4, 0, 4.4, 3.8, 4, P.skin);                                                   // soldier peeking out
+  b.add(0, 11.4, 0, 5, 1.2, 4.6, P.armor2); b.add(0, 12.0, 0, 5, 0.8, 1, P.armor2); b.add(0, 12.4, 0, 1.6, 1.6, 3, P.acc);   // helmet and crest
+  face(b, 8.4, 3.8, 4);
+  for (const s of [-1, 1]) { b.g = sideTag('hand', s); b.add(s * 3.6, 10.2, 2.3, 1.4, 1.2, 1.2, P.skin); }   // waving hands
   return b;
 }
 function horseLegs(b, body, hoof, big) {
@@ -130,43 +131,53 @@ function heroKnight(P) {
   return b;
 }
 function heroBishop(P) {
-  const b = new Vox();
-  const h = humanoid(b, P, { legs: 1, torso: 4, hair: false, shirt: P.tunic, tW: 5.4, tD: 3.2, hH: 4.6, armH: 3 });
-  b.add(0, 1, 0, 5.6, 1, 3.4, P.tunic); b.add(0, 2.2, 1.7, 1, 2.8, 0.3, P.tunic);       // sash
+  const W = { ...P, tunic: 0xf4f6fa, tunic2: 0xd3d9e5, trim: 0xe5c45c, cape: 0x2a5fc4 }, b = new Vox();   // a tall slim white robe, blue mitre
+  b.add(0, 0, 0, 7.2, 0.6, 5.4, W.trim);                                                   // gold hem
+  b.add(0, 0.6, 0, 6.8, 2.4, 5, W.tunic2); b.add(0, 3, 0, 5.8, 3.6, 4.2, W.tunic);          // robe
+  b.add(0, 6.4, 0, 6.4, 1.6, 3.8, W.tunic);                                                // shoulders
+  b.add(0, 0.6, 2.55, 1.8, 7, 0.3, W.cape);                                                // blue stole down the front
+  b.add(0, 5.4, 2.0, 5.2, 0.7, 0.4, W.trim);
+  for (const s of [-1, 1]) {
+    b.g = sideTag('arm', s);
+    b.add(s * 3.9, 3.2, 0, 2, 4.8, 2.4, W.tunic2); b.add(s * 3.9, 3.2, 0, 2.2, 0.7, 2.6, W.trim);   // wide sleeve
+    b.add(s * 3.9, 2.4, 0, 1.4, 1, 1.6, P.skin);
+  }
   b.g = 'head';
-  b.add(0, h.top - 0.5, 0, 5.6, 1.2, 4.6, P.trim);                           // mitre base
-  const w = [5, 4.2, 3.4, 2.6, 1.8, 1];
-  w.forEach((ww, i) => b.add(0, h.top + 0.7 + i * 0.85, 0, ww, 0.9, ww * 0.8 + 0.6, i % 2 ? P.trim : P.cape));
-  b.add(0, h.top + 1.8, 2.6, 0.8, 2.6, 0.3, P.gold); b.add(0, h.top + 2.6, 2.6, 2.2, 0.8, 0.3, P.gold);   // cross
-  b.add(0, h.top - 2.2, 0, 6.2, 0.6, 5.2, P.hair);                            // hair band
-  b.g = 'body';                                                               // staff stands on the ground
-  b.add(-4.6, 0, 1.4, 0.8, 11, 0.8, P.wood); b.add(-4.6, 11, 1.4, 1.8, 1.6, 1.8, P.gold);
-  b.add(-4.6, 12.6, 1.4, 0.8, 1.4, 0.8, P.gold);
+  b.add(0, 8, 0, 4.8, 4.2, 4.4, P.skin); face(b, 8, 4.2, 4.4);
+  b.add(0, 8, -2.3, 5, 3.4, 0.5, 0xd8d8d8);                                               // white hair behind
+  b.add(0, 12, 0, 5.6, 1, 5, W.trim);                                                      // mitre band
+  [5, 4.4, 3.8, 3.2, 2.6, 2, 1.4, 0.8].forEach((ww, i) => b.add(0, 13 + i * 1.0, 0, ww, 1.05, ww * 0.8 + 0.4, i % 3 === 2 ? W.trim : W.cape));   // a very tall blue mitre
+  b.add(0, 14.4, 2.3, 0.8, 3, 0.3, W.trim); b.add(0, 15.4, 2.3, 2.4, 0.8, 0.3, W.trim);  // gold cross
+  b.g = 'body';                                                                            // staff with a gold crook, standing on the ground
+  b.add(-5.6, 0, 1.4, 0.8, 16, 0.8, 0x9a6b3a); b.add(-5.6, 16, 1.4, 2.4, 0.9, 1.2, W.trim); b.add(-6.6, 14.8, 1.4, 0.9, 1.4, 1.2, W.trim);
   return b;
 }
 function heroQueen(P) {
-  const b = new Vox();
-  b.add(0, 0, 0, 7.4, 2.2, 5.4, P.cape); b.add(0, 0, 0, 7.6, 0.6, 5.6, P.gold);        // skirt
-  b.add(0, 2.2, 0, 6.2, 2, 4.4, P.cape);
-  b.add(0, 4, 0, 5, 2.2, 3, P.light);                                         // bodice
-  b.add(0, 4, 1.6, 1.6, 1.4, 0.3, P.gold);
-  for (const s of [-1, 1]) { b.g = sideTag('arm', s); b.add(s * 3.2, 3.4, 0, 1.4, 2.8, 1.8, P.trim); b.add(s * 3.2, 2.5, 0.1, 1.4, 1, 1.6, P.skin); }
+  const Q = { ...P, gown: 0x1b3a94, gown2: 0x2f6bd1, hair: 0x8a3b22, gold: 0xffd34d, lace: 0xffffff }, b = new Vox();   // a wide blue gown, golden hair, big crown
+  b.add(0, 0, 0, 10.4, 0.8, 8, Q.gold);                                                    // hem
+  b.add(0, 0.8, 0, 9.8, 2.6, 7.4, Q.gown);                                                 // hoop skirt
+  b.add(0, 3.4, 0, 8, 1.8, 5.8, Q.gown); b.add(0, 5.2, 0, 5.8, 2, 3.8, Q.gown2);           // upper skirt, bodice
+  b.add(0, 3.4, 3.0, 2.6, 1.8, 0.3, Q.gold);                                               // front panel
+  b.add(0, 5.2, 1.95, 2.4, 1.4, 0.3, Q.gold);
+  b.add(0, 7.2, 0, 7, 0.7, 4.6, Q.lace);                                                   // lace collar
+  for (const s of [-1, 1]) {
+    b.g = sideTag('arm', s);
+    b.add(s * 4.1, 5.4, 0, 2.2, 2.8, 2.4, Q.gown2); b.add(s * 4.1, 4.6, 0, 1.4, 0.9, 1.6, P.skin);   // puffed sleeves
+  }
   b.g = 'body';
-  b.add(0, 6.2, 0, 3, 0.7, 2.6, P.skin);                                      // neck
-  const y0 = 6.5;
+  b.add(0, 7.7, 0, 3, 0.6, 2.6, P.skin);                                                   // neck
+  const y0 = 8.2;
   b.g = 'head';
-  b.add(0, y0, 0, 6, 4.8, 4.8, P.skin);
-  b.add(0, y0 + 3.6, 0, 6.4, 1.4, 5.2, P.hair);                                // hair
-  b.add(0, y0 - 2.6, -2.6, 6.6, 7.2, 1.4, P.hair);                             // long hair
-  for (const s of [-1, 1]) b.add(s * 3.2, y0 + 0.4, -0.4, 0.8, 4, 4, P.hair);
-  face(b, y0, 4.8, 4.8);
-  for (const s of [-1, 1]) b.add(s * 1.5, y0 + 2.4, 2.65, 1.3, 0.35, 0.4, 0x1d2a4a);        // lashes
-  const cy = y0 + 4.6;
-  b.add(0, cy, 0, 6.2, 1.2, 5, P.gold);                                       // crown band
-  for (const [x, z, h] of [[-2.7, -2, 2], [0, -2, 1.4], [2.7, -2, 2], [-2.7, 2, 2], [0, 2, 1.4], [2.7, 2, 2], [-2.7, 0, 1.4], [2.7, 0, 1.4]]) b.add(x, cy + 1.2, z, 0.9, h, 0.9, P.gold);
-  b.add(0, cy + 1.2, 2.6, 1.1, 1.1, 0.4, 0xff4a6a);
-  b.add(0, cy + 1.2, 0, 1.4, 1.2, 1.4, 0x56d4ff);
-  b.add(0, y0 - 1, -3.5, 5, 6, 0.6, P.tunic);
+  b.add(0, y0, 0, 5.6, 4.6, 4.6, P.skin);
+  b.add(0, y0 + 3.4, 0, 6, 1.6, 5, Q.hair);                                                // fringe
+  b.add(0, y0 - 4.6, -2.7, 7.4, 9.6, 1.4, Q.hair);                                         // long golden hair behind
+  for (const s of [-1, 1]) b.add(s * 3.1, y0 - 2.4, -0.2, 0.9, 6.4, 3.6, Q.hair);          // side locks
+  face(b, y0, 4.6, 4.6);
+  for (const s of [-1, 1]) b.add(s * 1.5, y0 + 2.3, 2.5, 1.3, 0.35, 0.4, 0x1d2a4a);        // lashes
+  const cy = y0 + 4.4;
+  b.add(0, cy, 0, 6.6, 1.3, 5.4, Q.gold);                                                  // crown band
+  for (const [x, z, h] of [[-2.9, -2.2, 2.6], [-1.45, -2.2, 3.6], [0, -2.2, 2.6], [1.45, -2.2, 3.6], [2.9, -2.2, 2.6], [-2.9, 2.2, 2.6], [-1.45, 2.2, 3.6], [0, 2.2, 2.6], [1.45, 2.2, 3.6], [2.9, 2.2, 2.6], [-2.9, 0, 3.2], [2.9, 0, 3.2]]) b.add(x, cy + 1.3, z, 0.9, h, 0.9, Q.gold);
+  b.add(0, cy + 0.1, 2.8, 1.2, 1.1, 0.4, 0xff4a6a); b.add(0, cy + 1.3, 0, 1.6, 1.6, 1.6, 0x56d4ff);
   return b;
 }
 function heroKing(P) {
