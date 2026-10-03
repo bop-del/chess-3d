@@ -28,7 +28,7 @@ const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
 const GROUPS = ALL_GROUPS
   .filter(([n]) => !(flag('skip-fixes') && n.startsWith('fixes')))
-  .filter(([n]) => !opt('only', '') || opt('only', '').split(',').includes(n));   // --only=textures,views runs just those groups
+  .filter(([n]) => !opt('only', '') || opt('only', '').split(',').some((o) => o === n || o === family(n)));   // --only=textures,views runs just those groups (a family name runs all its parts)
 
 // affected groups: default inside a lane worktree, --all forces everything
 const lane = laneName();

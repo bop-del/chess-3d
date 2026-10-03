@@ -1,7 +1,7 @@
 // The ?open=<id> flag (smoke tier): node test/open-flag.mjs [--port=5369] [--skip-build] [--base=<server>]
 // ai=0, quality=low, manual=1, intro=0. Every value on desktop and on a phone in portrait and landscape: the target is on screen,
 // not collapsed, and the right tab is selected. An unknown value changes nothing and prints nothing. open combines with view.
-// Exit codes: 0 pass, 1 a check failed, 2 setup error.
+// --part=i/n runs every n-th unit. Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
 
 const args = process.argv.slice(2);
@@ -9,6 +9,9 @@ const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); ret
 const PORT = Number(opt('port', 5369));
 const OUT = '.tmp/open-flag-dist';
 const BASE = opt('base', '').replace(/\/$/, '');
+const [PI, PN] = opt('part', '0/1').split('/').map(Number);   // --part=i/n runs every n-th unit (a size, the badge panel per size, the wins, the combination): separate browsers, see test/smoke-group-list.mjs
+let unitNo = 0;
+const mine = () => unitNo++ % PN === PI;
 const R = reporter();
 let server = null, browser = null;
 const finish = async () => {
@@ -82,6 +85,7 @@ const shown = (page, sel) => page.evaluate((sel) => {
 try {
   const seen = { errs: [], foreign: [] };   // over all sizes
   for (const size of SIZES) {
+    if (!mine()) continue;
     // a fresh page per size: device.phone reads the screen, which the page gets from the viewport it is created with
     const page = await browser.newPage();
     const watch = await watchPage(page, ['127.0.0.1', 'localhost']);
@@ -116,6 +120,7 @@ try {
   }
   // the badge panel: ?open=badges shows the whole grid at both sizes, and a seeded badge gives one toast, once
   for (const size of [SIZES[0], SIZES[1]]) {
+    if (!mine()) continue;
     const bp = await browser.newPage();
     const bw = await watchPage(bp, ['127.0.0.1', 'localhost']);
     await bp.setViewport({ width: size[1], height: size[2], deviceScaleFactor: 1, isMobile: size[3], hasTouch: size[3] });
@@ -153,7 +158,7 @@ try {
     await bp.close();
   }
   // a win at game over: mate in one against the computer records that level and gives the badge; two players give nothing
-  for (const [query, want] of [['the computer on (Easy)', { wins: ['easy'], earned: ['win-easy'] }], ['two players', { wins: [], earned: [] }]]) {
+  for (const [query, want] of mine() ? [['the computer on (Easy)', { wins: ['easy'], earned: ['win-easy'] }], ['two players', { wins: [], earned: [] }]] : []) {
     const wp = await browser.newPage();
     await wp.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
     await wp.evaluateOnNewDocument(() => { try { for (const k of ['chess3d.badges', 'chess3d.train', 'chess3d.puzzles', 'chess3d.daily']) localStorage.removeItem(k); } catch (e) { /* ignore */ } });
@@ -170,13 +175,16 @@ try {
     await wp.close();
   }
   // combines with the other flags
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 720 });
-  const watch = await watchPage(page, ['127.0.0.1', 'localhost']);
-  await load(page, SIZES[0], '&view=tokens&open=puzzles');
-  const combo = await page.evaluate(() => ({ view: window.__chess.views.current(), tab: document.querySelector('.xtab[aria-selected="true"]')?.dataset.tab }));
-  R.expect('open=puzzles combines with view=tokens', combo.view === 'tokens' && combo.tab === 'puzzles', 'tokens + puzzles', JSON.stringify(combo));
-  R.expect('no console error, no foreign request', !seen.errs.length && !watch.errs.length && !seen.foreign.length && !watch.foreign.length, 'clean', seen.errs.concat(watch.errs, seen.foreign, watch.foreign).join(' | '));
+  if (mine()) {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 720 });
+    const watch = await watchPage(page, ['127.0.0.1', 'localhost']);
+    await load(page, SIZES[0], '&view=tokens&open=puzzles');
+    const combo = await page.evaluate(() => ({ view: window.__chess.views.current(), tab: document.querySelector('.xtab[aria-selected="true"]')?.dataset.tab }));
+    R.expect('open=puzzles combines with view=tokens', combo.view === 'tokens' && combo.tab === 'puzzles', 'tokens + puzzles', JSON.stringify(combo));
+    seen.errs.push(...watch.errs); seen.foreign.push(...watch.foreign);
+  }
+  R.expect('no console error, no foreign request', !seen.errs.length && !seen.foreign.length, 'clean', seen.errs.concat(seen.foreign).join(' | '));
 } catch (e) {
   R.fail('open flag run', String(e && e.stack || e).slice(0, 400));
 }

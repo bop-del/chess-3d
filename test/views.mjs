@@ -8,7 +8,7 @@
 //   remembered                 the choice survives a reload (localStorage chess3d.view); a stored view that is not offered falls back
 //   keys 1 to 5                leave an easy view for the matching preset (projection back to perspective)
 //   piece scale                Easy 3D scales the 3D pieces about 1.15x, other views 1.0
-// Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 setup error.
+// --part=i/n runs every n-th unit (a size, the orbit locks, the symbols, the rest). Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 setup error.
 import { ROOT, reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
 
 const args = process.argv.slice(2);
@@ -17,6 +17,9 @@ const PORT = Number(opt('port', 5361));
 const OUT = '.tmp/views-dist';
 const SIZES = [{ w: 1280, h: 720, touch: 0 }, { w: 390, h: 844, touch: 1 }, { w: 844, h: 390, touch: 1 }, { w: 844, h: 290, touch: 1 }];
 const IDS = ['white', 'black', 'top', 'side', 'iso', 'tokens', 'symbols', 'above', 'easy-3d', 'play'];
+const [PI, PN] = opt('part', '0/1').split('/').map(Number);   // --part=i/n runs every n-th unit, so the group can run in separate browsers (test/smoke-group-list.mjs)
+let unitNo = 0;
+const mine = () => unitNo++ % PN === PI;
 const BASE = (args.find((a) => a.startsWith('--base=')) || '').slice(7).replace(/\/$/, '');   // a server that is already up (test/smoke-groups.mjs)
 const R = reporter();
 let server = null, browser = null;
@@ -58,6 +61,7 @@ try {
   const page = await browser.newPage();
   const watch = await watchPage(page, ['127.0.0.1', 'localhost']);
   for (const size of SIZES) {
+    if (!mine()) continue;
     const tag = `${size.w}x${size.h}`;
     const phonePortrait = !!size.touch && size.h > size.w && Math.min(size.w, size.h) <= 500;
     for (const id of IDS) {
@@ -96,7 +100,7 @@ try {
     }
   }
   // Tokens and From above lock the orbit; Symbols and Easy 3D stay free
-  for (const [id, locked] of [['tokens', true], ['symbols', false], ['above', true], ['easy-3d', false]]) {
+  if (mine()) for (const [id, locked] of [['tokens', true], ['symbols', false], ['above', true], ['easy-3d', false]]) {
     await open(page, SIZES[0], `&view=${id}`);
     const c0 = await page.evaluate(() => window.__chess.controls.camera);
     await page.mouse.move(300, 300); await page.mouse.down(); await page.mouse.move(380, 360, { steps: 6 }); await page.mouse.up();
@@ -106,7 +110,7 @@ try {
     R.expect(`${id} orbit ${locked ? 'locked' : 'free'}`, same === locked, `yaw and pitch ${same ? 'unchanged' : 'changed'} by a drag`);
   }
   // Symbols: perspective at 65 degrees, a flat symbol on every piece, the 3D bodies hidden, a plain board; everything comes back on leaving
-  for (const size of [SIZES[0], SIZES[1]]) {
+  if (mine()) for (const size of [SIZES[0], SIZES[1]]) {
     const tag = `${size.w}x${size.h}`;
     await open(page, size, '&view=symbols');
     const look = () => page.evaluate(() => {
@@ -132,45 +136,47 @@ try {
       if (to === 'white') R.expect(`symbols ${tag}: leaving restores the board look`, b.map && b.vc && b.inlay !== false, JSON.stringify(b));
     }
   }
-  // a promotion in the Symbols view gets its symbol at once
-  await open(page, SIZES[0], '&view=symbols&fen=8/4P1k1/8/8/8/8/8/K7%20w%20-%20-%200%201');
-  const pr = await page.evaluate(() => {
-    const g = window.__chess.game; g.move('e7', 'e8', 'q'); window.__chess.step(2); window.__chess.draw();
-    const queens = g.root.children.filter((o) => o.userData.piece && o.userData.piece.type === 'q');
-    return { n: queens.length, sym: queens.every((o) => o.userData.sym?.visible), body: queens.every((o) => o.children.every((ch) => ch.userData.hit || ch.name === 'symbol' || !ch.visible)) };
-  });
-  R.expect('symbols: a promoted queen shows its symbol and no body', pr.n === 1 && pr.sym && pr.body, JSON.stringify(pr));
-  // From above: perspective at 65 degrees, the board edge to edge in width on a phone in portrait, the frame inside the screen
-  await open(page, SIZES[1], '&view=above');
-  const ab = await page.evaluate(() => { const c = window.__chess; return { pitch: Math.round(c.controls.camera.pitch * 180 / Math.PI), proj: c.stage.projection, battle: c.views.isEasy() }; });
-  R.expect('above: perspective, 65 degrees, an easy view', ab.pitch === 65 && ab.proj === 'perspective' && ab.battle, JSON.stringify(ab));
-  // a stored id from before Tokens: easy-flat becomes tokens
-  await page.evaluate(() => localStorage.setItem('chess3d.view', 'easy-flat'));
-  await open(page, SIZES[0]);
-  R.expect('stored easy-flat migrates to tokens', await page.evaluate(() => window.__chess.views.current()) === 'tokens');
-  await page.evaluate(() => localStorage.removeItem('chess3d.view'));
-  // phone cycle: the thumb bar Views button walks Play, Tokens, From above, Easy 3D, then the presets
-  await open(page, SIZES[1]);
-  const seen = [await page.evaluate(() => window.__chess.views.current())];
-  for (let i = 0; i < 5; i++) { await page.tap('.tb[data-act=views]'); await page.evaluate(() => window.__chess.step(1)); seen.push(await page.evaluate(() => window.__chess.views.current())); }
-  R.expect('phone cycle order', seen.join() === 'play,tokens,symbols,above,easy-3d,white', seen.join());
-  // remembered choice, fallback, keys
-  const size = SIZES[1];
-  await open(page, size);
-  await page.evaluate(() => window.__chess.views.set('easy-3d'));
-  await open(page, size);
-  R.expect('choice survives a reload', await page.evaluate(() => window.__chess.views.current()) === 'easy-3d');
-  await page.evaluate(() => localStorage.setItem('chess3d.view', 'play'));
-  await open(page, SIZES[2]);
-  R.expect('stored play falls back in landscape', await page.evaluate(() => window.__chess.views.current()) === 'white');
-  await page.evaluate(() => localStorage.removeItem('chess3d.view'));
-  await open(page, SIZES[1]);
-  R.expect('play is the default on a phone in portrait', await page.evaluate(() => window.__chess.views.current()) === 'play');
-  await open(page, SIZES[0], '&view=tokens');
-  await page.keyboard.press('3');
-  await page.evaluate(() => window.__chess.step(2));
-  const k = await page.evaluate(() => ({ cur: window.__chess.views.current(), proj: window.__chess.stage.projection }));
-  R.expect('key 3 leaves the easy view', k.cur === 'top' && k.proj === 'perspective', JSON.stringify(k));
+  if (mine()) {
+    // a promotion in the Symbols view gets its symbol at once
+    await open(page, SIZES[0], '&view=symbols&fen=8/4P1k1/8/8/8/8/8/K7%20w%20-%20-%200%201');
+    const pr = await page.evaluate(() => {
+      const g = window.__chess.game; g.move('e7', 'e8', 'q'); window.__chess.step(2); window.__chess.draw();
+      const queens = g.root.children.filter((o) => o.userData.piece && o.userData.piece.type === 'q');
+      return { n: queens.length, sym: queens.every((o) => o.userData.sym?.visible), body: queens.every((o) => o.children.every((ch) => ch.userData.hit || ch.name === 'symbol' || !ch.visible)) };
+    });
+    R.expect('symbols: a promoted queen shows its symbol and no body', pr.n === 1 && pr.sym && pr.body, JSON.stringify(pr));
+    // From above: perspective at 65 degrees, the board edge to edge in width on a phone in portrait, the frame inside the screen
+    await open(page, SIZES[1], '&view=above');
+    const ab = await page.evaluate(() => { const c = window.__chess; return { pitch: Math.round(c.controls.camera.pitch * 180 / Math.PI), proj: c.stage.projection, battle: c.views.isEasy() }; });
+    R.expect('above: perspective, 65 degrees, an easy view', ab.pitch === 65 && ab.proj === 'perspective' && ab.battle, JSON.stringify(ab));
+    // a stored id from before Tokens: easy-flat becomes tokens
+    await page.evaluate(() => localStorage.setItem('chess3d.view', 'easy-flat'));
+    await open(page, SIZES[0]);
+    R.expect('stored easy-flat migrates to tokens', await page.evaluate(() => window.__chess.views.current()) === 'tokens');
+    await page.evaluate(() => localStorage.removeItem('chess3d.view'));
+    // phone cycle: the thumb bar Views button walks Play, Tokens, From above, Easy 3D, then the presets
+    await open(page, SIZES[1]);
+    const seen = [await page.evaluate(() => window.__chess.views.current())];
+    for (let i = 0; i < 5; i++) { await page.tap('.tb[data-act=views]'); await page.evaluate(() => window.__chess.step(1)); seen.push(await page.evaluate(() => window.__chess.views.current())); }
+    R.expect('phone cycle order', seen.join() === 'play,tokens,symbols,above,easy-3d,white', seen.join());
+    // remembered choice, fallback, keys
+    const size = SIZES[1];
+    await open(page, size);
+    await page.evaluate(() => window.__chess.views.set('easy-3d'));
+    await open(page, size);
+    R.expect('choice survives a reload', await page.evaluate(() => window.__chess.views.current()) === 'easy-3d');
+    await page.evaluate(() => localStorage.setItem('chess3d.view', 'play'));
+    await open(page, SIZES[2]);
+    R.expect('stored play falls back in landscape', await page.evaluate(() => window.__chess.views.current()) === 'white');
+    await page.evaluate(() => localStorage.removeItem('chess3d.view'));
+    await open(page, SIZES[1]);
+    R.expect('play is the default on a phone in portrait', await page.evaluate(() => window.__chess.views.current()) === 'play');
+    await open(page, SIZES[0], '&view=tokens');
+    await page.keyboard.press('3');
+    await page.evaluate(() => window.__chess.step(2));
+    const k = await page.evaluate(() => ({ cur: window.__chess.views.current(), proj: window.__chess.stage.projection }));
+    R.expect('key 3 leaves the easy view', k.cur === 'top' && k.proj === 'perspective', JSON.stringify(k));
+  }
   R.expect('no page errors', !watch.errs.length, '', watch.errs.slice(0, 3).join(' | '));
   R.expect('no foreign requests', !watch.foreign.length, '', watch.foreign.slice(0, 3).join(' | '));
 } catch (e) {

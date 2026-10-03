@@ -87,16 +87,21 @@ try {
   const never = await visit({ seed: { visits: 40, shows: 3, last: 30 } });
   R.expect('never a fourth time', !never.shown && never.store.shows === 3, JSON.stringify(never.store));
 
-  const desktop = await visit({ ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', mobile: false });
-  R.expect('never on a desktop browser', !desktop.shown && desktop.store === null, JSON.stringify(desktop.store));
-  const auto = await visit({ webdriver: true });
-  R.expect('never under automation (navigator.webdriver)', !auto.shown && auto.store === null);
-  for (const flag of ['?manual=1', '?diag=1', '?fen=' + encodeURIComponent('4k3/8/8/8/8/8/8/4K3 w - - 0 1'), '?moves=e2e4', '?select=e2', '?promo=a7a8', '?quality=low']) {
-    const v = await visit({ path: flag, wait: 3000 });
-    R.expect(`never with ${flag.slice(0, 16)}`, !v.shown && v.store === null);
-  }
-  const inst = await visit({ standalone: true });
-  R.expect('never when launched from the Home Screen', !inst.shown && inst.store === null);
+  // the negatives share nothing (each visit seeds its own state and none writes the key), so they run as tabs of this one browser, a few at a time
+  const DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+  const FLAGS = ['?manual=1', '?diag=1', '?fen=' + encodeURIComponent('4k3/8/8/8/8/8/8/4K3 w - - 0 1'), '?moves=e2e4', '?select=e2', '?promo=a7a8', '?quality=low'];
+  const negatives = [
+    ['never on a desktop browser', { ua: DESKTOP_UA, mobile: false }],
+    ['never under automation (navigator.webdriver)', { webdriver: true }],
+    ...FLAGS.map((f) => [`never with ${f.slice(0, 16)}`, { path: f, wait: 3000 }]),
+    ['never when launched from the Home Screen', { standalone: true }],
+  ];
+  const outcomes = new Array(negatives.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, negatives.length) }, async () => {
+    for (let i; (i = next++) < negatives.length;) outcomes[i] = await visit(negatives[i][1]);
+  }));
+  negatives.forEach(([name], i) => R.expect(name, !outcomes[i].shown && outcomes[i].store === null, '', JSON.stringify(outcomes[i].store)));
 } catch (e) {
   R.fail('install test ran', String(e && e.stack || e).slice(0, 400));
 } finally {

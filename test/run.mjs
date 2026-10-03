@@ -1,13 +1,15 @@
 // Test runner: node test/run.mjs [fast|smoke|phone|all]   (default fast; npm test calls it)
 //   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules, novice level
 //   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on the lane's own port (5303 in the main checkout), only the groups the diff against main affects inside a lane (--all forces every group), cached passes print CACHED, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes, themes
-//   phone  phone sizes and real touch, the three scripts at the same time: tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
+//   phone  phone sizes and real touch, the three scripts at the same time, each cached by build, scripts and GL backend (CACHED, --no-cache reruns): tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes, --affected, --all, --no-cache
 // Exit codes: 0 all pass, 1 a check failed, 2 usage error, 3 nothing failed but a smoke group was skipped (no Chrome slot).
 import { spawn, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildHash } from '../tools/_lib.mjs';
+import { getResult, groupKey, putResult } from '../tools/result-cache.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [tier = 'fast', ...rest] = process.argv.slice(2);
@@ -29,18 +31,32 @@ const run = (name, script, args = [], { show = false } = {}) => {
   return ok;
 };
 
-/** Independent browser steps at the same time (each has its own Chrome slot, port and dist folder): output is held per step and printed when it ends. */
-const runParallel = (steps) => Promise.all(steps.map(([name, script, args = []]) => new Promise((done) => {
-  const t = Date.now();
-  const c = spawn(process.execPath, [script, ...args], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
-  let out = ''; c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { out += d; });
-  c.on('close', (status) => {
-    const secs = (Date.now() - t) / 1000, ok = status === 0;
-    results.push({ name, ok, secs, status });
-    console.log(`--- ${name}\n${out.trimEnd()}\n${ok ? 'PASS' : status === 3 ? 'INCOMPLETE' : 'FAIL'}  ${name}  ${secs.toFixed(1)}s`);
-    done();
-  });
-})));
+/** Independent browser steps at the same time (each has its own Chrome slot, port and dist folder): output is held per step and printed when it ends.
+ *  Result cache (tools/result-cache.mjs, the same key shape as the smoke groups): a step that passed cleanly for the same build, scripts and GL backend prints CACHED and
+ *  takes no Chrome slot. --no-cache runs every step for real. The cache needs a git checkout (the build hash); without one every step runs. */
+const runParallel = (steps, { cache = true } = {}) => {
+  let buildKey = ''; if (cache) { try { buildKey = buildHash(); } catch (e) { /* not a git checkout: no cache */ } }
+  return Promise.all(steps.map(([name, script, args = []]) => new Promise((done) => {
+    const t = Date.now();
+    const key = buildKey ? groupKey([name, script, args], buildKey) : '';
+    const hit = key ? getResult(key) : null;
+    if (hit) {
+      results.push({ name, ok: true, secs: 0, status: 0, cached: true });
+      console.log(`--- ${name} CACHED (passed ${hit.pass} checks in ${hit.secs}s at ${hit.t.slice(0, 16).replace('T', ' ')}, same build and scripts)\n${(hit.warns || []).join('\n')}${hit.warns?.length ? '\n' : ''}PASS  ${name}  CACHED`);
+      return done();
+    }
+    const c = spawn(process.execPath, [script, ...args], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = ''; c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { out += d; });
+    c.on('close', (status) => {
+      const secs = (Date.now() - t) / 1000, ok = status === 0;
+      results.push({ name, ok, secs, status });
+      const rows = (r) => (out.match(new RegExp(`^${r}  `, 'gm')) || []).length;
+      if (key && ok && !rows('FAIL')) putResult(key, { group: name, pass: rows('PASS'), warns: out.split('\n').filter((l) => /^WARN  /.test(l)), secs: Math.round(secs * 10) / 10 });
+      console.log(`--- ${name}\n${out.trimEnd()}\n${ok ? 'PASS' : status === 3 ? 'INCOMPLETE' : 'FAIL'}  ${name}  ${secs.toFixed(1)}s`);
+      done();
+    });
+  })));
+};
 
 const t0 = Date.now();
 if (tier === 'fast' || tier === 'all') {
@@ -73,8 +89,8 @@ if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((
 if (tier === 'phone') {
   console.log('--- phone tier (headless Chrome, phone sizes, real touch)');
   // the three scripts do not share state: one Chrome slot, port and dist folder each, so they run at the same time (the slot lock keeps it to what the machine allows)
-  const shared = rest.filter((a) => !a.startsWith('--port='));   // one port for three servers would clash: each script claims its own
-  await runParallel([['phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', shared], ['real touch (test/touch.mjs)', 'test/touch.mjs', shared], ['install reminder and manifest (test/install.mjs)', 'test/install.mjs', shared]]);
+  const shared = rest.filter((a) => !a.startsWith('--port=') && a !== '--no-cache');   // one port for three servers would clash: each script claims its own
+  await runParallel([['phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', shared], ['real touch (test/touch.mjs)', 'test/touch.mjs', shared], ['install reminder and manifest (test/install.mjs)', 'test/install.mjs', shared]], { cache: !rest.includes('--no-cache') });
 }
 
 const bad = results.filter((r) => !r.ok).length;
