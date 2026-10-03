@@ -9,6 +9,12 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 | all | `node test/run.mjs all` | fast plus smoke | Chrome | both tiers, then a reminder to run the release check |
 | release | `node tools/release-check.mjs` | 5 to 10 min | Chrome, network for `npm ci` | git hygiene, fresh copy build, dist scan, page loads, URL fuzzing, docs, version |
 
+## Speed: GPU rendering, build cache, slots
+
+- `launchBrowser()` uses the GPU (ANGLE Metal, `--enable-gpu --use-angle=metal`) by default on Apple Silicon and prints the WebGL renderer string once per launch. `CHESS_GL=swiftshader` forces software, `CHESS_GL=metal` forces the GPU. Elsewhere the default is software. The release check always stays on software, whatever the variable says. With metal on, a fourth slot is allowed under load 12.
+- Build cache: `build(outDir)` in `tools/_lib.mjs` hashes `git ls-files -s` plus the content of every build input (src, public, index.html, vite.config, package.json, package-lock.json, tracked or untracked), builds once into `~/.cache/chess-3d/dist-<hash>` and copies it into `outDir` with an APFS clone (`cp -c`). A second run, or the next tier, logs `build cache hit dist-<hash>`. Any input change builds again. The phone tier therefore builds once for its three scripts. Delete old `~/.cache/chess-3d/dist-*` folders any time.
+- Slots: two Chromes always, a third while the 1 minute load is under 12, a fourth under 6. Every launch appends its slot wait to `.tmp/chrome-waits.jsonl` (`waitSecs`, `load`, `gl`).
+
 ## Fast tier
 
 - `test/perft.mjs`: perft counts for five reference positions, SAN, check, mate, stalemate, repetition, en passant, promotion, castling. Exits 1 on any mismatch.
@@ -20,7 +26,7 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 
 `node test/smoke.mjs [--skip-build] [--dev] [--skip-fixes] [--write-budgets] [--shots]`
 
-- Builds into `.tmp/smoke-dist` (never touches `dist/`), serves it on port 5303, drives headless Chrome with software GL (swiftshader), `quality=low`, `manual=1`.
+- Builds into `.tmp/smoke-dist` (never touches `dist/`), serves it on port 5303, drives headless Chrome with the GPU on Apple Silicon (ANGLE Metal), software GL (swiftshader) elsewhere or with `CHESS_GL=swiftshader`, `quality=low`, `manual=1`.
 - The first page load uses no `ai` flag and checks that vs computer is on by default and that black replies to e2e4. Every other run adds `ai=0` so both sides are played by the test.
 - Game: capture, undo, both castles, en passant, promotion chooser (cancel, queen, knight), fool's mate with banner and toppled king, undo of each, new game. Moves are two real mouse clicks on projected square positions that the app's own picking resolves to the right square. After every step the view is compared with the rules through `game.audit()`.
 - Gimbal: each axis slider, floor fade when tilted, Reset, Level board, keyboard W and R.

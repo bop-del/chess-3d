@@ -1,15 +1,18 @@
 // Shared helpers for the test and release tools (test/smoke.mjs, tools/release-check.mjs). Not a tool itself.
 //   ROOT                     repo root
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
-//   launchBrowser(opts)      headless Chrome through puppeteer-core with software GL (swiftshader), so it runs anywhere.
-//                            Waits for a machine wide slot first: two always, three under load 10, four under load 6.
+//   launchBrowser(opts)      headless Chrome through puppeteer-core with software GL (swiftshader) by default, so it runs anywhere;
+//                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check does).
+//                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (four with metal).
+//                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
 //   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted); sets Battle scenes Off for the page unless { scenes: true }
 //   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers
-//   build(outDir)            vite build into outDir (inside a folder, never touches dist/)
+//   build(outDir)            vite build into outDir (inside a folder, never touches dist/), through a content hashed cache in ~/.cache/chess-3d/dist-<hash>
 // Exit codes used by the tools: 0 pass (warnings allowed), 1 a check failed, 2 usage or setup error.
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir, loadavg } from 'node:os';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir, loadavg, homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
@@ -39,11 +42,18 @@ export function chromePath() {
 }
 
 // Headless Chromes at a time on this machine, across lanes and agents, adaptive by load: two slots always, a third
-// while the 1 minute load is under 10, a fourth under 6. Each slot is a lock directory in the temp folder holding its
+// while the 1 minute load is under 12, a fourth under 6 (always four with CHESS_GL=metal, the GPU does the drawing). Each slot is a lock directory in the temp folder holding its
 // owner's pid (slot 0 keeps the original lock name, so older checkouts still count). A lock whose pid is gone is stale
 // and taken over. Released when the browser closes or the process exits.
 const SLOTS = ['', '.1', '.2', '.3'].map((x) => join(tmpdir(), 'chess-3d-chrome.lock' + x));
-const allowedSlots = () => { const l = loadavg()[0]; return l < 6 ? 4 : l < 10 ? 3 : 2; };
+// the release check always renders in software, whatever CHESS_GL says
+const defaultGl = () => {
+  if (/release-check\.mjs$/.test(process.argv[1] || '')) return 'swiftshader';
+  const want = process.env.CHESS_GL || (process.platform === 'darwin' && process.arch === 'arm64' ? 'metal' : 'swiftshader');   // GPU by default on Apple Silicon, CHESS_GL=swiftshader opts out
+  return want === 'metal' ? 'metal' : 'swiftshader';
+};
+const metalOn = () => defaultGl() === 'metal';
+const allowedSlots = () => { const l = loadavg()[0]; return l < 6 || (metalOn() && l < 12) ? 4 : l < 12 ? 3 : 2; };
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 /** Slots free right now at this load (at least 0). Used by test/smoke-groups.mjs to size its parallelism. */
 export const freeSlots = () => SLOTS.slice(0, allowedSlots()).filter((lock) => { try { return !alive(Number(readFileSync(join(lock, 'pid'), 'utf8'))); } catch (e) { return !existsSync(lock); } }).length;
@@ -54,7 +64,7 @@ async function acquireLock(maxWaitMs = 15 * 60 * 1000) {
   const t0 = Date.now(); let said = false;
   for (;;) {
     for (const lock of SLOTS.slice(0, allowedSlots())) {
-      try { mkdirSync(lock); writeFileSync(join(lock, 'pid'), String(process.pid)); held = lock; return; } catch (e) { /* taken */ }
+      try { mkdirSync(lock); writeFileSync(join(lock, 'pid'), String(process.pid)); held = lock; return (Date.now() - t0) / 1000; } catch (e) { /* taken */ }
       let pid = 0; try { pid = Number(readFileSync(join(lock, 'pid'), 'utf8')); } catch (e) { /* being written */ }
       if (pid && !alive(pid)) rmSync(lock, { recursive: true, force: true });
     }
@@ -64,17 +74,34 @@ async function acquireLock(maxWaitMs = 15 * 60 * 1000) {
   }
 }
 
-export async function launchBrowser({ w = 1280, h = 720, args = [] } = {}) {
+const GL_ARGS = {
+  swiftshader: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist'],
+  metal: ['--enable-gpu', '--use-angle=metal', '--use-gl=angle', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],   // swiftshader stays allowed as a fallback, the renderer log shows which one won
+};
+const logWait = (secs, gl) => { try { mkdirSync(join(ROOT, '.tmp'), { recursive: true }); appendFileSync(join(ROOT, '.tmp', 'chrome-waits.jsonl'), JSON.stringify({ t: new Date().toISOString(), script: process.argv[1] ? process.argv[1].split('/').slice(-2).join('/') : '', waitSecs: Math.round(secs * 10) / 10, load: Math.round(loadavg()[0] * 10) / 10, gl }) + '\n'); } catch (e) { /* ignore */ } };
+async function logRenderer(browser) {
+  try {
+    const pg = await browser.newPage();
+    const r = await pg.evaluate(() => { const c = document.createElement('canvas').getContext('webgl'); const x = c && c.getExtension('WEBGL_debug_renderer_info'); return c ? (x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : c.getParameter(c.RENDERER)) : 'no webgl'; });
+    await pg.close();
+    console.log(`      WebGL renderer (CHESS_GL=metal): ${r}`);
+  } catch (e) { console.log('      WebGL renderer: unknown ' + e.message); }
+}
+
+export async function launchBrowser({ w = 1280, h = 720, args = [], gl = defaultGl() } = {}) {
   const executablePath = chromePath();
   if (!executablePath) { console.error('Chrome not found. Set CHROME_PATH.'); process.exit(2); }
-  await acquireLock();
+  let waited = 0;
+  try { waited = await acquireLock(); } catch (e) { logWait(-1, gl); throw e; }
+  logWait(waited, gl);
   let browser;
   try {
     browser = await puppeteer.launch({
       executablePath, headless: true,
-      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist', `--window-size=${w},${h}`, '--hide-scrollbars', ...args],
+      args: [...GL_ARGS[gl], `--window-size=${w},${h}`, '--hide-scrollbars', ...args],
       defaultViewport: { width: w, height: h, deviceScaleFactor: 1 },
     });
+    if (gl === 'metal') await logRenderer(browser);
   } catch (e) { releaseLock(); throw e; }
   const close = browser.close.bind(browser);
   browser.close = async () => { try { await close(); } finally { releaseLock(); } };
@@ -105,9 +132,46 @@ export async function watchPage(page, hosts = ['127.0.0.1', 'localhost'], { scen
   return w;
 }
 
-/** Build into outDir (relative to cwd). Returns the combined vite output. */
+// Build cache shared by all tiers and lanes. Key: sha1 over the content of every file that can change the build (git
+// tracked and untracked under src, public, index.html, vite.config*, package.json, package-lock.json) plus `git ls-files -s`.
+// Built once into ~/.cache/chess-3d/dist-<hash>, then copied into outDir with an APFS clone (cp -c, plain copy elsewhere).
+const BUILD_INPUT = /^(src\/|public\/|index\.html$|vite\.config\.|package(-lock)?\.json$)/;
+export function buildHash(cwd = ROOT) {
+  const git = (...a) => execFileSync('git', a, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const h = createHash('sha1');
+  h.update(git('ls-files', '-s'));
+  const files = [...new Set([...git('ls-files').split('\n'), ...git('ls-files', '--others', '--exclude-standard').split('\n')])].filter((f) => f && BUILD_INPUT.test(f)).sort();
+  for (const f of files) { try { h.update(f + '\0'); h.update(readFileSync(join(cwd, f))); } catch (e) { h.update('missing'); } }
+  return h.digest('hex').slice(0, 16);
+}
+// keep the 20 newest cached builds (owner approved the cache in ~/.cache/chess-3d, 2026-10-03, with this limit)
+function pruneCache(dir) {
+  try {
+    const all = readdirSync(dir).filter((n) => /^dist-[0-9a-f]+$/.test(n)).map((n) => ({ n, t: statSync(join(dir, n)).mtimeMs })).sort((a, b) => b.t - a.t);
+    for (const old of all.slice(20)) rmSync(join(dir, old.n), { recursive: true, force: true });
+  } catch (e) { /* pruning is best effort */ }
+}
+
+/** Build into outDir (relative to cwd), from the cache when the inputs are unchanged. Returns the vite output, or a one line cache hit note. */
 export function build(outDir, cwd = ROOT) {
-  return execFileSync(VITE(cwd), ['build', '--outDir', outDir, '--emptyOutDir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 }) ;
+  const out = resolve(cwd, outDir);
+  let key = '';
+  try { key = buildHash(cwd); } catch (e) { /* not a git checkout: build without the cache */ }
+  const cache = key ? join(homedir(), '.cache', 'chess-3d', 'dist-' + key) : '';
+  let log, hit = false;
+  if (cache && existsSync(join(cache, 'index.html'))) hit = true;
+  else if (cache) {
+    const tmp = cache + '.' + process.pid;
+    log = execFileSync(VITE(cwd), ['build', '--outDir', tmp, '--emptyOutDir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
+    try { renameSync(tmp, cache); } catch (e) { rmSync(tmp, { recursive: true, force: true }); if (!existsSync(join(cache, 'index.html'))) throw e; }   // lost a race: the other build wins
+    pruneCache(dirname(cache));
+  } else return execFileSync(VITE(cwd), ['build', '--outDir', outDir, '--emptyOutDir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
+  rmSync(out, { recursive: true, force: true });
+  mkdirSync(dirname(out), { recursive: true });
+  try { execFileSync('cp', ['-cR', cache, out], { stdio: 'ignore' }); } catch (e) { rmSync(out, { recursive: true, force: true }); execFileSync('cp', ['-R', cache, out], { stdio: 'ignore' }); }
+  const msg = hit ? `build cache hit dist-${key}` : `build cached as dist-${key}`;
+  console.log('      ' + msg);
+  return (log || '') + (hit ? msg + '\n' : '');
 }
 
 const children = new Set();
