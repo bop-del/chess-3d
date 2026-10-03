@@ -24,15 +24,15 @@ export const MAP = [
   [/^src\/battle\//, ['battle']],
   [/^src\/music\//, ['music']],
   [/^src\/audio\.js$/, ['music', 'battle', 'core']],
-  [/^src\/themes\//, ['themes', 'textures', 'views', 'blocks chars']],
+  [/^src\/themes\//, ['themes', 'textures', 'views', 'blocks chars', 'blocks fixes']],
   [/^src\/(textures|texture-gen|texture-worker|loader-board)\.js$/, ['textures', 'themes', 'intro']],
   [/^src\/learn\//, ['learn', 'fixes']],
-  [/^src\/openings\//, ['explain', 'learn', 'fixes']],
+  [/^src\/openings\//, ['explain', 'learn', 'fixes', 'blocks fixes']],
   [/^src\/train\//, ['drill', 'fixes']],
   [/^src\/puzzles\//, ['puzzles', 'fixes']],
-  [/^src\/review\//, ['review', 'fixes']],
+  [/^src\/review\//, ['review', 'fixes', 'blocks fixes']],
   [/^src\/views\//, ['views', 'tokens', 'play', 'fixes']],
-  [/^src\/(trays|trays-setting)\.js$/, ['trays', 'fixes']],
+  [/^src\/(trays|trays-setting)\.js$/, ['trays', 'fixes', 'blocks fixes']],
   [/^src\/goodmove\.js$/, ['goodmove']],
   [/^src\/(intro|install-hint)\.js$/, ['intro', 'fixes']],
   [/^src\/dev\//, ['core']],
@@ -42,6 +42,7 @@ export const MAP = [
   [/^test\/(themes|textures|intro|views|tokens|play|drill|explain|learn|learnbar|review|puzzles|goodmove|fixes)\.mjs$/, null],   // null: the group named like the file, see below
   [/^test\/trays-page\.mjs$/, ['trays']],
   [/^test\/blocks-chars-page\.mjs$/, ['blocks chars']],
+  [/^test\/blocks-fixes-page\.mjs$/, ['blocks fixes']],
   [/^test\/open-flag\.mjs$/, ['open']],
 ];
 

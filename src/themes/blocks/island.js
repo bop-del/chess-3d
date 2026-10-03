@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { Mesher } from './mesher.js';
 import { makeKit, toGroup } from './kit.js';
+import { projectBox, projectPoints, hull, overlaps, rectPoly } from './screen.js';
 
 const rnd = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
@@ -59,12 +60,7 @@ function buildIsland(kit) {
     if (i > -5 && i < 4) { m.box('plank', -5, 0, i, 1, fh, 1); m.box('plank', 4, 0, i, 1, fh, 1); }
   }
   for (const [px, pz] of [[-5, -5], [4, -5], [-5, 4], [4, 4]]) m.box('bark', px, 0, pz, 1, 0.5, 1, { keys: { top: 'barkTop' } });
-  // tree
-  const tx = -6, tz = -6;
-  for (let i = 0; i < 4; i++) m.box('bark', tx, i, tz, 1, 1, 1, { keys: { top: 'barkTop' }, color: new THREE.Color(1 - R() * 0.06, 1 - R() * 0.06, 1) });
-  const leafAt = (x, y, z) => { const v = 0.9 + R() * 0.15; m.box('leaves', x, y, z, 1, 1, 1, { color: new THREE.Color(v, v, v) }); };
-  const blob = (cy, rad, h) => { for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) { if (Math.abs(dx) === rad && Math.abs(dz) === rad && R() < 0.6) continue; for (let dy = 0; dy < h; dy++) if (!(dx === 0 && dz === 0 && cy + dy < 4)) leafAt(tx + dx, cy + dy, tz + dz); } };
-  blob(3, 2, 2); blob(5, 1, 1); leafAt(tx, 6, tz);
+  // tree: its own mesh (buildTree), so it can step aside when it would cover the board
   // flowers and rocks on the grass
   const flowers = [[-5.3, -2.2, 0xff5c7a], [-4.6, 4.3, 0xffe36a], [5.2, 3.9, 0xffffff], [-6.0, 2.0, 0xff9bb5], [5.5, -5.4, 0xffe36a], [2.2, 5.3, 0xff5c7a], [-2.6, -5.6, 0xffffff], [0.4, -6.3, 0xff9bb5], [3.8, 5.8, 0xffe36a]];
   for (const [fx, fz, c] of flowers) {
@@ -84,6 +80,26 @@ function buildIsland(kit) {
   return { group: toGroup(m, kit, { name: 'island' }), fall: { wx, wz } };
 }
 
+const TREE = { x: -7, z: -6, trunk: 4 };
+/**
+ * The tree on the back left edge of the island: { group (scaled around its foot), cells (the minimum corner of every block) }.
+ * No block stands over the board or its frame (the 10 x 10 square from -5 to 5): a leaf cell is kept only when its whole footprint
+ * lies outside it. What a tall tree still covers on screen from other sides is handled per frame by buildAvoid.
+ */
+function buildTree(kit) {
+  const R = rnd(23), m = new Mesher(), { x: tx, z: tz } = TREE, cells = [];
+  const clear = (x, z) => x + 1 <= -5 || z + 1 <= -5 || x >= 5 || z >= 5;
+  for (let i = 0; i < TREE.trunk; i++) { m.box('bark', tx, i, tz, 1, 1, 1, { keys: { top: 'barkTop' }, color: new THREE.Color(1 - R() * 0.06, 1 - R() * 0.06, 1) }); cells.push([tx, i, tz]); }
+  const leafAt = (x, y, z) => { if (!clear(x, z)) return; const v = 0.9 + R() * 0.15; m.box('leaves', x, y, z, 1, 1, 1, { color: new THREE.Color(v, v, v) }); cells.push([x, y, z]); };
+  const blob = (cy, rad, h) => { for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) { if (Math.abs(dx) === rad && Math.abs(dz) === rad && R() < 0.6) continue; for (let dy = 0; dy < h; dy++) if (!(dx === 0 && dz === 0 && cy + dy < 4)) leafAt(tx + dx, cy + dy, tz + dz); } };
+  blob(3, 2, 2); blob(5, 1, 1); leafAt(tx, 6, tz);
+  const inner = toGroup(m, kit, { name: 'tree' });
+  inner.position.set(-tx - 0.5, 0, -tz - 0.5);
+  const group = new THREE.Group();
+  group.name = 'tree-foot'; group.position.set(tx + 0.5, 0, tz + 0.5); group.add(inner);
+  return { group, cells };
+}
+
 const CLOUDS = [[-14, -6, -12, 5, 0.3], [12, 0, -16, 4, 0.22], [-18, 4, 6, 4, 0.38], [16, -9, 8, 5, 0.28], [2, -14, -20, 5, 0.2], [-8, 8, -22, 4, 0.25], [24, 5, -6, 3, 0.33]];
 /** Each cloud is its own group so it drifts at its own (slow) speed. */
 function addClouds(parent, kit) {
@@ -95,7 +111,11 @@ function addClouds(parent, kit) {
       m.box('cloud', ox, (R() < 0.3 ? 0.8 : 0), oz, w, 0.8, d, { color: 0xffffff });
     }
     const g = toGroup(m, kit, { cast: false, receive: false, name: 'cloud' });
-    g.position.set(x, y, z); g.userData = { x0: x, speed };
+    // a material of its own per cloud, so one cloud can fade out (at a UI control) without the others
+    const mats = [];
+    g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; mats.push(o.material); } });
+    const local = new THREE.Box3().setFromObject(g);
+    g.position.set(x, y, z); g.userData = { x0: x, speed, mats, local, fade: 1 };
     parent.add(g); out.push(g);
   }
   return out;
@@ -142,23 +162,89 @@ function buildAnim(parent, kit, isl, clouds) {
   };
 }
 
-/** The whole Blocks world: { group, update(dt, t?), dispose() }. track(texture) registers a texture for disposal. */
-export function createWorld({ track, onKit } = {}) {
+const approach = (cur, target, step) => (cur < target ? Math.min(target, cur + step) : Math.max(target, cur - step));
+
+/**
+ * Keeps the tree and the clouds out of the way. view() gives { camera, w, h, rects } (the camera, the canvas size in px and the UI
+ * controls as DOMRect like objects). The tree shrinks into the ground while it would cover a board square or the frame on screen
+ * and grows back when the view moves on; a cloud fades out while it would pass behind a control. Each test runs on the full size
+ * tree and the full cloud, so nothing flickers. `state` is read by the smoke tests.
+ */
+function buildAvoid(group, tree, clouds, view) {
+  const hullTmp = [], state = { treeHidden: false, treeCovers: false, cloudsHidden: 0 };
+  // the board and its frame (10 x 10) up to the height of the pieces, in world space, as the hull of the corners on screen
+  const ground = [];
+  for (const y of [0, 1.2]) for (const [x, z] of [[-5, -5], [5, -5], [5, 5], [-5, 5]]) ground.push(new THREE.Vector3(x, y, z));
+  const cornerPts = [], corner = new THREE.Vector3();
+  let grow = 1, lastKey = '', wpts = [];
+  return {
+    state,
+    update(dt) {
+      const vw = view?.();
+      if (!vw?.camera) return;
+      const { camera, w, h, rects = [] } = vw;
+      camera.updateMatrixWorld();
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+      group.updateWorldMatrix(true, false);
+      wpts = ground.map((p) => { const q = group.localToWorld(p.clone()); return [q.x, q.y, q.z]; });
+      // the tree: only when the camera or the window moved
+      const key = camera.matrixWorldInverse.elements.concat(camera.projectionMatrix.elements, group.matrixWorld.elements, w, h).join();
+      if (key !== lastKey) {
+        lastKey = key;
+        const board = hull(projectPoints(wpts, camera, w, h));
+        let covers = false;
+        for (const [x, y, z] of tree.cells) {
+          cornerPts.length = 0;
+          for (let k = 0; k < 8; k++) { const q = group.localToWorld(corner.set(x + (k & 1), y + ((k >> 1) & 1), z + ((k >> 2) & 1))); cornerPts.push([q.x, q.y, q.z]); }
+          if (overlaps(hull(projectPoints(cornerPts, camera, w, h)), board)) { covers = true; break; }
+        }
+        state.treeCovers = covers;
+      }
+      grow = approach(grow, state.treeCovers ? 0 : 1, dt / 0.35);
+      tree.group.scale.setScalar(Math.max(grow, 0.0001));
+      tree.group.visible = grow > 0.02;
+      state.treeHidden = !tree.group.visible;
+      // the clouds
+      const polys = rects.map((r) => rectPoly(r, 10));
+      let hidden = 0;
+      for (const c of clouds) {
+        c.updateWorldMatrix(true, false);
+        const wb = c.userData.local.clone().applyMatrix4(c.matrixWorld);
+        const poly = hull(projectBox(wb, camera, w, h, hullTmp));
+        const hit = polys.some((pl) => overlaps(poly, pl));
+        c.userData.fade = approach(c.userData.fade, hit ? 0 : 1, dt / 0.6);
+        for (const mt of c.userData.mats) mt.opacity = c.userData.fade;
+        c.visible = c.userData.fade > 0.01;
+        if (hit) hidden++;
+      }
+      state.cloudsHidden = hidden;
+    },
+  };
+}
+
+/** The whole Blocks world: { group, update(dt, t?), dispose() }. track(texture) registers a texture for disposal. view(): see buildAvoid. */
+export function createWorld({ track, onKit, view } = {}) {
   const kit = makeKit(track);
   onKit?.(kit);
   const group = new THREE.Group();
   group.name = 'blocks-world';
   const isl = buildIsland(kit);
   group.add(isl.group);
+  const tree = buildTree(kit);
+  group.add(tree.group);
   const clouds = addClouds(group, kit);
   const anim = buildAnim(group, kit, isl, clouds);
+  const avoid = buildAvoid(group, tree, clouds, view);
   let time = 2.2;
   anim.update(time);
   return {
-    group, kit,
-    update(dt) { time += dt; anim.update(time); },
+    group, kit, avoid: avoid.state,
+    update(dt) { time += dt; anim.update(time); avoid.update(dt); },
+    /** run the avoid pass at once (the view changed in one jump: a test, a theme switch) */
+    settle() { avoid.update(5); },
     dispose() {
       group.traverse((o) => { if (o.isMesh && o.geometry !== anim.geo) o.geometry.dispose(); });
+      for (const c of clouds) for (const mt of c.userData.mats) mt.dispose();
       anim.geo.dispose();
       for (const mt of anim.mats) mt.dispose();
       kit.dispose();

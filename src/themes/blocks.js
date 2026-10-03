@@ -11,13 +11,16 @@ export function board() {
     hide: true,
     labelLift: 0.3,
     labels: { color: '#fff2c8', metalness: 0, roughness: 1, envMapIntensity: 0 },
+    // green grass squares: the move ring is cream with a dark outline, the hint is a cream arrow with a dark outline over orange squares
+    marks: { move: { ring: [1.0, 0.96, 0.78], dot: [1.0, 1.0, 0.92], edge: 0.7 } },
+    hint: { from: 0xffb02e, to: 0xffa01a, arrow: 0xfff3c4, outline: 0.7, fromOp: 0.4, toOp: 0.7, arrowOp: 0.97 },
     tray: { color: '#8a6035', roughness: 1, metalness: 0, clearcoat: 0, clearcoatRoughness: 1 },
   };
 }
 
 /** The island, clouds and waterfall: { group, update(dt), dispose() }; the registry adds the group to the gimbal. */
-export function world({ track, quality }) {
-  return createWorld({ track, quality });
+export function world({ track, quality, view }) {
+  return createWorld({ track, quality, view });
 }
 
 export function light() {

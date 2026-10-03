@@ -4,6 +4,12 @@
 import * as THREE from 'three';
 
 const GOLD = 0xd8b468;
+// The look of every hint arrow, set by the theme (themes/registry.js, board spec `hint`): { from, to, arrow, outline }. The default
+// is the quiet gold on the classic squares; Blocks has green grass, so it brings a cream arrow with a dark outline.
+const DEFAULT_STYLE = { from: GOLD, to: GOLD, arrow: GOLD, outline: 0, fromOp: 0.22, toOp: 0.5, arrowOp: 0.78 };
+let style = DEFAULT_STYLE;
+const live = new Set();
+export function setHintStyle(s) { style = s ? { ...DEFAULT_STYLE, ...s } : DEFAULT_STYLE; for (const fn of live) fn(); }
 const LIFT = 0.012;
 const KEY = 'chess3d.hint';
 
@@ -43,7 +49,8 @@ export function createHint({ gimbal, persist = true }) {
     color: GOLD, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
-  const fromMat = fill(0.22), toMat = fill(0.5), arrowMat = fill(0.78);
+  const fromMat = fill(0.22), toMat = fill(0.5), arrowMat = fill(0.78), outMat = fill(0.6);
+  outMat.color.set(0x10131a);
   const square = new THREE.PlaneGeometry(0.94, 0.94).rotateX(-Math.PI / 2);
   const fromMesh = new THREE.Mesh(square, fromMat);
   const toMesh = new THREE.Mesh(square, toMat);
@@ -51,6 +58,17 @@ export function createHint({ gimbal, persist = true }) {
   // renderOrder above the Tokens view discs (11), so the hint stays on top of them
   for (const m of [fromMesh, toMesh, arrowMesh]) { m.renderOrder = 12; m.position.y = LIFT; group.add(m); }
   arrowMesh.position.y = LIFT * 2;
+  // a dark outline under the arrow (a slightly fatter copy), only for themes that ask for it
+  const outMesh = new THREE.Mesh(new THREE.BufferGeometry(), outMat);
+  outMesh.renderOrder = 12; outMesh.visible = false; group.add(outMesh);
+  const applyStyle = () => {
+    fromMat.color.set(style.from); toMat.color.set(style.to); arrowMat.color.set(style.arrow);
+    fromMat.opacity = style.fromOp; toMat.opacity = style.toOp; arrowMat.opacity = style.arrowOp; outMat.opacity = style.outline;
+    outMesh.visible = style.outline > 0;
+    drawn = '';   // the outline's shape is cut with the arrow
+    redraw();
+  };
+  live.add(applyStyle);
 
   let enabled = persist ? readPref() : true;
   let forced = false;  // Help or a wrong move shows the arrow with the switch off, without touching the stored preference
@@ -74,11 +92,15 @@ export function createHint({ gimbal, persist = true }) {
     const len = Math.max(0.3, dist - startGap - endGap);
     arrowMesh.geometry.dispose();
     arrowMesh.geometry = new THREE.ShapeGeometry(arrowShape(len)).rotateX(Math.PI / 2);
+    outMesh.geometry.dispose();
+    outMesh.geometry = new THREE.ShapeGeometry(arrowShape(len + 0.1, 0.16, 0.38, 0.44)).rotateX(Math.PI / 2).translate(-0.05, 0, 0);
     // ShapeGeometry lies in xy; rotateX(+90deg) maps y to z, so the shape's +x stays +x and its y becomes z.
     const ux = dx / dist, uz = dz / dist;
     arrowMesh.position.set(sqX(from) + ux * startGap, LIFT * 2, sqZ(from) + uz * startGap);
     arrowMesh.rotation.set(0, -Math.atan2(uz, ux), 0);
+    outMesh.position.set(arrowMesh.position.x, LIFT * 1.5, arrowMesh.position.z); outMesh.rotation.copy(arrowMesh.rotation);
   }
+  applyStyle();
 
   return {
     group,
@@ -91,7 +113,8 @@ export function createHint({ gimbal, persist = true }) {
     set enabled(on) { enabled = !!on; if (persist) writePref(enabled); redraw(); },
     get visible() { return group.visible; },
     dispose() {
-      gimbal.remove(group);
+      gimbal.remove(group); live.delete(applyStyle);
+      outMesh.geometry.dispose(); outMat.dispose();
       arrowMesh.geometry.dispose(); square.dispose();
       fromMat.dispose(); toMat.dispose(); arrowMat.dispose();
     },

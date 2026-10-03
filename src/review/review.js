@@ -200,7 +200,7 @@ export function createReview({ game, hint, engine = null }) {
 }
 
 // ---------------------------------------------------------------- the DOM
-export function mountReview({ game, gimbal, createHint, engine = null }) {
+export function mountReview({ game, gimbal, createHint, engine = null, onInset = null }) {
   const hint = createHint({ gimbal, persist: false });
   const review = createReview({ game, hint, engine });
 
@@ -233,6 +233,10 @@ export function mountReview({ game, gimbal, createHint, engine = null }) {
   ctl.append(bStart, bBack, pos, bFwd, bDet, bClose);
   root.append(msg, detailsBox, strip, ctl);
   document.body.appendChild(root);
+  // the strip floats over the bottom of the canvas: tell the camera how much, so the board frame stays above it (it follows the
+  // strip's height: the message wraps, Details opens)
+  const inset = () => onInset?.(root.hidden ? 0 : innerHeight - root.getBoundingClientRect().top + 8);
+  if (onInset && window.ResizeObserver) new ResizeObserver(inset).observe(root);
 
   // the details: graph, best line, accuracy
   const SVGNS = 'http://www.w3.org/2000/svg';
@@ -320,7 +324,7 @@ export function mountReview({ game, gimbal, createHint, engine = null }) {
     const s = review.state();
     root.hidden = !s.active;
     document.body.classList.toggle('reviewing', s.active);
-    if (!s.active) { built = -1; return; }
+    if (!s.active) { built = -1; inset(); return; }
     if (built !== s.total) { buildStrip(s); built = s.total; }
     const sanList = review.sanList;
     s.kinds.forEach((k, i) => {

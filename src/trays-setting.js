@@ -14,7 +14,7 @@ export function mountTraysSetting({ ui, game, controls, flag = null }) {
   row.className = 'switch';
   row.innerHTML = '<input type="checkbox" data-trays><span class="track"><i></i></span><em data-i18n="trays.label">Captured pieces at the side</em>';
   const box = row.querySelector('input');
-  const apply = (on) => { game.setTrays(on); controls.setTrays?.(on); box.checked = on; };
+  const apply = (on) => { game.setTrays(on); controls.setTrays?.(on); box.checked = on; document.body.dataset.traysShown = on ? 'on' : 'off'; };
   apply(flag === '0' ? false : flag === '1' ? true : readStored());
   box.addEventListener('change', () => { apply(box.checked); writeStored(box.checked); });
   ui.mountSettings('trays', row);

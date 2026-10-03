@@ -195,6 +195,7 @@ async function boot() {
     if (flagTheme && isTheme(flagTheme)) await themes.set(flagTheme, { persist: false });   // this load only
     else await themes.set(storedTheme(), { persist: false });
   } catch (e) { console.warn('theme not applied, Classic stays', e); }   // a theme must never stop the boot
+  loaderEl.dataset.world = themes.current();   // the step line gets a calm backing over a theme with a busy world (Blocks), see style.css
 
   await pieceSet.buildAll((f, msg) => progress(0.4 + f * 0.52, msg));
   boot.pieces = performance.now();
@@ -276,7 +277,7 @@ async function boot() {
   const [{ createGoodMove }, { createHint }] = await Promise.all([import('./goodmove.js'), import('./openings/arrow.js')]);
   const goodMove = createGoodMove({ game, hint: createHint({ gimbal, persist: false }) });
   ui.bindGoodMove(goodMove);
-  const review = (await import('./review/review.js')).mountReview({ game, gimbal, createHint });   // the game over card gets its Review the game button
+  const review = (await import('./review/review.js')).mountReview({ game, gimbal, createHint, onInset: (px) => ui.setBottomInset(px) });   // the game over card gets its Review the game button
   mountSwatches({ themes, ui });
 
   // touch: rotation and the browser toolbar fire bursts of resize events. The camera follows at once, the render targets

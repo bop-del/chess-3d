@@ -146,7 +146,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
           <h4 data-i18n="panel.moves">Moves</h4>
           <ol class="moves" id="moves"></ol>
         </div>
-        <div class="sec">
+        <div class="sec cap-sec">
           <h4 data-i18n="panel.captured">Captured</h4>
           <div class="cap"><span class="who" data-i18n="hud.byWhite">By white</span><span class="glyphs b" id="cap-b"></span><span class="adv" id="adv-w"></span></div>
           <div class="cap"><span class="who" data-i18n="hud.byBlack">By black</span><span class="glyphs w" id="cap-w"></span><span class="adv" id="adv-b"></span></div>

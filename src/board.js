@@ -143,6 +143,9 @@ void main() {
 
 const HL_FRAG = /* glsl */`
 uniform float uTime;
+uniform vec3 uMoveRing;   // the move marker ring and dot colour (sRGB)
+uniform vec3 uMoveDot;
+uniform float uMoveEdge;  // 0: no dark outline; > 0: a dark outline of that opacity behind the ring (themes where the ring would sink into the squares)
 varying vec2 vUv;
 varying float vKind;
 varying float vSeed;
@@ -170,7 +173,15 @@ void main() {
     float dotc = exp(-pow(r / 0.065, 2.0)) * (0.55 + 0.15 * sin(t * 3.0));
     float inner = smoothstep(r0, 0.0, r) * 0.10;
     a = clamp(ring * 0.95 + halo + dotc + inner, 0.0, 0.95);
-    col = mix(lin(vec3(0.05, 0.72, 0.42)), lin(vec3(0.60, 1.0, 0.78)), clamp(dotc + ring * 0.30, 0.0, 1.0));
+    col = mix(lin(uMoveRing), lin(uMoveDot), clamp(dotc + ring * 0.30, 0.0, 1.0));
+    if (uMoveEdge > 0.0) {
+      float thick = band(r, r0, 0.046, 0.012);
+      float disc = band(r, 0.0, 0.085, 0.015);
+      float edge = max(band(r, r0, 0.078, 0.02), band(r, 0.0, 0.115, 0.025)) * uMoveEdge;
+      float bright = clamp(thick + disc, 0.0, 1.0);
+      a = clamp(max(bright * 0.97, edge), 0.0, 0.97);
+      col = mix(vec3(0.0), lin(uMoveRing), smoothstep(0.0, 0.7, bright));
+    }
   } else if (kind == 3) {     // capture: red ring hugging the square, with a faint red wash
     float r0 = 0.39 + 0.010 * sin(t * 4.0);
     float ring = band(r, r0, 0.040, 0.030);
@@ -210,7 +221,7 @@ function createHighlights() {
   geo.setAttribute('aInst', inst); geo.setAttribute('aSeed', seed);
   geo.instanceCount = 0;
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uMoveRing: { value: new THREE.Vector3(0.05, 0.72, 0.42) }, uMoveDot: { value: new THREE.Vector3(0.60, 1.0, 0.78) }, uMoveEdge: { value: 0 } },
     vertexShader: HL_VERT, fragmentShader: HL_FRAG,
     transparent: true, depthWrite: false, depthTest: true,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
@@ -451,6 +462,9 @@ export function createBoard() {
       // a theme with its own board (Blocks) hides the classic meshes; labels may be lifted onto its frame
       for (const m of [lightMesh, darkMesh, frameMesh, mapleMesh, goldMesh, plinthMesh, feltMesh]) m.visible = !spec?.hide;
       labelsW.position.y = labelsB.position.y = spec?.labelLift || 0;
+      // move markers: emerald by default; a theme whose squares are green too (Blocks) brings its own colours and a dark outline
+      const mk = spec?.marks?.move, u = hl.mat.uniforms;
+      u.uMoveRing.value.set(...(mk?.ring || [0.05, 0.72, 0.42])); u.uMoveDot.value.set(...(mk?.dot || [0.60, 1.0, 0.78])); u.uMoveEdge.value = mk?.edge || 0;
     },
     squareCenter(file, rank) { return new THREE.Vector3(file - 3.5, 0, 3.5 - rank); },
     setHighlights(list) { hl.set(list); },

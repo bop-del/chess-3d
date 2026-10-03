@@ -60,8 +60,11 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   showBtn.dataset.i18n = 'hud.show';
   showBtn.hidden = true;
 
+  // desktop: the camera's free area is the canvas minus the panel on the right and, while the game review is open, its strip below
+  let deskW = 0, deskBottom = 0;
+  const deskFrame = () => controls.setFrame({ ...(deskW ? { right: deskW } : {}), ...(deskBottom ? { bottom: deskBottom } : {}) });
   if (desk) {
-    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => controls.setFrame(w ? { right: w } : {}), fade: !manual });
+    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => { deskW = w; deskFrame(); }, fade: !manual });
     hud.append(showBtn);
   } else {
   // ------------------------------------------------------------ left column
@@ -756,5 +759,8 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   }
 
   // Phone only: the Learn sheet { body, open(), close(), isOpen }, null elsewhere. src/learn fills the body.
-  return { sync, toast, toggleHud, toggleHelp, render, mountPanel, mountSettings, openPanel, learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  /** px at the bottom of the canvas that something floating covers (the review strip): the desktop camera fits the board above it */
+  function setBottomInset(px) { px = Math.max(0, Math.round(px)); if (px === deskBottom) return; deskBottom = px; if (dsk) deskFrame(); }
+
+  return { sync, toast, setBottomInset, toggleHud, toggleHelp, render, mountPanel, mountSettings, openPanel, learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }

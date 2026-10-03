@@ -97,7 +97,8 @@
 .ghost svg { width: 16px; height: 16px; flex: none; }
 .ghost.think span::after { content: '...'; }
 
-/* moves and captured */
+/* moves and captured. With the 3D capture trays on (body[data-trays-shown=on], set by trays-setting.js) the text list is redundant: hidden, still in the DOM */
+body[data-trays-shown="on"] .cap-sec { display: none; }
 .panel .moves { background: var(--p-well); border-radius: 9px; padding: 6px; }
 .panel .moves li:nth-child(odd) { background: none; }
 .panel .moves li .n { color: var(--dim); }

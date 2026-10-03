@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { addDE } from '../i18n.js';
 import { createSkin } from './apply.js';
+import { setHintStyle } from '../openings/arrow.js';
 
 export const THEMES = [
   { id: 'classic', label: { en: 'Classic', de: 'Klassisch' }, swatch: ['#ece2cc', '#0d0f15'] },
@@ -53,6 +54,10 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
     return trayRoot;
   };
 
+  // what a theme's own scene needs to keep out of the way: the camera, the canvas size and the UI controls floating over it
+  const OVER = '.pstatus, .pgood, .pbar, .viewbar';
+  const screenView = () => ({ camera: stage.camera, w: innerWidth, h: innerHeight, rects: [...document.querySelectorAll(OVER)].filter((e) => e.offsetWidth).map((e) => e.getBoundingClientRect()) });
+
   let current = 'classic';
   let world = null;   // the theme's own scene (Blocks island), in the gimbal
   let tracked = [];
@@ -63,7 +68,7 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
   async function build(id) {
     const mod = LOADERS[id] ? await LOADERS[id]() : null;
     const fresh = [];
-    const ctx = { THREE, quality: stage.quality, base: board.base, track: (tex) => { fresh.push(tex); return tex; } };
+    const ctx = { THREE, quality: stage.quality, base: board.base, view: screenView, track: (tex) => { fresh.push(tex); return tex; } };
     const b = mod?.board?.(ctx) || null;
     return { fresh, board: b, pieces: mod?.pieces?.(ctx) || null, pieceStyle: mod?.pieceStyle?.(ctx) || null, world: mod?.world?.(ctx) || null, light: mod?.light?.(ctx) || null };
   }
@@ -72,12 +77,13 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
     const old = tracked;
     tracked = built.fresh;
     board.applyTheme(built.board);
+    setHintStyle(built.board?.hint);
     pieceSet.setStyle?.(built.pieceStyle || null);
     pieceSkin.apply(built.pieces);
     game?.restyle?.();
     if (world) { world.group.parent?.remove(world.group); world.dispose(); }
     world = built.world;
-    if (world) board.group.parent?.add(world.group);
+    if (world) { board.group.parent?.add(world.group); world.settle?.(); }
     stage.setFloorHidden?.(!!built.light?.noFloor);
     traySpec = built.board?.tray ? { tray: built.board.tray } : null;
     trayMaterial()?.apply(traySpec);
@@ -121,6 +127,8 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
     attachGame(g) { game = g; if (traySpec) trayMaterial()?.apply(traySpec); },
     /** per frame: the theme's own scene (water, clouds) */
     update(dt) { world?.update(dt); },
+    /** the theme's own scene, for the tests */
+    get world() { return world; },
     get textureCount() { return tracked.length; },
   };
 }

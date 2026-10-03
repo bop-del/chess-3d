@@ -1,4 +1,5 @@
-// 16 px block face textures drawn in code (no asset files). Nearest filtering on magnification, mipmapped nearest when far away.
+// 16 px block face textures drawn in code (no asset files). Nearest filtering on magnification (crisp pixels up close), trilinear
+// mipmaps when minified: nearest picking of texels 1 px apart made moire on the fine patterns (frame corner posts, planks) at phone size.
 import * as THREE from 'three';
 
 const rng = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -16,7 +17,7 @@ function make(seed, draw, size = 16) {
   draw({ x, r, P, fill, size });
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapLinearFilter;
+  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
   return t;
 }
