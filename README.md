@@ -6,9 +6,13 @@ Built with three.js (0.186) and Vite. Everything is procedural: the geometry com
 
 **Play it:** https://bop-del.github.io/chess-3d/
 
-![Start position, white's side](docs/start.jpg)
+![Start position, white's side, with the panel on the right](docs/start.jpg)
 
-![The board tilted, mid game](docs/tilt.jpg)
+![The board tilted, mid game, with the capture trays at its sides](docs/tilt.jpg)
+
+The capture trays: captured pieces lie inside the tray, never overlapping, the most valuable first.
+
+![Capture trays at the side of the board](docs/trays.jpg)
 
 ![Top down view](docs/topdown.jpg)
 
@@ -19,6 +23,22 @@ The Spielsteine view (named Tokens in English): a flat top view with every piece
 The Puzzles tab: a path of ten stations per chapter, gold for a clean solve, silver for one that needed help.
 
 ![The puzzle path](docs/puzzles-path.jpg)
+
+The Symbols view: flat chess diagram symbols as in chess books, on a plain board in the theme's colours.
+
+![Symbols view](docs/symbols.jpg)
+
+The Tournament theme (vinyl green and warm cream squares) and the Blocks theme (block heroes against block critters on a floating island).
+
+![Tournament theme](docs/tournament.jpg)
+
+![Blocks theme](docs/blocks.jpg)
+
+Game review after a game: a move strip with marked mistakes, a gold arrow for the better move and one sentence that says why. Details adds the evaluation graph, the best line and the accuracy of each side.
+
+![Game review: a marked move, the better move and the move strip](docs/review.jpg)
+
+![Game review with Details open: evaluation graph, best line and accuracy](docs/review-details.jpg)
 
 On a phone, in portrait: the game with its thumb bar, the Menu sheet, a lesson running with the learning bar, and the puzzle path.
 
@@ -129,7 +149,7 @@ Rendering
 - A short start sequence: a king turns slowly, then the board builds itself. Skip it with `?intro=0`; it is also off with the system setting reduce motion
 - Board of white and black marble squares in a walnut frame with a gold inlay, coordinate labels, a plinth and a captured-piece tray on each side of the board (pieces lie inside the tray, never overlapping, ordered by value; the Captured pieces at the side switch in the Scene card, or Menu on a phone, turns the trays off: a captured piece then fades out at the board edge, the camera fits the board alone, and the Captured list in the desktop Play tab appears (it is hidden while the trays show the pieces); the choice is kept per device)
 - Sculpted Staunton pieces: a lathe turned pawn, rook, bishop, queen and king and a modelled knight head. 58k to 83k triangles per piece type
-- Six themes (Classic, Tournament, Wood, Metal, Glass, Blocks), each one bundle of board squares, frame, inlay, pieces and lighting. The piece shapes stay, only materials and colours change. The textures are built on the first pick of a theme and freed again when you leave it. Glass uses real transmission only on the High quality tier; Low and Medium get a tinted lacquer look that costs nothing extra. Blocks is the exception to "the piece shapes stay": a floating block island with a grass and stone board, a plank frame, a tree that steps aside when it would stand in front of the board, a slow waterfall and drifting clouds that fade out behind the controls (all pixel textures drawn in code), with block heroes against block critters
+- Six themes (Classic, Tournament, Wood, Metal, Glass, Blocks), each one bundle of board squares, frame, inlay, pieces and lighting. The piece shapes stay, only materials and colours change (Tournament plays on vinyl green and warm cream squares like a club set). The textures are built on the first pick of a theme and freed again when you leave it. Glass uses real transmission only on the High quality tier; Low and Medium get a tinted lacquer look that costs nothing extra. Blocks is the exception to "the piece shapes stay": a floating block island with a grass and stone board, a plank frame, a tree that steps aside when it would stand in front of the board, a slow waterfall and drifting clouds that fade out behind the controls (all pixel textures drawn in code), with block heroes against block critters
 - Four studio lighting presets: Studio, Gallery, Sunset and Night, with a smooth transition between them
 - Quality tiers Low, Medium and High that change the shadow map size (1024, 2048 or 4096), the pixel ratio cap and the post chain
 - Shadows, bloom, ambient occlusion (High tier), a vignette and grade pass, and a soft reflection of the pieces in the studio floor
