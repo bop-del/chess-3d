@@ -83,7 +83,10 @@ function agent(branch, name, brief, model = 'sonnet') {
       // land agents (bin/land-all --land) may run exactly the local landing: the land lock and bin/lane close (owner, 2026-10-03)
       // the lock is taken and released only through the private helper (owner.json, stale takeover; S34), not mkdir/rmdir
       const root = join(process.env.HOME, 'code', 'chess-3d'), lockTool = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'land-lock');
-      const permissions = name === 'land' ? { allow: [`Bash(${lockTool} *)`, `Bash(${root}/bin/lane close *)`, `Bash(bin/lane close *)`] } : undefined;
+      // land and release prep agents also feed the release test draft and the result records (S27)
+      const relTool = (t) => `Bash(${join(process.env.HOME, 'code', 'chess-3d-private', 'bin', t)} *)`;
+      const permissions = name === 'land' ? { allow: [`Bash(${lockTool} *)`, `Bash(${root}/bin/lane close *)`, `Bash(bin/lane close *)`, relTool('release-next'), relTool('release-result')] }
+        : name === 'release' ? { allow: [relTool('release-next'), relTool('release-result')] } : undefined;
       writeFileSync(f, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node ${h} ${branch} ${name}` }] }] }, ...(permissions ? { permissions } : {}) }, null, 2));
       extra.push('--settings', f);
     } }
