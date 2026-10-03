@@ -5,6 +5,7 @@ import { createThemes, isTheme, storedTheme } from './themes/registry.js';
 import { mountSwatches } from './themes/swatches.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
+import { mountTraysSetting } from './trays-setting.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 window.__chessBoot = { script: performance.now() };   // start timings for ?diag=1, ms since navigation (download ends here)
@@ -229,6 +230,7 @@ async function boot() {
   intro?.setTarget(0.95);
   battle = createDirector({ game, controls, stage, ui });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
+  mountTraysSetting({ ui, game, controls, flag: params.get('trays') });   // Captured pieces at the side, below Battle scenes
   audio.mountMute(ui);     // the mute switch, right below the Battle scenes setting
   const [{ createMusic }, { mountMusicSettings }] = await Promise.all([import('./music/player.js'), import('./music/settings.js')]);
   const music = createMusic({ audio });    // background piano, starts after the first tap or key

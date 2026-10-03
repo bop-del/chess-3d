@@ -19,6 +19,7 @@ const tick = () => document.hidden ? Promise.resolve() : new Promise((res) => {
 export function createPieceSet(materials) {
   const protos = new Map();
   const heights = new Map();
+  const dias = new Map();       // base diameter (the wider of the two footprint sides), board units
 
   // Geometry does not depend on color, so only white is built. Black is a clone that shares the geometry and swaps the
   // two piece materials (the knight's dark inlay material belongs to neither color and stays).
@@ -31,6 +32,7 @@ export function createPieceSet(materials) {
         p.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(p);
         heights.set(key, Math.max(0.6, box.max.y));
+        dias.set(key, Math.max(box.max.x - box.min.x, box.max.z - box.min.z));
         p.traverse((o) => {
           if (!o.isMesh) return;
           o.castShadow = true; o.receiveShadow = true;
@@ -48,6 +50,7 @@ export function createPieceSet(materials) {
           else if (o.material === materials.white.accent) o.material = materials.black.accent;
         });
         heights.set(key, heights.get(type + 'w'));
+        dias.set(key, dias.get(type + 'w'));
       }
       protos.set(key, p);
     }
@@ -64,6 +67,7 @@ export function createPieceSet(materials) {
       wrap.name = `${color}${type}`;
       wrap.userData.piece = { type, color };
       wrap.userData.height = heights.get(type + color);
+      wrap.userData.dia = dias.get(type + color);
       return wrap;
     },
     height(type, color) { proto(type, color); return heights.get(type + color); },

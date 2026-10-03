@@ -34,6 +34,7 @@ if (tier === 'fast' || tier === 'all') {
   console.log('--- fast tier (no browser)');
   run('rules: perft and game logic (test/perft.mjs)', 'test/perft.mjs');
   run('piece geometry contract (test/geometry.mjs)', 'test/geometry.mjs');
+  run('capture tray layout (test/trays.mjs)', 'test/trays.mjs');
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');

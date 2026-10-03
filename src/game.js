@@ -3,10 +3,10 @@ import * as THREE from 'three';
 import { Chess, START_FEN, sqName, nameSq } from './rules.js';
 import { searchMove, levelById, LEVELS } from './ai.js';
 import { device } from './device.js';
+import { SLAB, layoutTray, checkLayout } from './trays.js';
 
 export * from './rules.js';
 
-const TRAY_X = 5.5, TRAY_COL = 0.5, TRAY_ROW = 0.56, TRAY_SCALE = 0.62, TRAY_Z0 = 3.45;
 const sqX = (sq) => (sq & 7) - 3.5;
 const sqZ = (sq) => 3.5 - (sq >> 3);
 const easeInOut = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
@@ -44,7 +44,8 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
 
   let map = new Map();           // square -> piece object
   let records = [];              // parallel to chess.history
-  const tray = { w: [], b: [] }; // captured pieces by their own color, in capture order
+  const tray = { w: [], b: [] }; // captured pieces by their own color, in capture order (kept with the trays off too: the HUD row reads it)
+  let traysOn = true;            // the slabs are shown and captured pieces lie on them; off: a captured piece fades out at the board edge
   let anims = [];
   let selected = -1;
   let legal = [];
@@ -59,14 +60,16 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
   // ---------------------------------------------------------------- tray slab
   const slabMat = new THREE.MeshPhysicalMaterial({ color: 0x14161c, roughness: 0.32, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.15 });
   const trimMat = materials?.white?.accent || new THREE.MeshStandardMaterial({ color: 0xb08d4a, metalness: 1, roughness: 0.3 });
+  const slabParts = [];
   for (const sign of [1, -1]) {
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.26, 4.9), slabMat);
-    slab.position.set(sign * (TRAY_X + 0.25), -0.13, 0.96);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(SLAB.w, 0.26, SLAB.len), slabMat);
+    slab.position.set(sign * SLAB.cx, -0.13, SLAB.cz);
     slab.castShadow = true; slab.receiveShadow = true;
-    const trim = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.03, 4.95), trimMat);
-    trim.position.set(slab.position.x, -0.265, 0.96);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(SLAB.w + 0.05, 0.03, SLAB.len + 0.05), trimMat);
+    trim.position.set(slab.position.x, -0.265, SLAB.cz);
     root.add(slab, trim);
     slab.name = 'tray-slab';
+    slabParts.push(slab, trim);
   }
 
   // ---------------------------------------------------------------- tweens
@@ -108,7 +111,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     hit.position.y = h / 2;
     hit.userData.hit = true;
     group.add(hit);
-    const obj = { id: nextId++, type, color, group, hit, sq: -1, trayIndex: -1 };
+    const obj = { id: nextId++, type, color, group, hit, sq: -1, moveGen: 0, trayTo: null, trayScale: 1, flying: false, fade: null };
     hit.userData.pieceObj = obj;
     return obj;
   }
@@ -127,10 +130,94 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     obj.group.visible = true;
     map.set(sq, obj);
   }
-  function trayPos(color, index) {
-    const sign = color === 'b' ? 1 : -1; // captured black pieces on the right (white's right), white on the left
-    const row = Math.floor(index / 2), col = index % 2;
-    return new THREE.Vector3(sign * (TRAY_X + (col - 0.5) * TRAY_COL + 0.25), 0, TRAY_Z0 - row * TRAY_ROW);
+  // ---------------------------------------------------------------- trays
+  // Tray targets for one color: every captured piece gets a slot (position and scale) from src/trays.js, by value.
+  function layoutColor(color) {
+    const list = tray[color];
+    const items = list.map((o) => ({ type: o.type, dia: o.group.userData.dia || 0.62, h: o.group.userData.height || 1.2 }));
+    const lay = layoutTray(items);
+    const sign = color === 'b' ? 1 : -1;   // captured black pieces on the right (white's right), white on the left
+    list.forEach((o, i) => { o.trayTo = new THREE.Vector3(sign * SLAB.cx + lay.slots[i].x, 0, lay.slots[i].z); o.trayScale = lay.scale; });
+    return { items, lay };
+  }
+  // one motion at a time per piece: a newer command makes the older tween a no-op
+  function pieceTween(obj, opts) {
+    const gen = ++obj.moveGen;
+    tween({ ...opts, step: (e, u) => { if (obj.moveGen === gen) opts.step(e, u); }, done: () => { if (obj.moveGen === gen) opts.done?.(); } });
+  }
+  // a piece already in the tray moves to its (new) slot
+  function glideInTray(obj, snap) {
+    const to = obj.trayTo, s1 = obj.trayScale, from = obj.group.position.clone(), s0 = obj.group.scale.x;
+    if (from.distanceTo(to) < 1e-4 && Math.abs(s0 - s1) < 1e-4) return;
+    if (snap) { obj.moveGen++; obj.group.position.copy(to); obj.group.scale.setScalar(s1); return; }
+    pieceTween(obj, { dur: 0.35, step: (e) => { obj.group.position.lerpVectors(from, obj.trayTo, e); obj.group.scale.setScalar(s0 + (obj.trayScale - s0) * e); } });
+  }
+  function settleTray(color, skip, snap) {
+    if (!traysOn) return;
+    layoutColor(color);
+    for (const o of tray[color]) if (o !== skip && !o.flying) glideInTray(o, snap);
+  }
+  // Trays off: the captured piece slides a little past the board edge while its materials fade (clones, so the shared ones stay opaque).
+  function startFade(obj) {
+    if (obj.fade) return;
+    obj.fade = [];
+    obj.group.traverse((o) => {
+      if (!o.isMesh || o.userData.hit || Array.isArray(o.material)) return;
+      const m = o.material.clone();
+      m.transparent = true; m.depthWrite = false;
+      obj.fade.push([o, o.material]);
+      o.material = m;
+    });
+  }
+  function endFade(obj) {
+    if (!obj.fade) return;
+    for (const [o, orig] of obj.fade) { o.material.dispose(); o.material = orig; }
+    obj.fade = null;
+  }
+  function fadeOut(obj, delay, edge) {
+    const from = obj.group.position.clone();
+    const to = edge ? new THREE.Vector3((obj.color === 'b' ? 1 : -1) * 4.85, 0, from.z) : from.clone();
+    obj.flying = true;
+    pieceTween(obj, {
+      dur: 0.7, delay, ease: easeOut,
+      step: (e, u) => {
+        if (!obj.fade) startFade(obj);
+        obj.group.position.lerpVectors(from, to, e);
+        for (const [o] of obj.fade) o.material.opacity = Math.max(0, 1 - u * 1.15);
+      },
+      done: () => { obj.flying = false; endFade(obj); obj.group.visible = false; },
+    });
+  }
+  // a captured piece that is on the board's side after the trays were off comes back into the tray
+  function restoreToTray(obj) {
+    endFade(obj);
+    obj.group.visible = true;
+    obj.flying = true;
+    const from = obj.group.position.clone(), s0 = obj.group.scale.x, spin = (Math.random() - 0.5) * 2;
+    pieceTween(obj, {
+      dur: 0.85, ease: easeInOut,
+      step: (e) => {
+        const p = obj.group.position;
+        p.lerpVectors(from, obj.trayTo, e);
+        p.y = Math.sin(Math.PI * e) * 1.6;
+        obj.group.scale.setScalar(s0 + (obj.trayScale - s0) * e);
+        obj.group.rotation.y = spin * Math.sin(Math.PI * e);
+      },
+      done: () => { obj.flying = false; },
+    });
+  }
+  function setTrays(on) {
+    on = !!on;
+    if (on === traysOn) return;
+    traysOn = on;
+    for (const m of slabParts) m.visible = on;
+    for (const color of ['w', 'b']) {
+      if (on) {
+        layoutColor(color);
+        for (const o of tray[color]) restoreToTray(o);   // everything captured so far returns, from where it faded
+      } else for (const o of tray[color]) { o.flying = false; fadeOut(o, 0, false); }
+    }
+    changed();
   }
 
   function clearPieces() {
@@ -193,6 +280,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       moves: records.map((r) => r.san),
       fullmove: chess.fullmove,
       captured,
+      trays: traysOn,
       advantage: mat(captured.b) - mat(captured.w), // positive: white ahead
       check: chess.inCheck(),
       over: gameOver,
@@ -263,23 +351,25 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     });
   }
   function flyToTray(obj, delay) {
-    const list = tray[obj.color];
-    obj.trayIndex = list.length;
-    list.push(obj);
+    tray[obj.color].push(obj);
     obj.sq = -1;
-    const to = trayPos(obj.color, obj.trayIndex);
-    const from = obj.group.position.clone();
+    if (!traysOn) { fadeOut(obj, delay, true); return; }
+    layoutColor(obj.color);
+    obj.flying = true;
+    const from = obj.group.position.clone(), s0 = obj.group.scale.x;
     const spin = (Math.random() - 0.5) * 2;
-    tween({
+    pieceTween(obj, {
       dur: 0.85, delay, ease: easeInOut,
       step: (e) => {
         const p = obj.group.position;
-        p.lerpVectors(from, to, e);
+        p.lerpVectors(from, obj.trayTo, e);
         p.y = Math.sin(Math.PI * e) * 1.6;
-        obj.group.scale.setScalar(1 - (1 - TRAY_SCALE) * e);
+        obj.group.scale.setScalar(s0 + (obj.trayScale - s0) * e);
         obj.group.rotation.y = spin * Math.sin(Math.PI * e);
       },
+      done: () => { obj.flying = false; },
     });
+    settleTray(obj.color, obj);
   }
 
   // ---------------------------------------------------------------- battle scenes
@@ -419,23 +509,25 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     if (rec.captured) {
       const c = rec.captured;
       const list = tray[c.color];
-      list.pop();
-      c.trayIndex = -1; c.sq = rec.capSq;
+      list.splice(list.indexOf(c), 1);
+      c.sq = rec.capSq; c.flying = false;
+      endFade(c); c.group.visible = true;
       map.set(rec.capSq, c);
       const cp = new THREE.Vector3(sqX(rec.capSq), 0, sqZ(rec.capSq));
       setFacing(c, cp.x);
       if (animate) {
-        const from = c.group.position.clone();
-        tween({
+        const from = c.group.position.clone(), s0 = c.group.scale.x;
+        pieceTween(c, {
           dur: 0.7, ease: easeInOut,
           step: (e) => {
             c.group.position.lerpVectors(from, cp, e);
             c.group.position.y = Math.sin(Math.PI * e) * 1.4;
-            c.group.scale.setScalar(TRAY_SCALE + (1 - TRAY_SCALE) * e);
+            c.group.scale.setScalar(s0 + (1 - s0) * e);
             c.group.rotation.y = 0;
           },
         });
-      } else { c.group.position.copy(cp); c.group.scale.setScalar(1); c.group.rotation.set(0, 0, 0); }
+      } else { c.moveGen++; c.group.position.copy(cp); c.group.scale.setScalar(1); c.group.rotation.set(0, 0, 0); }
+      settleTray(c.color, null, !animate);
     }
     return true;
   }
@@ -693,13 +785,19 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
           if (Math.abs(g.scale.x - 1) > 0.01 || !g.visible || g.parent !== root) bad.push(`bad state at ${sqName(sq)}`);
         }
       }
-      for (const c of ['w', 'b']) tray[c].forEach((o, i) => {
-        const t = trayPos(c, i);
-        if (o.group.position.distanceTo(t) > 0.02 || Math.abs(o.group.scale.x - TRAY_SCALE) > 0.01) bad.push(`tray ${c}${i} misplaced`);
-      });
+      for (const c of ['w', 'b']) {
+        if (!traysOn) { tray[c].forEach((o, i) => { if (o.group.visible) bad.push(`tray ${c}${i} still visible with the trays off`); }); continue; }
+        const { items, lay } = layoutColor(c);
+        tray[c].forEach((o, i) => {
+          if (o.group.position.distanceTo(o.trayTo) > 0.02 || Math.abs(o.group.scale.x - lay.scale) > 0.01 || !o.group.visible) bad.push(`tray ${c}${i} misplaced`);
+        });
+        for (const m of checkLayout(items, lay)) bad.push(`tray ${c}: ${m}`);
+      }
       return bad;
     },
     get busy() { return busy(); },
+    get trays() { return traysOn; },
+    setTrays,
     get pendingPromotion() { return pendingPromo; },
     get pieceCount() { return map.size; },
     sqName, nameSq,

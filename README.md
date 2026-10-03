@@ -124,7 +124,7 @@ Rules
 Rendering
 
 - A short start sequence: a king turns slowly, then the board builds itself. Skip it with `?intro=0`; it is also off with the system setting reduce motion
-- Board of white and black marble squares in a walnut frame with a gold inlay, coordinate labels, a plinth and a captured-piece tray on each side of the board
+- Board of white and black marble squares in a walnut frame with a gold inlay, coordinate labels, a plinth and a captured-piece tray on each side of the board (pieces lie inside the tray, never overlapping, ordered by value; the Captured pieces at the side switch in the Scene card, or Menu on a phone, turns the trays off: a captured piece then fades out at the board edge, the camera fits the board alone, and the captured row in the HUD stays; the choice is kept per device)
 - Sculpted Staunton pieces: a lathe turned pawn, rook, bishop, queen and king and a modelled knight head. 58k to 83k triangles per piece type
 - Five themes (Classic, Tournament, Wood, Metal, Glass), each one bundle of board squares, frame, inlay, pieces and lighting. The piece shapes stay, only materials and colours change. The textures are built on the first pick of a theme and freed again when you leave it. Glass uses real transmission only on the High quality tier; Low and Medium get a tinted lacquer look that costs nothing extra
 - Four studio lighting presets: Studio, Gallery, Sunset and Night, with a smooth transition between them
@@ -162,6 +162,7 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `moves` | `e2e4,e7e5,g1f3` | Play these moves after `fen` (the start position if there is none). Comma separated, from and to square, with a fifth letter for a promotion such as `e7e8q` |
 | `select` | square, for example `e2` | Select the piece on this square |
 | `promo` | four letters, for example `a7a8` | Click this move, which opens the promotion chooser |
+| `trays` | `0`, `1` | Capture trays at the side of the board: `0` off, `1` on, for this load only (the Captured pieces at the side switch remembers your choice in `localStorage` `chess3d.trays`; the flag beats it) |
 | `ai` | `0`, `1`, `2`, `3`, `4` | The computer opponent is on by default (plays black, Easy). `ai=0` turns it off for two players, `ai=1` is Novice, `ai=2` Easy, `ai=3` Normal, `ai=4` Hard (a level given here beats the remembered one) |
 | `spin` | `1` | Start with auto spin on |
 | `hud` | `0` | Start with the HUD hidden |

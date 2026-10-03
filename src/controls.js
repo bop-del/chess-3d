@@ -39,9 +39,10 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   // capture trays (outer edge at x = 6.5, near edge about 3.2 units closer to the camera) clear the HUD columns.
   const TRAY_EDGE = 6.6, TRAY_NEAR = 3.2, TAN_V = Math.tan(17.5 * DEG), HUD_GAP = 14;
   let size = { w: 1500, h: 1000 }, hudW = 268;
+  let traysOn = true;                           // capture trays shown: the fit leaves room for them (the Captured pieces setting, game.setTrays)
   function fit() {
     let f = (11.5 / (0.63 * aspect)) / HOME.dist;
-    if (size.w > 900) {
+    if (size.w > 900 && traysOn) {
       const free = size.w / 2 - (hudW + 2 * HUD_GAP);          // pixels from screen centre to the HUD edge
       const depth = (size.h / 2) * TRAY_EDGE / (TAN_V * Math.max(60, free));
       f = Math.max(f, (depth + TRAY_NEAR) / HOME.dist);
@@ -74,7 +75,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     if (fUp.y < 0) fUp.negate();
     gq.setFromEuler(gEuler.set(gim.x, gim.y, gim.z, 'YXZ'));
     // portrait: the board with its pieces fills the free width, the capture trays may run off screen; landscape keeps the trays in
-    const portrait = size.h > size.w, n = portrait ? BOARD_CORNERS : corners.length;
+    const portrait = size.h > size.w, n = portrait || !traysOn ? BOARD_CORNERS : corners.length;
     for (let i = 0; i < n; i++) pts[i].copy(corners[i]).applyQuaternion(gq).sub(target);
     const freeW = Math.max(40, size.w - frame.left - frame.right) * (1 - (portrait ? (edgeToEdge ? EDGE_MARGIN : PORTRAIT_MARGIN) : FRAME_MARGIN));
     const freeH = Math.max(40, size.h - frame.top - frame.bottom) * (1 - FRAME_MARGIN);
@@ -115,7 +116,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     fUp.crossVectors(fRight, fFwd);
     if (fUp.y < 0) fUp.negate();
     gq.setFromEuler(gEuler.set(gim.x, gim.y, gim.z, 'YXZ'));
-    const portrait = size.h > size.w, n = portrait ? BOARD_CORNERS : corners.length;
+    const portrait = size.h > size.w, n = portrait || !traysOn ? BOARD_CORNERS : corners.length;
     let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
     for (let i = 0; i < n; i++) {
       pts[i].copy(corners[i]).applyQuaternion(gq).sub(target);
@@ -244,6 +245,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     notify();
   }
   function setEdgeToEdge(v) { edgeToEdge = !!v; apply(); }
+  function setTrays(v) { v = !!v; if (v === traysOn) return; traysOn = v; apply(); }
   function setOrbitLock(v) { orbitLocked = !!v; if (orbitLocked) { vel.yaw = vel.pitch = 0; spin = false; } notify(); }
   function setCamera(v) { tw = null; Object.assign(cam, v); apply(); }
 
@@ -499,8 +501,9 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
 
   return {
     cinematic, restore,
-    setProjection, setFocus, setOrbitLock, setEdgeToEdge,
+    setProjection, setFocus, setOrbitLock, setEdgeToEdge, setTrays,
     update, apply, setPreset, reset, levelBoard, flip, topDown, toggleSpin, setGimbal, nudgeZoom, setCamera, onResize, setFrame, setLocked, retarget,
+    get trays() { return traysOn; },
     get locked() { return locked; },
     get frame() { return { ...frame }; },
     presets: Object.keys(PRESETS),
