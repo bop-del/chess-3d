@@ -204,6 +204,10 @@ body.phone .mrow input[type="range"] { height: 44px; }
 .moves li .n { color: var(--dim); }
 .moves li .m { font-weight: 550; }
 .moves li.latest .m:last-child:not(:empty), .moves li.latest:has(.m:last-child:empty) .m:nth-child(2) { color: var(--gold); }
+.moves li .m.pick { justify-self: start; cursor: pointer; border-radius: 5px; padding: 0 4px; margin: 0 -4px; touch-action: manipulation; }
+.moves li .m.pick:hover { background: rgba(255, 255, 255, 0.1); }
+.moves li .m.pick.mistake { color: #ffc27a; } .moves li .m.pick.blunder { color: #ff9b8f; }
+.moves li .m.pick.cur { background: var(--gold-soft); color: var(--gold); outline: 1px solid var(--gold); }
 .moves li.empty { display: block; color: var(--dim); background: none; padding: 8px 2px; font-size: 12px; }
 .moves::-webkit-scrollbar { width: 6px; } .moves::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 6px; }
 
@@ -384,6 +388,7 @@ body.phone .psheet .card.grow { max-height: none; min-height: 0; display: block;
 body.phone .psheet .card.grow .body { display: block; overflow: visible; }
 body.phone .psheet .moves { max-height: min(34vh, 220px); }
 body.phone .psheet .moves li { padding: 7px 6px; }
+body.phone .psheet .moves li .m.pick { padding: 6px 4px; }
 body.phone .card > header { min-height: 44px; padding: 0 14px; }
 body.phone .card > header h2 { font-size: 11px; }
 body.phone .btn { min-height: 44px; font-size: 14px; }

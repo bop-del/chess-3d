@@ -143,6 +143,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
           <div class="opp" id="opp"></div>
         </div>
         <button class="ghost" id="btn-good" type="button" title="Show one good move" data-i18n-title="good.title">${ICONS.bulb}<span data-i18n="good.label">Good move?</span></button>
+        <div class="rvd" id="rv-host" hidden></div>
         <div class="sec grow">
           <h4 data-i18n="panel.moves">Moves</h4>
           <ol class="moves" id="moves"></ol>

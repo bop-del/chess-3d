@@ -117,6 +117,13 @@
 .ghost svg { width: 16px; height: 16px; flex: none; }
 .ghost.think span::after { content: '...'; }
 
+/* game review: Details box in the panel, above the move list */
+.rvd { flex: none; }
+.rvd[hidden] { display: none; }
+.rvd .rv-details { font-size: 13px; background: var(--p-well); }
+/* the computer is off and moves are refused during a review: the room goes to the move list */
+body.reviewing #tp-play > .dailycard, body.reviewing #tp-play > .sec:not(.grow):not(.cap-sec), body.reviewing #tp-play > #btn-good { display: none; }
+
 /* moves and captured. With the 3D capture trays on (body[data-trays-shown=on], set by trays-setting.js) the text list is redundant: hidden, still in the DOM */
 body[data-trays-shown="on"] .cap-sec { display: none; }
 .panel .moves { background: var(--p-well); border-radius: 9px; padding: 6px; }

@@ -34,7 +34,7 @@ The Tournament theme (vinyl green and warm cream squares) and the Blocks theme (
 
 ![Blocks theme](docs/blocks.jpg)
 
-Game review after a game: a move strip with marked mistakes, a gold arrow for the better move and one sentence that says why. Details adds the evaluation graph, the best line and the accuracy of each side.
+Game review after a game: a move strip with marked mistakes, a gold arrow for the better move and one sentence that says why. Details adds the evaluation graph, the best line and the accuracy of each side. On a desktop the Moves list shows the game and Details open beside the board.
 
 ![Game review: a marked move, the better move and the move strip](docs/review.jpg)
 
@@ -128,7 +128,7 @@ Sliders and buttons (Settings tab; Flip, Spin, Reset and Lock are on the view ba
 | Quality | Low, Medium, High |
 | New game, Undo, Keyboard shortcuts | Header buttons and the link at the foot of the Play tab (on a phone: the thumb bar and the Menu) |
 | vs computer | On by default (you play white, Easy). Switch, your side (play white or black) and strength (Novice about 700, Easy about 900, Normal about 1200, Hard about 1450, estimated, see below; the choice is remembered on the device). In the Play tab, Good move? shows one good move with the hint arrow (a bulb in the status line on a phone) |
-| Review the game | When a game ends, the card has a Review the game button (German: Partie ansehen) next to New game. Step back and forward through the whole game on a move strip under the board (above the thumb bar on a phone, arrow keys on a desktop; on a desktop the board makes room so the strip never covers it); mistakes are orange, blunders red. On a marked move the board shows the position before it, the gold arrow shows a better move and one friendly sentence says why. Details adds an evaluation graph (tap or drag to jump), the best line in notation and the accuracy of each side. The analysis is Hard's search in a Web Worker, so the strip fills in while you look |
+| Review the game | When a game ends, the card has a Review the game button (German: Partie ansehen) next to New game. Step back and forward through the whole game on a move strip under the board (above the thumb bar on a phone, arrow keys on a desktop; on a desktop the board makes room so the strip never covers it); mistakes are orange, blunders red. On a marked move the board shows the position before it, the gold arrow shows a better move and one friendly sentence says why. Details adds an evaluation graph (tap or drag to jump), the best line in notation and the accuracy of each side; on a desktop it opens in the panel beside the board. The Moves list in the panel shows the reviewed game with the move on the board highlighted, and a click on a move jumps there. The analysis is Hard's search in a Web Worker, so the strip fills in while you look |
 
 Home Screen: on an iPhone or iPad the game can be added to the Home Screen from Safari (Share, then Add to Home Screen) and then runs full screen with its own icon (a web app manifest, no service worker). In a Safari tab it shows a short reminder with the three steps once after the first load, and at most twice more a few visits later. Later or a tap outside closes it at once. It never shows when the game is already installed, on desktop, or with any URL parameter below. The link preview used by chat apps and social sites is `public/og-image.png`.
 

@@ -90,6 +90,20 @@ export async function runReviewChecks({ page, baseUrl, log = () => {}, shot = nu
     const refused = await page.evaluate(() => { const g = window.__chess.game; const before = g.chess.fen(); g.move('a2', 'a3'); return g.chess.fen() === before; });
     ok('moves are refused while reviewing', refused);
 
+    // the Moves list in the panel shows the reviewed game, the move on the board highlighted, a click jumps there
+    const ml = await page.evaluate(() => ({ rows: [...document.querySelectorAll('#moves .m')].map((m) => m.textContent).filter(Boolean), empty: !!document.querySelector('#moves li.empty'), cur: document.querySelector('#moves .m.cur')?.textContent || null }));
+    ok('review: the Moves list shows the game, not "No moves yet"', !ml.empty && ml.rows.length === 4 && ml.rows[0] === 'f3' && ml.rows[3] === 'Qh4#', JSON.stringify(ml));
+    s = await st();
+    ok('review: the reviewed move is highlighted in the Moves list', ml.cur === ['f3', 'e5', 'g4', 'Qh4#'][s.moveNo - 1], JSON.stringify({ ml, moveNo: s.moveNo }));
+    await page.evaluate(() => document.querySelector('#moves .m[data-n="4"]').click());
+    await step(0.2);
+    s = await st();
+    ok('review: clicking a move in the list jumps the review there', s.moveNo === 4 && !s.suggest && (await page.evaluate(() => document.querySelector('#moves .m.cur')?.textContent)) === 'Qh4#', JSON.stringify({ ply: s.ply, moveNo: s.moveNo }));
+    await page.evaluate(() => document.querySelector('#moves .m[data-n="3"]').click());
+    await step(0.2);
+    s = await st();
+    ok('review: a marked move in the list lands on its suggestion step (gold arrow)', s.suggest && s.ply === 2 && await arrow(), JSON.stringify({ ply: s.ply, suggest: s.suggest }));
+
     // ------------------------------------------------ details
     await page.evaluate(() => document.querySelector('.rv-det').click());
     await step(0.2);
@@ -107,6 +121,27 @@ export async function runReviewChecks({ page, baseUrl, log = () => {}, shot = nu
     s = await st();
     ok('tapping the graph jumps to that move', s.moveNo >= 2 && s.moveNo <= 3, JSON.stringify({ ply: s.ply, moveNo: s.moveNo }));
     await shot?.('review-details-desktop');
+    // Details sit in the panel beside the board and the camera frame keeps the board above the strip (desktop sizes, both views)
+    const inPanel = await page.evaluate(() => { const d = document.querySelector('.rv-details'), r = d.getBoundingClientRect(), p = document.querySelector('.panel').getBoundingClientRect(); return { host: d.parentElement.id, inside: r.left >= p.left - 1 && r.right <= p.right + 1 && r.width > 100 }; });
+    ok('details: on desktop the box is in the panel, not over the board', inPanel.host === 'rv-host' && inPanel.inside, JSON.stringify(inPanel));
+    for (const [w, h] of [[1440, 900], [1500, 940], [1920, 1080]]) {
+      for (const view of ['white', 'black']) {
+        await page.setViewport({ width: w, height: h });
+        await page.evaluate((v) => window.__chess.controls.setPreset(v), view);
+        await step(2);
+        const g = await page.evaluate(() => {
+          const c = window.__chess, cam = c.stage.camera, T = c.THREE;
+          const pr = (x, y, z) => { const v = new T.Vector3(x, y, z); c.gimbal.localToWorld(v); v.project(cam); return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; };
+          const pts = [[-4.65, -0.3, 4.65], [4.65, -0.3, 4.65], [-4.65, -0.3, -4.65], [4.65, -0.3, -4.65]].map((p) => pr(...p));
+          const rv = document.querySelector('.rv').getBoundingClientRect(), pl = document.querySelector('.panel').getBoundingClientRect();
+          return { bottom: Math.max(...pts.map((p) => p.y)), right: Math.max(...pts.map((p) => p.x)), left: Math.min(...pts.map((p) => p.x)), top: Math.min(...pts.map((p) => p.y)), stripTop: rv.top, panelLeft: pl.left, arrow: (() => { let v = false; c.gimbal.traverse((o) => { if (o.name === 'move-hint' && o.visible) v = true; }); return v; })() };
+        });
+        ok(`details open, ${w}x${h} ${view} view: the whole board is above the strip and left of the panel`, g.bottom <= g.stripTop && g.right <= g.panelLeft && g.left >= 0 && g.top >= 0, JSON.stringify(g));
+      }
+    }
+    await page.evaluate(() => window.__chess.controls.setPreset('white'));
+    await page.setViewport({ width: 1280, height: 800 });
+    await step(2);
     await page.evaluate(() => document.querySelector('.rv-det').click());
 
     // ------------------------------------------------ German

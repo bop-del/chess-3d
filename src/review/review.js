@@ -200,7 +200,7 @@ export function createReview({ game, hint, engine = null }) {
 }
 
 // ---------------------------------------------------------------- the DOM
-export function mountReview({ game, gimbal, createHint, engine = null, onInset = null }) {
+export function mountReview({ game, gimbal, createHint, engine = null, onInset = null, onMoves = null, host = null }) {
   const hint = createHint({ gimbal, persist: false });
   const review = createReview({ game, hint, engine });
 
@@ -320,11 +320,31 @@ export function mountReview({ game, gimbal, createHint, engine = null, onInset =
 
   const pct = (v) => (v == null ? '-' : Math.round(v) + '%');
 
+  // desktop: the Details box lives in the panel beside the board, so it never covers it; elsewhere it stays in the strip
+  let wasActive = false, wasDetails = false;
+  function placeDetails(s) {
+    const slot = host?.slot() || null;
+    if (slot) {
+      slot.hidden = !(s.active && s.details);
+      if (detailsBox.parentNode !== slot) slot.append(detailsBox);
+    } else if (detailsBox.parentNode !== root) root.insertBefore(detailsBox, strip);
+  }
   function render() {
     const s = review.state();
     root.hidden = !s.active;
     document.body.classList.toggle('reviewing', s.active);
-    if (!s.active) { built = -1; inset(); return; }
+    if (!s.active) {
+      built = -1; wasActive = wasDetails = false;
+      onMoves?.(null);
+      placeDetails(s);
+      inset();
+      return;
+    }
+    if (!wasActive) host?.reveal();
+    if (s.details && !wasDetails) host?.reveal({ unfold: true });
+    wasActive = true; wasDetails = s.details;
+    onMoves?.({ sans: review.sanList, kinds: s.kinds, cur: s.moveNo, pick: (n) => review.goMove(n) });
+    placeDetails(s);
     if (built !== s.total) { buildStrip(s); built = s.total; }
     const sanList = review.sanList;
     s.kinds.forEach((k, i) => {
@@ -389,6 +409,7 @@ export function mountReview({ game, gimbal, createHint, engine = null, onInset =
     else if (e.key === 'Escape') { review.close(); e.preventDefault(); }
   });
   review.on(render);
+  host?.on(() => { if (review.active) { placeDetails(review.state()); inset(); } });
   onLanguage(() => { translateTree(root); render(); });
   translateTree(root);
 

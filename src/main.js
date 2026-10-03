@@ -285,7 +285,7 @@ async function boot() {
   const [{ createGoodMove }, { createHint }] = await Promise.all([import('./goodmove.js'), import('./openings/arrow.js')]);
   const goodMove = createGoodMove({ game, hint: createHint({ gimbal, persist: false }) });
   ui.bindGoodMove(goodMove);
-  const review = (await import('./review/review.js')).mountReview({ game, gimbal, createHint, onInset: (px) => ui.setBottomInset(px) });   // the game over card gets its Review the game button
+  const review = (await import('./review/review.js')).mountReview({ game, gimbal, createHint, onInset: (px) => ui.setBottomInset(px), onMoves: (v) => ui.setReviewMoves(v), host: ui.reviewHost });   // the game over card gets its Review the game button
   mountSwatches({ themes, ui });
 
   // touch: rotation and the browser toolbar fire bursts of resize events. The camera follows at once, the render targets

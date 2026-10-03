@@ -62,9 +62,10 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
 
   // desktop: the camera's free area is the canvas minus the panel on the right and, while the game review is open, its strip below
   let deskW = 0, deskBottom = 0;
+  const hostFns = [];   // told when the desktop panel changes width (folded or unfolded): the review moves its Details box
   const deskFrame = () => controls.setFrame({ ...(deskW ? { right: deskW } : {}), ...(deskBottom ? { bottom: deskBottom } : {}) });
   if (desk) {
-    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => { deskW = w; deskFrame(); }, fade: !manual });
+    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => { deskW = w; deskFrame(); hostFns.forEach((fn) => fn()); }, fade: !manual });
     hud.append(showBtn);
   } else {
   // ------------------------------------------------------------ left column
@@ -346,10 +347,16 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
 
   // ------------------------------------------------------------ state rendering
   const movesEl = $('#moves');
+  const pickMove = (e) => { const m = revMoves && e.target.closest?.('[data-n]'); if (m) revMoves.pick(Number(m.dataset.n)); };
+  movesEl.addEventListener('click', pickMove);
+  movesEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { pickMove(e); e.preventDefault(); } });
   let lastMovesKey = null;
+  let lastSt = null;
+  let revMoves = null;   // while the game review is open: { sans, kinds, cur, pick(n) }, shown instead of the game's own history
   let lastCheck = false;
   const sideName = (w) => (w === 'w' ? t('side.white', 'White') : t('side.black', 'Black'));
   function render(st) {
+    lastSt = st;
     // turn
     const white = st.turn === 'w';
     const dot = $('.turn .dot');
@@ -371,20 +378,27 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     $('.turn').classList.toggle('check', !!st.check && !st.over);
     $('.turn').classList.toggle('think', !!st.thinking);
 
-    // moves
-    const key = i18n.language + '|' + st.moves.join(' ');
+    // moves (in a game review: the reviewed game, the move on the board highlighted, a click jumps there)
+    const list = revMoves ? revMoves.sans : st.moves;
+    const key = i18n.language + '|' + (revMoves ? `r${revMoves.cur}|${revMoves.kinds.join()}|` : '') + list.join(' ');
     if (key !== lastMovesKey) {
       lastMovesKey = key;
       movesEl.innerHTML = '';
-      for (let i = 0; i < st.moves.length; i += 2) {
+      const cell = (i) => {
+        if (i >= list.length) return '<span class="m"></span>';
+        if (!revMoves) return `<span class="m">${sanDisplay(list[i])}</span>`;
+        const k = revMoves.kinds[i];
+        return `<span class="m pick${k === 'mistake' || k === 'blunder' ? ' ' + k : ''}${revMoves.cur === i + 1 ? ' cur' : ''}" data-n="${i + 1}" role="button" tabindex="0">${sanDisplay(list[i])}</span>`;
+      };
+      for (let i = 0; i < list.length; i += 2) {
         const li = el('li');
-        li.innerHTML = `<span class="n">${i / 2 + 1}.</span><span class="m">${sanDisplay(st.moves[i])}</span><span class="m">${sanDisplay(st.moves[i + 1] || '')}</span>`;
-        if (i + 1 >= st.moves.length - 1) li.classList.add('latest');
+        li.innerHTML = `<span class="n">${i / 2 + 1}.</span>${cell(i)}${cell(i + 1)}`;
+        if (!revMoves && i + 1 >= list.length - 1) li.classList.add('latest');
         movesEl.append(li);
       }
-      const latest = movesEl.querySelector('.latest');
+      const latest = revMoves ? movesEl.querySelector('.cur') : movesEl.querySelector('.latest');
       if (latest) latest.scrollIntoView({ block: 'nearest' });
-      if (!st.moves.length) movesEl.append(el('li', 'empty', t('moves.empty', 'No moves yet. Click a piece to begin.')));
+      if (!list.length) movesEl.append(el('li', 'empty', t('moves.empty', 'No moves yet. Click a piece to begin.')));
     }
     // captured: st.captured.b = black pieces lost (captured by white)
     const sortFn = (a, b) => VAL[b] - VAL[a];
@@ -774,5 +788,15 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   /** px at the bottom of the canvas that something floating covers (the review strip): the desktop camera fits the board above it */
   function setBottomInset(px) { px = Math.max(0, Math.round(px)); if (px === deskBottom) return; deskBottom = px; if (dsk) deskFrame(); }
 
-  return { sync, toast, setBottomInset, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  /** the game review shows its game in the Moves list: { sans, kinds, cur (1 based, 0 at the start), pick(n) }, null when it closes */
+  function setReviewMoves(v) { revMoves = v; lastMovesKey = null; if (lastSt) render(lastSt); }
+  /** desktop: the slot in the panel where the review puts its Details box, null when there is no panel or it is folded to the rail.
+   *  reveal() shows the Play tab (unfolding the panel); on(fn) is told when the panel is folded or unfolded */
+  const reviewHost = {
+    slot: () => (dsk && !dsk.rail ? hud.querySelector('#rv-host') : null),
+    reveal: ({ unfold = false } = {}) => { if (!dsk) return; dsk.setTab('play'); if (unfold && dsk.rail) dsk.setRail(false, { persist: false }); },
+    on: (fn) => { hostFns.push(fn); },
+  };
+
+  return { sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }

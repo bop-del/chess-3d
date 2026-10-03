@@ -229,6 +229,8 @@ A finished game, replayed on the 3D board with its mistakes marked. Loaded by ma
 
 The strip floats over the bottom of the canvas, so `mountReview({ onInset })` reports its height (ResizeObserver and `render`) to `ui.setBottomInset`, which adds it to the desktop camera frame (`controls.setFrame({ right: panel, bottom })`): the board and its lower frame edge stay above the strip, and closing the review gives the room back. The phone keeps its own probe frame.
 
+On desktop the Details box does not sit in the strip: `mountReview({ host: ui.reviewHost })` moves it into the panel's Play tab (`#rv-host`, above the Moves list), so it never covers the board and the strip stays short. `reviewHost.slot()` is null on phones and while the panel is folded to the rail (Details then stay in the strip); turning Details on shows the Play tab and unfolds the rail. `mountReview({ onMoves })` feeds `ui.setReviewMoves({ sans, kinds, cur, pick })`: while a review is open the Moves list shows the reviewed game (mistakes orange, blunders red, the move on the board with a gold outline) instead of the game's own history, and a click on a move calls `goMove`. `body.reviewing` hides the Opponent, Good move and Daily puzzle blocks of the Play tab to give the list room.
+
 Tests: `test/review-core.mjs` (fast tier: thresholds, accuracy, the engine on small positions and a scripted game) and `test/review.mjs` (smoke group `review`: the whole flow in the real page on desktop and phone; `node test/review.mjs --shots` writes shots and a contact sheet to `.tmp/review/`).
 
 ### `src/game.js`
