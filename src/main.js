@@ -103,10 +103,10 @@ async function boot() {
   const { createViews } = await import('./views/registry.js');
   const views = createViews({ controls, stage, game, board, device });
   const ui = createUI({ game, controls, stage, quality, views });
-  const [{ createPlayView }, { createSymbols }] = await Promise.all([import('./views/play.js'), import('./views/symbols.js')]);
+  const [{ createPlayView }, { createTokens }] = await Promise.all([import('./views/play.js'), import('./views/tokens.js')]);
   const play = createPlayView({ controls, game, views, device, stage });
-  const symbols = createSymbols({ gimbal, game, materials, stage });
-  views.on(() => symbols.setVisible(views.style() === 'A'));
+  const tokens = createTokens({ gimbal, game, materials, stage });
+  views.on(() => tokens.setVisible(views.current() === 'tokens'));
   const battle = createDirector({ game, controls, stage, ui });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
   audio.mountMute(ui);     // the mute switch, right below the Battle scenes setting
@@ -143,7 +143,7 @@ async function boot() {
   if (flagTheme && isTheme(flagTheme)) await themes.set(flagTheme, { persist: false });   // this load only
   else await themes.set(storedTheme(), { persist: false });
 
-  symbols.setVisible(false);
+  tokens.setVisible(false);
   // resize
   const resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
@@ -168,7 +168,7 @@ async function boot() {
   // scripted states for testing and screenshots
   applyParams({ game, controls, stage, ui, views });
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, goodMove, themes, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, sfx, THREE, pick, openings, views, play, tokens, puzzles, puzzleProgress, goodMove, themes, train: { store, drill, sweep, learn } };
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
@@ -180,7 +180,7 @@ async function boot() {
     upLocal.set(0, 1, 0).applyQuaternion(stage.camera.quaternion).applyQuaternion(gimbalInv.copy(gimbal.quaternion).invert());
     board.orientLabels(upLocal);
   };
-  const advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(); battle.update(dt); openings.tick(dt); drill.tick(dt); puzzles.tick(dt); sweep.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  const advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); tokens.sync(); battle.update(dt); openings.tick(dt); drill.tick(dt); puzzles.tick(dt); sweep.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;

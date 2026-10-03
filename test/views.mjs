@@ -16,7 +16,7 @@ const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); ret
 const PORT = Number(opt('port', 5361));
 const OUT = '.tmp/views-dist';
 const SIZES = [{ w: 1280, h: 720, touch: 0 }, { w: 390, h: 844, touch: 1 }, { w: 844, h: 390, touch: 1 }, { w: 844, h: 290, touch: 1 }];
-const IDS = ['white', 'black', 'top', 'side', 'iso', 'easy-flat', 'easy-3d', 'play'];
+const IDS = ['white', 'black', 'top', 'side', 'iso', 'tokens', 'above', 'easy-3d', 'play'];
 const BASE = (args.find((a) => a.startsWith('--base=')) || '').slice(7).replace(/\/$/, '');   // a server that is already up (test/smoke-groups.mjs)
 const R = reporter();
 let server = null, browser = null;
@@ -64,9 +64,9 @@ try {
       const want = phonePortrait || id !== 'play';
       await open(page, size, `&view=${id}&fen=4k3/8/8/8/8/8/4P3/K7%20w%20-%20-%200%201`);   // a lone pawn: no piece stands in front of it
       const info = await page.evaluate(() => !window.__chess?.views ? { cur: 'none', list: [], proj: null, err: window.__chessError || 'no __chess.views' } : ({ cur: window.__chess.views.current(), list: window.__chess.views.list().map((v) => v.id), proj: window.__chess.stage.projection, err: window.__chessError || null }));
-      if (id === IDS[0]) R.expect(`views list ${tag}`, info.list.includes('play') === phonePortrait && ['easy-flat', 'easy-3d', 'iso'].every((v) => info.list.includes(v)), info.list.join(','), info.list.join(','));
+      if (id === IDS[0]) R.expect(`views list ${tag}`, info.list.includes('play') === phonePortrait && ['tokens', 'above', 'easy-3d', 'iso'].every((v) => info.list.includes(v)), info.list.join(','), info.list.join(','));
       if (!want) { R.expect(`${id} not offered ${tag}`, info.cur !== 'play', `falls back to ${info.cur}`); continue; }
-      const easy = id.startsWith('easy');
+      const easy = id === 'easy-3d' || id === 'tokens';
       R.expect(`${id} applies ${tag}`, info.cur === id && info.proj === (easy ? 'ortho' : 'perspective') && !info.err, `${info.cur} ${info.proj}`, JSON.stringify(info));
       // picking: click the e2 pawn, then a legal target square
       const e2 = await xy(page, 0.5, 0.4, 2.5), tgt = await xy(page, 0.5, 0, 0.5);
@@ -89,14 +89,14 @@ try {
       const mv = await page.evaluate(() => window.__chess.game.getState().moves.length);
       if (id === 'side' && mv !== 1) R.warn(`${id} move by click ${tag}`, 'the pawn hides e4 at a 7 degree pitch, as in the existing Side preset');
       else R.expect(`${id} move by click ${tag}`, mv === 1, 'e4 played', `${mv} moves`);
-      if (id === 'easy-3d' || id === 'white') {
+      if (id === 'easy-3d' || id === 'white' || id === 'above') {
         const sc = await page.evaluate(() => { const r = window.__chess.stage.scene.getObjectByName('pieces'); for (const g of r.children) { const m = g.children.find((c) => !c.userData.hit); if (m) return m.scale.x; } return -1; });
         R.expect(`${id} piece scale ${tag}`, Math.abs(sc - (id === 'easy-3d' ? 1.15 : 1)) < 0.01, `scale ${sc.toFixed(2)}`);
       }
     }
   }
-  // Easy flat locks the orbit; Easy 3D stays free
-  for (const [id, locked] of [['easy-flat', true], ['easy-3d', false]]) {
+  // Tokens and From above lock the orbit; Easy 3D stays free
+  for (const [id, locked] of [['tokens', true], ['above', true], ['easy-3d', false]]) {
     await open(page, SIZES[0], `&view=${id}`);
     const c0 = await page.evaluate(() => window.__chess.controls.camera);
     await page.mouse.move(300, 300); await page.mouse.down(); await page.mouse.move(380, 360, { steps: 6 }); await page.mouse.up();
@@ -105,6 +105,20 @@ try {
     const same = Math.abs(c1.yaw - c0.yaw) < 1e-6 && Math.abs(c1.pitch - c0.pitch) < 1e-6;
     R.expect(`${id} orbit ${locked ? 'locked' : 'free'}`, same === locked, `yaw and pitch ${same ? 'unchanged' : 'changed'} by a drag`);
   }
+  // From above: perspective at 65 degrees, the board edge to edge in width on a phone in portrait, the frame inside the screen
+  await open(page, SIZES[1], '&view=above');
+  const ab = await page.evaluate(() => { const c = window.__chess; return { pitch: Math.round(c.controls.camera.pitch * 180 / Math.PI), proj: c.stage.projection, battle: c.views.isEasy() }; });
+  R.expect('above: perspective, 65 degrees, an easy view', ab.pitch === 65 && ab.proj === 'perspective' && ab.battle, JSON.stringify(ab));
+  // a stored id from before Tokens: easy-flat becomes tokens
+  await page.evaluate(() => localStorage.setItem('chess3d.view', 'easy-flat'));
+  await open(page, SIZES[0]);
+  R.expect('stored easy-flat migrates to tokens', await page.evaluate(() => window.__chess.views.current()) === 'tokens');
+  await page.evaluate(() => localStorage.removeItem('chess3d.view'));
+  // phone cycle: the thumb bar Views button walks Play, Tokens, From above, Easy 3D, then the presets
+  await open(page, SIZES[1]);
+  const seen = [await page.evaluate(() => window.__chess.views.current())];
+  for (let i = 0; i < 4; i++) { await page.tap('.tb[data-act=views]'); await page.evaluate(() => window.__chess.step(1)); seen.push(await page.evaluate(() => window.__chess.views.current())); }
+  R.expect('phone cycle order', seen.join() === 'play,tokens,above,easy-3d,white', seen.join());
   // remembered choice, fallback, keys
   const size = SIZES[1];
   await open(page, size);
@@ -117,7 +131,7 @@ try {
   await page.evaluate(() => localStorage.removeItem('chess3d.view'));
   await open(page, SIZES[1]);
   R.expect('play is the default on a phone in portrait', await page.evaluate(() => window.__chess.views.current()) === 'play');
-  await open(page, SIZES[0], '&view=easy-flat');
+  await open(page, SIZES[0], '&view=tokens');
   await page.keyboard.press('3');
   await page.evaluate(() => window.__chess.step(2));
   const k = await page.evaluate(() => ({ cur: window.__chess.views.current(), proj: window.__chess.stage.projection }));

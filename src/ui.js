@@ -357,7 +357,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     toastEl.classList.toggle('info', kind === 'info');
     toastEl.classList.add('show');
     clearTimeout(toastT);
-    toastT = setTimeout(() => toastEl.classList.remove('show'), 1400);
+    toastT = setTimeout(() => toastEl.classList.remove('show'), 1600);
   }
 
   // ------------------------------------------------------------ per-frame control sync

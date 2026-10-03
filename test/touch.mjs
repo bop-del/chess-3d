@@ -247,8 +247,8 @@ async function runSize(size) {
     if (collapsedGame) { await tapEl(gameHdr); await sleep(400); }
     const hudOk = await ev(() => !!document.getElementById('btn-new'));
     R.expect(`${tag}: HUD is built`, hudOk, '');
-    // a view. Phone HUD: the Views button on the thumb bar cycles the views (src/views/registry.js: White, Black, Top down, Side, Isometric,
-    // Easy flat, Easy 3D, and Play in portrait). One tap moves to the next view. Older layouts: the third preset button, which may sit in the Controls drawer.
+    // a view. Phone HUD: the Views button on the thumb bar cycles the views (src/views/registry.js: Play, Tokens, From above, Easy 3D first on a phone in portrait,
+    // then White, Black, Top down, Side, Isometric). One tap moves to the next view. Older layouts: the third preset button, which may sit in the Controls drawer.
     const viewsBtn = '.tb[data-act="views"]';
     if (await centre(viewsBtn)) {
       const before = (await state()).pitch;
@@ -256,6 +256,7 @@ async function runSize(size) {
       await tapEl(viewsBtn); await step(2);
       s = await state();
       const viewAfter = await ev(() => window.__chess.views?.current());
+      await ev(() => { try { localStorage.removeItem('chess3d.view'); } catch (e) { /* storage blocked */ } });   // the cycle may have stored a locked easy view: later sizes start from the default
       R.expect(`${tag}: tapping Views on the thumb bar cycles the views`, viewAfter !== viewBefore, `view ${viewBefore} to ${viewAfter}, pitch ${(before * 57.3).toFixed(0)} to ${(s.pitch * 57.3).toFixed(0)} deg`);
     } else {
     const presetSel = '#presets .preset:nth-child(3)';

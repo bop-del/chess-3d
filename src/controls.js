@@ -53,7 +53,8 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   // and slides its target sideways in the view plane so the board sits in the middle of the free area. Zero insets (desktop,
   // tablets) keep the old fit() untouched. cam.dist stays the user's zoom: FRAME_REF is the neutral value (presets are 19 to 20).
   let frame = { top: 0, right: 0, bottom: 0, left: 0 };
-  const FRAME_REF = 19, FRAME_MARGIN = 0.03, PORTRAIT_MARGIN = 0.04, BOARD_CORNERS = 8, TAN_HALF = Math.tan(17.5 * DEG);
+  let edgeToEdge = false;                       // easy views: in portrait the board fills the free width almost to the screen edges
+  const FRAME_REF = 19, FRAME_MARGIN = 0.03, PORTRAIT_MARGIN = 0.04, EDGE_MARGIN = 0.01, BOARD_CORNERS = 8, TAN_HALF = Math.tan(17.5 * DEG);
   const corners = [];
   for (const x of [-4, 4]) for (const z of [-4, 4]) for (const y of [-0.3, 2.0]) corners.push(new THREE.Vector3(y < 0 ? x * 1.16 : x, y, y < 0 ? z * 1.16 : z));   // the frame foot reaches 4.65
   for (const x of [-6.5, 6.5]) for (const z of [-1.5, 3.45]) for (const y of [-0.3, 1.2]) corners.push(new THREE.Vector3(x, y, z));
@@ -75,7 +76,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     // portrait: the board with its pieces fills the free width, the capture trays may run off screen; landscape keeps the trays in
     const portrait = size.h > size.w, n = portrait ? BOARD_CORNERS : corners.length;
     for (let i = 0; i < n; i++) pts[i].copy(corners[i]).applyQuaternion(gq).sub(target);
-    const freeW = Math.max(40, size.w - frame.left - frame.right) * (1 - (portrait ? PORTRAIT_MARGIN : FRAME_MARGIN));
+    const freeW = Math.max(40, size.w - frame.left - frame.right) * (1 - (portrait ? (edgeToEdge ? EDGE_MARGIN : PORTRAIT_MARGIN) : FRAME_MARGIN));
     const freeH = Math.max(40, size.h - frame.top - frame.bottom) * (1 - FRAME_MARGIN);
     const P = (size.h / 2) / TAN_HALF;                                          // px per unit at depth 1
     const ox = (frame.left - frame.right) / 2, oy = (frame.top - frame.bottom) / 2; // free centre relative to screen centre, y down
@@ -123,7 +124,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     }
     let fr = frame;
     if (!framed() && size.w > 900) { const g = hudW + 2 * HUD_GAP; fr = { top: 0, bottom: 0, left: g, right: g }; }
-    const freeW = Math.max(40, size.w - fr.left - fr.right) * (1 - (portrait ? PORTRAIT_MARGIN : FRAME_MARGIN));
+    const freeW = Math.max(40, size.w - fr.left - fr.right) * (1 - (portrait ? (edgeToEdge ? EDGE_MARGIN : PORTRAIT_MARGIN) : FRAME_MARGIN));
     const freeH = Math.max(40, size.h - fr.top - fr.bottom) * (1 - FRAME_MARGIN);
     const s = Math.min(freeW / Math.max(0.1, a1 - a0), freeH / Math.max(0.1, b1 - b0));   // px per world unit
     const ox = (fr.left - fr.right) / 2, oy = (fr.top - fr.bottom) / 2;
@@ -237,6 +238,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     if (locked) { vel.yaw = vel.pitch = 0; pinch = null; if (drag?.moved) drag = null; }
     notify();
   }
+  function setEdgeToEdge(v) { edgeToEdge = !!v; apply(); }
   function setOrbitLock(v) { orbitLocked = !!v; if (orbitLocked) { vel.yaw = vel.pitch = 0; spin = false; } notify(); }
   function setCamera(v) { tw = null; Object.assign(cam, v); apply(); }
 
@@ -270,7 +272,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   let drag = null;
   let pinch = null;
   let locked = false;
-  let orbitLocked = false;                     // Easy flat: no tilt or turn by drag, twist or keys; zoom and Flip still work
+  let orbitLocked = false;                     // Tokens and From above: no tilt or turn by drag, twist or keys; zoom and Flip still work
   const TWIST_DEAD = 6 * DEG;                  // a pure pinch wobbles a few degrees: ignore the twist until it is deliberate
   const pairAngle = () => { const [a, b] = [...pointers.values()]; return Math.atan2(b.y - a.y, b.x - a.x); };
   let lastMoveT = 0;
@@ -492,7 +494,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
 
   return {
     cinematic, restore,
-    setProjection, setFocus, setOrbitLock,
+    setProjection, setFocus, setOrbitLock, setEdgeToEdge,
     update, apply, setPreset, reset, levelBoard, flip, topDown, toggleSpin, setGimbal, nudgeZoom, setCamera, onResize, setFrame, setLocked,
     get locked() { return locked; },
     get frame() { return { ...frame }; },

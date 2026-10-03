@@ -1,6 +1,6 @@
 // Views: the named camera setups the player chooses from (Views button, preset buttons, keys 1 to 5, ?view=). One list is the
-// single source. A view has a kind: 'preset' (a perspective camera preset), 'easy' (orthographic, style A flat with symbols or
-// style B steep 3D) or 'play' (the phone portrait play view: perspective, close, with the follow camera of src/views/play.js).
+// single source. A view has a kind: 'preset' (a perspective camera preset), 'easy' (style T Tokens: flat top view with turned
+// discs, style V From above: perspective at 65 degrees with the real pieces, style B Easy 3D: steep orthographic) or 'play' (the phone portrait play view: perspective, close, with the follow camera of src/views/play.js).
 // The choice is remembered per device under localStorage 'chess3d.view'. See docs/ARCHITECTURE.md (Views).
 import { DE } from '../i18n.js';
 
@@ -13,7 +13,8 @@ export const VIEWS = [
   { id: 'top', label: 'Top down', kind: 'preset' },
   { id: 'side', label: 'Side', kind: 'preset' },
   { id: 'iso', label: 'Isometric', kind: 'preset' },
-  { id: 'easy-flat', label: 'Easy flat', kind: 'easy', style: 'A', pitch: 89.6 * DEG },
+  { id: 'tokens', label: 'Tokens', kind: 'easy', style: 'T', pitch: 89.6 * DEG, lock: true },
+  { id: 'above', label: 'From above', kind: 'easy', style: 'V', pitch: 65 * DEG, lock: true, persp: true },
   { id: 'easy-3d', label: 'Easy 3D', kind: 'easy', style: 'B', pitch: 62 * DEG },
   { id: 'play', label: 'Play', kind: 'play', when: 'phone-portrait', dist: 10.3, pitch: 40 },
 ];
@@ -21,9 +22,15 @@ const BY_ID = Object.fromEntries(VIEWS.map((v) => [v.id, v]));
 const BY_LABEL = Object.fromEntries(VIEWS.map((v) => [v.label, v.id]));
 export const PIECE_SCALE_B = 1.15;
 
+// 'Von oben' is the name of From above, so the Top down preset is called Draufsicht in German
 Object.assign(DE, {
-  'preset.Easy flat': 'Einfach flach', 'preset.Easy 3D': 'Einfach 3D', 'preset.Play': 'Spielansicht',
+  'preset.Top down': 'Draufsicht', 'preset.Tokens': 'Spielsteine', 'preset.From above': 'Von oben', 'preset.Easy 3D': 'Einfach 3D',
+  'preset.Play': 'Spielansicht',
 });
+// A stored id from before Tokens existed
+const MIGRATE = { 'easy-flat': 'tokens' };
+// From above: a slight shift of the look point towards Black keeps the back rank clear of the frame's edge
+const ABOVE_FOCUS = { x: 0, z: -0.3 }, ABOVE_ZOOM = 1;
 
 // The director (battle scenes) asks this before it plays one. Easy views skip every scene: the capture just happens.
 let current = null;
@@ -33,15 +40,23 @@ export function createViews({ controls, stage, game, board, device }) {
   const listeners = [];
   const phonePortrait = () => !!device.phone && !!device.portrait;
   const available = (v) => !v.when || (v.when === 'phone-portrait' && phonePortrait());
-  const list = () => VIEWS.filter(available);
+  // On a phone in portrait the cycle starts with the easy views: Play, Tokens, From above, Easy 3D, then the presets
+  const EASY_FIRST = ['play', 'tokens', 'above', 'easy-3d'];
+  const list = () => {
+    const l = VIEWS.filter(available);
+    if (!phonePortrait()) return l;
+    const rank = (v) => { const i = EASY_FIRST.indexOf(v.id); return i < 0 ? EASY_FIRST.length : i; };
+    return l.map((v, i) => [v, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map((x) => x[0]);
+  };
   const fallback = () => (phonePortrait() ? 'play' : 'white');
   let id = fallback();
   try {
-    const s = localStorage.getItem(STORE);
+    const s = MIGRATE[localStorage.getItem(STORE)] || localStorage.getItem(STORE);
     if (s && BY_ID[s] && available(BY_ID[s])) id = s;
   } catch (e) { /* storage blocked */ }
   let applied = null;
   let scaled = false;
+  let focused = false;
 
   // Style B: the 3D pieces about 1.15x around their base. Scaled on their inner nodes (the game owns the group scale).
   const piecesRoot = () => game.root || stage.scene.getObjectByName('pieces');
@@ -54,8 +69,14 @@ export function createViews({ controls, stage, game, board, device }) {
   function enter(v, { instant = false } = {}) {
     const dur = instant ? 0 : undefined;
     controls.hooks.preset = (name) => { const k = BY_LABEL[name]; if (k) set(k); };
-    controls.setOrbitLock(v.style === 'A');
-    if (v.kind === 'easy') {
+    controls.setOrbitLock(!!v.lock);
+    controls.setEdgeToEdge(v.kind === 'easy');
+    if (v.id === 'above') controls.setFocus(ABOVE_FOCUS, { dur: 0, zoom: ABOVE_ZOOM });
+    else if (focused) controls.setFocus(null, { dur: 0 });
+    focused = v.id === 'above';
+    if (v.persp) {
+      controls.setProjection('perspective', { pitch: v.pitch, yaw: 0, dist: 19, dur });
+    } else if (v.kind === 'easy') {
       controls.setProjection('ortho', { pitch: v.pitch, yaw: 0, dist: 19, dur });
     } else if (v.kind === 'play') {
       controls.setProjection('perspective', { pitch: (v.pitch ?? 46) * DEG, dist: v.dist, dur });
