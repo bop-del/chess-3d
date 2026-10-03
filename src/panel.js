@@ -130,6 +130,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
         <button class="ib" id="btn-undo" type="button" title="Undo (U)" aria-label="Undo" data-i18n-title="hud.undoTitle" data-i18n-aria="hud.undo">${ICONS.undo}</button>
         <button class="ib" id="btn-rail" type="button" title="Fold the panel (H)" aria-label="Fold the panel" data-i18n-title="panel.collapse" data-i18n-aria="panel.collapse">${ICONS.collapse}</button>
       </div>
+      <div class="pclock" id="pclock" hidden></div>
     </header>
     <nav class="tabs" role="tablist" aria-label="Sections" data-i18n-aria="panel.tabs">
       ${tabsDef.map(([id, label, icon]) => `<button class="tab" type="button" role="tab" id="tab-${id}" data-tab="${id}" aria-controls="tp-${id}">${icon}<span data-i18n="panel.tab.${id}">${label}</span></button>`).join('')}
@@ -159,6 +160,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
         <div class="sec" data-slot="themes"></div>
         <div class="sec"><h4 data-i18n="panel.light">Light</h4><div id="light-slot"></div></div>
         <div class="sec" data-slot="battle"></div>
+        <div class="sec" data-slot="clock"></div>
         <div class="sec"><h4 data-i18n="panel.sound">Sound</h4><div class="stack" data-slot="audio"></div><div class="stack" data-slot="music"></div></div>
         <div class="sec"><h4 data-i18n="panel.quality">Quality</h4><div id="quality-slot"></div></div>
         <div class="sec"><h4 data-i18n="panel.language">Language</h4>

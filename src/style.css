@@ -318,6 +318,28 @@ body.phone .pstatus .dot.w { background: radial-gradient(circle at 35% 30%, #fff
 body.phone .pstatus .dot.b { background: radial-gradient(circle at 35% 30%, #4a4d57, #0b0c10 70%); }
 body.phone .pstatus.think .dot { animation: pulse 1s ease-in-out infinite; }
 
+/* chess clock (src/clock-ui.js): two compact faces at the right end of the status line, the running one gold, under 30 s red and bold;
+   the last move steps aside while the clock shows */
+body.phone .pstatus .pclock { display: flex; flex-direction: row; gap: 5px; flex: none; margin-left: auto; }
+body.phone .pstatus .pclock[hidden], body.phone .pstatus .cface[hidden] { display: none; }
+body.phone .pstatus .cface { display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.28); font-size: 13px; font-variant-numeric: tabular-nums; }
+body.phone .pstatus .cface .dot { width: 9px; height: 9px; animation: none; }
+body.phone .pstatus .cface .cn { display: none; }
+body.phone .pstatus .cface .ct { font-size: 13px; font-weight: 500; letter-spacing: 0; }
+body.phone .pstatus .pclock[data-bottom="b"] { flex-direction: row-reverse; }
+body.phone .pstatus .cface.run { border-color: var(--gold); background: var(--gold-soft); }
+body.phone .pstatus .cface.run .ct { color: #f3dfa8; }
+body.phone .pstatus .cface.low { border-color: rgba(255, 107, 90, 0.6); }
+body.phone .pstatus .cface.low .ct { color: #ff9b8f; font-weight: 800; }
+body.phone .pstatus .cface.out .ct { color: #ff6b5a; font-weight: 800; }
+body.phone.clock-on .pstatus .ps-last { display: none; }
+.clock-settings h4 { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.clock-hint { margin: 8px 0 0; font-size: 12px; color: var(--dim); }
+.clock-hint[hidden] { display: none; }
+body.phone .clock-settings { margin-top: 12px; }
+body.phone .clock-settings .chip { min-height: 44px; }
+body.phone .clock-settings .chips { flex-wrap: nowrap; }
+
 body.phone .pbar {
   position: fixed; z-index: 16; left: var(--sl); right: var(--sr); bottom: var(--sb); height: var(--bar); gap: var(--gap);
   pointer-events: auto; transition: opacity 0.35s ease;

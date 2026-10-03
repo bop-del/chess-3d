@@ -38,6 +38,7 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
     src/ui.js            HUD wiring: game buttons, move list, captured pieces, sliders, banners; the phone layout
     src/panel.js         the desktop and tablet layout: one panel with tabs, rail, view bar, help overlay (see ADR 0008), plus chipGroup()
     src/panel.css        styles of the panel, the rail, the view bar and the help overlay
+    src/clock.js, clock-ui.js  Chess clock: pure core, faces and chooser
     src/install-hint.js  Add to Home Screen reminder for iPhone and iPad Safari (loaded only on iOS outside the installed app)
     src/dev/diag.js      on device diagnostics box, loaded only for ?diag=1
     src/audio.js         WebAudio context and plumbing (unlock on the first gesture, buses, Mute switch, stopScene), no audio files
@@ -392,12 +393,20 @@ Explain mode: walk one of the starter lines on the 3D board.
 - Learn strings (English fallbacks in the code, German in `src/learn/strings.js`) are registered with `addDE`.
 - `window.__chess.train = { store, drill, sweep, learn }` is the test hook. `test/learn.mjs` (smoke tier) drives it on desktop and on phone sizes.
 
+### `src/clock.js`, `src/clock-ui.js` (chess clock)
+
+    createClock({ preset, onFlag }) -> { start(turn), switchTo(turn), tick(dt), remaining(color), pause(), resume(), stop(), reset(preset?), choose(preset), setUntimed(color), suspend(on), state() }
+    PRESETS (off, 3+2, 5+0, 10+0, 15+10), formatTime(sec), normalizePreset(v), flagVerdict(chess, flagged), bindGame({ clock, game }), createGameClock({ game, preset })
+    mountClock({ ui, game, clock }) -> { tick(dt), render(), choose(preset) }; initialPreset(flag)
+
+`clock.js` is pure (no DOM, no real time): `main.js` ticks it from `advance` through `clockUi.tick(dt)`, so `?manual=1` and `__chess.step` drive it. `switchTo(turn)` credits the increment to the side that just moved. `bindGame` wires it to the game events: a move switches it (the first move of White starts it, so the first move is free), `newgame` resets it to the chosen preset, a finished game stops it, `game.mode` other than `play` suspends and resets it, and with the computer on its side is `setUntimed` (never runs, no increment). A flag calls `game.end({ result, reason: 'time', winner })` with `flagVerdict`: a loss for the flagged side, or a draw when the other side has only a king. `game.end` also closes a pending promotion chooser (event `promotioncancel`); after a loss on time `undo()` does nothing and `canUndo` is false. The clock never reads the real time, so a hidden tab (no frames) stops it. `clock-ui.js` shows two faces (`#pclock` in the desktop panel header, `.pclock` inside `.pstatus` on a phone; classes `run`, `low` under 30 s, `out`; `body.clock-on` while shown) and the chooser `#sel-clock` (`ui.mountSettings('clock', ...)`, `localStorage` `chess3d.clock`, kept in memory when storage is blocked). A choice made during a running game applies at the next new game and a hint says so. `?clock=<preset>` beats the stored value for that load; `?open=clock` opens the chooser (`ui.openPanel('clock')`). Hooks: `__chess.clock` (the core) and `__chess.clockUi`. Tests: `test/clock.mjs` (fast), `test/clock-page.mjs` (smoke group `clock`).
+
 ### `src/install-hint.js`
 
     mountInstallHint()         // called once after the board is ready, by a dynamic import in main.js
     wantInstallHint(storage)   // the gate, also counts the visit
 
-A bottom sheet with three drawn steps (the Share icon in the Safari bar, the Add to Home Screen row, the installed icon from `apple-touch-icon.png`) and a Later button. `main.js` imports it only when `device.ios` and not `device.standalone`. The gate then needs all of: iOS, not standalone, no URL flag of the app at all (`quality touch light preset yaw pitch dist gx gy gz fen moves select promo ai spin hud help manual diag theme view intro`), not `navigator.webdriver`, and working `localStorage`. The state is one key, `chess3d.install-hint`, `{ visits, shows, last }`: it shows on the first visit, and then at most twice more, at least 3 visits after the last showing. It appears 2.2 s after the board is ready. Later, a tap on the scrim or Escape closes it at once and nothing waits on it. There is no service worker and no network use.
+A bottom sheet with three drawn steps (the Share icon in the Safari bar, the Add to Home Screen row, the installed icon from `apple-touch-icon.png`) and a Later button. `main.js` imports it only when `device.ios` and not `device.standalone`. The gate then needs all of: iOS, not standalone, no URL flag of the app at all (`quality touch light preset yaw pitch dist gx gy gz fen moves select promo ai spin hud help manual diag theme view intro open clock`), not `navigator.webdriver`, and working `localStorage`. The state is one key, `chess3d.install-hint`, `{ visits, shows, last }`: it shows on the first visit, and then at most twice more, at least 3 visits after the last showing. It appears 2.2 s after the board is ready. Later, a tap on the scrim or Escape closes it at once and nothing waits on it. There is no service worker and no network use.
 
 ### `src/dev/diag.js`
 
@@ -428,4 +437,4 @@ Imported by `main.js` only for exactly `?diag=1` (right after `window.__chess` i
 
 ## The `open` flag
 
-`?open=<id>` shows one panel or tab when the game is ready. `applyLateParams` in `src/main.js` calls `openFlag(id, { ui, learn })`, so it runs after the start sequence. Values `learn`, `openings`, `mine`, `drill`, `practise` and `puzzles` go to `learn.open(tab)` (`src/learn/learn.js`: selects the tab, then opens the Learn sheet on a phone or unfolds the Learn card on desktop; `drill` maps to the Practise tab, which falls back to Openings while no opening was added). `settings`, `scene`, `music`, `moves` and `daily` go to `ui.openPanel(id)` (`src/ui.js`: on a phone the Menu sheet with that card open, on desktop the card unfolded, then scrolled into view; `music` scrolls to `.music-settings`). Lookups use `Object.hasOwn`, an unknown value does nothing and logs nothing. Test: `test/open-flag.mjs` (smoke group `open`).
+`?open=<id>` shows one panel or tab when the game is ready. `applyLateParams` in `src/main.js` calls `openFlag(id, { ui, learn })`, so it runs after the start sequence. Values `learn`, `openings`, `mine`, `drill`, `practise` and `puzzles` go to `learn.open(tab)` (`src/learn/learn.js`: selects the tab, then opens the Learn sheet on a phone or unfolds the Learn card on desktop; `drill` maps to the Practise tab, which falls back to Openings while no opening was added). `settings`, `scene`, `music`, `clock`, `moves` and `daily` go to `ui.openPanel(id)` (`src/ui.js`: on a phone the Menu sheet with that card open, on desktop the card unfolded, then scrolled into view; `music` scrolls to `.music-settings`). Lookups use `Object.hasOwn`, an unknown value does nothing and logs nothing. Test: `test/open-flag.mjs` (smoke group `open`).

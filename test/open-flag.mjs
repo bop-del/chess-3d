@@ -45,10 +45,11 @@ const CASES = [
   ['music', { see: '.music-settings [data-music-on]' }],
   ['scene', { see: '.card[data-card="scene"] .body' }],
   ['moves', { see: '.card[data-card="moves"] .body' }],
+  ['clock', { see: '.clock-settings #sel-clock' }],
   ['daily', { see: '.dailycard' }],
 ];
 // desktop: the one right panel, so Settings and Moves are tabs, not cards
-const DESKTOP_SEE = { settings: '#tp-settings #presets', scene: '#tp-settings #presets', moves: '#tp-play #moves' };
+const DESKTOP_SEE = { settings: '#tp-settings #presets', scene: '#tp-settings #presets', moves: '#tp-play #moves', clock: '#tp-settings #sel-clock' };
 const SIZES = [['desktop', 1280, 720, false], ['phone portrait', 390, 844, true], ['phone landscape', 844, 390, true]];
 
 // seeded: one adopted opening, so the Practise tab is not locked

@@ -357,8 +357,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     let main = white ? t('turn.white', 'White to move') : t('turn.black', 'Black to move'), sub = ' ';
     if (st.over) {
       const w = st.over.winner;
-      main = st.over.reason === 'checkmate' ? t('turn.checkmate', 'Checkmate. {side} wins', { side: sideName(w) }) : t('turn.draw', 'Draw');
-      sub = st.over.reason === 'checkmate' ? t('turn.gameOver', 'Game over') : t(`reason.${st.over.reason}`, st.over.reason);
+      const timeLoss = st.over.reason === 'time' && w;   // a draw on time reads like any draw, with its own reason below
+      main = st.over.reason === 'checkmate' ? t('turn.checkmate', 'Checkmate. {side} wins', { side: sideName(w) }) : timeLoss ? t('turn.timeout', 'Time out. {side} wins', { side: sideName(w) }) : t('turn.draw', 'Draw');
+      sub = st.over.reason === 'checkmate' || timeLoss ? t('turn.gameOver', 'Game over') : st.over.reason === 'time' ? t('reason.timeDraw', 'Time out, draw: the opponent has only a king') : t(`reason.${st.over.reason}`, st.over.reason);
     } else if (st.thinking) { sub = t('turn.thinking', 'Computer is thinking'); }
     else if (st.check) sub = t('turn.check', 'Check');
     else if (st.vsComputer) sub = st.turn === st.computerColor ? t('turn.computerMove', 'Computer to move') : t('turn.yourMove', 'Your move');
@@ -422,9 +423,10 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   function hideBanner() { banner.hidden = true; }
   game.on('gameover', (st) => {
     const mate = st.reason === 'checkmate';
-    const title = mate ? t('banner.checkmate', 'Checkmate') : t('banner.draw', 'Draw');
+    const timeLoss = st.reason === 'time' && st.winner;
+    const title = mate ? t('banner.checkmate', 'Checkmate') : timeLoss ? t('banner.time', 'Time out') : t('banner.draw', 'Draw');
     const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
-    const sub = mate ? t('banner.wins', '{side} wins', { side: sideName(st.winner) }) : t(`reason.${st.reason}`, cap(st.reason));
+    const sub = mate || timeLoss ? t('banner.wins', '{side} wins', { side: sideName(st.winner) }) : st.reason === 'time' ? t('reason.timeDraw', 'Time out, draw: the opponent has only a king') : t(`reason.${st.reason}`, cap(st.reason));
     banner.innerHTML = `<div class="banner-card"><small>${st.result}</small><h2>${title}</h2><p>${sub}</p>
       <div class="row"><button class="btn primary" id="bn-new">${t('hud.newGame', 'New game')}</button><button class="btn" id="bn-view">${t('banner.review', 'Review board')}</button></div></div>`;
     banner.hidden = false;
@@ -432,6 +434,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     banner.querySelector('#bn-view').onclick = hideBanner;
   });
   game.on('newgame', hideBanner);
+  game.on('promotioncancel', () => { promoEl.hidden = true; promoCancel = null; });   // the clock ran out with the chooser open
 
   // ------------------------------------------------------------ toast
   const toastEl = document.getElementById('toast');
@@ -745,7 +748,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // into view. 'settings' is the Scene card (or the Menu sheet itself on a phone), 'music' the music block inside it.
   // Returns false for an id that is not a panel here.
   function openPanel(id) {
-    const PANELS = { settings: 'scene', menu: 'scene', scene: 'scene', music: 'scene', moves: 'moves', daily: 'daily', openings: 'openings', drill: 'drill', puzzles: 'puzzles' };
+    const PANELS = { settings: 'scene', menu: 'scene', scene: 'scene', music: 'scene', clock: 'scene', moves: 'moves', daily: 'daily', openings: 'openings', drill: 'drill', puzzles: 'puzzles' };
     if (!Object.hasOwn(PANELS, id)) return false;
     const card = PANELS[id];
     if (phoneUI) {
@@ -761,9 +764,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       if (!c) return false;
       c.classList.remove('collapsed');
     }
-    const target = id === 'daily' ? hud.querySelector('.dailycard') : id === 'music' ? hud.querySelector('.music-settings') : id === 'moves' && dsk ? hud.querySelector('#moves') : hud.querySelector(`.card[data-card="${card}"]`);
-    target?.scrollIntoView?.({ block: id === 'music' ? 'start' : 'nearest' });
-    if (dsk) setTimeout(() => target?.scrollIntoView?.({ block: id === 'music' ? 'start' : 'nearest' }), 450);   // again once the panel has unfolded and settled
+    const target = id === 'daily' ? hud.querySelector('.dailycard') : id === 'music' ? hud.querySelector('.music-settings') : id === 'clock' ? hud.querySelector('.clock-settings') : id === 'moves' && dsk ? hud.querySelector('#moves') : hud.querySelector(`.card[data-card="${card}"]`);
+    target?.scrollIntoView?.({ block: id === 'music' || id === 'clock' ? 'start' : 'nearest' });
+    if (dsk) setTimeout(() => target?.scrollIntoView?.({ block: id === 'music' || id === 'clock' ? 'start' : 'nearest' }), 450);   // again once the panel has unfolded and settled
     return true;
   }
 

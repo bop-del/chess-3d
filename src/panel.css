@@ -43,6 +43,26 @@
 .ib.on { background: var(--p-soft); border-color: var(--gold); color: var(--p-gold-text); }
 .panel :focus-visible, .viewbar :focus-visible, .kbov :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
+/* chess clock faces (src/clock-ui.js): opponent above, player below, the running one gold. Under 30 s a face is red AND bold. */
+.pclock { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; }
+.pclock[hidden] { display: none; }
+.pclock[data-bottom="b"] { flex-direction: column-reverse; }
+.cface {
+  display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--p-line); background: var(--p-well);
+  font-variant-numeric: tabular-nums; transition: background 0.18s, border-color 0.18s;
+}
+.cface[hidden] { display: none; }
+.cface .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(255, 255, 255, 0.35); }
+.cface .dot.w { background: radial-gradient(circle at 35% 30%, #fff, #d9d4c6 70%); }
+.cface .dot.b { background: radial-gradient(circle at 35% 30%, #4a4d57, #0b0c10 70%); }
+.cface .cn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--dim); }
+.cface .ct { font-size: 18px; font-weight: 500; letter-spacing: -0.01em; color: var(--text); }
+.cface.run { border-color: var(--gold); background: var(--p-soft); }
+.cface.run .cn, .cface.run .ct { color: var(--p-gold-text); }
+.cface.low .ct { color: #ff9b8f; font-weight: 800; }
+.cface.low { border-color: rgba(255, 107, 90, 0.6); }
+.cface.out .ct { color: #ff6b5a; font-weight: 800; }
+
 /* tabs */
 .tabs { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--p-line); }
 .tab {
@@ -134,6 +154,7 @@ body[data-trays-shown="on"] .cap-sec { display: none; }
 .panel .field.themes { margin: 0; gap: 0; }
 .panel .field.themes > span { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
 .panel .battle-settings h4 { margin-bottom: 8px; }
+.panel .clock-settings .clock-hint { margin: 8px 0 0; }
 .panel .stack + .stack { margin-top: 8px; }
 .panel .stack > .switch, .panel .stack > .music-settings .switch { min-height: 30px; }
 .panel .music-settings { margin-top: 4px; }
@@ -206,7 +227,7 @@ body.touch:not(.phone) .vm-item, body.touch:not(.phone) .fold summary, body.touc
 body.touch:not(.phone) .ib, body.touch:not(.phone) .vb.ico { min-width: 44px; min-height: 44px; }
 body.touch:not(.phone) .swatch { min-height: 56px; }
 body.touch:not(.phone) .panel .switch { min-height: 44px; }
-@media (prefers-reduced-motion: reduce) { .panel, .viewbar { transition: none; } .kbov, .kbcard { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .panel, .viewbar, .cface { transition: none; } .kbov, .kbcard { animation: none; } }
 
 /* the lists in the Learn tab grow with the content, the tab itself scrolls */
 body:not(.phone) .lhost .xlist, body:not(.phone) .lhost .xtext { max-height: none; overflow: visible; }

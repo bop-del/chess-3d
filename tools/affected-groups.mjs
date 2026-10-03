@@ -34,6 +34,7 @@ export const MAP = [
   [/^src\/views\//, ['views', 'tokens', 'play', 'fixes']],
   [/^src\/(trays|trays-setting)\.js$/, ['trays', 'fixes', 'blocks fixes']],
   [/^src\/goodmove\.js$/, ['goodmove']],
+  [/^src\/clock(-ui)?\.js$/, ['clock', 'fixes']],
   [/^src\/(intro|install-hint)\.js$/, ['intro', 'fixes']],
   [/^src\/dev\//, ['core']],
   // test scripts: the group that runs the script
@@ -44,6 +45,7 @@ export const MAP = [
   [/^test\/blocks-chars-page\.mjs$/, ['blocks chars']],
   [/^test\/blocks-fixes-page\.mjs$/, ['blocks fixes']],
   [/^test\/open-flag\.mjs$/, ['open']],
+  [/^test\/clock-page\.mjs$/, ['clock']],
   [/^test\/daily-page\.mjs$/, ['puzzles']],
 ];
 

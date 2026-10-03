@@ -59,6 +59,7 @@ if (tier === 'fast' || tier === 'all') {
   run('puzzle data is legal and solvable (test/puzzles-data.mjs)', 'test/puzzles-data.mjs');
   run('music data and logic (test/music.mjs)', 'test/music.mjs');
   run('novice level (test/novice.mjs)', 'test/novice.mjs');
+  run('chess clock (test/clock.mjs)', 'test/clock.mjs');
   run('game review core: classification, accuracy, engine (test/review-core.mjs)', 'test/review-core.mjs');
   run('training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs');
 }

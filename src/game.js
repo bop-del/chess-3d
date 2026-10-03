@@ -286,7 +286,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       over: gameOver,
       thinking: !!search,
       vsComputer, computerColor, depth, level,
-      canUndo: records.length > 0,
+      canUndo: records.length > 0 && gameOver?.reason !== 'time',
       busy: busy(),
       fen: chess.fen(),
       selected: selected >= 0 ? sqName(selected) : null,
@@ -599,8 +599,20 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     changed();
   }
 
+  // A game ended from outside the rules (the clock flagged): { result, reason, winner }. Returns false when it is already over or a lesson has the board.
+  function end({ result, reason, winner = null }) {
+    if (gameOver || mode !== 'play') return false;
+    search = null; selected = -1;
+    if (pendingPromo) { pendingPromo = null; emit('promotioncancel'); }   // the chooser closes, the pawn stays where it was
+    gameOver = { over: true, result, reason, check: false, winner };
+    overTimer = 0.4;
+    refreshHighlights();
+    changed();
+    return true;
+  }
+
   function undo() {
-    if (!records.length) return;
+    if (!records.length || gameOver?.reason === 'time') return;   // a game lost on time stays lost: the clock would flag again at once
     finishAnimations();
     search = null; pendingPromo = null; gameOver = null; selected = -1;
     resetToppled();
@@ -759,7 +771,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
 
   return {
     chess, root, on(evt, fn) { (listeners[evt] = listeners[evt] || []).push(fn); },
-    clickSquare, pickSquare, hoverAction, update, restyle, newGame, undo, loadFen, setVsComputer, getState, playMoves, selectSquare,
+    clickSquare, pickSquare, hoverAction, update, restyle, newGame, undo, end, loadFen, setVsComputer, getState, playMoves, selectSquare,
     move: (from, to, promo) => doMove({ from: nameSq(from), to: nameSq(to), promo }),
     finishAnimations,
     // CONTRACT stubs (lead): filled in by the Openings (C) and Battle (B) lanes

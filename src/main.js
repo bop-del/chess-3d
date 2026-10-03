@@ -6,6 +6,8 @@ import { mountSwatches } from './themes/swatches.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
 import { mountTraysSetting } from './trays-setting.js';
+import { createGameClock } from './clock.js';
+import { initialPreset, mountClock } from './clock-ui.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 window.__chessBoot = { script: performance.now() };   // start timings for ?diag=1, ms since navigation (download ends here)
@@ -85,7 +87,7 @@ async function boot() {
 
   // camera and views come first: the sequence ends in whatever view the controls hold (the stored or ?view= view, the White
   // view on desktop, the Play view on a phone in portrait), so it reads that pose every frame
-  let game = null, tokens = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null;
+  let game = null, tokens = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null;
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const pick = (cx, cy) => {
@@ -234,13 +236,15 @@ async function boot() {
   };
   let t = 0;
   // the frame loop runs the whole game from here on (the modules that follow are optional in it until they exist)
-  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); tokens.sync(); symbols.sync(); themes.update(dt); battle?.update(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); tokens.sync(); symbols.sync(); themes.update(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   advance(0.001);   // the Play view's first focus and the HUD measure land in the camera now
   intro?.boardGo();
   intro?.setTarget(0.95);
   battle = createDirector({ game, controls, stage, ui });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
   mountTraysSetting({ ui, game, controls, flag: params.get('trays') });   // Captured pieces at the side, below Battle scenes
+  const clock = createGameClock({ game, preset: initialPreset(params.get('clock')) });   // the chess clock: off unless chosen (or ?clock=5+0)
+  clockUi = mountClock({ ui, game, clock });
   audio.mountMute(ui);     // the mute switch, right below the Battle scenes setting
   const [{ createMusic }, { mountMusicSettings }] = await Promise.all([import('./music/player.js'), import('./music/settings.js')]);
   const music = createMusic({ audio });    // background piano, starts after the first tap or key
@@ -298,7 +302,8 @@ async function boot() {
   window.addEventListener('resize', onResize);
   if (device.touch) window.addEventListener('orientationchange', onResize);
 
-  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, daily, reward, goodMove, review, themes, train: { store, drill, sweep, learn } };
+  window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, daily, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
+  window.__chess.clockUi = clockUi;
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
