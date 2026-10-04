@@ -7,6 +7,8 @@
 .pzbandline b { color: var(--gold); font-weight: 600; }
 .pzstart, .pznext { width: 100%; min-height: 52px; font-size: 17px; }
 .pzhelp { width: 100%; }
+/* phone Learn sheet: the medals above the path push Start down, so it sticks to the bottom of the scrolling sheet and stays tappable */
+body.phone .psheet .pzpath > .pzstart { position: sticky; bottom: 0; z-index: 2; box-shadow: 0 0 0 6px var(--glass-strong), 0 -8px 14px 2px var(--glass-strong); }
 /* the strip is shorter than the Drill one: no long sentence, so the camera frame follows --ph */
 body.phone.puzzling .pframe { top: calc(var(--st) + var(--stat) + var(--gap) * 2 + var(--ph, 0px)); }
 body.phone .pzstrip .pzhelp, body.phone .pzstrip .pznext { min-height: 48px; }
