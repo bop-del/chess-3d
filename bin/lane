@@ -33,7 +33,7 @@
 //                                       lock first (bin/land-lock; a lock held by this same lane counts as ours) and records the lane's
 //                                       release test steps from its report before the worktree is removed. A lane with no Linear key on
 //                                       record is refused before anything is merged (exit 1, a RED line); --no-linear skips Linear for
-//                                       a lane that tracks no issue. The squash commit subject gets ' (CHE-n[, CHE-m])' from the recorded
+//                                       a lane that tracks no issue. The squash commit subject gets ' (CHE-n[, CHE-m])' for the recorded keys it lacks, from the recorded
 //                                       keys when it names none.
 // Exit codes: 0 done, 1 a step failed (nothing after it ran), 2 usage error.
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -255,8 +255,8 @@ function closeLocked(branch, message, noLinear) {
     if (commits.length) message = git('log', '-1', '--format=%B', branch);
     else { if (privAhead > 1) die(`private worktree of ${branch} has ${privAhead} commits: pass -m with the squash commit message`); message = privateLane('message', branch).stdout.trim(); if (!message) die(`private worktree of ${branch} has no usable commit message (only WIP): pass -m`); }
   }
-  // the CHE key is part of every squash commit subject: appended from the recorded keys when the message has none (git log --grep finds it later)
-  if (keys.length && !/CHE-\d+/.test(message.split('\n')[0])) { const [first, ...more] = message.split('\n'); message = [`${first.trimEnd()} (${keys.join(', ')})`, ...more].join('\n'); }
+  // every recorded CHE key is part of the squash commit subject (CHE-197): the ones the first line lacks are appended (git log --grep finds them later)
+  if (keys.length) { const [first, ...more] = message.split('\n'); const miss = keys.filter((k) => !first.includes(k)); if (miss.length) message = [`${first.trimEnd()} (${miss.join(', ')})`, ...more].join('\n'); }
   if (commits.length) {
     const m = spawnSync('git', ['merge', '--squash', branch], { cwd: MAIN, encoding: 'utf8' });
     if (m.status !== 0) { spawnSync('git', ['merge', '--abort'], { cwd: MAIN }); spawnSync('git', ['reset', '--hard', 'HEAD'], { cwd: MAIN }); die(`squash merge of ${branch} failed, main is unchanged:\n${m.stdout}${m.stderr}`); }
