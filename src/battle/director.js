@@ -72,7 +72,7 @@ export function createDirector({ game, controls, stage, ui }) {
 
   // ------------------------------------------------------------ loading
   async function loadScene(type, style) {
-    const name = style === 'blocks' || style === 'pixel' ? 'blocks' : NAMES[type];     // the Blocks and Pixelwelt themes share one scene: the victim falls into cubes
+    const name = style === 'pixel' ? 'pixel-gore' : style === 'blocks' ? 'blocks' : NAMES[type];     // Blocks: the victim falls into cubes; Pixelwelt: pixel gore
     if (sceneCache.has(name)) return sceneCache.get(name);
     const load = SCENES[`./scenes/${name}.js`];
     let mod = null;
@@ -144,7 +144,7 @@ export function createDirector({ game, controls, stage, ui }) {
       r.fx = fx.fx; r.fxRaw = fx.raw; r.sfx = sfx;
       if (r.ac.signal.aborted) return;
       if (sfx) sfx.sceneActive = true;
-      const swoop = camera(info, mod.cam, short);
+      const swoop = camera(info, mod.camFor?.(info.attacker) || mod.cam, short);
       await Promise.race([swoop, abortion(r)]);
       if (!r.ac.signal.aborted) {
         r.playing = true;

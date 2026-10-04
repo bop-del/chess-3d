@@ -1,6 +1,6 @@
 // Pixelwelt figures in the real page: node test/pixel-chars-page.mjs [--port=5352] [--base=<server>]
 // The theme puts blocky figures on the board (rigs, a piece style), they idle (the head turns, the chest breathes), walk with
-// swinging legs while they move and stand still again, a knight gallops, a capture bursts the victim into cubes (battle On) and
+// swinging legs while they move and stand still again, a knight gallops, a capture plays the pixel gore scene (Short and On) and
 // ends with a clean board, every piece and tray piece changes with the theme in place, leaving the theme gives the lathe pieces back,
 // no console error or warning. Software or GPU GL, quality=low and ?manual=1 so the clock is simulated.
 import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
@@ -49,14 +49,17 @@ try {
   R.expect('gallop: the four legs of the mount swing out of step', gal.filter((x) => Math.abs(x) > 0.15).length >= 3, gal.map((x) => x.toFixed(2)).join(' '));
   await ev(() => window.__chess.step(2));
 
-  // a capture: cubes, then a clean board and the victim in the tray
-  await ev(() => { window.__chess.game.loadFen('8/8/8/3p4/4P3/8/8/4K2k w - - 0 1'); window.__chess.step(2); window.__chess.game.move('e4', 'd5'); });
-  let burst = 0;
-  for (let i = 0; i < 40 && !burst; i++) { await ev(async () => { await window.__chess.stepAsync(0.15); }); burst = await ev(() => window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3).length); }
-  R.expect('capture: the victim bursts into cubes', burst > 20, `${burst} cubes`);
-  await ev(async () => { await window.__chess.stepAsync(5); });
-  const after = await ev(() => ({ audit: window.__chess.game.audit(), busy: window.__chess.game.busy, left: window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3).length, tray: window.__chess.game.getState().captured.b.length }));
-  R.expect('capture: afterwards the board is clean, no cube is left, the victim is in the tray', !after.audit.length && !after.busy && after.left === 0 && after.tray === 1, JSON.stringify(after));
+  // a capture in Short (level 1) and On (level 2): the pixel gore scene plays, the cube count peaks in range, then a clean board and the victim in the tray
+  const cubes = () => ev(() => window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3).length);
+  for (const [mode, lo, hi] of [['short', 9, 60], ['on', 24, 120]]) {
+    await ev((m) => { const c = window.__chess; c.battle.settings.set({ mode: m }); c.game.loadFen('8/8/8/3p4/4P3/8/8/4K2k w - - 0 1'); c.step(2); c.game.move('e4', 'd5'); }, mode);
+    let peak = 0;
+    for (let i = 0; i < 160 && (i < 4 || (await ev(() => window.__chess.game.busy))); i++) { await ev(async () => { await window.__chess.stepAsync(0.1); }); peak = Math.max(peak, await cubes()); }
+    R.expect(`capture ${mode}: the pixel gore scene plays, cube count in range`, peak >= lo && peak <= hi, `peak ${peak} cubes (${lo} to ${hi})`);
+    await ev(async () => { await window.__chess.stepAsync(5); });
+    const after = await ev(() => ({ audit: window.__chess.game.audit(), busy: window.__chess.game.busy, left: window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3).length, tray: window.__chess.game.getState().captured.b.length }));
+    R.expect(`capture ${mode}: afterwards the board is clean, no cube is left, the victim is in the tray`, !after.audit.length && !after.busy && after.left === 0 && after.tray === 1, JSON.stringify(after));
+  }
 
   // the theme in and out in place
   await ev(async () => { await window.__chess.themes.set('wood', { persist: false }); window.__chess.draw(); });
