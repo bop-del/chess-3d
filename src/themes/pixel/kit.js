@@ -2,10 +2,12 @@
 // (top brightest, sides darker by fixed factors), so no smooth gradients anywhere. One material per texture key.
 import * as THREE from 'three';
 import { pixelTextures } from './textures.js';
+import { pixLight, WARM } from '../pixel.js';
 
 export function makePixelKit(track = (t) => t) {
   const T = pixelTextures(track);
-  const bas = (map, extra = {}) => new THREE.MeshBasicMaterial({ map, vertexColors: true, ...extra });
+  const warm = pixLight() === 'b';   // variant b: a warm multiplier colour on the unlit materials (the sun keeps its own colour)
+  const bas = (map, extra = {}) => new THREE.MeshBasicMaterial({ map, vertexColors: true, ...(warm && map !== T.sun ? { color: WARM.world } : {}), ...extra });
   const mats = {};
   for (const k of ['grassTop', 'grassSide', 'dirt', 'stone', 'cobble', 'sand', 'planks', 'logSide', 'logTop', 'sun']) mats[k] = bas(T[k]);
   mats.crate = bas(T.planks);

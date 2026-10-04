@@ -189,6 +189,7 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `touch` | `1`, `0` | `1` forces touch mode on (Medium start tier, page gesture blocking), `0` forces it off (desktop behaviour even on a touch device). With `1` the phone layout is decided from the viewport size (a 390 px wide frame on a desktop gets the thumb bar), not from the screen. Without it touch is detected from the primary input. An explicit `quality` wins over the touch start tier |
 | `light` | `Studio`, `Gallery`, `Sunset`, `Night` | Start with this lighting preset |
 | `theme` | `classic`, `tournament`, `wood`, `metal`, `glass`, `blocks`, `pixel` | Start with this theme for this load only (the swatch row remembers the theme you pick, in `localStorage` `chess3d.theme`) |
+| `pixlight` | `a`, `b` | Pixelwelt light variant for this load only: `a` the plain daylight world, `b` the warm evening mood of Blocks done the Pixelwelt way (peach sky, a warm tint on the unlit materials, a little vignette and bloom). Default `b`. Example: `?theme=pixel&pixlight=a` |
 | `view` | `white`, `black`, `top`, `side`, `iso`, `symbols`, `above`, `play` | Start in this view for this load only (without it the remembered view, or the device default). `play` only exists on a phone in portrait |
 | `preset` | `White view`, `Black view`, `Top down`, `Side`, `Isometric` | Jump to a view preset |
 | `yaw`, `pitch` | degrees | Set the camera angles |

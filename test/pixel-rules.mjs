@@ -103,5 +103,27 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
   }
 }
 
+// 5 Light variants (CHE-181): ?pixlight=a is daylight, b the warm evening mood; both keep every mesh flat and unlit, b only tints
+// through the sky, the grade and the material multiplier colour (no lights, no new textures).
+{
+  const { light, WARM, PIXLIGHT_DEFAULT } = await import('../src/themes/pixel.js');
+  const hex = (c) => '#' + c.getHexString();
+  for (const v of ['a', 'b']) {
+    globalThis.location = { search: `?pixlight=${v}` };
+    const L = light(), w = createPixelWorld({}), ms = [];
+    w.group.traverse((o) => { if (o.isMesh) ms.push(o); });
+    const unlit = ms.every((m) => m.material.isMeshBasicMaterial && (m.material.map || m.material.vertexColors));
+    const sunOk = ms.filter((m) => m.parent?.name === 'sun').every((m) => m.material.color.getHex() === 0xffffff);
+    const tinted = ms.filter((m) => m.parent?.name !== 'sun' && m.material.map).every((m) => m.material.color.getHex() === (v === 'b' ? WARM.world : 0xffffff));
+    check(`variant ${v}: sky, grade and multiplier as specified, every mesh unlit`, unlit && sunOk && tinted && (v === 'b' ? L.bg.bottom === '#ffd6a8' && L.post.tint === '#fff0e0' && L.exposure === 0.88 : L.bg.bottom === '#cfe6ff' && L.post.tint === '#ffffff' && L.exposure === 1.0), `${ms.length} meshes`);
+    w.dispose();
+  }
+  globalThis.location = { search: '' };
+  check(`variant default is ${PIXLIGHT_DEFAULT} without the flag`, light().bg.bottom === (PIXLIGHT_DEFAULT === 'b' ? '#ffd6a8' : '#cfe6ff'));
+  globalThis.location = { search: '?pixlight=x' };
+  check('a bad pixlight value falls back to the default', light().bg.bottom === (PIXLIGHT_DEFAULT === 'b' ? '#ffd6a8' : '#cfe6ff'));
+  delete globalThis.location;
+}
+
 console.log(failed ? `\n${failed} CHECK(S) FAILED` : '\nPIXEL RULES PASSED');
 process.exit(failed ? 1 : 0);

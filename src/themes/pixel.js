@@ -22,7 +22,28 @@ export function board({ track } = {}) {
 
 export function world({ track, view }) { return createPixelWorld({ track, view }); }
 
+// Light variant: ?pixlight=a is the plain daylight Pixelwelt, b the warm evening mood of Blocks done the Pixelwelt way (sky, grade and a
+// warm multiplier on the unlit materials, no real lights). A value in the URL decides, else the default.
+export const PIXLIGHT_DEFAULT = 'b';
+export function pixLight() {
+  const v = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pixlight') : null;
+  return v === 'a' || v === 'b' ? v : PIXLIGHT_DEFAULT;
+}
+export const WARM = { world: 0xffe9d2, figure: 0xfff1e2 };   // multiplier colours of variant b (texture pixels stay as drawn)
+
 export function light() {
+  if (pixLight() === 'b') {
+    return {
+      preset: 'Gallery',
+      key: { color: '#ffc78a', intensity: 2.4, dir: [-10, 16, -8] },
+      fill: { color: '#cfe0ff', intensity: 0.8, dir: [10, 8, 9] },
+      rim: { color: '#ffd9b0', intensity: 0.3, dir: [8, 5, -12] },
+      exposure: 0.88, env: 0.5, floor: '#5b86d6',
+      bg: { top: '#5b86d6', bottom: '#ffd6a8', glow: '#ffe2bd', glowAmount: 0.25 },
+      post: { bloom: 0.05, vignette: 0.2, tint: '#fff0e0' },
+      noFloor: true,
+    };
+  }
   return {
     preset: 'Gallery',
     key: { color: '#fff4d6', intensity: 2.4, dir: [-10, 16, -8] },
@@ -44,7 +65,7 @@ export function pieceStyle(ctx) {
     id: 'pixel',
     build: buildPixelVox,
     mesher: { shade: true },
-    makeMaterial: (tex) => new THREE.MeshBasicMaterial({ map: tex, vertexColors: true }),
+    makeMaterial: (tex) => new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, color: pixLight() === 'b' ? WARM.figure : 0xffffff }),
     decorate(inner, type) {
       const s = new THREE.Mesh(geo, mat);
       s.name = 'blob';
