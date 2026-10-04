@@ -151,7 +151,7 @@ function addClouds(parent, kit) {
     const mats = [];
     g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; mats.push(o.material); } });
     const local = new THREE.Box3().setFromObject(g);
-    g.position.set(x, y, z); g.userData = { x0: x, speed, mats, local, fade: 1 };
+    g.position.set(x, y, z); g.userData = { x0: x, y0: y, speed, mats, local, fade: 1 };
     parent.add(g); out.push(g);
   }
   return out;
@@ -198,6 +198,8 @@ function buildAnim(parent, kit, isl, clouds) {
   };
 }
 
+const MASK_X = 6.6, MASK_TOP = 2.3;       // the prism over the board: crates to x = 6.6, figures to 2.3
+const LIFT = 14, LIFT_FROM = 0.5;           // clouds rise by up to LIFT while the camera elevation is below LIFT_FROM (rad)
 export const approach = (cur, target, step) => (cur < target ? Math.min(target, cur + step) : Math.max(target, cur - step));
 
 /**
@@ -207,11 +209,15 @@ export const approach = (cur, target, step) => (cur < target ? Math.min(target, 
  * tree and the full cloud, so nothing flickers. `state` is read by the smoke tests.
  */
 export function buildAvoid(group, tree, clouds, view, edge = EDGE) {
-  const hullTmp = [], state = { treeHidden: false, treeCovers: false, cloudsHidden: 0 };
+  const hullTmp = [], state = { treeHidden: false, treeCovers: false, cloudsHidden: 0, boardAvoid: true, lift: 0 };
   // the board and its frame (10 x 10) up to the height of the pieces, in world space, as the hull of the corners on screen
   const ground = [];
   for (const y of [0, 1.2]) for (const [x, z] of [[-edge, -edge], [edge, -edge], [edge, edge], [-edge, edge]]) ground.push(new THREE.Vector3(x, y, z));
-  const cornerPts = [], corner = new THREE.Vector3();
+  // what no cloud may cover (CHE-159): the board, its frame, both crates and the figures standing on them, as one prism
+  const mask = [];
+  for (const y of [-0.4, MASK_TOP]) for (const [x, z] of [[-MASK_X, -edge], [MASK_X, -edge], [MASK_X, edge], [-MASK_X, edge]]) mask.push(new THREE.Vector3(x, y, z));
+  const cornerPts = [], corner = new THREE.Vector3(), camLocal = new THREE.Vector3();
+  let lift = 0;
   let grow = 1, lastKey = '', wpts = [];
   return {
     state,
@@ -240,15 +246,22 @@ export function buildAvoid(group, tree, clouds, view, edge = EDGE) {
       tree.group.scale.setScalar(Math.max(grow, 0.0001));
       tree.group.visible = grow > 0.02;
       state.treeHidden = !tree.group.visible;
-      // the clouds
+      // the clouds: they follow the camera height (a low camera looks past the island at the sky, so the clouds go up with it)
+      // and fade out while they would come between the camera and the board or a figure, or behind a control
+      camLocal.copy(camera.position); group.worldToLocal(camLocal);
+      const elev = Math.atan2(camLocal.y, Math.hypot(camLocal.x, camLocal.z));
+      lift = state.boardAvoid ? LIFT * Math.min(1, Math.max(0, (LIFT_FROM - elev) / LIFT_FROM)) : 0;
+      state.lift = lift;
       const polys = rects.map((r) => rectPoly(r, 10));
+      if (state.boardAvoid) polys.push(hull(projectPoints(mask.map((p) => { const q = group.localToWorld(p.clone()); return [q.x, q.y, q.z]; }), camera, w, h)));
       let hidden = 0;
       for (const c of clouds) {
+        c.position.y = c.userData.y0 + lift;
         c.updateWorldMatrix(true, false);
         const wb = c.userData.local.clone().applyMatrix4(c.matrixWorld);
         const poly = hull(projectBox(wb, camera, w, h, hullTmp));
         const hit = polys.some((pl) => overlaps(poly, pl));
-        c.userData.fade = approach(c.userData.fade, hit ? 0 : 1, dt / 0.6);
+        c.userData.fade = approach(c.userData.fade, hit ? 0 : 1, dt / 0.3);
         for (const mt of c.userData.mats) mt.opacity = c.userData.fade;
         c.visible = c.userData.fade > 0.01;
         if (hit) hidden++;

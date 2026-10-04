@@ -139,7 +139,7 @@ function addClouds(parent, kit) {
     const mats = [];
     g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
     const local = new THREE.Box3().setFromObject(g);
-    g.position.set(x, y, z); g.userData = { boxes: m.boxes, x0: x, speed, mats, local, fade: 1 };
+    g.position.set(x, y, z); g.userData = { boxes: m.boxes, x0: x, y0: y, speed, mats, local, fade: 1 };
     parent.add(g); out.push(g);
   }
   return out;
