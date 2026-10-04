@@ -42,8 +42,8 @@ for (const color of ['w', 'b']) {
   if (color === 'w') check('heroes: pawn is the lowest of the foot pieces, king and queen stand above the rook', h('p') < h('r') && h('p') < h('b') && h('r') < h('q') && h('r') < h('k') && h('b') < 1.8);
   else check('critters: pawn is the lowest, king and queen the tallest of the foot pieces', h('p') < h('r') && h('p') < h('b') && h('b') < h('k') && h('k') >= h('q') - 0.12);
 }
-// the three hero pieces that used to look alike (rook, bishop, queen) are told apart at a glance: height (at least 0.12: the short
-// mitre variants sit between the rook and the queen), outline and colour
+// the three hero pieces that used to look alike (rook, bishop, queen) are told apart at a glance: height (at least 0.12: the mitre
+// sits between the rook and the queen), outline and colour
 const dom = (t) => {   // colour of the most voxel volume
   const by = new Map(); for (const p of buildVox('w', t).parts) by.set(p.color, (by.get(p.color) || 0) + p.w * p.h * p.d);
   const c = [...by.entries()].sort((a, b) => b[1] - a[1])[0][0]; return [(c >> 16) & 255, (c >> 8) & 255, c & 255];
@@ -54,21 +54,15 @@ for (const [a, b] of [['r', 'b'], ['r', 'q'], ['b', 'q']]) {
   const dc = Math.hypot(...dom(a).map((v, i) => v - dom(b)[i]));
   check(`heroes: ${TYPES[a]} and ${TYPES[b]} differ in height (${dh.toFixed(2)}), outline (${dw.toFixed(2)} x ${dd.toFixed(2)}) and main colour (${dc.toFixed(0)})`, dh >= 0.12 && Math.max(dw, dd) >= 0.1 && dc >= 25);
 }
-// the bishop mitre variants (?variant=a|b|c): the contract holds for each, b and c stay below the king, an unknown value is b
-const heightOf = (v) => { const { rig } = buildTemplate('w', 'b', mat, (c, t) => buildVox(c, t, v)); return new THREE.Box3().setFromObject(rig).max.y; };
-const kingH = heights.wk, hv = { a: heightOf('a'), b: heightOf('b'), c: heightOf('c') };
-check(`bishop variants: a ${hv.a.toFixed(2)} > c ${hv.c.toFixed(2)} > b ${hv.b.toFixed(2)}`, hv.a > hv.c && hv.c > hv.b);
-check('bishop variant b stays below the king, c stays a clearly tall mitre', hv.b < kingH && hv.b > heights.wr + 0.1 && hv.c > hv.b + 0.15);
-check('bishop variant: the default (no flag, unknown value) is b', Math.abs(heights.wb - hv.b) < 1e-6 && Math.abs(heightOf('zzz') - hv.b) < 1e-6);
-for (const v of ['a', 'b', 'c']) {
-  const { rig } = buildTemplate('w', 'b', mat, (c, t) => buildVox(c, t, v)); const box = new THREE.Box3().setFromObject(rig), size = box.getSize(new THREE.Vector3());
-  const by = new Map(); for (const p of buildVox('w', 'b', v).parts) by.set(p.color, (by.get(p.color) || 0) + p.w * p.h * p.d);
-  const c = [...by.entries()].sort((x, y) => y[1] - x[1])[0][0], col = [(c >> 16) & 255, (c >> 8) & 255, c & 255];
-  const dc = (t) => Math.hypot(...dom(t).map((q, i) => q - col[i]));
-  for (const t of ['r', 'q']) {
-    const dh = Math.abs(box.max.y - heights['w' + t]), dw = Math.abs(size.x - outline['w' + t][0]), dd = Math.abs(size.z - outline['w' + t][1]);
-    check(`variant ${v}: bishop and ${TYPES[t]} differ in height (${dh.toFixed(2)}), outline (${dw.toFixed(2)} x ${dd.toFixed(2)}) and main colour (${dc(t).toFixed(0)})`, dh >= 0.12 && Math.max(dw, dd) >= 0.1 && dc(t) >= 25);
-  }
+// the bishop mitre (the owner's pick, 1.25): below the king, above the rook, and a staff stands beside it in both colours
+check(`hero bishop stays below the king (${heights.wb.toFixed(2)} < ${heights.wk.toFixed(2)}) and above the rook`, heights.wb < heights.wk && heights.wb > heights.wr + 0.1);
+for (const color of ['w', 'b']) {
+  const parts = buildVox(color, 'b').parts, tall = parts.filter((p) => p.x < -4.5 && p.h >= 9 && p.w <= 1.5);
+  check(`${color === 'w' ? 'hero' : 'critter'} bishop carries a staff (a slim tall box at the left, ${tall.length} found)`, tall.length === 1 && tall[0].h >= 12);
 }
+// the red king and queen are told apart: main body colour and outline
+const domB = (t) => { const by = new Map(); for (const p of buildVox('b', t).parts) by.set(p.color, (by.get(p.color) || 0) + p.w * p.h * p.d); const c = [...by.entries()].sort((x, y) => y[1] - x[1])[0][0]; return [(c >> 16) & 255, (c >> 8) & 255, c & 255]; };
+const dk = Math.hypot(...domB('k').map((v, i) => v - domB('q')[i]));
+check(`critters: king and queen differ in main colour (${dk.toFixed(0)}) and outline (${Math.abs(outline.bk[0] - outline.bq[0]).toFixed(2)})`, dk >= 60 && Math.abs(outline.bk[0] - outline.bq[0]) >= 0.1);
 console.log(failed ? `\n${failed} check(s) failed` : '\nBlocks characters contract passed');
 process.exit(failed ? 1 : 0);

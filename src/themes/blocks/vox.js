@@ -130,14 +130,9 @@ function heroKnight(P) {
   face(b, 8.8, 3.4, 3.8); b.parts.slice(-4).forEach((p) => { p.z -= 0.8; });
   return b;
 }
-// The hero bishop's mitre height is a taste variant (?variant=a|b|c, read here and nowhere else): a as first built (1.68 high, taller
-// than the king at 1.30), b shortened so the bishop stays below the king (the default), c in between (1.53, still clearly above the queen). Unknown values give b.
-const MITRE_TOP = { a: 21, b: 15.6, c: 19.1 };
-function mitreVariant(search = typeof location === 'undefined' ? '' : location.search) {
-  const v = new URLSearchParams(search).get('variant');
-  return MITRE_TOP[v] ? v : 'b';
-}
-function heroBishop(P, variant = mitreVariant()) {
+// The hero bishop's mitre top (1.25 high, below the king at 1.30; the owner's final pick of three tried heights).
+const MITRE_TOP = 15.6;
+function heroBishop(P) {
   const W = { ...P, tunic: 0xf4f6fa, tunic2: 0xd3d9e5, trim: 0xe5c45c, cape: 0x2a5fc4 }, b = new Vox();   // a tall slim white robe, blue mitre
   b.add(0, 0, 0, 7.2, 0.6, 5.4, W.trim);                                                   // gold hem
   b.add(0, 0.6, 0, 6.8, 2.4, 5, W.tunic2); b.add(0, 3, 0, 5.8, 3.6, 4.2, W.tunic);          // robe
@@ -153,7 +148,7 @@ function heroBishop(P, variant = mitreVariant()) {
   b.add(0, 8, 0, 4.8, 4.2, 4.4, P.skin); face(b, 8, 4.2, 4.4);
   b.add(0, 8, -2.3, 5, 3.4, 0.5, 0xd8d8d8);                                               // white hair behind
   b.add(0, 12, 0, 5.6, 1, 5, W.trim);                                                      // mitre band
-  const top = MITRE_TOP[variant], n = Math.max(3, Math.round((top - 13) / 1.0)), sh = (top - 13) / n;   // mitre: n steps from y 13 up to top
+  const top = MITRE_TOP, n = Math.max(3, Math.round((top - 13) / 1.0)), sh = (top - 13) / n;   // mitre: n steps from y 13 up to top
   for (let i = 0; i < n; i++) { const ww = 5 - (3.8 * i) / (n - 1); b.add(0, 13 + i * sh, 0, ww, sh + 0.05, ww * 0.8 + 0.4, i % 3 === 2 ? W.trim : W.cape); }   // a blue mitre
   const cv = Math.min(3, (top - 13) * 0.45);
   b.add(0, 13 + (top - 13) * 0.18, 2.3, 0.8, cv, 0.3, W.trim); b.add(0, 13 + (top - 13) * 0.18 + cv * 0.65, 2.3, Math.min(2.4, cv * 0.8 + 0.4), 0.8, 0.3, W.trim);   // gold cross
@@ -212,7 +207,7 @@ function heroKing(P) {
   b.add(4.5, 2.7, 1.4, 0.9, 1, 0.9, P.wood); b.add(4.5, 3.6, 1.4, 3.2, 0.7, 1, P.gold); b.add(4.5, 4.3, 1.4, 0.9, 6.6, 0.5, P.armor);
   return b;
 }
-const HERO_BUILD = { p: heroPawn, r: heroRook, n: heroKnight, b: (P, v) => heroBishop(P, v), q: heroQueen, k: heroKing };
+const HERO_BUILD = { p: heroPawn, r: heroRook, n: heroKnight, b: heroBishop, q: heroQueen, k: heroKing };
 
 // ---------------- critters ----------------
 // The whole torso (body, face, hat, arms) is the 'head' group: a critter looks around by turning its upper body, the legs walk.
@@ -250,10 +245,14 @@ function monsterBishop(S) {
   const w = [5.4, 4.6, 3.8, 3, 2.2, 1.4];
   w.forEach((ww, i) => b.add(i > 2 ? 0.25 * (i - 2) : 0, t + 0.8 + i * 1.0, 0, ww, 1.1, ww * 0.85, S.hat));
   b.add(0, t + 0.8, 0, 5.8, 0.9, 4.9, S.band); b.add(0.6, t + 3.2, 2.4, 1.2, 1.2, 0.3, S.band);
+  b.g = 'body';                                                               // a staff with a big gold crook, standing on the ground beside it
+  const sf = t + 6;
+  b.add(-5.4, 0, 1.2, 1.4, sf, 1.4, 0x9a6b3a); b.add(-4.4, sf, 1.2, 3.8, 1.4, 1.8, S.band); b.add(-3.2, sf - 1.8, 1.2, 1.4, 1.9, 1.8, S.band);   // the crook curls in over the bishop
   return b;
 }
-function monsterQueen(S) {
-  const b = new Vox(); const t = mBody(b, S, { w: 6.4, h: 6.2, d: 5.2, legH: 1, eye: 2, eyeY: 0.52 });
+function monsterQueen(S0) {
+  const S = { ...S0, body: 0xf0689a, body2: 0xc24a7c, belly: 0xffd0e0, cheek: 0xff8ab0, hat: 0xc24a7c }, b = new Vox();   // a rose pink queen, so the red king and queen read apart at a glance
+  const t = mBody(b, S, { w: 6.4, h: 6.2, d: 5.2, legH: 1, eye: 2, eyeY: 0.52 });
   for (const s of [-1, 1]) { b.add(s * 3.7, t - 2.2, 0, 1.4, 2.2, 1.4, S.cheek); b.add(s * 3.7, t - 3.6, 0, 1.8, 1.4, 1.8, S.cheek); }
   const yb = 1 + 6.2 * 0.52 + 2.1;
   for (const s of [-1, 1]) b.add(s * 1.5, yb, 2.9, 1.6, 0.35, 0.4, S.pupil);   // lashes
@@ -306,7 +305,7 @@ function monsterKnight(S) {
 }
 const MON_BUILD = { p: monsterPawn, r: monsterRook, n: monsterKnight, b: monsterBishop, q: monsterQueen, k: monsterKing };
 
-/** The box list of one character (variant: the bishop's mitre a, b or c, tests; the URL flag when absent): color 'w' (blue heroes) or 'b' (red critters), type p, n, b, r, q or k. */
-export function buildVox(color, type, variant) {
-  return color === 'w' ? HERO_BUILD[type](HERO, MITRE_TOP[variant] ? variant : mitreVariant()) : MON_BUILD[type](CRIT);
+/** The box list of one character: color 'w' (blue heroes) or 'b' (red critters), type p, n, b, r, q or k. */
+export function buildVox(color, type) {
+  return color === 'w' ? HERO_BUILD[type](HERO) : MON_BUILD[type](CRIT);
 }
