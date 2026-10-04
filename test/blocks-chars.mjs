@@ -3,7 +3,8 @@
 // Run: node test/blocks-chars.mjs    Exit 0 pass, 1 on any failed check.
 import * as THREE from 'three';
 import { buildTemplate } from '../src/themes/blocks/rig.js';
-import { buildVox } from '../src/themes/blocks/vox.js';
+import { coplanarOverlaps } from '../src/themes/blocks/mesher.js';
+import { buildVox, queenVariant } from '../src/themes/blocks/vox.js';
 
 const TYPES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
 const mat = new THREE.MeshBasicMaterial();
@@ -60,9 +61,30 @@ for (const color of ['w', 'b']) {
   const parts = buildVox(color, 'b').parts, tall = parts.filter((p) => p.x < -4.5 && p.h >= 9 && p.w <= 1.5);
   check(`${color === 'w' ? 'hero' : 'critter'} bishop carries a staff (a slim tall box at the left, ${tall.length} found)`, tall.length === 1 && tall[0].h >= 12);
 }
-// the red king and queen are told apart: main body colour and outline
-const domB = (t) => { const by = new Map(); for (const p of buildVox('b', t).parts) by.set(p.color, (by.get(p.color) || 0) + p.w * p.h * p.d); const c = [...by.entries()].sort((x, y) => y[1] - x[1])[0][0]; return [(c >> 16) & 255, (c >> 8) & 255, c & 255]; };
+const domB = (t) => { const by = new Map(); for (const p of buildVox('b', t).parts) by.set(p.color, (by.get(p.color) || 0) + p.w * p.h * p.d); const c = [...by.entries()].sort((x, y) => y[1] - x[1])[0][0]; return rgb(c); };
+const rgb = (c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+// the red king and queen are told apart in all three queen variants (rqueen=a|b|c): outline, and a crown or body colour the king lacks;
+// no variant is pink; every box is a plain positive box, no two boxes share a coplanar overlapping face, every colour is a pixel colour
+const kingColours = new Set(buildVox('b', 'k').parts.map((p) => p.color));
+const F = { px: 1, nx: 1, py: 1, ny: 1, pz: 1, nz: 1 };
+const overlapCoplanar = (parts) => coplanarOverlaps(parts.filter((p) => !p.ry).map((p) => ({ x: p.x - p.w / 2, y: p.y, z: p.z - p.d / 2, w: p.w, h: p.h, d: p.d, color: p.color, faces: F }))).length;
+for (const v of ['a', 'b', 'c']) {
+  const parts = buildVox('b', 'q', v).parts, tag = `red queen ${v}`;
+  const by = new Map(); for (const p of parts) by.set(p.color, (by.get(p.color) || 0) + p.w * p.h * p.d);
+  const dom = rgb([...by.entries()].sort((x, y) => y[1] - x[1])[0][0]), dk = Math.hypot(...dom.map((x, i) => x - rgb([...new Set(buildVox('b', 'k').parts.map((p) => p.color))][0])[i]));
+  const odd = [...by.keys()].filter((c) => !kingColours.has(c)).length;
+  const pink = [...by.keys()].filter((c) => { const [r, g, b] = rgb(c); return r > 200 && b > 120 && b > g + 20 && r - g > 60; });   // rose or magenta pink
+  
+  check(`${tag}: no pink box (${pink.length}), a colour the king lacks (${odd}) and a body other than the pink of old`, pink.length === 0 && odd >= 2 && dom[0] > 100);
+  check(`${tag}: all boxes positive and in the head or leg groups`, parts.every((p) => p.w > 0 && p.h > 0 && p.d > 0 && (p.g === 'head' || p.g.startsWith('leg'))));
+  const q = buildVox('b', 'q', v), top = Math.max(...q.parts.map((p) => p.y + p.h)) * 0.08;
+  check(`${tag}: stays below the king (${top.toFixed(2)})`, top <= heights.bk + 1e-6 && top > 0.8);
+  check(`${tag}: no coplanar overlapping faces`, overlapCoplanar(parts) === 0, `${overlapCoplanar(parts)} found`);
+}
 const dk = Math.hypot(...domB('k').map((v, i) => v - domB('q')[i]));
-check(`critters: king and queen differ in main colour (${dk.toFixed(0)}) and outline (${Math.abs(outline.bk[0] - outline.bq[0]).toFixed(2)})`, dk >= 60 && Math.abs(outline.bk[0] - outline.bq[0]) >= 0.1);
+check(`critters: king and queen differ in outline (${Math.abs(outline.bk[0] - outline.bq[0]).toFixed(2)}); default queen is variant a (${dk.toFixed(0)} colour distance, the crown tells them apart)`, Math.abs(outline.bk[0] - outline.bq[0]) >= 0.1);
+check('rqueen flag: a, b, c are read, no flag is a, an unknown value is ignored', queenVariant('?theme=blocks&rqueen=b') === 'b' && queenVariant('?rqueen=c') === 'c' && queenVariant('') === 'a' && queenVariant('?rqueen=z') === 'a' && queenVariant('?rqueen=') === 'a');
+const sig = (v) => JSON.stringify(buildVox('b', 'q', v).parts);
+check('the three queen variants differ from each other', new Set(['a', 'b', 'c'].map(sig)).size === 3 && sig(undefined) === sig('a'));
 console.log(failed ? `\n${failed} check(s) failed` : '\nBlocks characters contract passed');
 process.exit(failed ? 1 : 0);

@@ -250,16 +250,45 @@ function monsterBishop(S) {
   b.add(-5.4, 0, 1.2, 1.4, sf, 1.4, 0x9a6b3a); b.add(-4.4, sf, 1.2, 3.8, 1.4, 1.8, S.band); b.add(-3.2, sf - 1.8, 1.2, 1.4, 1.9, 1.8, S.band);   // the crook curls in over the bishop
   return b;
 }
-function monsterQueen(S0) {
-  const S = { ...S0, body: 0xf0689a, body2: 0xc24a7c, belly: 0xffd0e0, cheek: 0xff8ab0, hat: 0xc24a7c }, b = new Vox();   // a rose pink queen, so the red king and queen read apart at a glance
+// The red queen has three looks behind the URL flag rqueen=a|b|c (a is the default, an unknown value is ignored). None is pink: the
+// queen is told apart from the red king by her crown and her outline (the king has horns, a gold crown with a cross and is wider).
+export const QUEEN_VARIANTS = ['a', 'b', 'c'];
+/** The variant asked for by a query string like "?rqueen=b"; 'a' when the flag is missing or unknown. */
+export function queenVariant(search = globalThis.location ? globalThis.location.search : '') {
+  const v = new URLSearchParams(search).get('rqueen');
+  return QUEEN_VARIANTS.includes(v) ? v : 'a';
+}
+function monsterQueen(S0, variant = 'a') {
+  const violet = variant === 'c';
+  const S = violet
+    ? { ...S0, body: 0x8e2a5e, body2: 0x5e1a45, belly: 0xe8b0a0, cheek: 0xe0707a, hat: 0x5e1a45 }
+    : { ...S0, cheek: 0xff9a8a };
+  const b = new Vox();
   const t = mBody(b, S, { w: 6.4, h: 6.2, d: 5.2, legH: 1, eye: 2, eyeY: 0.52 });
-  for (const s of [-1, 1]) { b.add(s * 3.7, t - 2.2, 0, 1.4, 2.2, 1.4, S.cheek); b.add(s * 3.7, t - 3.6, 0, 1.8, 1.4, 1.8, S.cheek); }
+  for (const s of [-1, 1]) { b.add(s * 3.7, t - 2.5, 0, 1.4, 2.2, 1.4, S.body2); b.add(s * 3.7, t - 3.8, 0, 1.8, 1.4, 1.8, S.body2); }   // side curls
   const yb = 1 + 6.2 * 0.52 + 2.1;
   for (const s of [-1, 1]) b.add(s * 1.5, yb, 2.9, 1.6, 0.35, 0.4, S.pupil);   // lashes
-  b.add(0, t, 0, 6.6, 1.2, 5.4, S.gold);
-  for (const [x, z, h] of [[-2.8, -2, 2], [0, -2, 1.5], [2.8, -2, 2], [-2.8, 2, 2], [0, 2, 1.5], [2.8, 2, 2], [-2.8, 0, 1.5], [2.8, 0, 1.5]]) b.add(x, t + 1.2, z, 0.9, h, 0.9, S.gold);
-  b.add(0, t + 0.2, 2.8, 1.2, 1, 0.4, 0xff4a8a); b.add(0, t + 1.2, 0, 1.4, 1.3, 1.4, S.gem);
-  b.add(2.6, t - 0.2, 2.3, 2.4, 1.6, 0.8, 0xff4a8a); b.add(2.6, t - 1.0, 2.5, 0.9, 1, 0.4, 0xff4a8a);   // bow
+  if (variant === 'a') {                                                       // a silver tiara with a tall centre spire and an icy gem
+    const silver = 0xdfe6ee, ice = 0x9fe8ff;
+    b.add(0, t, 0, 6.6, 1, 5.4, silver);
+    for (const [x, h] of [[-2.8, 1.6], [-1.4, 2.6], [0, 3.8], [1.4, 2.6], [2.8, 1.6]]) b.add(x, t + 1, 2, 0.9, h, 0.9, silver);   // front spikes
+    for (const [x, h] of [[-2.8, 1.4], [0, 2], [2.8, 1.4]]) b.add(x, t + 1, -2, 0.9, h, 0.9, silver);
+    b.add(0, t + 4.8, 2, 0.6, 1, 0.6, silver);                                 // the spire's tip
+    b.add(0, t + 0.1, 2.8, 1.2, 0.8, 0.4, ice); b.add(0, t + 2, 2.55, 0.6, 1.2, 0.4, ice);
+  } else {
+    const gold = S.gold;
+    b.add(0, t, 0, 6.6, 1.2, 5.4, gold);
+    for (const [x, z, h] of [[-2.8, -2, 2], [0, -2, 1.5], [2.8, -2, 2], [-2.8, 2, 2], [0, 2, 1.5], [2.8, 2, 2], [-2.8, 0, 1.5], [2.8, 0, 1.5]]) b.add(x, t + 1.2, z, 0.9, h, 0.9, gold);
+    if (variant === 'b') {                                                     // a fan of three tall blue-white gems and a dark red veil
+      const white = 0xcfefff, veil = 0x7a1f26;
+      b.add(0, t + 0.1, 2.8, 1.2, 0.8, 0.4, white);
+      for (const [x, h] of [[-1.8, 3], [0, 4.2], [1.8, 3]]) b.add(x, t + 1.2, -0.4, 1.1, h, 1.1, white);
+      b.add(0, 1, -3, 7.4, t + 1.2, 0.8, veil); b.add(0, 1.5, -3.7, 5.6, t - 2.5, 0.7, 0x5a1219);
+    } else {                                                                   // violet-red body, gold crown and a small gold orb on top
+      b.add(0, t + 0.1, 2.8, 1.2, 0.8, 0.4, 0xe0707a); b.add(0, t + 1.2, 0, 1.4, 1.3, 1.4, S.gem);
+      b.add(0, t + 2.5, 0, 0.6, 0.6, 0.6, gold); b.add(0, t + 3.1, 0, 1.6, 1.6, 1.6, gold);
+    }
+  }
   return b;
 }
 function monsterKing(S) {
@@ -306,6 +335,7 @@ function monsterKnight(S) {
 const MON_BUILD = { p: monsterPawn, r: monsterRook, n: monsterKnight, b: monsterBishop, q: monsterQueen, k: monsterKing };
 
 /** The box list of one character: color 'w' (blue heroes) or 'b' (red critters), type p, n, b, r, q or k. */
-export function buildVox(color, type) {
-  return color === 'w' ? HERO_BUILD[type](HERO) : MON_BUILD[type](CRIT);
+export function buildVox(color, type, queen = queenVariant()) {
+  if (color === 'w') return HERO_BUILD[type](HERO);
+  return type === 'q' ? monsterQueen(CRIT, queen) : MON_BUILD[type](CRIT);
 }
