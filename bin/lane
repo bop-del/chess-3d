@@ -18,6 +18,8 @@
 //                                       (default model sonnet), prompted to read the brief and to send its final
 //                                       report to the lead session (Herdr agent chess-3d-lead). With the private
 //                                       bin/agent-stop-hook present, the agent also gets a Stop hook that saves its report.
+//                                       With the private agents/builder.md present, the prompt starts with it, then `Mode for this brief:`
+//                                       builder or engineer, from the brief's `Mode:` line (builder when missing; tools/lane-identity.mjs, CHE-104).
 //   bin/lane list                       open lanes of this repo
 //   bin/lane land <branch> [-m <msg>]   land a green lane with no agent (the private bin/land-lane): lock, merge main, fast tier, the
 //                                       lane's affected smoke groups, release-next add, then close below; prints `landed <sha>`,
@@ -39,6 +41,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileS
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseLaneFlags } from '../tools/lane-args.mjs';
+import { agentPrompt } from '../tools/lane-identity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USAGE = 'usage: bin/lane open <che-n-words | branch --key CHE-n> [--key CHE-n]... [--private] [--agent <name> <brief> [--model <m>]] | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
@@ -185,7 +188,8 @@ function agent(branch, name, brief, model = 'sonnet') {
     + (priv ? `This lane also has a private repo worktree: ${priv}. Edit the private repo files ONLY there (never ~/code/chess-3d-private itself), commit WIP there with git add -A and a message ending in [no-doc]. board.json, pulse.json, sdlc-events.jsonl, metrics/, .tmp/, review/out/ and RESTART-PROMPT.md are live files: never commit them. ` : '')
     + 'If the send is refused (the lead may be waiting on the owner), retry every 2 minutes, at most 10 times. '
     + 'Then stop and wait; the lead may message you with follow ups.';
-  run('herdr', ['agent', 'prompt', id, prompt]);
+  // CHE-104: the private agents/builder.md (identity, owner, goals, mode) goes first when it exists
+  run('herdr', ['agent', 'prompt', id, agentPrompt(prompt, brief)]);
   console.log(`agent ${id} started in tab "${name} agent" of workspace ${lane.open_workspace_id} (${model}); it reports to ${LEAD}`);
 }
 

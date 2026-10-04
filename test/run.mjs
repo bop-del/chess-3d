@@ -71,6 +71,7 @@ if (tier === 'fast' || tier === 'all') {
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
   run('bin/lane flag parsing (test/lane-args.mjs)', 'test/lane-args.mjs');
+  run('bin/lane agent identity prepend (test/lane-identity.mjs)', 'test/lane-identity.mjs');
   run('affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
   run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
