@@ -10,6 +10,9 @@
 //                                       report to the lead session (Herdr agent chess-3d-lead). With the private
 //                                       bin/agent-stop-hook present, the agent also gets a Stop hook that saves its report.
 //   bin/lane list                       open lanes of this repo
+//   bin/lane land <branch> [-m <msg>]   land a green lane with no agent (the private bin/land-lane): lock, merge main, fast tier, the
+//                                       lane's affected smoke groups, release-next add, then close below; prints `landed <sha>`,
+//                                       `red: <step>` or `conflict: <files>` (exit 0, 1, 3). Needs the private repo's bin/land-lane.
 //   bin/lane close <branch> [-m <msg>]  squash merge into main (the main checkout, which must be on main), then remove the
 //                                       workspace, the worktree and the branch. Without -m the lane's only commit message
 //                                       is reused; a lane with several commits needs -m.
@@ -20,7 +23,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const USAGE = 'usage: bin/lane open <branch> | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane close <branch> [-m <message>]';
+const USAGE = 'usage: bin/lane open <branch> | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>]';
 const LEAD = 'chess-3d-lead';   // the lead session\'s Herdr agent name
 const die = (msg, code = 1) => { console.error(msg); process.exit(code); };
 // the main clone, also when this script runs from inside a lane. Every git command below runs there.
@@ -146,11 +149,20 @@ function close(branch, message) {
   console.log('Servers the lane started are not stopped here: stop them by PID. Pushing needs the owner\'s go.');
 }
 
+// landing by script (S49): hands over to the private bin/land-lane, which ends in `bin/lane close` itself
+function land(branch, message) {
+  const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'land-lane');
+  if (!existsSync(h)) die('bin/lane land needs ~/code/chess-3d-private/bin/land-lane (the private landing script)');
+  const r = spawnSync(process.execPath, [h, branch, ...(message ? ['-m', message] : [])], { stdio: 'inherit', env: { ...process.env, LAND_MAIN: MAIN } });
+  process.exit(r.status ?? 1);
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 try {
   if (cmd === 'open' && rest.length === 1) open(rest[0]);
   else if (cmd === 'agent' && (rest.length === 3 || (rest.length === 5 && rest[3] === '--model'))) agent(rest[0], rest[1], rest[2], rest[4]);
   else if (cmd === 'list' && !rest.length) list();
+  else if (cmd === 'land' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) land(rest[0], rest[2]);
   else if (cmd === 'close' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) close(rest[0], rest[2]);
   else die(USAGE, 2);
 } catch (e) {
