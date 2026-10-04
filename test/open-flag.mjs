@@ -2,7 +2,7 @@
 // ai=0, quality=low, manual=1, intro=0. Every value on desktop and on a phone in portrait and landscape: the target is on screen,
 // not collapsed, and the right tab is selected. An unknown value changes nothing and prints nothing. open combines with view.
 // --part=i/n runs every n-th unit. Exit codes: 0 pass, 1 a check failed, 2 setup error.
-import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, watchPage, startServer, build, settleUi } from '../tools/_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
@@ -65,7 +65,7 @@ async function load(page, [, w, h, phone], query) {
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   const err = await page.evaluate(() => window.__chessError || null);
   if (err) throw new Error('page failed to start: ' + err);
-  await new Promise((r) => setTimeout(r, 700));   // the sheet slide (0.3 s of CSS, real time even with manual=1)
+  await settleUi(page);   // the sheet slide (0.3 s of CSS, real time even with manual=1)
 }
 
 // the element exists, has a size, is on screen and no ancestor card is collapsed or sheet closed

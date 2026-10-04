@@ -4,6 +4,7 @@
 // Run alone with its own server: node test/puzzles.mjs [--port=5365]
 // `shot(name)` is optional and saves a screenshot when the smoke run was started with --shots.
 import { pathToFileURL } from 'node:url';
+import { settleUi } from '../tools/_lib.mjs';
 
 const FLAGS = 'quality=low&manual=1&ai=0';
 
@@ -20,7 +21,7 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
     await page.goto(`${baseUrl}/?${FLAGS}${extra}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step && !!window.__chess.puzzles', { timeout: 120000 });
     await page.evaluate(() => { window.__chess.game.on('promotion', (e) => { window.__promo = e; }); });
-    await new Promise((r) => setTimeout(r, 900));   // the loader fades on the real clock
+    await settleUi(page);
   };
   const step = (s) => page.evaluate((x) => { window.__chess.step(x); window.__chess.draw(); }, s);
   const st = () => page.evaluate(() => {
@@ -168,7 +169,7 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     await load('&touch=1');
     await page.evaluate(() => { window.__chess.train.learn.show('puzzles'); window.__chess.ui.learnSheet.open(); });
-    await new Promise((r) => setTimeout(r, 1000));   // the sheet slides in on the real clock
+    await settleUi(page);
     await step(0.3);
     const sheetTab = await page.evaluate(() => { const b = document.querySelector('.psheet.plearn .pzstart'); const r = b && b.getBoundingClientRect(); const tabs = document.querySelector('.psheet.plearn .xtabs'); return { h: r && r.height, inView: r && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, rect: r && [r.left, r.top, r.right, r.bottom, innerWidth, innerHeight], tabsFit: tabs && tabs.scrollWidth <= tabs.clientWidth + 1 }; });
     ok('puzzles: phone Learn sheet shows a 44 px Start inside the screen, four tabs fit', sheetTab.h >= 44 && sheetTab.inView && sheetTab.tabsFit, JSON.stringify(sheetTab));
@@ -190,11 +191,11 @@ export async function runPuzzleChecks({ page, baseUrl, log = () => {}, shot = nu
     ok('puzzles: phone, solved: exactly one Next is visible, the learning bar one', s.phase === 'solved' && nexts.length === 1 && nexts[0] === 'tb:next', JSON.stringify({ phase: s.phase, nexts }));
     await shot?.('puzzles-phone-solved');
     await page.setViewport({ width: 844, height: 390, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
-    await new Promise((r) => setTimeout(r, 500));   // touch resizes settle on the real clock
+    await settleUi(page);
     await step(0.5);
     await shot?.('puzzles-phone-landscape');
     await page.setViewport({ width: 844, height: 290, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
-    await new Promise((r) => setTimeout(r, 500));   // touch resizes settle on the real clock
+    await settleUi(page);
     await step(0.5);
     await shot?.('puzzles-phone-short');
     ok('puzzles: the strip stays inside the short landscape screen', await page.evaluate(() => { const r = document.querySelector('.pzstrip')?.getBoundingClientRect(); return !!r && r.bottom <= innerHeight && r.right <= innerWidth; }));

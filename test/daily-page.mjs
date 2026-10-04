@@ -4,6 +4,7 @@
 // stored moves marks the day done and the card says "Heute gelöst"; the path stats do not change.
 // Run alone with its own server: node test/daily-page.mjs [--port=5366] [--shots]
 import { pathToFileURL } from 'node:url';
+import { settleUi } from '../tools/_lib.mjs';
 
 const FLAGS = 'quality=low&manual=1&ai=0&intro=0';
 
@@ -21,7 +22,7 @@ export async function runDailyChecks({ page, baseUrl, log = () => {}, shot = nul
     await page.setViewport(sizes[size]);
     await page.goto(`${baseUrl}/?${FLAGS}${size === 'phone' ? '&touch=1' : ''}&${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step && !!window.__chess.daily', { timeout: 120000 });
-    await new Promise((r) => setTimeout(r, 900));   // the loader fades and the sheet slides on the real clock
+    await settleUi(page);
   };
   const step = (s) => page.evaluate((x) => { window.__chess.step(x); window.__chess.draw(); }, s);
   const card = () => page.evaluate(() => {
@@ -108,7 +109,7 @@ export async function runDailyChecks({ page, baseUrl, log = () => {}, shot = nul
     ok('daily: the card shows "Heute gelöst" with a gold mark and the streak, no Start', c && !c.hidden && c.state === 'done' && c.mark === 'g' && /Heute gelöst/.test(c.text) && /1 Tag in Folge/.test(c.text) && !c.start && /gold/.test(c.dot || ''), c && c.text);
     await page.evaluate(() => window.__chess.ui.openPanel('daily'));
     await step(0.5);
-    await new Promise((r) => setTimeout(r, 500));
+    await settleUi(page);
     await shot?.('daily-desktop-done');
 
     // ---- the next day: yesterday's run is alive, solved with Help makes silver and 2 in a row
@@ -147,14 +148,14 @@ export async function runDailyChecks({ page, baseUrl, log = () => {}, shot = nul
     // ---- phone: ?open=daily opens the Menu sheet on the Game section
     await load('open=daily&daily=2026-10-03', 'phone');
     await step(1);
-    await new Promise((r) => setTimeout(r, 500));
+    await settleUi(page);
     c = await card(); s = await st();
     ok('daily: on a phone ?open=daily opens the Menu sheet with the card inside the screen', c && !c.hidden && c.sheetOpen === true && c.left >= 0 && c.right <= c.w && c.top >= 0 && c.bottom <= c.h, JSON.stringify(c));
     ok('daily: phone card shows "Heute gelöst" for the solved day', c && /Heute gelöst/.test(c.text) && /Tagesrätsel/.test(c.text), c && c.text);
     ok('daily: on the phone the card is the first block of the Game section and does not start the puzzle', s.phase === 'idle' && await page.evaluate(() => document.querySelector('.card[data-card="game"] .body').firstElementChild.classList.contains('dailycard')));
     await shot?.('daily-phone-open');
     await load('open=daily&daily=2026-10-09', 'phone');
-    await new Promise((r) => setTimeout(r, 500));
+    await settleUi(page);
     c = await card();
     ok('daily: phone card of an open day has the Start button at 44 px or more', c && c.start && await page.evaluate(() => document.querySelector('.dcstart').getBoundingClientRect().height >= 44));
     await shot?.('daily-phone-start');
@@ -170,7 +171,7 @@ export async function runDailyChecks({ page, baseUrl, log = () => {}, shot = nul
     await page.evaluate(() => { window.__chess.badges.earn('puzzles-10'); window.__chess.daily.finish(true); });
     const before = await keep();
     await page.evaluate(() => document.querySelector('.xdata .xrow button').click());
-    await new Promise((r) => setTimeout(r, 300));
+    await settleUi(page);
     const text = await page.evaluate(() => window.__blob.text());
     const obj = JSON.parse(text);
     ok('export: the file has daily and badges next to the openings and puzzles', obj.daily?.days?.['2026-03-04'] === 'g' && obj.badges?.earned?.['puzzles-10'] && 'puzzles' in obj, Object.keys(obj).join(','));
@@ -179,12 +180,12 @@ export async function runDailyChecks({ page, baseUrl, log = () => {}, shot = nul
     const f1 = join(tmpdir(), `chess3d-export-${process.pid}.json`), f2 = join(tmpdir(), `chess3d-old-${process.pid}.json`);
     writeFileSync(f1, text);
     await (await page.$('.xdata input[type=file]')).uploadFile(f1);
-    await new Promise((r) => setTimeout(r, 600));
+    await settleUi(page);
     ok('import: the daily streak and the badges come back', (await keep()) === before, await keep());
     const old = { ...obj }; delete old.daily; delete old.badges;
     writeFileSync(f2, JSON.stringify(old));
     await (await page.$('.xdata input[type=file]')).uploadFile(f2);
-    await new Promise((r) => setTimeout(r, 600));
+    await settleUi(page);
     ok('import: an old file without daily and badges still imports and leaves them alone', (await page.evaluate(() => document.querySelector('.xdatamsg').textContent)) === 'Importiert.' && (await keep()) === before);
     try { (await import('node:fs')).rmSync(f1); (await import('node:fs')).rmSync(f2); } catch (e) { /* ignore */ }
   } finally {

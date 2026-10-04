@@ -6,7 +6,7 @@
 // and the other themes keep the quiet gold one, the block textures use mipmaps when minified (no moire on the corner posts).
 // ai=0, manual=1, quality=low: time by __chess.step()/draw(). Exit codes: 0 pass, 1 a check failed.
 import { mkdirSync } from 'node:fs';
-import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, watchPage, startServer, build, settleUi } from '../tools/_lib.mjs';
 const args = process.argv.slice(2);
 const opt = (k, d) => (args.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).slice(k.length + 3);
 const PORT = Number(opt('port', 5353)), BASE = opt('base', '').replace(/\/$/, ''), SHOTS = opt('shots', '');
@@ -137,7 +137,7 @@ try {
     for (let i = 0; i < 20 && !(await page.evaluate(() => !!document.getElementById('bn-review-game') && !document.getElementById('banner').hidden)); i++) await settle(0.5);
     await page.evaluate(() => document.getElementById('bn-review-game').click());
     await settle(3);
-    await new Promise((r) => setTimeout(r, 400));
+    await settleUi(page);
     const m = await page.evaluate(() => {
       const c = window.__chess, cam = c.stage.camera, V = c.THREE.Vector3; cam.updateMatrixWorld();
       const lows = [-5, 5].flatMap((x) => [-5, 5].map((z) => { const v = c.gimbal.localToWorld(new V(x, 0, z)).project(cam); return (1 - v.y) / 2 * innerHeight; }));

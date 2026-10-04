@@ -9,7 +9,9 @@
 //   forced touch on a desktop    ?touch=1 on a large screen: 390x844 and 844x390 viewports get body.phone and the thumb bar, 1280x800 does not
 //   HUD buttons                    New game, the Controls drawer and a view preset respond to taps
 // Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 setup error.
-import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort, proveGpu } from '../tools/_lib.mjs';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, settleUi, claimPort, proveGpu } from '../tools/_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
@@ -139,7 +141,7 @@ async function runSize(size) {
     let collapsedGame = false;
     if (!(await sqXY('e2')).found || !(await sqXY('d2')).found) {
       R.warn(`${tag}: the Game card covers the white pieces, tapping the board needs it collapsed`, 'e2 or d2 cannot be tapped in the default layout');
-      collapsedGame = await tapEl(gameHdr); await sleep(400); await step(0.5);
+      collapsedGame = await tapEl(gameHdr); await settleUi(page); await step(0.5);
     }
     await ev(() => { const st = document.createElement('style'); st.id = 'touch-test-park'; st.textContent = '#tools { pointer-events: none !important; } #tools * { pointer-events: none !important; }'; document.head.append(st); });
     await tapSq('e2');
@@ -235,7 +237,7 @@ async function runSize(size) {
       const ofs = Math.min(40, off.w / 4);
       await down(1, off.x - ofs, off.y); await down(2, off.x + ofs, off.y);
       await moveTo(1, off.x - ofs * 2, off.y, 4); await moveTo(2, off.x + ofs * 2, off.y, 4);
-      await up(2); await up(1); await sleep(100);
+      await up(2); await up(1); await settleUi(page);
       const tt = await ev(() => window.__tt);
       s = await state();
       R.expect(`${tag}: visual viewport scale stays 1 after pinch and double tap`, s.scale === 1, `scale ${s.scale}`);
@@ -246,7 +248,7 @@ async function runSize(size) {
 
     // ---- HUD buttons respond to taps
     await ev(() => document.getElementById('touch-test-park')?.remove());
-    if (collapsedGame) { await tapEl(gameHdr); await sleep(400); }
+    if (collapsedGame) { await tapEl(gameHdr); await settleUi(page); }
     const hudOk = await ev(() => !!document.getElementById('btn-new'));
     R.expect(`${tag}: HUD is built`, hudOk, '');
     // a view. Phone HUD: the Views button on the thumb bar cycles the views (src/views/registry.js: Play, Symbols, From above first on a phone in portrait,
@@ -263,10 +265,10 @@ async function runSize(size) {
     } else {
     const presetSel = '#presets .preset:nth-child(3)';
     let c = await centre(presetSel);
-    if (!c) { await tapEl('.drawer-btn'); await sleep(150); c = await centre(presetSel); }
+    if (!c) { await tapEl('.drawer-btn'); await settleUi(page); c = await centre(presetSel); }
     if (!c) {   // the View card can be collapsed too
       const hdr = await ev(() => { const h = document.querySelector('#presets')?.closest('.card')?.querySelector('header'); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-      if (hdr) { await tap(hdr.x, hdr.y); await sleep(150); c = await centre(presetSel); }
+      if (hdr) { await tap(hdr.x, hdr.y); await settleUi(page); c = await centre(presetSel); }
     }
     if (!c) R.fail(`${tag}: a view preset button can be reached and tapped`, 'not visible even with the drawer open');
     else {
@@ -295,25 +297,25 @@ async function runSize(size) {
       let closed = false;
       for (let k = 0; k < 30 && !closed; k++) { await sleep(100); closed = !(await ev(() => document.querySelector('.psheet')?.classList.contains('open'))); }
       R.expect(`${tag}: the sheet's close button closes it`, closed, 'closed', 'still open');
-      await sleep(500);
+      await settleUi(page);
     }
     // New game: on the phone HUD a game in progress asks "Start a new game?" first (Yes and Cancel)
     const newBtn = '.tb[data-act="new"]';
     const before = (await state()).moves.length;
     let tapped = await tapEl(newBtn) || await tapEl('#btn-new');
-    if (!tapped) { await tapEl('.drawer-btn'); await sleep(150); tapped = await tapEl('#btn-new'); }
-    await sleep(200);
+    if (!tapped) { await tapEl('.drawer-btn'); await settleUi(page); tapped = await tapEl('#btn-new'); }
+    await settleUi(page);
     const asked = await centre('.pconfirm [data-a="no"]');
     if (asked) {
-      await tap(asked.x, asked.y); await sleep(200); await step(0.5);
+      await tap(asked.x, asked.y); await settleUi(page); await step(0.5);
       s = await state();
       R.expect(`${tag}: Cancel on the new game question keeps the game`, s.moves.length === before && before > 0 && !(await centre('.pconfirm [data-a="no"]')), `${before} moves kept, question closed`, `moves ${s.moves.length} of ${before}`);
-      await tapEl(newBtn); await sleep(200);
+      await tapEl(newBtn); await settleUi(page);
       const yes = await centre('.pconfirm [data-a="yes"]');
       if (yes) await tap(yes.x, yes.y);
       else R.fail(`${tag}: the Yes button of the new game question can be tapped`, 'not reachable');
     }
-    await sleep(100); await step(2.5);
+    await settleUi(page); await step(2.5);
     s = await state();
     R.expect(`${tag}: tapping New game, then Yes, resets the game`, tapped && s.moves.length === 0 && s.turn === 'w' && s.audit.length === 0, 'start position', `tapped ${tapped}, asked ${!!asked}, moves ${s.moves.length}`);
     R.expect(`${tag}: no console or page error during the touch run`, watch.errs.length === 0, 'clean', watch.errs.slice(0, 3).join(' | '));
@@ -334,7 +336,7 @@ async function runForced(size) {
     R.expect(`${tag}: screen is larger than a phone`, f.screenShort > 500, '> 500', String(f.screenShort));
     R.expect(`${tag}: phone class ${size.phone ? 'set' : 'not set'}`, f.phone === size.phone, String(size.phone), String(f.phone));
     R.expect(`${tag}: thumb bar ${size.phone ? 'built' : 'absent'}`, f.pbar === size.phone, String(size.phone), String(f.pbar));
-    if (size.phone && size.name === 'portrait') await page.screenshot({ path: '.tmp/builder/forced-390x844.png' });
+    if (size.phone && size.name === 'portrait') { mkdirSync(join(ROOT, '.tmp', 'builder'), { recursive: true }); await page.screenshot({ path: '.tmp/builder/forced-390x844.png' }); }
     R.expect(`${tag}: no console or page error`, watch.errs.length === 0, 'clean', watch.errs.slice(0, 3).join(' | '));
   } finally { await page.close().catch(() => {}); }
 }

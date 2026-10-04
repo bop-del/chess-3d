@@ -3,6 +3,7 @@
 // (src/main.js). Uses ?quality=low&manual=1&ai=0. Asserts order and attribution, never durations: time is stepped with
 // __chess.step. A scheduled session with one miss and its retry, a Practise run that changes no level, the end sweep.
 // `shot(name)` is optional and saves a screenshot when the smoke run was started with --shots.
+import { settleUi } from '../tools/_lib.mjs';
 
 const FLAGS = 'quality=low&manual=1&ai=0';
 
@@ -63,7 +64,7 @@ export async function runDrillChecks({ page, baseUrl, log = () => {}, shot = nul
   try {
     await step(1);
     await page.waitForFunction("document.body.classList.contains('ready') && document.getElementById('loader').classList.contains('done')");
-    await new Promise((r) => setTimeout(r, 900));
+    await settleUi(page);
     // count the sweeps through the object the drill holds
     await page.evaluate(() => {
       const t = window.__chess.train;

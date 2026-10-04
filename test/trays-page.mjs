@@ -7,7 +7,7 @@
 // Screenshots (full tray desktop and phone landscape, trays off, two themes) and a contact sheet go to --shots (default .tmp/trays).
 // Exit codes: 0 pass, 1 a check failed.
 import { mkdirSync } from 'node:fs';
-import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, watchPage, startServer, build, settleUi } from '../tools/_lib.mjs';
 import { contactSheets } from '../tools/contact-sheet.mjs';
 const args = process.argv.slice(2);
 const opt = (k, d) => (args.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).slice(k.length + 3);
@@ -38,7 +38,7 @@ try {
     return { audit: c.game.audit(), cap: { w: s.captured.w.length, b: s.captured.b.length }, trays: s.trays, slabs, ctrl: c.controls.trays, dist: c.stage.camera.position.length(),
       hudRow: { w: document.querySelectorAll('#cap-w i').length, b: document.querySelectorAll('#cap-b i').length }, box: !!document.querySelector('[data-trays]'), checked: document.querySelector('[data-trays]')?.checked, stored: localStorage.getItem('chess3d.trays'), over: window.__chess.game.root.children.filter((o) => o.visible && o.userData.piece).length };
   });
-  const shot = async (name) => { await page.evaluate(() => Promise.race([Promise.all(document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 1000))])); await new Promise((r) => setTimeout(r, 250)); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
+  const shot = async (name) => { await settleUi(page); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
   const theme = async (id) => { await page.evaluate((t) => window.__chess.themes.set(t), id); await settle(1); };
 
   // ---- trays on, full tray

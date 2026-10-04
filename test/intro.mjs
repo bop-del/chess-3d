@@ -17,7 +17,6 @@ const OUT = '.tmp/intro-dist';
 if (!BASE && !args.includes('--skip-build')) build(OUT);
 const server = BASE ? { stop() {} } : await startServer({ mode: 'preview', port: PORT, outDir: OUT });
 const url = (q) => `${BASE || `http://127.0.0.1:${PORT}`}/?${q}`;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // device.phone reads screen, not the viewport
 const PHONE = () => { for (const [k, v] of [['width', 390], ['height', 844]]) Object.defineProperty(screen, k, { get: () => v }); };
 

@@ -2,7 +2,7 @@
 // the free frame between the text card and the bar, the card shows its whole text, End gives the normal bar and the Play view back.
 // runLearnBarChecks({ browser, baseUrl, log, part, shotsDir }) -> [{ name, pass, detail }]; part is 'explain', 'drill' or 'puzzles'.
 // Called from the learn, drill and puzzles groups of test/smoke.mjs. Needs a served build at baseUrl.
-import { sleep } from '../tools/_lib.mjs';
+import { settleUi } from '../tools/_lib.mjs';
 
 const FLAGS = 'quality=low&manual=1&ai=0&touch=1&view=play';
 
@@ -18,9 +18,9 @@ export async function runLearnBarChecks({ browser, baseUrl, log = () => {}, part
     await page.evaluateOnNewDocument(() => { for (const [k, v] of [['width', 390], ['height', 844]]) Object.defineProperty(screen, k, { get: () => v }); });   // device.phone reads screen
     await page.goto(`${baseUrl}/?${FLAGS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 300000 });
-    await sleep(900);
+    await settleUi(page);
     const step = (s) => page.evaluate((x) => { window.__chess.step(x); window.__chess.draw(); }, s);
-    const settle = async () => { await sleep(400); await step(2); await sleep(150); await step(0.5); };   // the ResizeObserver feeds the frame on the real clock
+    const settle = async () => { await settleUi(page); await step(2); await settleUi(page); await step(0.5); };   // the ResizeObserver feeds the frame on the real clock
     const shot = async (n) => { if (shotsDir) await page.screenshot({ path: `${shotsDir}/learnbar-${n}.png` }); };
     // the four board corners and the squares of every visible hint arrow, projected: must lie inside the free frame
     const geometry = () => page.evaluate(() => {

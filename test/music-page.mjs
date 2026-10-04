@@ -31,20 +31,20 @@ try {
   const notes = () => ev(() => window.__chess.music.notes);
   // Mute
   await ev(() => window.__chess.audio.setMuted(true));
-  const n1 = await notes(); await sleep(2500);
+  const n1 = await notes(); await sleep(1700);   // real time: a leaking scheduler would add notes within two ticks (TICK 800 ms)
   R.expect('Mute pauses the music, no new notes', (await ev(() => window.__chess.music.state)) === 'paused' && (await notes()) === n1, 'paused, flat', `${n1} -> ${await notes()}`);
   await ev(() => window.__chess.audio.setMuted(false));
   R.expect('unmuting resumes it', await until(() => window.__chess.music.state === 'playing' && window.__chess.music.notes > 0), 'playing again');
   // Music switch
   await ev(() => document.querySelector('[data-music-on]').click());
-  const n2 = await notes(); await sleep(2500);
+  const n2 = await notes(); await sleep(1700);   // real time: a leaking scheduler would add notes within two ticks (TICK 800 ms)
   const off = await ev(() => ({ s: window.__chess.music.state, on: window.__chess.music.settings.on, stored: JSON.parse(localStorage.getItem('chess3d.music') || '{}').on, dis: document.querySelector('#music-volume').disabled }));
   R.expect('the Music switch stops it, saves, greys the sliders', off.s === 'paused' && !off.on && off.stored === false && off.dis && (await notes()) === n2, 'paused, saved off', JSON.stringify(off));
   await ev(() => document.querySelector('[data-music-on]').click());
   R.expect('switching on starts it again', await until(() => window.__chess.music.state === 'playing' && !document.querySelector('#music-volume').disabled), 'playing');
   // hidden tab
   await ev(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
-  const n3 = await notes(); await sleep(2000);
+  const n3 = await notes(); await sleep(1700);   // real time, two scheduler ticks
   R.expect('a hidden tab pauses the music', (await ev(() => window.__chess.music.state)) === 'paused' && (await notes()) === n3, 'paused', `${n3} -> ${await notes()}`);
   await ev(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
   R.expect('a visible tab resumes it', await until(() => window.__chess.music.state === 'playing'), 'playing');
@@ -58,7 +58,7 @@ try {
   R.expect('sliders change the settings (Klang runs bright to warm) and save them', Math.abs(sl.s.vol - 0.55) < 1e-9 && Math.abs(sl.s.klang - 0.2) < 1e-9 && Math.abs(sl.s.tempo - 0.9) < 1e-9 && Math.abs(sl.s.raum - 0.4) < 1e-9 && Math.abs(sl.st.tempo - 0.9) < 1e-9, 'vol .55 klang .2 tempo .9 raum .4', JSON.stringify(sl));
   R.expect('tempo output reads like 0.90x', sl.outs.includes('0.90x'), '0.90x', sl.outs.join(' '));
   // ducking
-  const duck = await ev(async () => { const { audio, sfx } = window.__chess; sfx.play('capture'); await new Promise((r) => setTimeout(r, 250)); return audio.bus.music.gain.value; });
+  const duck = await ev(async () => { const { audio, sfx } = window.__chess; sfx.play('capture'); const end = performance.now() + 1000; while (audio.bus.music.gain.value >= 0.85 && performance.now() < end) await new Promise((r) => requestAnimationFrame(() => r())); return audio.bus.music.gain.value; });
   R.expect('a sound effect ducks the music bus', duck < 0.85, 'gain below 0.85', String(duck));
   // reload: settings come back
   await load();

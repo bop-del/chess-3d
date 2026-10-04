@@ -2,6 +2,7 @@
 // Called from test/smoke.mjs. Needs a served build at baseUrl. Uses ?quality=low&manual=1&ai=0 and window.__chess.openings.
 // Asserts order and attribution, never durations (ADR 0007): time is stepped with __chess.step.
 // `shot(name)` is optional and saves a screenshot when the smoke run was started with --shots.
+import { settleUi } from '../tools/_lib.mjs';
 
 const FLAGS = 'quality=low&manual=1&ai=0';
 
@@ -31,7 +32,7 @@ export async function runExplainChecks({ page, baseUrl, log = () => {}, shot = n
   try {
     await step(1);
     await page.waitForFunction("document.body.classList.contains('ready') && document.getElementById('loader').classList.contains('done')");
-    await new Promise((r) => setTimeout(r, 900));   // the loader fades on the real clock
+    await settleUi(page);
     await shot?.('explain-list');
     ok('explain: line list has all 27 lines', (await page.evaluate(() => window.__chess.openings.explain.lines.length)) === 27);
     ok('explain: the Italian Game starts', await page.evaluate(() => window.__chess.openings.explain.start('italian-game')));

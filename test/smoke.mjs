@@ -20,7 +20,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort, proveGpu } from '../tools/_lib.mjs';
+import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, settleUi, claimPort, proveGpu } from '../tools/_lib.mjs';
 import { contactSheets } from '../tools/contact-sheet.mjs';
 
 const args = process.argv.slice(2);
@@ -96,7 +96,7 @@ await guard('page health', async () => {
   if (st.ready) await proveGpu(page, R);
   R.expect('page reaches window.__chessReady', st.ready, `${(readyMs / 1000).toFixed(1)}s`, st.error || 'not ready');
   R.expect('test hooks are exposed on window.__chess', st.api.length === 0, 'stage gimbal board game controls step draw', 'missing ' + st.api.join(','));
-  await sleep(300);
+  await settleUi(page);
   R.expect('no console error and no page error while loading', watch.errs.length === 0, 'clean', watch.errs.slice(0, 3).join(' | '));
   R.expect('no request to a foreign host', watch.foreign.length === 0, 'only 127.0.0.1', watch.foreign.slice(0, 3).join(' | '));
   const w = watch.warns.filter((m) => !/GPU stall|ReadPixels|swiftshader|software|WebGL: CONTEXT_LOST/i.test(m));
@@ -382,7 +382,7 @@ await guard('pixels', async () => {
   }
   await ev(() => { window.__chess.controls.reset(); window.__chess.step(2); });
 });
-await sleep(100);
+await settleUi(page);
 if (G('core')) {
 R.expect('no console error or page error during the whole run', watch.errs.length === 0, 'clean', watch.errs.slice(0, 3).join(' | '));
 R.expect('no request to a foreign host during the whole run', watch.foreign.length === 0, 'only 127.0.0.1', watch.foreign.slice(0, 3).join(' | '));

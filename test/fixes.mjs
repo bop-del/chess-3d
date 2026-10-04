@@ -92,14 +92,14 @@ const PICK_HELPERS = `
   };
 `;
 
-async function settle(page) {
+async function settleUi(page) {
   await page.evaluate(() => { window.__chess.step(3); window.__chess.draw(); });
 }
 
 async function clickAt(page, x, y) {
   await page.mouse.move(x, y);
   await page.mouse.click(x, y);
-  await settle(page);
+  await settleUi(page);
 }
 
 /** the first position goes through ?fen at load, the others are set in the page (game.loadFen is what ?fen calls) */

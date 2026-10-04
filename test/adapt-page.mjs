@@ -5,7 +5,7 @@
 // ?adapt=1 ignore the feed; ?adapt=1 on desktop (High start) steps down to Medium. The toast is photographed (--shots).
 // Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { mkdirSync } from 'node:fs';
-import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, watchPage, startServer, build, settleUi } from '../tools/_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
@@ -56,7 +56,7 @@ const feed = (ms, n) => page.evaluate((m, c) => {
   const mo = new MutationObserver(() => { if (toast.classList.contains('show')) { shows++; text = toast.textContent; } });
   mo.observe(toast, { attributes: true, attributeFilter: ['class'] });
   for (let i = 0; i < c; i++) window.__chess.adapt.feed(m);
-  return new Promise((res) => setTimeout(() => { mo.disconnect(); res({ shows, text, now: toast.classList.contains('show') }); }, 300));
+  return new Promise((res) => { let n = 0; const tick = () => { if (++n < 8) return requestAnimationFrame(tick); mo.disconnect(); res({ shows, text, now: toast.classList.contains('show') }); }; requestAnimationFrame(tick); });   // eight frames: the toast shows within the frame of the step
 }, ms, n);
 
 try {
@@ -70,7 +70,7 @@ try {
   R.check('200 frames of 45 ms: Medium drops to Low, locked at the last level', s.quality === 'low' && s.steps === 1 && s.locked, JSON.stringify(s));
   R.check('the chip follows (the quality select shows Niedrig)', await page.evaluate(() => document.getElementById('sel-quality').value) === 'low');
   R.check('one toast, in German, naming the level', slow.shows === 1 && slow.text === 'Grafik auf Niedrig gestellt, damit alles flüssig läuft', JSON.stringify(slow));
-  await new Promise((r) => setTimeout(r, 800));
+  await settleUi(page);   // the toast has faded in
   await page.screenshot({ path: `${SHOTS}/toast-390x844.png` });
   const box = await page.evaluate(() => { const r = document.getElementById('toast').getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: innerWidth }; });
   R.check('the toast fits the 390 px screen', box.l >= 0 && box.r <= box.w, JSON.stringify(box));

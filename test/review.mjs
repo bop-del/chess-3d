@@ -3,6 +3,7 @@
 // arrow and the sentence, stepping, Details, German, closing, and the phone layout.
 // Called from test/smoke.mjs (group review). Also runs alone: node test/review.mjs [--port=5242] [--skip-build] [--shots]
 // (shots and a contact sheet go to .tmp/review/). Asserts order and state, never durations.
+import { settleUi } from '../tools/_lib.mjs';
 
 const FLAGS = 'quality=low&manual=1&ai=0';
 const MOVES = [['f2', 'f3'], ['e7', 'e5'], ['g2', 'g4'], ['d8', 'h4']];   // fool's mate: g4 is the blunder, Qh4# the best move
@@ -42,7 +43,7 @@ export async function runReviewChecks({ page, baseUrl, log = () => {}, shot = nu
     await playGame();
     ok('game over: the card has Review the game next to New game', await bannerUp() && await page.evaluate(() => { const r = document.querySelector('#banner .row'); return [...r.children].map((c) => c.textContent).join('|'); }) === 'New game|Review the game|Review board');
     await step(1.5);
-    if (shot) await new Promise((r) => setTimeout(r, 1200));   // real time: the card pops in with a CSS animation
+    if (shot) await settleUi(page);
     await shot?.('review-gameover-desktop');
     const startFen = await page.evaluate(() => window.__chess.game.chess.history.length);
     ok('the finished game holds four moves', startFen === 4);
@@ -180,7 +181,7 @@ export async function runReviewChecks({ page, baseUrl, log = () => {}, shot = nu
     await playGame();
     ok('phone: the game over card has the button', await bannerUp());
     await step(1.5);
-    if (shot) await new Promise((r) => setTimeout(r, 1200));
+    if (shot) await settleUi(page);
     await shot?.('review-gameover-phone');
     await page.evaluate(() => document.getElementById('bn-review-game').click());
     await waitDone();

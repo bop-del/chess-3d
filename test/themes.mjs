@@ -5,7 +5,7 @@
 // row sits in the Scene card (desktop) and in the phone Menu, Glass uses transmission on High only, no console error or warning.
 // Exit codes: 0 pass, 1 a check failed.
 import { createHash } from 'node:crypto';
-import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, watchPage, startServer, build, settleUi, waitStable } from '../tools/_lib.mjs';
 const args = process.argv.slice(2);
 const PORT = Number((args.find((a) => a.startsWith('--port=')) || '--port=5351').slice(7));
 const R = reporter();
@@ -136,12 +136,19 @@ try {
   // Glass: real transmission on High only
   await page.evaluate(async () => { await window.__chess.themes.set('glass'); });
   const lowT = await page.evaluate(() => window.__chess.stage.quality);
-  const t = async () => page.evaluate(async () => { await new Promise((r) => setTimeout(r, 400)); let tr = 0; window.__chess.game.root.traverse((o) => { if (o.isMesh && o.material.transmission > tr) tr = o.material.transmission; }); return tr; });
-  const trLow = await t();
+  // the transmission is read once the quality change has shown up (high: above 0.5, low: none), at most 3 s
+  const t = async (high) => page.evaluate(async (high) => {
+    const read = () => { let tr = 0; window.__chess.game.root.traverse((o) => { if (o.isMesh && o.material.transmission > tr) tr = o.material.transmission; }); return tr; };
+    const end = performance.now() + 3000;
+    await new Promise((r) => requestAnimationFrame(() => r()));
+    while ((read() > 0.5) !== high && performance.now() < end) await new Promise((r) => requestAnimationFrame(() => r()));
+    return read();
+  }, high);
+  const trLow = await t(false);
   await page.evaluate(() => window.__chess.stage.setQuality('high'));
-  const trHigh = await t();
+  const trHigh = await t(true);
   await page.evaluate(() => window.__chess.stage.setQuality('low'));
-  const trBack = await t();
+  const trBack = await t(false);
   R.expect('Glass: no transmission on Low, real transmission on High, and back', lowT === 'low' && trLow === 0 && trHigh > 0.5 && trBack === 0, `low ${trLow}, high ${trHigh}, low ${trBack}`);
 
   // phone: the swatches are in the Menu sheet and reachable by tap
@@ -152,10 +159,10 @@ try {
   await page.tap('.tb[data-act="menu"]');
   await page.waitForSelector('.psheet.open', { timeout: 10000 });
   await page.evaluate(() => { const c = document.querySelector('.card[data-card="scene"]'); if (c.classList.contains('collapsed')) c.querySelector('header').click(); });
-  await new Promise((r) => setTimeout(r, 600));
+  await settleUi(page);
   const rect = () => page.evaluate(() => { const r = document.querySelector('.swatch[data-theme="glass"]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height }; });
   await page.evaluate(() => document.querySelector('.swatch[data-theme="glass"]').scrollIntoView({ block: 'center' }));
-  await new Promise((r) => setTimeout(r, 900));   // the sheet scrolls smoothly: read the rectangle only after it settled
+  await waitStable(page, '.swatch[data-theme="glass"]');   // the sheet scrolls smoothly: read the rectangle only after it settled
   const box = await rect();
   R.expect('phone: swatch tap target is at least 44 px', box.w >= 44 && box.h >= 44, `${Math.round(box.w)} x ${Math.round(box.h)}`);
   await page.touchscreen.tap(box.x, box.y);
@@ -213,7 +220,7 @@ try {
     R.expect(`${label}: every theme button switches the theme, starting on ${start || 'classic'}`, !bad.length, 'all seven', bad.join('; '));
   };
   const desktopClick = (id) => page.evaluate((id) => document.querySelector(`.swatch[data-theme="${id}"]`).scrollIntoView({ block: 'center' }), id).then(() => page.click(`.swatch[data-theme="${id}"]`));
-  const phoneTap = async (id) => { await page.evaluate((id) => document.querySelector(`.swatch[data-theme="${id}"]`).scrollIntoView({ block: 'center' }), id); await new Promise((r) => setTimeout(r, 900)); await page.tap(`.swatch[data-theme="${id}"]`); };
+  const phoneTap = async (id) => { await page.evaluate((id) => document.querySelector(`.swatch[data-theme="${id}"]`).scrollIntoView({ block: 'center' }), id); await waitStable(page, `.swatch[data-theme="${id}"]`); await page.tap(`.swatch[data-theme="${id}"]`); };
   await page.evaluate(() => localStorage.removeItem('chess3d.theme'));
   for (const start of [null, 'wood', 'pixel']) await clickAll('desktop', start, desktopClick);
   for (const start of [null, 'pixel']) await clickAll('phone', start, phoneTap);
@@ -224,15 +231,18 @@ try {
   await load('&theme=wood');
   await page.evaluate(() => document.querySelector('#tab-settings')?.click());
   await block(true);   // fail the first attempt only: the retry comes 400 ms later
+  const firstFail = new Promise((r) => cdp.once('Network.loadingFailed', r));
   await page.click('.swatch[data-theme="pixel"]');
-  await new Promise((r) => setTimeout(r, 150));
+  await Promise.race([firstFail, new Promise((r) => setTimeout(r, 5000))]);   // the first attempt was made and blocked (the retry waits 400 ms)
   await block(false);
   const retried = await page.waitForFunction("window.__chess.themes.current() === 'pixel'", { timeout: 30000 }).then(() => true, () => false);
   R.expect('a theme chunk that fails once is retried and the theme switches', retried, 'pixel', await cur());
   await page.evaluate(() => window.__chess.themes.set('wood', { persist: false }));
   await block(true);   // keep failing
+  await page.evaluate(() => { window.__themeWarned = false; const w = console.warn; console.warn = (...a) => { if (String(a[0]).includes('theme failed to load')) window.__themeWarned = true; w.apply(console, a); }; });
   await page.click('.swatch[data-theme="pixel"]');
-  await new Promise((r) => setTimeout(r, 4000));
+  await page.waitForFunction(() => window.__themeWarned, { timeout: 30000 }).catch(() => null);   // the retry exhausted: the loader warned and gave the mark back
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const kept = await page.evaluate(() => ({ cur: window.__chess.themes.current(), mark: document.querySelector('[data-settings="themes"] .swatch.on')?.dataset.theme }));
   R.expect('a theme chunk that keeps failing leaves the current theme on, the mark stays on it', kept.cur === 'wood' && kept.mark === 'wood', 'wood, wood', JSON.stringify(kept));
   await block(false);   // let it through again: later switches still work

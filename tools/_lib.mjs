@@ -11,6 +11,8 @@
 //   startServer(opts)        vite preview of a built folder or the vite dev server, resolves when it answers. Only reuses a server this process started; a port that answers otherwise is an error (no port given: the next free one is taken)
 //   claimPort(opts)          a port for a server, from the lane name: the first free port from the lane's own, claimed by a lock folder (pid, lane, build hash) so two callers at once never share one; a port that answers without our claim is skipped
 //   waitReady(page, opts)    the ready signal of every tier (window.__chessReady or window.__chessError), with what it still waited for when it times out
+//   settleUi(page, opts)       waits until every finite CSS animation and transition on the page has finished, then two frames (replaces a fixed sleep after a slide, fade or pop in)
+//   waitStable(page, sel)    waits until the element's rectangle has not changed for a few frames (smooth scroll, slide, resize observers)
 //   build(outDir)            vite build into outDir (inside a folder, never touches dist/), through a content hashed cache in ~/.cache/chess-3d/dist-<hash>
 // Exit codes used by the tools: 0 pass (warnings allowed), 1 a check failed, 2 usage or setup error.
 import { spawn, execFileSync } from 'node:child_process';
@@ -349,6 +351,35 @@ export async function waitReady(page, { timeout = 120000 } = {}) {
   })).catch(() => ({ ready: false, error: 'page gone', doc: '?', hook: false, step: '', loaderDone: false }));
   const why = st.ready ? '' : `${timedOut ? `no __chessReady after ${Math.round(ms / 1000)}s` : 'boot failed'}: document ${st.doc}, loader step "${st.step.slice(0, 60)}"${st.loaderDone ? ' (loader done)' : ''}, __chess ${st.hook ? 'present' : 'missing'}${st.error ? ', error ' + st.error.slice(0, 120) : ''}`;
   return { ready: st.ready, error: st.error, ms, why };
+}
+
+/** Wait for the page to be visually at rest: finite CSS animations and transitions finished (the loader fade, a sheet slide, a card pop in), then two frames.
+ *  Never throws: a page that never settles is released at the timeout and the check after it decides. */
+export async function settleUi(page, { timeout = 5000 } = {}) {
+  await page.evaluate(async (ms) => {
+    const end = performance.now() + ms;
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    for (;;) {
+      await frame();
+      const run = document.getAnimations().filter((a) => a.playState === 'running' && a.effect && a.effect.getComputedTiming().iterations !== Infinity);
+      if (!run.length || performance.now() > end) break;
+      await Promise.race([Promise.all(run.map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 200))]);
+    }
+    await frame(); await frame();
+  }, timeout).catch(() => null);
+}
+
+/** Wait until the rectangle of the first element matching sel is the same for `frames` frames in a row (or the timeout passes). Never throws. */
+export async function waitStable(page, sel, { frames = 4, timeout = 5000 } = {}) {
+  await page.evaluate(async (sel, frames, ms) => {
+    const end = performance.now() + ms;
+    const key = () => { const e = document.querySelector(sel); if (!e) return 'none'; const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map((v) => v.toFixed(1)).join(); };
+    let last = null, same = 0;
+    while (same < frames && performance.now() < end) {
+      await new Promise((r) => requestAnimationFrame(() => r()));
+      const k = key(); same = k === last ? same + 1 : 0; last = k;
+    }
+  }, sel, frames, timeout).catch(() => null);
 }
 
 /** Which lane this checkout is: the worktree directory name, or '' for the main checkout. */

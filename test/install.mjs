@@ -65,7 +65,7 @@ try {
       const shown = await page.evaluate(() => { const e = document.querySelector('.ih-scrim'); return !!e && e.classList.contains('in'); });
       const shot = shown ? await page.screenshot({ type: 'png' }) : null;   // before any tap closes the sheet
       let after = null;
-      if (act && shown) { await act(page); await sleep(600); after = await page.evaluate(() => !!document.querySelector('.ih-scrim')); }
+      if (act && shown) { await act(page); await page.waitForFunction(() => !document.querySelector('.ih-scrim'), { timeout: 2000, polling: 30 }).catch(() => {}); after = await page.evaluate(() => !!document.querySelector('.ih-scrim')); }
       const store = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || 'null'), KEY);
       return { shown, after, store, errs: [...watch.errs, ...watch.foreign], shot };
     } finally { await page.close(); }

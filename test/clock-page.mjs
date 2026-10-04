@@ -9,7 +9,7 @@
 // Screenshots (desktop running, low time, against the computer, phone portrait and landscape) and a contact sheet go to --shots.
 // Exit codes: 0 pass, 1 a check failed.
 import { mkdirSync } from 'node:fs';
-import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, watchPage, startServer, build, settleUi } from '../tools/_lib.mjs';
 import { contactSheets } from '../tools/contact-sheet.mjs';
 const args = process.argv.slice(2);
 const opt = (k, d) => (args.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).slice(k.length + 3);
@@ -55,7 +55,7 @@ try {
       fen: g.fen.split(' ')[0], hintBtn: !!document.querySelector('.clock-hint:not([hidden]) .clock-now'),
     };
   });
-  const shot = async (name) => { await page.evaluate(() => window.__chess.draw()); await new Promise((r) => setTimeout(r, 300)); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
+  const shot = async (name) => { await page.evaluate(() => window.__chess.draw()); await settleUi(page); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
   const near = (a, b) => Math.abs(a - b) < 0.2;
 
   // ---- ?clock=3+2: the plus of a query string arrives as a space and still works
@@ -245,13 +245,13 @@ try {
   // the panel folded by hand hides its header: the floating faces take over, and unfolding hands them back
   await load('&clock=5%2B0', 'desktop', { ai: true });
   await page.evaluate(() => document.getElementById('btn-rail').click());
-  await new Promise((r2) => setTimeout(r2, 500));
+  await settleUi(page);
   let fl = await inView('.rail-clock .cface:not([hidden])');
   const hd = await inView('#pclock .cface:not([hidden])');
   R.expect('panel folded to the rail: the floating clock shows, the header copy does not', !!fl && fl.in && !hd, 'floating', JSON.stringify({ fl, hd }));
   await shot('s36-rail-folded');
   await page.evaluate(() => document.getElementById('btn-rail-open').click());
-  await new Promise((r2) => setTimeout(r2, 500));
+  await settleUi(page);
   fl = await inView('.rail-clock .cface:not([hidden])');
   R.expect('panel open again: the floating clock is gone', !fl, 'hidden', JSON.stringify(fl));
 
@@ -260,7 +260,7 @@ try {
     await load('&clock=off', size, { ai: true });
     await page.evaluate(() => { window.__chess.game.move('e2', 'e4'); window.__chess.step(8); });
     await page.evaluate(() => window.__chess.ui.openPanel?.('clock'));
-    await new Promise((r2) => setTimeout(r2, 700));
+    await settleUi(page);
     await page.evaluate(() => document.querySelector('.psheet.open #sel-clock .chip[data-value="5+0"]').click());
     r = await info();
     R.expect(`phone ${size}: a clock chosen in a running game waits and says so`, r.s.preset === 'off' && r.s.next === '5+0' && r.hint && r.hintBtn, 'pending', JSON.stringify({ s: r.s, hint: r.hint }));
@@ -277,12 +277,12 @@ try {
     // the same through the hint button of the sheet
     await page.evaluate(() => { window.__chess.game.move('e2', 'e4'); window.__chess.step(8); });
     await page.evaluate(() => window.__chess.ui.openPanel?.('clock'));
-    await new Promise((r2) => setTimeout(r2, 700));
+    await settleUi(page);
     await page.evaluate(() => document.querySelector('.psheet.open #sel-clock .chip[data-value="3+2"]').click());
     const hb = await page.evaluate(() => { const b = document.querySelector('.psheet.open .clock-now'); const q = b?.getBoundingClientRect(); return { h: q ? Math.round(q.height) : 0, shown: !!q && q.width > 0 }; });
     R.expect(`phone ${size}: the "start now" button is a 44 px tap target`, hb.shown && hb.h >= 44, '44', JSON.stringify(hb));
     await page.evaluate(() => document.querySelector('.psheet.open .clock-now').click());
-    await new Promise((r2) => setTimeout(r2, 500));
+    await settleUi(page);
     r = await info();
     const open = await page.evaluate(() => !!document.querySelector('.psheet.open'));
     R.expect(`phone ${size}: the button starts the game with 3:00 and closes the sheet`, freshFull(r, 180) && r.s.preset === '3+2' && !open, 'fresh', JSON.stringify({ fen: r.fen, s: r.s, open }));
@@ -314,7 +314,7 @@ try {
   R.expect('phone against the computer: one face (the player)', pc.faces === 1, '1', JSON.stringify(pc));
   await shot('phone-portrait-vs-computer');
   await load('&open=clock', 'portrait');
-  await new Promise((r) => setTimeout(r, 700));
+  await settleUi(page);
   const po = await page.evaluate(() => { const e = document.querySelector('.psheet.open #sel-clock'); const r = e?.getBoundingClientRect(); const chips = [...(e?.querySelectorAll('.chip') || [])].map((c) => { const q = c.getBoundingClientRect(); return [Math.round(q.width), Math.round(q.height), q.right <= innerWidth]; }); return { open: !!e, vis: !!r && r.top >= 0 && r.bottom <= innerHeight, chips }; });
   R.expect('phone ?open=clock: the Menu sheet shows the chooser, five chips of at least 44 px height inside the screen', po.open && po.vis && po.chips.length === 5 && po.chips.every(([cw, ch, inside]) => ch >= 44 && cw >= 44 && inside), 'in view', JSON.stringify(po));
   await shot('phone-portrait-open-clock');

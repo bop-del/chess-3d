@@ -3,7 +3,7 @@
 // and window.__chess.train. Asserts order and attribution, never durations: time is stepped with __chess.step.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT } from '../tools/_lib.mjs';
+import { ROOT, settleUi } from '../tools/_lib.mjs';
 
 // The Openings list groups the 15 side lines under their parent: parent first, same side, in data order, indented.
 const sideCheck = (page, scope) => page.evaluate((sc) => {
@@ -42,7 +42,7 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
     await page.goto(`${baseUrl}/?${FLAGS}${flags}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step && !!window.__chess.train', { timeout: 120000 });
     await page.waitForFunction("document.getElementById('loader').classList.contains('done')");
-    await new Promise((r) => setTimeout(r, 900));
+    await settleUi(page);
     return errs;
   }
   const step = (page, s) => page.evaluate((x) => { window.__chess.step(x); window.__chess.draw(); }, s);
@@ -205,7 +205,7 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
       ok(`learn ${tag}: thumb bar buttons do not overlap`, !overlap);
       await pp.evaluate(() => document.querySelector('.tb[data-act="learn"]').click());
       await pp.waitForFunction(() => document.querySelector('.plearn').getBoundingClientRect().top < innerHeight, { timeout: 10000 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 450));
+      await settleUi(pp);
       ok(`learn ${tag}: the Learn button opens the sheet with four tabs`, (await pp.evaluate(() => document.querySelector('.plearn').classList.contains('open'))) && (await count(pp, '.plearn .xtab')) === 4);
       const sb = await visibleBox(pp, '.plearn');
       ok(`learn ${tag}: the sheet fits the screen`, sb && sb.y >= -0.5 && sb.y + sb.h <= h + 0.5 && sb.x >= -0.5 && sb.x + sb.w <= w + 0.5, JSON.stringify(sb));
@@ -234,7 +234,7 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
         await snap(pp, `learn-phone-mine-${tag}`);
         ok(`learn ${tag}: Mine shows the line`, (await count(pp, '.plearn .xline.mine')) === 1);
         await pp.evaluate(() => document.querySelector('.tb[data-act="menu"]').click());
-        await new Promise((r) => setTimeout(r, 450));
+        await settleUi(pp);
         ok(`learn ${tag}: opening Menu closes the Learn sheet`, !(await pp.evaluate(() => document.querySelector('.plearn').classList.contains('open'))));
       }
     } catch (e) {
