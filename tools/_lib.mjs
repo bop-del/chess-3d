@@ -5,7 +5,7 @@
 //                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check's extra software pass does).
 //                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 12, three under 24).
 //                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
-//                            Shared mode (smoke tier, opt in with --shared-chrome or CHESS_SHARED_CHROME=1): a group connects to the one Chrome of the runner (CHESS_SHARED_WS) and gets a BrowserContext, no slot of its own, see launchSharedHost().
+//                            Shared mode (smoke tier, the default; --own-chrome or CHESS_SHARED_CHROME=0 opts out): a group connects to the one Chrome of the runner (CHESS_SHARED_WS) and gets a BrowserContext, no slot of its own, see launchSharedHost().
 //   pageRenderer(page)       the WebGL renderer the page itself draws with (the app's own context, UNMASKED_RENDERER), logged by the smoke, phone and release tiers as proof of the GPU
 //   proveGpu(page, R)        prints pageRenderer once, a WARN when the GPU was asked for and the page reports software
 //   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted); sets Battle scenes Off for the page unless { scenes: true }
@@ -200,12 +200,12 @@ async function launchOwn({ w = 1280, h = 720, args = [], gl = defaultGl(), execu
   return browser;
 }
 
-/** Shared Chrome for the smoke tier (CHE-171). Default mode: one Chrome per group process (the old path). With shared mode on, test/smoke-groups.mjs starts ONE Chrome
+/** Shared Chrome for the smoke tier (CHE-171). Shared mode is the default (CHE-186); the old path is one Chrome per group process. With shared mode on, test/smoke-groups.mjs starts ONE Chrome
  *  through launchSharedHost() (one slot for the whole run) and hands its WebSocket endpoint to every group process in CHESS_SHARED_WS (plus CHESS_SHARED_EXE, CHESS_SHARED_GL:
  *  what that Chrome is). launchBrowser() in a group then connects and returns a BrowserContext wrapper that behaves like a Browser for our tests: no slot, no Chrome process of its own.
  *  A launch that asks for other args, another GL backend or another executable than the shared Chrome has falls back to its own Chrome (one log line says why).
  *  CHESS_SHARED_CHROME=0 (or --own-chrome on the smoke run) forces the old path, =1 (or --shared-chrome) the shared one. SHARED_BY_DEFAULT is the one switch to flip the default. */
-export const SHARED_BY_DEFAULT = false;
+export const SHARED_BY_DEFAULT = true;
 export const sharedChromeOn = (argv = process.argv.slice(2)) => {
   if (argv.includes('--own-chrome') || process.env.CHESS_SHARED_CHROME === '0') return false;
   if (argv.includes('--shared-chrome') || process.env.CHESS_SHARED_CHROME === '1') return true;
