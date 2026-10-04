@@ -152,12 +152,12 @@ try {
         const vr = view && view.getBoundingClientRect(), sr = strip && strip.getBoundingClientRect();
         return { tab: document.querySelector('.xtab[aria-selected="true"]')?.dataset.tab, strips: strips.length, inView: !!(strip && view && view.contains(strip)),
           fams: strip ? [...strip.querySelectorAll('.bdfam')].map((f) => f.dataset.family) : [], cells: strip ? strip.querySelectorAll('.bdg').length : 0,
-          lead: strip?.querySelector('.bdlead')?.textContent ?? null, topFirst: id === 'openings' ? view.firstElementChild === strip : null,
+          lead: strip?.querySelector('.bdlead')?.textContent ?? null, topFirst: view.firstElementChild === strip,
           wins: strip ? strip.querySelectorAll('[data-family="wins"]').length : 0, inside: !!(sr && sr.left >= -1 && sr.right <= innerWidth + 1) };
       }, tabId);
       const okTab = tb.tab === tabId && tb.strips === 1 && tb.inView && tb.fams.join() === fams.join() && tb.cells === count && tb.wins === 0 && tb.inside
-        && (tabId === 'openings' ? tb.lead === '0 of 27' && tb.topFirst === true : tb.lead === null);
-      R.expect(`${size[0]}: the ${tabId} tab shows only ${fams.join(' and ')} medals${tabId === 'openings' ? ', "0 of 27" at the top' : ''}`, okTab, 'one strip with its own families', JSON.stringify(tb));
+        && tb.topFirst === true && (tabId === 'openings' ? tb.lead === '0 of 27' : tb.lead === null);
+      R.expect(`${size[0]}: the ${tabId} tab shows only ${fams.join(' and ')} medals${tabId === 'openings' ? ', "0 of 27"' : ''}, first in the tab`, okTab, 'one strip with its own families', JSON.stringify(tb));
     }
     await load(bp, size, '&open=badges');
     const t = await bp.evaluate(async () => {

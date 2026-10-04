@@ -185,7 +185,7 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
         closeSheet();
       },
     });
-    view.append(...strip(['puzzles', 'daily']));   // only the puzzle and daily medals
+    view.prepend(...strip(['puzzles', 'daily']));  // only the puzzle and daily medals, at the top like Openings
     return view;
   }
 
