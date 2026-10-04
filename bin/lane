@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Lanes: one branch, one git worktree and one Herdr workspace per backlog item or agent round.
 // Usage:
-//   bin/lane open <branch> [--key CHE-n]...
+//   bin/lane open <branch> [--key CHE-n]... [--private]     name lanes che-<n>-words (e.g. che-177-private-worktrees); an old item id name (s73-...) needs --key
 //                                       worktree and workspace "<branch>" under ~/.herdr/worktrees/chess-3d/, its first
 //                                       tab "diff" running hunk diff main --watch, node_modules linked in, fast tier run.
 //                                       With the private tools present the lane needs a Linear key: the item's CHE key in BACKLOG.md
 //                                       (one sync is run when there is none), or --key, several times for a lane that carries several
 //                                       items. Without any key nothing is created and the fix is printed.
+//                                       --private (S71): the lane also touches the private repo, so it gets its own git worktree of it,
+//                                       ~/.herdr/worktrees/chess-3d-private/<branch> (private bin/private-lane), and a second hunk tab
+//                                       "diff private". A brief line `Private repo: yes` makes bin/lane agent do the same.
 //   bin/lane agent <branch> <name> <brief> [--model <m>]
 //                                       a tab "<name> agent" in the lane's workspace with a visible Claude session
 //                                       (plus, once per lane, a "diff" tab running hunk diff main --watch)
@@ -20,7 +23,9 @@
 //   bin/lane close <branch> [-m <msg>] [--no-linear]
 //                                       squash merge into main (the main checkout, which must be on main), then remove the
 //                                       workspace, the worktree and the branch. Without -m the lane's only commit message
-//                                       is reused; a lane with several commits needs -m. With the private tools present it takes the land
+//                                       is reused; a lane with several commits needs -m. A private worktree of the lane is squash merged into
+//                                       private main with the same message and removed too (live files never; checked before anything merges).
+//                                       With the private tools present it takes the land
 //                                       lock first (bin/land-lock; a lock held by this same lane counts as ours) and records the lane's
 //                                       release test steps from its report before the worktree is removed. A lane with no Linear key on
 //                                       record is refused before anything is merged (exit 1, a RED line); --no-linear skips Linear for
@@ -28,12 +33,12 @@
 //                                       keys when it names none.
 // Exit codes: 0 done, 1 a step failed (nothing after it ran), 2 usage error.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const USAGE = 'usage: bin/lane open <branch> [--key CHE-n]... | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
+const USAGE = 'usage: bin/lane open <che-n-words | branch --key CHE-n> [--key CHE-n]... [--private] | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
 const LEAD = 'chess-3d-lead';   // the lead session\'s Herdr agent name
 const die = (msg, code = 1) => { console.error(msg); process.exit(code); };
 // the main clone, also when this script runs from inside a lane. Every git command below runs there.
@@ -41,6 +46,11 @@ const MAIN = resolve(execFileSync('git', ['rev-parse', '--path-format=absolute',
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { cwd: MAIN, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
 const git = (...a) => run('git', a);
 const herdr = (...a) => JSON.parse(run('herdr', a)).result;
+
+// S71: the private repo's worktree of a lane (optional private tool bin/private-lane; null when the tool is absent)
+const privateLaneTool = () => { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'private-lane'); return existsSync(h) ? h : null; };
+const privateLane = (...a) => { const h = privateLaneTool(); if (!h) return { status: 127, stdout: '', stderr: 'no private bin/private-lane' }; return spawnSync(process.execPath, [h, ...a], { encoding: 'utf8', timeout: 120000 }); };
+const privatePathOf = (branch) => { const r = privateLane('path', branch); return r.status === 0 ? r.stdout.trim() : null; };
 
 function lanes() {
   const res = herdr('worktree', 'list', '--cwd', MAIN);
@@ -64,9 +74,12 @@ function laneKeys(branch, given) {
   return out === 'off' ? [] : out.split(/\s+/).filter(Boolean);
 }
 
-function open(branch, given = []) {
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(branch || '')) die(`branch names are lower case words joined by hyphens\n${USAGE}`, 2);
+function open(branch, given = [], withPrivate = false) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(branch || '')) die(`branch names are lower case words joined by hyphens, best che-<n>-words\n${USAGE}`, 2);
   if (git('branch', '--list', branch)) die(`branch ${branch} exists already`);
+  // owner, 2026-10-04: the Linear key is the only id. A lane named after an old item id (s73-..., n8-...) without --key is refused.
+  if (!given.length && /^[a-z]+\d+-/.test(branch) && linearHook()) die(`lane ${branch} not opened: it starts with an old item id. Name lanes che-<n>-words (the Linear key is the only id, for example che-177-private-worktrees), or pass --key CHE-n.`);
+  if (withPrivate && !privateLaneTool()) die(`lane ${branch} not opened: --private needs ~/code/chess-3d-private/bin/private-lane`);
   const keys = laneKeys(branch, given);
   const res = herdr('worktree', 'create', '--cwd', MAIN, '--branch', branch, '--base', 'main', '--label', branch, '--no-focus');
   const path = res.worktree.path, ws = res.workspace.workspace_id, tab = res.tab.tab_id;
@@ -74,11 +87,18 @@ function open(branch, given = []) {
   run('herdr', ['tab', 'rename', tab, 'diff']);
   const nm = join(path, 'node_modules');
   if (!existsSync(nm)) symlinkSync(join(MAIN, 'node_modules'), nm);
-  console.log(`lane ${branch}: ${path}\nworkspace ${ws} "${branch}", first tab "diff" (hunk diff main --watch)${keys && keys.length ? `\nLinear: ${keys.join(', ')}` : ''}`);
+  let priv = null;
+  if (withPrivate) {
+    const r = privateLane('open', branch);
+    if (r.status !== 0) die(`lane ${branch}: the public worktree is open (${path}) but the private worktree failed: ${(r.stderr || r.stdout).trim()}\nFix it, then run bin/private-lane open ${branch}`);
+    priv = r.stdout.trim();
+  }
+  console.log(`lane ${branch}: ${path}${priv ? `\nprivate worktree: ${priv}` : ''}\nworkspace ${ws} "${branch}", first tab "diff" (hunk diff main --watch)${keys && keys.length ? `\nLinear: ${keys.join(', ')}` : ''}`);
   { const h = linearHook(); if (h) spawnSync(h, ['open', branch, ...(keys || [])], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook, never blocks a lane
   const t = spawnSync(process.execPath, ['test/run.mjs'], { cwd: path, encoding: 'utf8' });
   const pane = (res.root_pane || {}).pane_id;
   if (pane) { run('herdr', ['pane', 'send-text', pane, 'hunk diff main --watch']); run('herdr', ['pane', 'send-keys', pane, 'Enter']); }
+  if (priv) ensurePrivateDiffTab({ open_workspace_id: ws }, priv);
   console.log(t.status === 0 ? 'fast tier green in the lane' : `FAST TIER RED in the lane, fix before building on it:\n${t.stdout}${t.stderr}`);
   process.exit(t.status === 0 ? 0 : 1);
 }
@@ -94,12 +114,31 @@ function ensureDiffTab(lane) {
   run('herdr', ['pane', 'send-keys', pane, 'Enter']);
 }
 
+// S71: a second tab "diff private" with the private worktree's diff against private main (a lane touching both repos shows both)
+function ensurePrivateDiffTab(lane, privPath) {
+  const tabs = (herdr('tab', 'list', '--workspace', lane.open_workspace_id).tabs || []);
+  if (tabs.some((t) => t.label === 'diff private')) return;
+  const tab = herdr('tab', 'create', '--workspace', lane.open_workspace_id, '--cwd', privPath, '--label', 'diff private');
+  const pane = (tab.root_pane || tab.pane || {}).pane_id;
+  if (!pane) return;
+  run('herdr', ['pane', 'send-text', pane, 'hunk diff main --watch']);
+  run('herdr', ['pane', 'send-keys', pane, 'Enter']);
+}
+
 function agent(branch, name, brief, model = 'sonnet') {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(name || '')) die(`agent names are lower case words joined by hyphens\n${USAGE}`, 2);
   if (!existsSync(brief || '')) die(`brief not found: ${brief}`, 2);
   const lane = lanes().find((w) => w.branch === branch);
   if (!lane || !lane.open_workspace_id) die(`no open lane ${branch} with a workspace: bin/lane open ${branch} first`);
   ensureDiffTab(lane);
+  // S71: a brief that says `Private repo: yes` gives the lane its private worktree (once), and its diff tab
+  let priv = privatePathOf(branch);
+  if (!priv && privateLaneTool() && /^private repo:\s*yes\b/im.test(readFileSync(brief, 'utf8'))) {
+    const r = privateLane('open', branch);
+    if (r.status !== 0) die(`the brief says Private repo: yes but the private worktree failed: ${(r.stderr || r.stdout).trim()}`);
+    priv = r.stdout.trim();
+  }
+  if (priv) ensurePrivateDiffTab(lane, priv);
   const tab = herdr('tab', 'create', '--workspace', lane.open_workspace_id, '--cwd', lane.path, '--label', `${name} agent`);
   const pane = (tab.root_pane || tab.pane || {}).pane_id;
   if (!pane) die(`could not read the new tab's pane from herdr: ${JSON.stringify(tab).slice(0, 200)}`);
@@ -133,6 +172,7 @@ function agent(branch, name, brief, model = 'sonnet') {
   }
   const prompt = `You are the "${name}" agent of lane ${branch} (worktree ${lane.path}). Read your brief at ${resolve(brief)} and follow it exactly. `
     + `When you are done, write your final report to .tmp/${name}/report.md in the lane AND send it to the lead session with: herdr agent prompt ${LEAD} "<your report>" (one message, plain text). `
+    + (priv ? `This lane also has a private repo worktree: ${priv}. Edit the private repo files ONLY there (never ~/code/chess-3d-private itself), commit WIP there with git add -A and a message ending in [no-doc]. board.json, pulse.json, sdlc-events.jsonl, metrics/, .tmp/, review/out/ and RESTART-PROMPT.md are live files: never commit them. ` : '')
     + 'If the send is refused (the lead may be waiting on the owner), retry every 2 minutes, at most 10 times. '
     + 'Then stop and wait; the lead may message you with follow ups.';
   run('herdr', ['agent', 'prompt', id, prompt]);
@@ -142,7 +182,7 @@ function agent(branch, name, brief, model = 'sonnet') {
 function list() {
   const ls = lanes();
   if (!ls.length) { console.log('no open lanes'); return; }
-  for (const w of ls) console.log(`${(w.branch || '?').padEnd(28)} ${w.path}${w.open_workspace_id ? `  (workspace ${w.open_workspace_id})` : '  (no workspace)'}`);
+  for (const w of ls) { const pp = privatePathOf(w.branch); console.log(`${(w.branch || '?').padEnd(28)} ${w.path}${w.open_workspace_id ? `  (workspace ${w.open_workspace_id})` : '  (no workspace)'}${pp ? `  (private ${pp})` : ''}`); }
 }
 
 // S54: a hand run `bin/lane close` takes the land lock (private bin/land-lock) so it never overlaps the land script or a land agent, which
@@ -170,7 +210,16 @@ function closeLocked(branch, message, noLinear) {
   const path = lane ? lane.path : null;
   if (path && run('git', ['status', '--porcelain'], { cwd: path })) die(`lane ${branch} has uncommitted changes: commit them in the lane first`);
   const commits = git('rev-list', `main..${branch}`).split('\n').filter(Boolean);
-  if (!commits.length) {   // a lane without a merge (research, previews): nothing to squash, just remove it
+  // S71: the lane's private worktree. Everything that could stop its squash is checked now, before the public repo is touched.
+  const hasPriv = !!privatePathOf(branch);
+  let privAhead = 0;
+  if (hasPriv) {
+    const pf = privateLane('preflight', branch);
+    if (pf.status !== 0) die(`private worktree of ${branch} is not ready, nothing was merged or removed: ${(pf.stderr || pf.stdout).trim()}`);
+    privAhead = JSON.parse(privateLane('state', branch).stdout).ahead;
+  }
+  if (!commits.length && !privAhead) {   // a lane without a merge (research, previews): nothing to squash, just remove it
+    if (hasPriv) privateLane('drop', branch);
     if (lane && lane.open_workspace_id) run('herdr', ['worktree', 'remove', '--workspace', lane.open_workspace_id]);
     else if (path) git('worktree', 'remove', path);
     git('branch', '-D', branch);
@@ -189,14 +238,23 @@ function closeLocked(branch, message, noLinear) {
   }
   if (!message) {
     if (commits.length > 1) die(`lane ${branch} has ${commits.length} commits: pass -m with the squash commit message`);
-    message = git('log', '-1', '--format=%B', branch);
+    if (commits.length) message = git('log', '-1', '--format=%B', branch);
+    else { if (privAhead > 1) die(`private worktree of ${branch} has ${privAhead} commits: pass -m with the squash commit message`); message = privateLane('message', branch).stdout.trim(); if (!message) die(`private worktree of ${branch} has no usable commit message (only WIP): pass -m`); }
   }
   // the CHE key is part of every squash commit subject: appended from the recorded keys when the message has none (git log --grep finds it later)
   if (keys.length && !/CHE-\d+/.test(message.split('\n')[0])) { const [first, ...more] = message.split('\n'); message = [`${first.trimEnd()} (${keys.join(', ')})`, ...more].join('\n'); }
-  const m = spawnSync('git', ['merge', '--squash', branch], { cwd: MAIN, encoding: 'utf8' });
-  if (m.status !== 0) { spawnSync('git', ['merge', '--abort'], { cwd: MAIN }); spawnSync('git', ['reset', '--hard', 'HEAD'], { cwd: MAIN }); die(`squash merge of ${branch} failed, main is unchanged:\n${m.stdout}${m.stderr}`); }
-  run('git', ['commit', '-q', '-F', '-'], { input: message, stdio: ['pipe', 'pipe', 'pipe'] });
-  console.log(`squash merged ${branch} into main: ${git('log', '-1', '--format=%h %s')}`);
+  if (commits.length) {
+    const m = spawnSync('git', ['merge', '--squash', branch], { cwd: MAIN, encoding: 'utf8' });
+    if (m.status !== 0) { spawnSync('git', ['merge', '--abort'], { cwd: MAIN }); spawnSync('git', ['reset', '--hard', 'HEAD'], { cwd: MAIN }); die(`squash merge of ${branch} failed, main is unchanged:\n${m.stdout}${m.stderr}`); }
+    run('git', ['commit', '-q', '-F', '-'], { input: message, stdio: ['pipe', 'pipe', 'pipe'] });
+    console.log(`squash merged ${branch} into main: ${git('log', '-1', '--format=%h %s')}`);
+  }
+  // S71: the private worktree is squash merged into private main with the same message (key included), then removed with its branch
+  if (hasPriv) {
+    const pc = privateLane('close', branch, '-m', message);
+    if (pc.status !== 0) die(`RED: ${commits.length ? 'the public squash is on main, but ' : ''}the private squash of ${branch} failed, the lane was not removed: ${(pc.stderr || pc.stdout).trim()}\nFix it, then run bin/private-lane close ${branch} -m "<message>" and bin/lane close ${branch} again.`);
+    console.log(pc.stdout.trim());
+  }
   // the lane's release test steps are read from its builder report while the worktree still exists (S54; idempotent after bin/land-lane's own add)
   { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'release-next'); if (path && existsSync(h)) spawnSync(process.execPath, [h, 'add', '--lane', branch, '--dir', path], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook
   { const h = noLinear ? null : linearHook(); if (h) spawnSync(h, ['close', branch, git('log', '-1', '--format=%h')], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 20000 }); }   // optional private hook, a RED line stays visible
@@ -224,13 +282,14 @@ function flags(args, spec) {
     if (a === '--key' && spec.key && args[i + 1]) out.key.push(args[++i]);
     else if (a === '-m' && spec.m && args[i + 1]) out.m = args[++i];
     else if (a === '--no-linear' && spec.noLinear) out.noLinear = true;
+    else if (a === '--private' && spec.priv) out.priv = true;
     else if (a.startsWith('-')) die(USAGE, 2);
     else out.pos.push(a);
   }
   return out;
 }
 try {
-  if (cmd === 'open') { const o = flags(rest, { key: true }); if (o.pos.length !== 1) die(USAGE, 2); open(o.pos[0], o.key); }
+  if (cmd === 'open') { const o = flags(rest, { key: true, priv: true }); if (o.pos.length !== 1) die(USAGE, 2); open(o.pos[0], o.key, !!o.priv); }
   else if (cmd === 'agent' && (rest.length === 3 || (rest.length === 5 && rest[3] === '--model'))) agent(rest[0], rest[1], rest[2], rest[4]);
   else if (cmd === 'list' && !rest.length) list();
   else if (cmd === 'land' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) land(rest[0], rest[2]);
