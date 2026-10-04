@@ -286,16 +286,9 @@ export function createStage(canvas, opts = {}) {
   renderer.setSize(width, height);
 
   const scene = new THREE.Scene();
-  // Two cameras share one scene. `camera` is the active one (stage.camera always returns it); setProjection swaps it and
-  // rebuilds the post chain, whose passes hold their own camera reference. The orthographic one is sized by the controls.
-  const perspCamera = new THREE.PerspectiveCamera(35, width / height, 0.1, 200);
-  perspCamera.position.set(0, 9, 11);
-  perspCamera.lookAt(0, 0, 0);
-  const orthoCamera = new THREE.OrthographicCamera(-8, 8, 4.5, -4.5, 0.1, 200);
-  orthoCamera.position.set(0, 40, 0.1);
-  orthoCamera.lookAt(0, 0, 0);
-  let camera = perspCamera;
-  let projection = 'perspective';
+  const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 200);
+  camera.position.set(0, 9, 11);
+  camera.lookAt(0, 0, 0);
 
   // ---- state / presets ----
   const lightingPresets = Object.keys(PRESET_DEFS);
@@ -491,8 +484,6 @@ export function createStage(canvas, opts = {}) {
     floorUniforms.tRefl.value = reflTarget.texture;
   }
   function renderReflection() {
-    // the mirrored floor needs a perspective camera to mirror: in the orthographic easy views the floor stays matte
-    if (projection === 'ortho') { floorUniforms.reflStrength.value = 0; return; }
     camera.updateMatrixWorld();
     _camPos.setFromMatrixPosition(camera.matrixWorld);
     if (_camPos.y <= FLOOR_Y + 0.05) { floorUniforms.reflStrength.value = 0; return; }
@@ -698,40 +689,16 @@ export function createStage(canvas, opts = {}) {
 
   // camera aspect only, cheap: used on touch devices while a burst of resize events is still going on
   function setAspect(w, h) {
-    perspCamera.aspect = Math.max(1, w) / Math.max(1, h);
-    perspCamera.updateProjectionMatrix();
-    syncOrtho(w, h);
-  }
-
-  // The controls set the orthographic frame (half height in world units); the width follows the aspect ratio.
-  let orthoHalfH = 4.5;
-  function syncOrtho(w = width, h = height) {
-    const a = Math.max(1, w) / Math.max(1, h);
-    orthoCamera.left = -orthoHalfH * a; orthoCamera.right = orthoHalfH * a;
-    orthoCamera.top = orthoHalfH; orthoCamera.bottom = -orthoHalfH;
-    orthoCamera.updateProjectionMatrix();
-  }
-  function setOrthoSize(halfH) {
-    if (Math.abs(halfH - orthoHalfH) < 1e-6) return;
-    orthoHalfH = halfH;
-    syncOrtho();
-  }
-  function setProjection(kind) {
-    const k = kind === 'ortho' ? 'ortho' : 'perspective';
-    if (k === projection) return;
-    projection = k;
-    camera = k === 'ortho' ? orthoCamera : perspCamera;
-    if (k === 'perspective') floorUniforms.reflStrength.value = cfg.reflection > 0 ? cur.reflection * floorVisibility : 0;
-    buildPipeline();
+    camera.aspect = Math.max(1, w) / Math.max(1, h);
+    camera.updateProjectionMatrix();
   }
 
   function resize(w, h) {
     width = Math.max(1, Math.floor(w)); height = Math.max(1, Math.floor(h));
     applyPixelRatio();
     renderer.setSize(width, height);
-    perspCamera.aspect = width / height;
-    perspCamera.updateProjectionMatrix();
-    syncOrtho();
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
     if (composer) {
       composer.setPixelRatio(pixelRatio);
       composer.setSize(width, height);
@@ -803,8 +770,6 @@ export function createStage(canvas, opts = {}) {
   return {
     renderer, scene, floor,
     get camera() { return camera; },
-    get projection() { return projection; },
-    setProjection, setOrthoSize,
     lights: { key, fill, rim },
     lightingPresets,
     setLightingPreset, setThemeLight, setFloorHidden, setDim, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, dispose,

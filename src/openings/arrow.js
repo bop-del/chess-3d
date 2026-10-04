@@ -55,7 +55,7 @@ export function createHint({ gimbal, persist = true }) {
   const fromMesh = new THREE.Mesh(square, fromMat);
   const toMesh = new THREE.Mesh(square, toMat);
   const arrowMesh = new THREE.Mesh(new THREE.BufferGeometry(), arrowMat);
-  // renderOrder above the Tokens view discs (11), so the hint stays on top of them
+  // renderOrder above the Symbols cards (11), so the hint stays on top of them
   for (const m of [fromMesh, toMesh, arrowMesh]) { m.renderOrder = 12; m.position.y = LIFT; group.add(m); }
   arrowMesh.position.y = LIFT * 2;
   // a dark outline under the arrow (a slightly fatter copy), only for themes that ask for it

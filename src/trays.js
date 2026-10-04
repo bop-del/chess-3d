@@ -9,7 +9,7 @@ export const SLAB = { cx: 5.75, cz: 0.96, w: 1.45, len: 4.9 };   // centre x of 
 export const MARGIN = 0.14;       // clear space between a piece and the slab edge, every side
 const GAP = 0.05;                 // clear space between two pieces
 const SCALE_MAX = 0.62, SCALE_MIN = 0.4, SCALE_STEP = 0.01;
-const WIDEN = 1.15;               // the Easy 3D view draws every piece 1.15 times larger around its base: the layout leaves room for it
+const WIDEN = 1.15;               // the layout reserves 1.15 times each piece's base diameter, a roomier spacing in every view
 const EXTRA_MAX = 0.2;            // spare depth spread between the rows while the tray is not full, never more than this per row
 export const VALUE_ORDER = { q: 0, r: 1, b: 2, n: 3, p: 4, k: 5 };
 const COLS = 2;

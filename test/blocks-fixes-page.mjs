@@ -45,8 +45,8 @@ try {
       const p = c.gimbal.localToWorld(new V(x, y, z));
       const camPos = new V().setFromMatrixPosition(cam.matrixWorld);
       const dir = p.clone().sub(camPos);
-      if (cam.isOrthographicCamera) { const f = new V(); cam.getWorldDirection(f); rc.set(p.clone().sub(f.multiplyScalar(60)), f); } else rc.set(camPos, dir.clone().normalize());
-      rc.far = cam.isOrthographicCamera ? 60 : dir.length();
+      rc.set(camPos, dir.clone().normalize());
+      rc.far = dir.length();
       if (rc.intersectObjects(meshes, false).length) hits++;
     }
     return { visible: foot.visible, hits };

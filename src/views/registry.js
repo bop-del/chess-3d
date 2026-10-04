@@ -63,11 +63,10 @@ export function createViews({ controls, stage, game, board, device }) {
     else if (focused) controls.setFocus(null, { dur: 0 });
     focused = v.id === 'above';
     if (v.persp) {
-      controls.setProjection('perspective', { pitch: v.pitch, yaw: 0, dist: 19, dur });
+      controls.glideTo({ pitch: v.pitch, yaw: 0, dist: 19, dur });
     } else if (v.kind === 'play') {
-      controls.setProjection('perspective', { pitch: (v.pitch ?? 46) * DEG, dist: v.dist, dur });
+      controls.glideTo({ pitch: (v.pitch ?? 46) * DEG, dist: v.dist, dur });
     } else {
-      controls.setProjection('perspective');
       controls.setPreset(v.label);
     }
     if (instant) for (let i = 0; i < 120; i++) controls.update(0.02);

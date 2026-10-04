@@ -35,7 +35,7 @@ try {
   const info = () => page.evaluate(() => {
     const c = window.__chess, s = c.game.getState();
     const slabs = []; c.game.root.traverse((o) => { if (o.name === 'tray-slab') slabs.push(o.visible); });
-    return { audit: c.game.audit(), cap: { w: s.captured.w.length, b: s.captured.b.length }, trays: s.trays, slabs, ctrl: c.controls.trays, dist: c.stage.camera.position.length(), ortho: c.stage.camera.isOrthographicCamera ? c.stage.camera.top : 0,
+    return { audit: c.game.audit(), cap: { w: s.captured.w.length, b: s.captured.b.length }, trays: s.trays, slabs, ctrl: c.controls.trays, dist: c.stage.camera.position.length(),
       hudRow: { w: document.querySelectorAll('#cap-w i').length, b: document.querySelectorAll('#cap-b i').length }, box: !!document.querySelector('[data-trays]'), checked: document.querySelector('[data-trays]')?.checked, stored: localStorage.getItem('chess3d.trays'), over: window.__chess.game.root.children.filter((o) => o.visible && o.userData.piece).length };
   });
   const shot = async (name) => { await page.evaluate(() => Promise.race([Promise.all(document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 1000))])); await new Promise((r) => setTimeout(r, 250)); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };

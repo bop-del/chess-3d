@@ -36,7 +36,7 @@ const finished = () => {
   const cam = c.stage.camera;
   return {
     bad: [...new Set(bad)], key: +c.stage.lights.key.intensity.toFixed(3), env: +c.stage.scene.environmentIntensity.toFixed(3),
-    cam: [cam.position.x, cam.position.y, cam.position.z].map((x) => +x.toFixed(2)), view: c.views.current(), ortho: !!cam.isOrthographicCamera,
+    cam: [cam.position.x, cam.position.y, cam.position.z].map((x) => +x.toFixed(2)), view: c.views.current(),
     lights: c.stage.scene.children.filter((o) => o.isDirectionalLight).length,
     loaderDone: document.getElementById('loader').classList.contains('done'), introClass: document.body.classList.contains('intro'),
     fallback: document.getElementById('loader').classList.contains('fallback'), hasIntro: !!window.__intro,

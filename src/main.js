@@ -122,7 +122,7 @@ async function boot() {
     controls.onResize(w, h);
   };
   resize();
-  const deferredView = applyViewParams({ controls, views, stage });
+  applyViewParams({ controls, views });
 
   // the start sequence: the king first (a failure here falls back to the CSS board, the game boots the same way)
   let introEnd = null, simT = 0;   // simT: the test driven clock of ?manual=1&intro=1
@@ -357,7 +357,6 @@ async function boot() {
     // loading is done: the sequence plays out the rest within half a second, then the game is on
     await new Promise((res) => { introEnd = res; intro.finish(res); });
     document.body.classList.remove('intro');
-    if (deferredView) views.set(deferredView, { instant: true, remember: false });   // an Easy view cannot be flown to: it takes over now
     intro = null;
   } else {
     // the CSS board plays out its last squares (only when the sequence could not run)
@@ -388,14 +387,11 @@ function showContextNotice(state) {
 }
 
 // The camera part of the URL flags, applied before the sequence starts (the sequence ends in this view): ?view=, ?preset=, the
-// board gimbal and ?yaw, ?pitch, ?dist. Returns the view to switch to when the sequence is over, if it is an Easy view (an
-// orthographic camera cannot be flown to: the sequence then ends in the White view and the Easy view takes over with a cut).
-function applyViewParams({ controls, views, stage }) {
+// board gimbal and ?yaw, ?pitch, ?dist.
+function applyViewParams({ controls, views }) {
   const view = params.get('view');
   // ?view= is for this load only; without it the remembered choice (or the device default) is applied
   if (!(view && views.set(view, { instant: true, remember: false }))) views.set(views.current(), { instant: true });
-  let deferred = null;
-  if (wantIntro && stage.camera.isOrthographicCamera) { deferred = views.current(); views.set('white', { instant: true, remember: false }); }
   const preset = params.get('preset');
   if (preset) {
     controls.setPreset(preset);
@@ -416,7 +412,6 @@ function applyViewParams({ controls, views, stage }) {
       dist: num('dist') !== null ? num('dist') : c.dist,
     });
   }
-  return deferred;
 }
 
 // the game part of the URL flags: the position and the computer opponent, applied as soon as the game exists

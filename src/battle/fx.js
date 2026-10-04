@@ -406,8 +406,8 @@ export function createFx({ stage, parent, signal } = {}) {
     mesh.castShadow = false; mesh.receiveShadow = false;
     const colors = o.colors || BLOOD;
     const axis = (o.dir || UP).clone().normalize();
-    const ortho = Math.abs(axis.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-    const t1 = new THREE.Vector3().crossVectors(axis, ortho).normalize(), t2 = new THREE.Vector3().crossVectors(axis, t1);
+    const perp = Math.abs(axis.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const t1 = new THREE.Vector3().crossVectors(axis, perp).normalize(), t2 = new THREE.Vector3().crossVectors(axis, t1);
     const ps = [];
     const col = new THREE.Color();
     for (let i = 0; i < count; i++) {

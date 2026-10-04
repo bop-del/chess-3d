@@ -1,13 +1,12 @@
 // Views test (smoke tier): build, serve, drive the page in headless Chrome (software GL).
 // Usage: node test/views.mjs [--port=5361] [--skip-build]
 //   per view and size (1280x720, 390x844, 844x390, 844x290)
-//     the view applies         views.current(), the right camera projection, no page errors
+//     the view applies         views.current(), no page errors
 //     picking                  a real click on the e2 pawn selects e2, a click on a legal target square moves it
 //     highlights               every legal target square of the selected pawn projects inside the screen
 //   views list                 the preset views and both easy views everywhere; Play only on a phone in portrait
 //   remembered                 the choice survives a reload (localStorage chess3d.view); a stored view that is not offered falls back
-//   keys 1 to 5                leave an easy view for the matching preset (projection back to perspective)
-//   piece scale                Easy 3D scales the 3D pieces about 1.15x, other views 1.0
+//   keys 1 to 5                leave an easy view for the matching preset
 // --part=i/n runs every n-th unit (a size, the orbit locks, the symbols, the rest). Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 setup error.
 import { ROOT, reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
 
@@ -67,10 +66,10 @@ try {
     for (const id of IDS) {
       const want = phonePortrait || id !== 'play';
       await open(page, size, `&view=${id}&fen=4k3/8/8/8/8/8/4P3/K7%20w%20-%20-%200%201`);   // a lone pawn: no piece stands in front of it
-      const info = await page.evaluate(() => !window.__chess?.views ? { cur: 'none', list: [], proj: null, err: window.__chessError || 'no __chess.views' } : ({ cur: window.__chess.views.current(), list: window.__chess.views.list().map((v) => v.id), proj: window.__chess.stage.projection, err: window.__chessError || null }));
+      const info = await page.evaluate(() => !window.__chess?.views ? { cur: 'none', list: [], err: window.__chessError || 'no __chess.views' } : ({ cur: window.__chess.views.current(), list: window.__chess.views.list().map((v) => v.id), err: window.__chessError || null }));
       if (id === IDS[0]) R.expect(`views list ${tag}`, info.list.includes('play') === phonePortrait && ['symbols', 'above', 'iso'].every((v) => info.list.includes(v)), info.list.join(','), info.list.join(','));
       if (!want) { R.expect(`${id} not offered ${tag}`, info.cur !== 'play', `falls back to ${info.cur}`); continue; }
-      R.expect(`${id} applies ${tag}`, info.cur === id && info.proj === 'perspective' && !info.err, `${info.cur} ${info.proj}`, JSON.stringify(info));
+      R.expect(`${id} applies ${tag}`, info.cur === id && !info.err, `${info.cur}`, JSON.stringify(info));
       // picking: click the e2 pawn, then a legal target square
       const e2 = await xy(page, 0.5, 0.4, 2.5), tgt = await xy(page, 0.5, 0, 0.5);
       await page.mouse.click(e2.x, e2.y);
@@ -117,10 +116,10 @@ try {
       const bodies = c.game.root.children.filter((g) => g.userData.piece).map((g) => g.children.filter((ch) => !ch.userData.hit && ch.name !== 'symbol' && ch.visible).length);
       const syms = c.game.root.children.filter((g) => g.userData.piece && g.userData.sym?.visible).length;
       const map = g => g;
-      return { on: c.symbols.visible, pitch: Math.round(c.controls.camera.pitch * 180 / Math.PI), proj: c.stage.projection, battle: c.views.isEasy(), syms, bodies: bodies.reduce((a, b) => a + b, 0), pieces: bodies.length, map: !!sq.map, vc: sq.vertexColors, inlay: c.gimbal.getObjectByName('gold-inlay')?.visible };
+      return { on: c.symbols.visible, pitch: Math.round(c.controls.camera.pitch * 180 / Math.PI), battle: c.views.isEasy(), syms, bodies: bodies.reduce((a, b) => a + b, 0), pieces: bodies.length, map: !!sq.map, vc: sq.vertexColors, inlay: c.gimbal.getObjectByName('gold-inlay')?.visible };
     });
     const a = await look();
-    R.expect(`symbols ${tag}: perspective 65 degrees, an easy view, no battle scenes`, a.pitch === 65 && a.proj === 'perspective' && a.battle && a.on, JSON.stringify(a));
+    R.expect(`symbols ${tag}: 65 degrees, an easy view, no battle scenes`, a.pitch === 65 && a.battle && a.on, JSON.stringify(a));
     R.expect(`symbols ${tag}: 32 symbols, no 3D body shows`, a.syms === 32 && a.pieces === 32 && a.bodies === 0, JSON.stringify(a));
     R.expect(`symbols ${tag}: plain flat squares, no inlay`, !a.map && !a.vc && a.inlay === false, JSON.stringify(a));
     // switching between Symbols and the White view in both directions: the symbols and the bodies swap cleanly
@@ -145,9 +144,9 @@ try {
     R.expect('symbols: a promoted queen shows its symbol and no body', pr.n === 1 && pr.sym && pr.body, JSON.stringify(pr));
     // From above: perspective at 65 degrees, the board edge to edge in width on a phone in portrait, the frame inside the screen
     await open(page, SIZES[1], '&view=above');
-    const ab = await page.evaluate(() => { const c = window.__chess; return { pitch: Math.round(c.controls.camera.pitch * 180 / Math.PI), proj: c.stage.projection, battle: c.views.isEasy() }; });
-    R.expect('above: perspective, 65 degrees, an easy view', ab.pitch === 65 && ab.proj === 'perspective' && ab.battle, JSON.stringify(ab));
-    // removed views (Tokens, Easy 3D) and the old easy-flat id, stored or in the link: the device default opens, no error
+    const ab = await page.evaluate(() => { const c = window.__chess; return { pitch: Math.round(c.controls.camera.pitch * 180 / Math.PI), battle: c.views.isEasy() }; });
+    R.expect('above: 65 degrees, an easy view', ab.pitch === 65 && ab.battle, JSON.stringify(ab));
+    // ids of views that no longer exist, stored or in the link: the device default opens, no error
     for (const [stored, vp, want] of [['tokens', SIZES[0], 'white'], ['easy-3d', SIZES[0], 'white'], ['easy-flat', SIZES[0], 'white'], ['easy-3d', SIZES[1], 'play']]) {
       await page.evaluate((v) => localStorage.setItem('chess3d.view', v), stored);
       await open(page, vp);
@@ -179,8 +178,8 @@ try {
     await open(page, SIZES[0], '&view=above');
     await page.keyboard.press('3');
     await page.evaluate(() => window.__chess.step(2));
-    const k = await page.evaluate(() => ({ cur: window.__chess.views.current(), proj: window.__chess.stage.projection }));
-    R.expect('key 3 leaves the easy view', k.cur === 'top' && k.proj === 'perspective', JSON.stringify(k));
+    const k = await page.evaluate(() => ({ cur: window.__chess.views.current() }));
+    R.expect('key 3 leaves the easy view', k.cur === 'top', JSON.stringify(k));
   }
   R.expect('no page errors', !watch.errs.length, '', watch.errs.slice(0, 3).join(' | '));
   R.expect('no foreign requests', !watch.foreign.length, '', watch.foreign.slice(0, 3).join(' | '));
