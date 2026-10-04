@@ -64,8 +64,8 @@ function restore(snap, { keepHidden = false } = {}) {
   if (keepHidden && hidden) g.visible = false;
 }
 
-export function createDirector({ game, controls, stage, ui }) {
-  const settings = createSettings({ ui });
+export function createDirector({ game, controls, stage, ui, themes, gore }) {
+  const settings = createSettings({ ui, themes, gore });
   let active = null;                       // the run in progress
   let fxModule, sfxModule;                 // loaded on first use
   const sceneCache = new Map();
@@ -211,7 +211,7 @@ export function createDirector({ game, controls, stage, ui }) {
     return api.lastCtx = {
       stage, attackerObj: info.attackerObj, victimObj: info.victimObj, square: info.square,
       attacker: info.attacker, victim: info.victim, attackerColor: info.attackerColor, victimColor: info.victimColor,
-      short, fx: r.fx, sfx: r.sfx, signal, dir: info.dir.clone(), center, root: game.root, gimbal: game.root.parent,
+      short, gore: settings.gore, fx: r.fx, sfx: r.sfx, signal, dir: info.dir.clone(), center, root: game.root, gimbal: game.root.parent,
       ease: EASE,
       time: () => r.time,
       wait: guard((sec) => new Promise((resolve) => { r.timers.push({ at: r.time + sec, resolve }); })),

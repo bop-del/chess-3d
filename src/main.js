@@ -235,7 +235,7 @@ async function boot() {
   advance(0.001);   // the Play view's first focus and the HUD measure land in the camera now
   intro?.boardGo();
   intro?.setTarget(0.95);
-  battle = createDirector({ game, controls, stage, ui });
+  battle = createDirector({ game, controls, stage, ui, themes, gore: params.get('gore') });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
   mountTraysSetting({ ui, game, controls, flag: params.get('trays') });   // Captured pieces at the side, below Battle scenes
   const clock = createGameClock({ game, preset: initialPreset(params.get('clock')) });   // the chess clock: off unless chosen (or ?clock=5+0)

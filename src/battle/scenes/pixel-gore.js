@@ -1,7 +1,7 @@
 // Capture scene of the Pixelwelt theme: gore in pixel style. The attacker plays the choreography of its classic Gore scene
 // (pawn jabs a lance, knight hews, bishop and queen fire a bolt, rook topples, king smashes with a mace) with props built from
 // boxes; blood is small red cubes (fx bodies) and the victim tips over. The setting picks the level: On is level 2 (about 24
-// cubes, a ring splash, a puddle that grows and fades), Short is level 1 (about 9 cubes, a cube puff).
+// cubes, a ring splash, a puddle that grows and fades), Short is level 1 (about 9 cubes, a cube puff), Blood Off is level 0 (the same choreography with no red at all).
 // Staging, time, skip and cleanup come from the director and ctx.fx, like every scene.
 import * as THREE from 'three';
 import { createStage, lerp, bump } from './kit-a.js';
@@ -11,14 +11,14 @@ const inQuad = (k) => k * k;
 const inOut = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
 const TAU = Math.PI * 2;
 const RED = [0xb31414, 0x8a0c0c, 0xd02020, 0x640808];
-const LEVELS = [null,
+const LEVELS = [{ hit: 0, ring: 0, puddle: 0, fount: 0 },
   { hit: 9, ring: 0, puddle: 0, fount: 0 },
   { hit: 24, ring: 12, puddle: 12, fount: 1 }];
 
 function seeded(seed = 7) { let x = seed; return () => { x = (x * 16807) % 2147483647; return x / 2147483647; }; }
 
 async function gore(ctx) {
-  const level = ctx.short ? 1 : 2, L = LEVELS[level];
+  const level = ctx.gore === false ? 0 : ctx.short ? 1 : 2, L = LEVELS[level];
   const s = createStage(ctx), sfx = ctx.sfx, { fx, a, v, aim, C, hV } = s;
   const type = ctx.attacker, vw = s.V.type === 'p' ? 0 : s.V.type === 'n' || s.V.type === 'b' ? 1 : 2;
   const rnd = seeded(level * 101 + (type.charCodeAt(0) | 0));
@@ -37,6 +37,7 @@ async function gore(ctx) {
 
   // red cubes thrown from a point: one fx body each, axis aligned, falling and fading like the cubes of the Blocks scene
   function bleed(point, { count, dir = up, spread = 0.9, speed = [1.2, 3.6], size = [0.035, 0.075], life = [1.2, 2.2], colors = RED, gravity = -13 } = {}) {
+    if (colors === RED && !L.hit) return;       // Blood Off (level 0): no red at all, dust and sparks stay
     for (let i = 0; i < count; i++) {
       const sz = size[0] + rnd() * (size[1] - size[0]);
       const m = box(sz, sz, sz, colors[(rnd() * colors.length) | 0]);

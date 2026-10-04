@@ -51,15 +51,28 @@ try {
 
   // a capture in Short (level 1) and On (level 2): the pixel gore scene plays, the cube count peaks in range, then a clean board and the victim in the tray
   const cubes = () => ev(() => window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3).length);
-  for (const [mode, lo, hi] of [['short', 25, 60], ['on', 95, 130]]) {
-    await ev((m) => { const c = window.__chess; c.battle.settings.set({ mode: m }); c.game.loadFen('8/8/8/3p4/4P3/8/8/4K2k w - - 0 1'); c.step(2); c.game.move('e4', 'd5'); }, mode);
-    let peak = 0;
-    for (let i = 0; i < 160 && (i < 4 || (await ev(() => window.__chess.game.busy))); i++) { await ev(async () => { await window.__chess.stepAsync(0.1); }); peak = Math.max(peak, await cubes()); }
-    R.expect(`capture ${mode}: the pixel gore scene plays, cube count in range (pawn x pawn: two jabs, as strong as the other pairings)`, peak >= lo && peak <= hi, `peak ${peak} cubes (${lo} to ${hi})`);
+  const reds = () => ev(() => window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3 && (() => { const h = o.material.color.getHex(), r = h >> 16, g = (h >> 8) & 255; return r > 0x50 && r > g * 3; })()).length);
+  // Blood is a setting of Pixelwelt: Off (level 0) plays the same choreography with no red; Short and On unchanged
+  for (const [mode, gore, lo, hi] of [['short', true, 25, 60], ['on', true, 95, 130], ['short', false, 1, 30], ['on', false, 1, 40]]) {
+    await ev(({ m, g }) => { const c = window.__chess; c.battle.settings.set({ mode: m, gore: g }); c.game.loadFen('8/8/8/3p4/4P3/8/8/4K2k w - - 0 1'); c.step(2); c.game.move('e4', 'd5'); }, { m: mode, g: gore });
+    let peak = 0, peakRed = 0;
+    for (let i = 0; i < 160 && (i < 4 || (await ev(() => window.__chess.game.busy))); i++) { await ev(async () => { await window.__chess.stepAsync(0.1); }); peak = Math.max(peak, await cubes()); peakRed = Math.max(peakRed, await reds()); }
+    R.expect(`capture ${mode} blood ${gore ? 'on' : 'off'}: red cubes ${gore ? 'appear' : 'never appear (dust and sparks only)'}`, gore ? peakRed > 0 : peakRed === 0, `peak red ${peakRed}`);
+    R.expect(`capture ${mode} blood ${gore ? 'on' : 'off'}: the pixel gore scene plays, cube count in range (pawn x pawn: two jabs, as strong as the other pairings)`, peak >= lo && peak <= hi, `peak ${peak} cubes (${lo} to ${hi})`);
     await ev(async () => { await window.__chess.stepAsync(5); });
     const after = await ev(() => ({ audit: window.__chess.game.audit(), busy: window.__chess.game.busy, left: window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3).length, tray: window.__chess.game.getState().captured.b.length }));
-    R.expect(`capture ${mode}: afterwards the board is clean, no cube is left, the victim is in the tray`, !after.audit.length && !after.busy && after.left === 0 && after.tray === 1, JSON.stringify(after));
+    R.expect(`capture ${mode} blood ${gore ? 'on' : 'off'}: afterwards the board is clean, no cube is left, the victim is in the tray`, !after.audit.length && !after.busy && after.left === 0 && after.tray === 1, JSON.stringify(after));
   }
+
+  await ev(() => window.__chess.battle.settings.set({ mode: 'on', gore: true }));
+  // the control shows on Pixelwelt only and returns after a theme switch without a reload
+  const vis = () => ev(() => { const r = document.querySelector('#sel-gore')?.closest('.battle-gore'); return !!r && !r.hidden; });
+  const v1 = await vis();
+  await ev(async () => { await window.__chess.themes.set('wood', { persist: false }); });
+  const v2 = await vis();
+  await ev(async () => { await window.__chess.themes.set('pixel', { persist: false }); });
+  const v3 = await vis();
+  R.expect('Blood control: visible on Pixelwelt, hidden on Wood, visible again after switching back', v1 && !v2 && v3, `${v1} ${v2} ${v3}`);
 
   // the theme in and out in place
   await ev(async () => { await window.__chess.themes.set('wood', { persist: false }); window.__chess.draw(); });
