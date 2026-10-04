@@ -5,6 +5,7 @@
 //                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check's extra software pass does).
 //                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 12, three under 24).
 //                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
+//                            Shared mode (smoke tier, opt in with --shared-chrome or CHESS_SHARED_CHROME=1): a group connects to the one Chrome of the runner (CHESS_SHARED_WS) and gets a BrowserContext, no slot of its own, see launchSharedHost().
 //   pageRenderer(page)       the WebGL renderer the page itself draws with (the app's own context, UNMASKED_RENDERER), logged by the smoke, phone and release tiers as proof of the GPU
 //   proveGpu(page, R)        prints pageRenderer once, a WARN when the GPU was asked for and the page reports software
 //   watchPage(page, hosts)   collects console errors and warnings, page errors and requests to foreign hosts (foreign requests are aborted); sets Battle scenes Off for the page unless { scenes: true }
@@ -162,7 +163,7 @@ export function browserKind() {
   return exe === 'chrome' || headlessShell().path ? (exe === 'chrome' ? 'chrome' : 'shell') : 'chrome';
 }
 
-export async function launchBrowser({ w = 1280, h = 720, args = [], gl = defaultGl(), executablePath: exe = process.env.CHESS_BROWSER, full = false } = {}) {
+async function launchOwn({ w = 1280, h = 720, args = [], gl = defaultGl(), executablePath: exe = process.env.CHESS_BROWSER, full = false } = {}) {
   const executablePath = pickBrowser(exe, full);
   if (!executablePath || !existsSync(executablePath)) { console.error('Chrome not found. Set CHROME_PATH.'); process.exit(2); }
   let lock, waited = 0;
@@ -197,6 +198,66 @@ export async function launchBrowser({ w = 1280, h = 720, args = [], gl = default
   };
   browser.on('disconnected', () => releaseLock(lock));
   return browser;
+}
+
+/** Shared Chrome for the smoke tier (CHE-171). Default mode: one Chrome per group process (the old path). With shared mode on, test/smoke-groups.mjs starts ONE Chrome
+ *  through launchSharedHost() (one slot for the whole run) and hands its WebSocket endpoint to every group process in CHESS_SHARED_WS (plus CHESS_SHARED_EXE, CHESS_SHARED_GL:
+ *  what that Chrome is). launchBrowser() in a group then connects and returns a BrowserContext wrapper that behaves like a Browser for our tests: no slot, no Chrome process of its own.
+ *  A launch that asks for other args, another GL backend or another executable than the shared Chrome has falls back to its own Chrome (one log line says why).
+ *  CHESS_SHARED_CHROME=0 (or --own-chrome on the smoke run) forces the old path, =1 (or --shared-chrome) the shared one. SHARED_BY_DEFAULT is the one switch to flip the default. */
+export const SHARED_BY_DEFAULT = false;
+export const sharedChromeOn = (argv = process.argv.slice(2)) => {
+  if (argv.includes('--own-chrome') || process.env.CHESS_SHARED_CHROME === '0') return false;
+  if (argv.includes('--shared-chrome') || process.env.CHESS_SHARED_CHROME === '1') return true;
+  return SHARED_BY_DEFAULT;
+};
+/** Start the one shared Chrome (holds one slot until closed) and export its endpoint to child processes. Returns the Browser; the caller closes it in a finally block. */
+export async function launchSharedHost(opts = {}) {
+  const gl = opts.gl || defaultGl(), exe = pickBrowser(process.env.CHESS_BROWSER, false);
+  const browser = await launchOwn({ ...opts, gl });
+  process.env.CHESS_SHARED_WS = browser.wsEndpoint(); process.env.CHESS_SHARED_EXE = exe; process.env.CHESS_SHARED_GL = gl;
+  const close = browser.close;
+  browser.close = async () => { delete process.env.CHESS_SHARED_WS; await close(); };
+  return browser;
+}
+/** Close a browser context a group process opened in the shared Chrome (the group crashed or was killed before it could). Through CDP, because the host's Browser object only knows contexts it created itself. Never throws; false when it was gone already. */
+export async function disposeSharedContext(host, id) {
+  try { const s = await host.target().createCDPSession(); try { await s.send('Target.disposeBrowserContext', { browserContextId: id }); return true; } finally { await s.detach().catch(() => {}); } } catch (e) { return false; }
+}
+/** Why a launch cannot use the shared Chrome, or '' when it can. */
+function sharedMismatch({ args = [], gl = defaultGl(), executablePath: exe = process.env.CHESS_BROWSER, full = false }) {
+  if (args.length) return `own args ${args.join(' ')}`;
+  if (gl !== process.env.CHESS_SHARED_GL) return `GL ${gl} differs from the shared ${process.env.CHESS_SHARED_GL}`;
+  if (pickBrowser(exe, full) !== process.env.CHESS_SHARED_EXE) return 'another browser executable';
+  return '';
+}
+async function connectShared({ w = 1280, h = 720 } = {}) {
+  const conn = await puppeteer.connect({ browserWSEndpoint: process.env.CHESS_SHARED_WS, defaultViewport: { width: w, height: h, deviceScaleFactor: 1 } });
+  let ctx;
+  try { ctx = await conn.createBrowserContext(); } catch (e) { await conn.disconnect().catch(() => {}); throw e; }
+  try { process.send?.({ sharedContext: ctx.id }); } catch (e) { /* no IPC channel: the runner cannot dispose a leaked context, the browser close at the end does */ }
+  let closed = false;
+  const own = {
+    newPage: () => ctx.newPage(), pages: () => ctx.pages(),
+    version: () => conn.version(), userAgent: () => conn.userAgent(), wsEndpoint: () => conn.wsEndpoint(), process: () => null,
+    isConnected: () => conn.connected, browserContexts: () => [ctx], defaultBrowserContext: () => ctx,
+    on: (...a) => conn.on(...a), once: (...a) => conn.once(...a), off: (...a) => conn.off(...a),
+    async close() {
+      if (closed) return; closed = true;
+      let timer;
+      try { await Promise.race([ctx.close(), new Promise((r) => { timer = setTimeout(r, 8000); })]); } catch (e) { /* the page or the browser is gone already */ }
+      finally { clearTimeout(timer); await conn.disconnect().catch(() => {}); }
+    },
+  };
+  return own;
+}
+export async function launchBrowser(opts = {}) {
+  if (process.env.CHESS_SHARED_WS && process.env.CHESS_SHARED_CHROME !== '0') {
+    const why = sharedMismatch(opts);
+    if (!why) return connectShared(opts);
+    console.log(`      own Chrome instead of the shared one: ${why}`);
+  }
+  return launchOwn(opts);
 }
 
 /** Attach collectors to a page. Requests to hosts other than the given ones are recorded and aborted. */

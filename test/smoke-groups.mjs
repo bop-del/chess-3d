@@ -8,12 +8,14 @@
 // Result cache: a group that passed cleanly for the same build and scripts prints CACHED, takes no Chrome slot and needs no build. --no-cache
 // (also implied by --shots, --write-budgets and --dev) runs everything for real. Ports: derived from the lane name (tools/_lib.mjs lanePorts).
 // Schedule: the groups to run start longest first, by the run times stored in the result cache (tools/result-cache.mjs groupTimings), groups without a time in list order after them.
+// Shared Chrome (CHE-171, off by default): --shared-chrome (or CHESS_SHARED_CHROME=1) starts ONE headless Chrome for the whole run, holding one slot, and every group gets a BrowserContext of it instead of its own Chrome
+// (launchBrowser() in tools/_lib.mjs connects through CHESS_SHARED_WS). A group asking for other args, GL or executable falls back to its own Chrome and logs why. --own-chrome (or CHESS_SHARED_CHROME=0) forces the old path.
 // Options: --port=<lane preview port, 5303 in the main checkout> --dev --dev-port=<lane dev port, 5302> --skip-build --write-budgets --shots --skip-fixes, plus --only=<group,group> to run just those groups, --jobs=<n> to set the number of processes at once (default: the free Chrome slots at start, at least 2, so waiting groups do not hit the 15 minute lock timeout).
 // A group that still finds no slot is reported as SKIPPED (slot starvation), not as a failure: run it alone with node test/smoke.mjs --group=<name>.
 import { spawn, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, startServer, claimPort } from '../tools/_lib.mjs';
+import { ROOT, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, launchSharedHost, disposeSharedContext, sharedChromeOn, startServer, claimPort } from '../tools/_lib.mjs';
 import { affectedGroups, changedFiles } from '../tools/affected-groups.mjs';
 import { getResult, groupKey, groupTimings, longestFirst, putResult } from '../tools/result-cache.mjs';
 import { GROUPS as ALL_GROUPS, SMOKE, family } from './smoke-group-list.mjs';
@@ -59,7 +61,7 @@ for (const g of selected) {
 }
 const JOBS = Math.max(1, Number(opt('jobs', Math.max(2, freeSlots()))));
 
-let server = null;
+let server = null, host = null;
 const fail = (m) => { console.log('FAIL  ' + m); console.log('SMOKE FAILED'); process.exit(1); };
 try {
   if (!todo.length) console.log('PASS  every selected group is cached or not affected: no build, no server, no Chrome');
@@ -86,7 +88,8 @@ const totals = { np: server ? 2 : 1, nw: 0, nf: 0 }, skipped = [];   // the buil
 for (const { g: [name], hit } of cached) { totals.np += hit.pass; totals.nw += (hit.warns || []).length; console.log(`--- group ${name} CACHED (passed ${hit.pass} checks in ${hit.secs}s at ${hit.t.slice(0, 16).replace('T', ' ')}, same build and scripts)`); for (const w of hit.warns || []) console.log(w); }
 const runGroup = ({ g: [name, script, extra], key }) => new Promise((resolve) => {
   const tg = Date.now();
-  const c = spawn(process.execPath, [script, ...(script === SMOKE ? pass : [`--base=${base}`]), ...extra], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  const c = spawn(process.execPath, [script, ...(script === SMOKE ? pass : [`--base=${base}`]), ...extra], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+  const contexts = new Set(); c.on('message', (m) => { if (m && m.sharedContext) contexts.add(m.sharedContext); });   // shared Chrome: the browser contexts this child opened
   let out = ''; const trace = (d) => { out += d; if (process.env.SMOKE_TRACE) { mkdirSync(join(ROOT, '.tmp/smoke-trace'), { recursive: true }); appendFileSync(join(ROOT, '.tmp/smoke-trace', name.replace(/\W+/g, '-') + '.log'), String(d).split('\n').filter(Boolean).map((l) => `${((Date.now() - t0) / 1000).toFixed(1)}s ${l}`).join('\n') + '\n'); } };   // SMOKE_TRACE=1: every output line of every group with the time it arrived, in .tmp/smoke-trace/
   // Safety net: a child silent for QUIET_MS after its first output (so not while it waits for a Chrome slot) is killed, by its own PID only.
   // A stall after the last check then costs 60 s, not minutes; the group is judged by its rows. With SMOKE_TRACE the process list is saved
@@ -106,8 +109,9 @@ const runGroup = ({ g: [name, script, extra], key }) => new Promise((resolve) =>
   const onData = (d) => { if (/waiting for a headless Chrome slot/.test(String(d))) { clearTimeout(quiet); return; } arm(); };   // waiting for a slot is not a stall: the timer starts again at the next line
   c.stdout.on('data', onData); c.stderr.on('data', onData);
   c.stdout.on('data', trace); c.stderr.on('data', trace);
-  c.on('close', (code) => {
+  c.on('close', async (code) => {
     clearTimeout(quiet);
+    if (host) for (const id of contexts) await disposeSharedContext(host, id);   // a crashed or killed group must not leave its pages in the shared Chrome
     if (killedQuiet) {
       out += `\nWARN  killed quiet child  group ${name} printed nothing for ${QUIET_MS / 1000}s after its last row, judged by its rows\n`;
       code = /^PASS  /m.test(out) ? 0 : 1;
@@ -127,6 +131,7 @@ const runGroup = ({ g: [name, script, extra], key }) => new Promise((resolve) =>
   });
 });
 try {
+  if (todo.length && sharedChromeOn(args)) { host = await launchSharedHost({ w: 1280, h: 720 }); console.log('      shared headless Chrome started (one slot, groups use browser contexts)'); }
   const queue = longestFirst(todo, groupTimings());   // longest known group first, from the stored run times; no time yet: the list order
   await Promise.all(Array.from({ length: Math.min(JOBS, queue.length) }, async () => { for (let g; (g = queue.shift());) await runGroup(g); }));
 
@@ -136,7 +141,7 @@ try {
     catch (e) { console.log('WARN  contact sheet  ' + String(e.message).slice(0, 200)); }
     finally { try { await b?.close(); } catch (e) { /* ignore */ } }
   }
-} finally { server?.stop(); }
+} finally { try { await host?.close(); } catch (e) { /* ignore */ } server?.stop(); }
 console.log(`\nsmoke: ${totals.np + totals.nw + totals.nf} checks: ${totals.np} pass, ${totals.nw} warn, ${totals.nf} fail (${secs()})`);
 if (notAffected.length) console.log(`SKIPPED (not affected by this diff): ${notAffected.join(', ')}. node test/run.mjs smoke --all runs them.`);
 if (cached.length) console.log(`CACHED: ${cached.map(({ g: [n] }) => n).join(', ')} (${cached.length} of ${selected.length} selected groups, no Chrome slot used)`);
