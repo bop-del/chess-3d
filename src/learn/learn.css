@@ -14,6 +14,10 @@ body:not(.phone) .xtabs { display: grid; grid-template-columns: 1fr 1fr; }
 .xname { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .xname b { overflow: hidden; text-overflow: ellipsis; }
 .xmark { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px rgba(216, 180, 104, 0.55); }
+.xgroup { display: flex; flex-direction: column; gap: 4px; }
+/* a side line sits indented under its parent, a gold rule on the left ties the group together */
+.xline.xsub { margin-left: 14px; border-left: 2px solid rgba(216, 180, 104, 0.45); }
+body.phone .xline.xsub { margin-left: 12px; }
 .xempty { margin: 6px 2px; }
 .xline.mine { grid-template-columns: 1fr auto; }
 .xbar { grid-column: 1 / -1; height: 6px; margin-top: 3px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }

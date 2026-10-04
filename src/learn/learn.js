@@ -17,6 +17,17 @@ const el = (tag, cls, text) => {
 };
 const pick = (pair) => (pair ? pair[i18n.language] || pair.en || '' : '');
 const sideLabel = (l) => t(l.side === 'w' ? 'explain.forWhite' : 'explain.forBlack', l.side === 'w' ? 'You play White' : 'You play Black');
+// The 15 side lines and the opening each one hangs under (the line data has no parent field). test/learn.mjs checks this
+// map against the data: every key and value is a line id, the parent comes first and is played from the same side.
+export const SIDE_OF = {
+  'london-system-c5': 'london-system', 'london-system-bf5': 'london-system',
+  'queens-gambit-accepted': 'queens-gambit', 'slav-defense': 'queens-gambit',
+  'scandinavian-queen-d6': 'scandinavian-defense', 'scandinavian-modern': 'scandinavian-defense',
+  'caro-kann-advance': 'caro-kann', 'caro-kann-panov': 'caro-kann',
+  'french-tarrasch': 'french-defense', 'french-advance': 'french-defense',
+  'sicilian-najdorf': 'sicilian-defense', 'sicilian-dragon': 'sicilian-defense', 'sicilian-alapin': 'sicilian-defense',
+  'kings-indian-classical': 'kings-indian-defense', 'kings-indian-samisch': 'kings-indian-defense',
+};
 const TABS = ['openings', 'mine', 'practise', 'puzzles'];
 
 export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress, reward = null }) {
@@ -99,7 +110,19 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   function openingsView() {
     const box = el('div', 'xlist');
     box.append(el('p', 'xlead', t('explain.lead', 'Pick an opening. You play your moves, the game plays the other side, and every move says what it is for.')));
-    for (const line of explain.lines) box.append(row(line, 'openings'));
+    // parents first, each followed by its side lines in a group; a side line whose parent is missing stays at the top level
+    const all = explain.lines;
+    const ids = new Set(all.map((l) => l.id));
+    for (const line of all) {
+      if (SIDE_OF[line.id] && ids.has(SIDE_OF[line.id])) continue;
+      const kids = all.filter((l) => SIDE_OF[l.id] === line.id);
+      if (!kids.length) { box.append(row(line, 'openings')); continue; }
+      const group = el('div', 'xgroup');
+      group.dataset.parent = line.id;
+      group.append(row(line, 'openings'));
+      for (const k of kids) { const r = row(k, 'openings'); r.classList.add('xsub'); r.dataset.parent = line.id; group.append(r); }
+      box.append(group);
+    }
     return box;
   }
 

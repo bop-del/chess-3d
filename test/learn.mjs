@@ -5,6 +5,25 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from '../tools/_lib.mjs';
 
+// The Openings list groups the 15 side lines under their parent: parent first, same side, in data order, indented.
+const sideCheck = (page, scope) => page.evaluate((sc) => {
+  const lines = window.__chess.openings.explain.lines;
+  const rows = [...document.querySelectorAll(`${sc} .xline.openings`)];
+  const subs = rows.filter((r) => r.classList.contains('xsub'));
+  const dataOrder = lines.map((l) => l.id).join();
+  const order = rows.map((r) => r.dataset.id);
+  const groups = [...document.querySelectorAll(`${sc} .xgroup`)];
+  const grouped = groups.every((g) => {
+    const first = g.querySelector('.xline'); const kids = [...g.querySelectorAll('.xline.xsub')];
+    const pl = lines.find((l) => l.id === first.dataset.id);
+    return !first.classList.contains('xsub') && kids.length > 0 && kids.every((k) => k.dataset.parent === first.dataset.id && lines.find((l) => l.id === k.dataset.id).side === pl.side);
+  });
+  const indent = subs.map((r) => parseFloat(getComputedStyle(r).marginLeft) - parseFloat(getComputedStyle(r.closest('.xgroup').querySelector('.xline')).marginLeft));
+  const parentsTop = rows.filter((r) => !r.classList.contains('xsub')).length;
+  return { n: rows.length, subs: subs.length, sorted: [...order].sort().join() === [...lines.map((l) => l.id)].sort().join(), grouped, minIndent: Math.min(...indent), parentsTop, dataOrder: dataOrder === order.join() };
+}, scope);
+
+
 const FLAGS = 'quality=low&manual=1&ai=0';
 const TMP = join(ROOT, '.tmp', 'learn-ui');
 
@@ -45,6 +64,8 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
     errs = await open(page);
     await step(page, 1);
     ok('learn: Openings lists 27 rows, none marked yet', (await count(page, '.xline.openings')) === 27 && (await count(page, '.xmark')) === 0);
+    const sc = await sideCheck(page, '.xlist');
+    ok('learn: 15 side lines sit indented under their 12 parents, parent first, same order as the data', sc.n === 27 && sc.subs === 15 && sc.parentsTop === 12 && sc.grouped && sc.dataOrder && sc.minIndent >= 10, JSON.stringify(sc));
     ok('learn: Practise is greyed before the first adopt', await page.evaluate(() => document.querySelector('.xtab[data-tab="practise"]').disabled));
     await tapTab(page, 'mine');
     ok('learn: Mine is empty with one plain sentence', (await count(page, '.xempty')) === 1 && (await count(page, '.xline.mine')) === 0);
@@ -190,6 +211,9 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
       ok(`learn ${tag}: the sheet fits the screen`, sb && sb.y >= -0.5 && sb.y + sb.h <= h + 0.5 && sb.x >= -0.5 && sb.x + sb.w <= w + 0.5, JSON.stringify(sb));
       const tabsOk = await pp.evaluate(() => [...document.querySelectorAll('.plearn .xtab, .plearn .xline')].every((e) => e.getBoundingClientRect().height >= 43.5));
       ok(`learn ${tag}: tabs and rows are 44 px tall`, tabsOk);
+      const ps = await sideCheck(pp, '.plearn');
+      ok(`learn ${tag}: side lines indented under their parent, nothing cut at the right edge`, ps.subs === 15 && ps.grouped && ps.dataOrder && ps.minIndent >= 8, JSON.stringify(ps));
+      ok(`learn ${tag}: every row stays inside the sheet width`, await pp.evaluate(() => { const sb = document.querySelector('.plearn .psheet-body') || document.querySelector('.plearn'); const R = sb.getBoundingClientRect(); return [...document.querySelectorAll('.plearn .xline')].every((e) => e.getBoundingClientRect().right <= R.right + 0.5 && e.scrollWidth <= e.clientWidth + 1); }));
       await snap(pp, `learn-phone-${tag}`);
       if (w === 390) {
         await pp.evaluate(() => document.querySelector('.plearn .xline.openings[data-id="italian-game"]').click());
