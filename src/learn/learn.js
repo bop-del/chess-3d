@@ -38,6 +38,10 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   // the daily store and the badge store are created after this module is mounted (main.js): read them when Export or Import runs
   const extras = () => { const c = typeof window !== 'undefined' ? window.__chess : null; return { daily: c?.daily || null, badges: c?.badges?.store || null }; };
 
+  // the badge panel is created after this module is mounted (main.js): setBadges({ strip, badges }) hands its strips over
+  let badgeStrip = null;
+  const strip = (families) => (badgeStrip ? [badgeStrip(families)] : []);
+
   let tab = 'openings';
   let editing = false;
   let practiseLines = false;                   // the Practise tab shows the lines instead of the start button
@@ -109,6 +113,7 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   // ------------------------------------------------------------ tabs
   function openingsView() {
     const box = el('div', 'xlist');
+    box.append(...strip(['openings']));          // only the openings medals, with "3 of 27", at the top
     box.append(el('p', 'xlead', t('explain.lead', 'Pick an opening. You play your moves, the game plays the other side, and every move says what it is for.')));
     // parents first, each followed by its side lines in a group; a side line whose parent is missing stays at the top level
     const all = explain.lines;
@@ -172,7 +177,7 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   }
 
   function puzzlesView() {
-    return puzzlesTab({
+    const view = puzzlesTab({
       puzzles, progress: puzzleProgress, reward,
       onStart() {
         if (explain.state().phase !== 'list') explain.stop();
@@ -180,6 +185,8 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
         closeSheet();
       },
     });
+    view.append(...strip(['puzzles', 'daily']));   // only the puzzle and daily medals
+    return view;
   }
 
   function render() {
@@ -276,6 +283,11 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   return {
     idle, render,
     get tab() { return tab; },
+    setBadges(api) {
+      badgeStrip = api.strip;
+      api.badges.onChange(() => { if (puzzles.state().phase === 'idle') render(); });
+      render();
+    },
     show(id) { if (TABS.includes(id)) { tab = id; render(); } },
     // Open the puzzle path: the Puzzles tab, and on the phone the Learn sheet. A running puzzle stays as it is until a station is tapped.
     openPath() { tab = 'puzzles'; puzzleProgress.setView(null); render(); sheet?.open(); },

@@ -3,6 +3,7 @@ import { addDE } from '../i18n.js';
 
 addDE({
   'badges.title': 'Abzeichen',
+  'badges.strip.openings': '{n} von {max}',
   'badges.new': 'Neues Abzeichen: {name}',
   'badges.fam.puzzles': 'Rätsel', 'badges.fam.openings': 'Eröffnungen', 'badges.fam.wins': 'Siege gegen den Computer', 'badges.fam.daily': 'Tagesrätsel',
   'badges.prog.puzzles': '{n} von {max} Rätseln gelöst', 'badges.prog.openings': '{n} von {max} Eröffnungen gelernt',

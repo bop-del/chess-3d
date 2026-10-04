@@ -1,9 +1,10 @@
 // The badge panel: a card "Abzeichen" (Learn tab on desktop, a section of the Menu sheet on a phone) with a grid of all badges
 // grouped by family, and the toast for a newly earned badge. Earned badges are in colour with their date, locked ones grey with the
-// goal ("noch 7 Rätsel"), every family has a progress line. The look is a variant (?variant=a|b|c, read here and nowhere else).
+// goal ("noch 7 Rätsel"), every family has a progress line. The Learn tabs show a strip of their own families only (strip(): Openings
+// the openings medals under a line "3 of 27", Puzzles the puzzle and daily medals); the full grid stays in the card.
 import * as I18N from '../i18n.js';
 import { BADGES, FAMILIES, LEVELS } from './badges.js';
-import { badgeSvg, VARIANTS } from './badge-art.js';
+import { badgeSvg } from './badge-art.js';
 import './strings.js';
 import './badges.css';
 
@@ -23,17 +24,10 @@ const dateText = (iso) => {
   try { return new Date(y, m - 1, d).toLocaleDateString(i18n.language === 'de' ? 'de-DE' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return iso; }
 };
 
-/** The variant from the URL: a, b or c; anything else is the default a. */
-export function variantFlag(search = location.search) {
-  const v = new URLSearchParams(search).get('variant');
-  return VARIANTS.includes(v) ? v : 'a';
-}
-
 const GLINT_MS = 3000;
 
-export function mountBadgesPanel({ badges, ui = null, variant = variantFlag() }) {
+export function mountBadgesPanel({ badges, ui = null }) {
   const root = el('div', 'badges');
-  root.dataset.variant = variant;
   const card = ui?.mountPanel ? ui.mountPanel('badges', root, { title: t('badges.title', 'Badges') }) : null;
   const fresh = new Set();   // the ids that glint now
 
@@ -57,7 +51,7 @@ export function mountBadgesPanel({ badges, ui = null, variant = variantFlag() })
     if (fresh.has(b.id)) li.classList.add('fresh');
     const label = b.family === 'wins' ? '' : b.id === 'openings-all' ? '★' : String(b.goal === 'all' ? p.max : b.goal);
     const holder = el('span', 'bdart');
-    holder.innerHTML = badgeSvg({ id: b.id, family: b.family, label, pips: LEVELS.indexOf(b.level) + 1, variant });   // own markup, no player text
+    holder.innerHTML = badgeSvg({ id: b.id, family: b.family, label, pips: LEVELS.indexOf(b.level) + 1 });   // own markup, no player text
     li.append(holder, el('b', 'bdname', pick(b.name)));
     li.append(el('span', 'bdsub', item.earned ? dateText(item.date) : leftText(b, item)));
     li.setAttribute('aria-label', `${pick(b.name)}: ${item.earned ? t('badges.earned', 'Earned on {date}', { date: dateText(item.date) }) : leftText(b, item)}`);
@@ -65,31 +59,42 @@ export function mountBadgesPanel({ badges, ui = null, variant = variantFlag() })
     return li;
   }
 
-  function render() {
-    const parts = [];
-    for (const f of FAMILIES) {
-      const p = badges.progress(f);
-      const sec = el('section', 'bdfam');
-      sec.dataset.family = f;
+  // one family: head, progress line, bar, grid. In a strip (a Learn tab) the openings head is the plain count "3 of 27" and has no hint.
+  function section(f, strip = false) {
+    const p = badges.progress(f);
+    const sec = el('section', 'bdfam');
+    sec.dataset.family = f;
+    const max = f === 'puzzles' ? 100 : f === 'daily' ? 30 : p.max || 1;
+    const bar = el('div', 'bdbar');
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', famName(f));
+    bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', String(max)); bar.setAttribute('aria-valuenow', String(Math.min(p.value, max)));
+    const fill = el('i');
+    fill.style.width = `${Math.round(Math.min(1, p.value / max) * 100)}%`;
+    bar.append(fill);
+    const list = el('ul', 'bdgrid');
+    list.setAttribute('role', 'list');
+    for (const item of p.items) list.append(cell(BADGES.find((b) => b.id === item.id), item, p));
+    if (strip && f === 'openings') {
       const head = el('header', 'bdhead');
-      head.append(el('h3', '', famName(f)), el('span', 'bdcount', `${p.earned}/${p.total}`));
-      const prog = el('p', 'bdprog', progText(f, p));
-      const max = f === 'puzzles' ? 100 : f === 'daily' ? 30 : p.max || 1;
-      const bar = el('div', 'bdbar');
-      bar.setAttribute('role', 'progressbar');
-      bar.setAttribute('aria-label', famName(f));
-      bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', String(max)); bar.setAttribute('aria-valuenow', String(Math.min(p.value, max)));
-      const fill = el('i');
-      fill.style.width = `${Math.round(Math.min(1, p.value / max) * 100)}%`;
-      bar.append(fill);
-      const list = el('ul', 'bdgrid');
-      list.setAttribute('role', 'list');
-      for (const item of p.items) list.append(cell(BADGES.find((b) => b.id === item.id), item, p));
-      sec.append(head, prog, bar, list);
-      if (f === 'openings') sec.append(el('p', 'bdhint', t('badges.hint.openings', 'An opening counts once you have played it to the end and added it to your openings.')));
-      parts.push(sec);
+      head.append(el('b', 'bdlead', t('badges.strip.openings', '{n} of {max}', { n: p.value, max: p.max })), el('span', 'bdcount', `${p.earned}/${p.total}`));
+      sec.append(head, bar, list);
+      return sec;
     }
-    root.replaceChildren(...parts);
+    const head = el('header', 'bdhead');
+    head.append(el('h3', '', famName(f)), el('span', 'bdcount', `${p.earned}/${p.total}`));
+    sec.append(head, el('p', 'bdprog', progText(f, p)), bar, list);
+    if (f === 'openings' && !strip) sec.append(el('p', 'bdhint', t('badges.hint.openings', 'An opening counts once you have played it to the end and added it to your openings.')));
+    return sec;
+  }
+
+  function render() { root.replaceChildren(...FAMILIES.map((f) => section(f))); }
+
+  /** A strip with the medals of the given families only, for a Learn tab. Built fresh by the tab on every render. */
+  function strip(families) {
+    const box = el('div', 'badges bdstrip');
+    box.append(...families.map((f) => section(f, true)));
+    return box;
   }
 
   // a newly earned badge: one toast for all that came together, and a short glint on it in the panel
@@ -110,5 +115,5 @@ export function mountBadgesPanel({ badges, ui = null, variant = variantFlag() })
 
   // phone: the card sits in the Menu sheet, folded; the panel is opened by ?open=badges
   if (card && document.body.classList.contains('phone')) card.classList.add('collapsed');
-  return { root, card, render, variant, fresh };
+  return { root, card, render, strip, fresh };
 }

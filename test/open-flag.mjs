@@ -50,7 +50,7 @@ const CASES = [
   ['moves', { see: '.card[data-card="moves"] .body' }],
   ['clock', { see: '.clock-settings #sel-clock' }],
   ['daily', { see: '.dailycard' }],
-  ['badges', { see: '.badges .bdgrid' }],
+  ['badges', { see: '.badges:not(.bdstrip) .bdgrid' }],
 ];
 // desktop: the one right panel, so Settings and Moves are tabs, not cards
 const DESKTOP_SEE = { settings: '#tp-settings #presets', scene: '#tp-settings #presets', moves: '#tp-play #moves', clock: '#tp-settings #sel-clock' };
@@ -129,17 +129,35 @@ try {
       try { localStorage.removeItem('chess3d.badges'); localStorage.removeItem('chess3d.train'); localStorage.removeItem('chess3d.puzzles'); localStorage.removeItem('chess3d.daily'); } catch (e) { /* ignore */ }
       if (phone) for (const [k, v] of [['width', w], ['height', h]]) Object.defineProperty(screen, k, { get: () => v });
     }, size[1], size[2], size[3]);
-    for (const variant of ['a', 'b', 'c']) {
-      await load(bp, size, `&open=badges&variant=${variant}`);
-      const g = await bp.evaluate(() => {
-        const root = document.querySelector('.badges');
-        const cells = [...document.querySelectorAll('.badges .bdg')];
-        const art = cells.map((c) => c.querySelector('.bd').getBoundingClientRect());
-        const within = cells.every((c) => { const r = c.getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1; });
-        return { variant: root && root.dataset.variant, cells: cells.length, locked: cells.filter((c) => c.dataset.earned === 'false').length, fams: document.querySelectorAll('.badges .bdfam').length,
-          minArt: Math.round(Math.min(...art.map((r) => Math.min(r.width, r.height)))), within, svgs: document.querySelectorAll('.badges svg.bd').length, firstLeft: cells[0] && cells[0].querySelector('.bdsub').textContent };
-      });
-      R.expect(`${size[0]}: badges grid, variant ${variant}`, g.variant === variant && g.cells === 13 && g.locked === 13 && g.fams === 4 && g.svgs === 13 && g.minArt >= 44 && g.within, '13 locked badges in 4 families, art at least 44 px, inside the screen', JSON.stringify(g));
+    await load(bp, size, '&open=badges');
+    const g = await bp.evaluate(() => {
+      const cells = [...document.querySelectorAll('.badges:not(.bdstrip) .bdg')];
+      const art = cells.map((c) => c.querySelector('.bd').getBoundingClientRect());
+      const within = cells.every((c) => { const r = c.getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1; });
+      return { cells: cells.length, locked: cells.filter((c) => c.dataset.earned === 'false').length, fams: document.querySelectorAll('.badges:not(.bdstrip) .bdfam').length,
+        minArt: Math.round(Math.min(...art.map((r) => Math.min(r.width, r.height)))), within, svgs: document.querySelectorAll('.badges:not(.bdstrip) svg.bd').length, firstLeft: cells[0] && cells[0].querySelector('.bdsub').textContent };
+    });
+    R.expect(`${size[0]}: badges grid`, g.cells === 13 && g.locked === 13 && g.fams === 4 && g.svgs === 13 && g.minArt >= 44 && g.within, '13 locked badges in 4 families, art at least 44 px, inside the screen', JSON.stringify(g));
+    // the look variants b and c are gone: ?variant= changes nothing on the badges
+    await load(bp, size, '&open=badges&variant=c');
+    const vc = await bp.evaluate(() => ({ attr: document.querySelector('.badges:not(.bdstrip)').dataset.variant ?? null, rb: document.querySelectorAll('.badges:not(.bdstrip) .bd-rb').length, other: document.querySelectorAll('.badges .bd-sq1, .badges .bd-top, .badges .bd-px').length }));
+    R.expect(`${size[0]}: ?variant=c no longer changes the badges`, vc.attr === null && vc.rb === 26 && vc.other === 0, 'round medals with ribbons only', JSON.stringify(vc));
+    // each Learn tab shows the medals of its own families: Openings "n of 27" on top, Puzzles the puzzle and daily families
+    for (const [tabId, fams, count] of [['openings', ['openings'], 3], ['puzzles', ['puzzles', 'daily'], 6]]) {
+      await load(bp, size, `&open=${tabId}`);
+      const tb = await bp.evaluate((id) => {
+        const view = document.querySelector('.xtabs + [role="tabpanel"]');
+        const strips = [...document.querySelectorAll('.bdstrip')];
+        const strip = strips[0];
+        const vr = view && view.getBoundingClientRect(), sr = strip && strip.getBoundingClientRect();
+        return { tab: document.querySelector('.xtab[aria-selected="true"]')?.dataset.tab, strips: strips.length, inView: !!(strip && view && view.contains(strip)),
+          fams: strip ? [...strip.querySelectorAll('.bdfam')].map((f) => f.dataset.family) : [], cells: strip ? strip.querySelectorAll('.bdg').length : 0,
+          lead: strip?.querySelector('.bdlead')?.textContent ?? null, topFirst: id === 'openings' ? view.firstElementChild === strip : null,
+          wins: strip ? strip.querySelectorAll('[data-family="wins"]').length : 0, inside: !!(sr && sr.left >= -1 && sr.right <= innerWidth + 1) };
+      }, tabId);
+      const okTab = tb.tab === tabId && tb.strips === 1 && tb.inView && tb.fams.join() === fams.join() && tb.cells === count && tb.wins === 0 && tb.inside
+        && (tabId === 'openings' ? tb.lead === '0 of 27' && tb.topFirst === true : tb.lead === null);
+      R.expect(`${size[0]}: the ${tabId} tab shows only ${fams.join(' and ')} medals${tabId === 'openings' ? ', "0 of 27" at the top' : ''}`, okTab, 'one strip with its own families', JSON.stringify(tb));
     }
     await load(bp, size, '&open=badges');
     const t = await bp.evaluate(async () => {

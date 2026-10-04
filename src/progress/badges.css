@@ -1,4 +1,4 @@
-/* Badge panel: families, grids, the three badge looks (variant a, b, c) and the glint. Colours and radii come from the HUD tokens. */
+/* Badge panel: families, grids, the strips of the Learn tabs and the glint. Colours and radii come from the HUD tokens. */
 .badges { display: flex; flex-direction: column; gap: 14px; }
 .bdhead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .bdhead h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: var(--text); }
@@ -6,6 +6,9 @@
 .bdprog { margin: 2px 0 5px; font-size: 12px; color: var(--dim); line-height: 1.35; }
 .bdbar { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .bdbar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #b08d45, var(--gold)); }
+.bdstrip { gap: 8px; margin: 2px 0 10px; }
+.bdlead { font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.bdstrip .bdgrid { margin-top: 8px; }
 .bdhint { margin: 6px 0 0; font-size: 11.5px; color: var(--dim); line-height: 1.4; }
 .bdgrid { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px 6px; }
 
@@ -21,8 +24,8 @@ body.phone .bdname { font-size: 13px; }
 body.phone .bdsub { font-size: 12px; }
 
 /* colours: a family and a state set the same four custom properties, so every look is one drawing */
-.bdg { --bc: #3a3d49; --bc2: #262932; --bcl: #50545f; --ink: #8a8d99; --sq1: #4a4d58; --sq2: #2b2d36; --rim2: #20222a; }
-.bdg[data-earned="true"] { --ink: #2a2008; --sq1: #e6e1d6; --sq2: #14161d; --rim2: #3b2a1c; }
+.bdg { --bc: #3a3d49; --bc2: #262932; --bcl: #50545f; --ink: #8a8d99; }
+.bdg[data-earned="true"] { --ink: #2a2008; }
 .bdfam[data-family="puzzles"] .bdg[data-earned="true"] { --bc: #d8b468; --bc2: #8a6a2a; --bcl: #f3dfa8; }
 .bdfam[data-family="openings"] .bdg[data-earned="true"] { --bc: #7db4e6; --bc2: #2f5f8f; --bcl: #c4e0f7; --ink: #0e2238; }
 .bdfam[data-family="wins"] .bdg[data-earned="true"] { --bc: #e8826f; --bc2: #8f3326; --bcl: #f9bfb3; --ink: #3a0f08; }
@@ -37,15 +40,6 @@ body.phone .bdsub { font-size: 12px; }
 .bd-rb { fill: var(--bc2); stroke: var(--bcl); stroke-width: 0.8; stroke-opacity: 0.5; }
 .bd-shine { fill: none; stroke: var(--bcl); stroke-width: 2.4; stroke-linecap: round; opacity: 0.8; }
 .bdg[data-earned="false"] .bd-shine { opacity: 0.3; }
-.bd-sq1 { fill: var(--sq1); }
-.bd-sq2 { fill: var(--sq2); }
-.bd-edge { fill: none; stroke: var(--bcl); stroke-width: 1.6; stroke-opacity: 0.8; }
-/* variant c, the block token: a dirt-brown rim, a bevelled face, a light top strip and a dark bottom strip */
-.badges[data-variant="c"] .bd-rim { fill: var(--rim2); }
-.bd-top { fill: var(--bcl); opacity: 0.5; }
-.bd-bot { fill: var(--bc2); opacity: 0.55; }
-.bd-px { fill: var(--bc2); opacity: 0.7; }
-.bdg[data-earned="false"] .bd-top, .bdg[data-earned="false"] .bd-bot { opacity: 0.35; }
 .bdg[data-earned="false"] .bd { opacity: 0.85; }
 
 /* the glint on a badge earned just now */
