@@ -2,7 +2,7 @@
 // except `portrait`, which follows orientation changes.
 //   device.touch      primary input is a finger ((pointer: coarse)), ?touch=1 forces it on, ?touch=0 forces it off
 //   device.ios        iPhone, iPad or iPadOS that reports itself as a Mac (every iOS browser uses WebKit)
-//   device.phone      touch and the short side of the screen is 500 CSS px or less
+//   device.phone      touch and the short side of the screen is 500 CSS px or less (with ?touch=1 the short side of the viewport)
 //   device.standalone launched from the Home Screen (no browser bars)
 //   device.portrait   the viewport is taller than wide right now
 // It also puts classes on <body> (and `touch` on <html>) so CSS can react: `touch`, `ios`, `phone`, `portrait`.
@@ -17,7 +17,8 @@ const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' &&
 const flag = params.get('touch');
 const forced = flag === '1' || flag === '0';
 const touch = flag === '1' ? true : flag === '0' ? false : mq('(pointer: coarse)');
-const short = Math.min(screen.width || innerWidth, screen.height || innerHeight);
+// a forced ?touch=1 measures the viewport (the private phone frame is an iframe of 390x844 on a Mac whose screen is large), else the screen
+const short = flag === '1' ? Math.min(innerWidth, innerHeight) : Math.min(screen.width || innerWidth, screen.height || innerHeight);
 
 export const device = {
   touch,

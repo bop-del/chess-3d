@@ -6,6 +6,7 @@
 //   pinch on the board             two fingers apart and together change the camera distance (controls.camera.dist)
 //   page zoom blocked              visualViewport.scale stays 1 through a pinch off the board and a double tap on the board, and device.js
 //                                  calls preventDefault on the second tap of a double tap and on a two finger move off the canvas
+//   forced touch on a desktop    ?touch=1 on a large screen: 390x844 and 844x390 viewports get body.phone and the thumb bar, 1280x800 does not
 //   HUD buttons                    New game, the Controls drawer and a view preset respond to taps
 // Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 setup error.
 import { ROOT, reporter, launchBrowser, watchPage, startServer, build, sleep, claimPort, proveGpu } from '../tools/_lib.mjs';
@@ -319,5 +320,25 @@ async function runSize(size) {
   } finally { await page.close().catch(() => {}); }
 }
 
+// ?touch=1 on a desktop profile (no mobile emulation, the screen stays large): the viewport decides phone or not (the private phone frame)
+const FORCED = [{ name: 'portrait', w: 390, h: 844, phone: true }, { name: 'landscape', w: 844, h: 390, phone: true }, { name: 'wide', w: 1280, h: 800, phone: false }];
+async function runForced(size) {
+  const tag = `forced touch on a desktop screen, ${size.name} ${size.w}x${size.h}`;
+  const page = await browser.newPage();
+  try {
+    const watch = await watchPage(page, ['127.0.0.1', 'localhost']);
+    await page.setViewport({ width: size.w, height: size.h, deviceScaleFactor: 1 });
+    await page.goto(server.base + URLQ, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
+    const f = await page.evaluate(() => ({ screenShort: Math.min(screen.width, screen.height), phone: document.body.classList.contains('phone'), pbar: !!document.querySelector('.pbar') }));
+    R.expect(`${tag}: screen is larger than a phone`, f.screenShort > 500, '> 500', String(f.screenShort));
+    R.expect(`${tag}: phone class ${size.phone ? 'set' : 'not set'}`, f.phone === size.phone, String(size.phone), String(f.phone));
+    R.expect(`${tag}: thumb bar ${size.phone ? 'built' : 'absent'}`, f.pbar === size.phone, String(size.phone), String(f.pbar));
+    if (size.phone && size.name === 'portrait') await page.screenshot({ path: '.tmp/builder/forced-390x844.png' });
+    R.expect(`${tag}: no console or page error`, watch.errs.length === 0, 'clean', watch.errs.slice(0, 3).join(' | '));
+  } finally { await page.close().catch(() => {}); }
+}
+
 for (const size of SIZES) await guard(`${size.name} run`, () => runSize(size));
+for (const size of FORCED) await guard(`forced ${size.name} run`, () => runForced(size));
 await finish();
