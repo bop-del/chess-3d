@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 // Lanes: one branch, one git worktree and one Herdr workspace per backlog item or agent round.
 // Usage:
-//   bin/lane open <branch>              worktree and workspace "<branch>" under ~/.herdr/worktrees/chess-3d/, its first
-//                                       tab "diff" running hunk diff main --watch, node_modules linked in, fast tier run
+//   bin/lane open <branch> [--key CHE-n]...
+//                                       worktree and workspace "<branch>" under ~/.herdr/worktrees/chess-3d/, its first
+//                                       tab "diff" running hunk diff main --watch, node_modules linked in, fast tier run.
+//                                       With the private tools present the lane needs a Linear key: the item's CHE key in BACKLOG.md
+//                                       (one sync is run when there is none), or --key, several times for a lane that carries several
+//                                       items. Without any key nothing is created and the fix is printed.
 //   bin/lane agent <branch> <name> <brief> [--model <m>]
 //                                       a tab "<name> agent" in the lane's workspace with a visible Claude session
 //                                       (plus, once per lane, a "diff" tab running hunk diff main --watch)
@@ -13,11 +17,15 @@
 //   bin/lane land <branch> [-m <msg>]   land a green lane with no agent (the private bin/land-lane): lock, merge main, fast tier, the
 //                                       lane's affected smoke groups, release-next add, then close below; prints `landed <sha>`,
 //                                       `red: <step>` or `conflict: <files>` (exit 0, 1, 3). Needs the private repo's bin/land-lane.
-//   bin/lane close <branch> [-m <msg>]  squash merge into main (the main checkout, which must be on main), then remove the
+//   bin/lane close <branch> [-m <msg>] [--no-linear]
+//                                       squash merge into main (the main checkout, which must be on main), then remove the
 //                                       workspace, the worktree and the branch. Without -m the lane's only commit message
 //                                       is reused; a lane with several commits needs -m. With the private tools present it takes the land
 //                                       lock first (bin/land-lock; a lock held by this same lane counts as ours) and records the lane's
-//                                       release test steps from its report before the worktree is removed.
+//                                       release test steps from its report before the worktree is removed. A lane with no Linear key on
+//                                       record is refused before anything is merged (exit 1, a RED line); --no-linear skips Linear for
+//                                       a lane that tracks no issue. The squash commit subject gets ' (CHE-n[, CHE-m])' from the recorded
+//                                       keys when it names none.
 // Exit codes: 0 done, 1 a step failed (nothing after it ran), 2 usage error.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -25,7 +33,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const USAGE = 'usage: bin/lane open <branch> | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>]';
+const USAGE = 'usage: bin/lane open <branch> [--key CHE-n]... | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
 const LEAD = 'chess-3d-lead';   // the lead session\'s Herdr agent name
 const die = (msg, code = 1) => { console.error(msg); process.exit(code); };
 // the main clone, also when this script runs from inside a lane. Every git command below runs there.
@@ -40,17 +48,34 @@ function lanes() {
   return list.filter((w) => w.is_linked_worktree);
 }
 
-function open(branch) {
+const linearHook = () => { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'linear-hook'); return existsSync(h) ? h : null; };   // optional private hook
+
+// The keys a new lane gets, asked before anything is created (S69: lanes were opened seconds before the sync made the CHE key, so
+// the hook recorded none and close moved nothing). null: no private tools, nothing to enforce; []: Linear is switched off.
+function laneKeys(branch, given) {
+  const h = linearHook();
+  if (!h) return null;
+  const ask = (extra = []) => spawnSync(h, ['resolve', branch, ...given.flatMap((k) => ['--key', k]), ...extra], { encoding: 'utf8', timeout: 120000 });
+  let r = ask();
+  if (r.status === 1) r = ask(['--sync']);   // not in BACKLOG.md yet: one sync may create the key, then match again
+  if (r.status === 2) die(`lane ${branch} not opened: ${(r.stderr || r.stdout).trim()}`);
+  if (r.status !== 0) die(`lane ${branch} not opened: its item has no CHE key in BACKLOG.md, so Linear could not follow the lane.\nFix: add a ### NEW block for the item, run bin/linear sync, or pass --key CHE-n (several times for several items).`);
+  const out = r.stdout.trim();
+  return out === 'off' ? [] : out.split(/\s+/).filter(Boolean);
+}
+
+function open(branch, given = []) {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(branch || '')) die(`branch names are lower case words joined by hyphens\n${USAGE}`, 2);
   if (git('branch', '--list', branch)) die(`branch ${branch} exists already`);
+  const keys = laneKeys(branch, given);
   const res = herdr('worktree', 'create', '--cwd', MAIN, '--branch', branch, '--base', 'main', '--label', branch, '--no-focus');
   const path = res.worktree.path, ws = res.workspace.workspace_id, tab = res.tab.tab_id;
   // the first tab shows the lane's changes against main, live (hunk); a lane needs no plain shell tab
   run('herdr', ['tab', 'rename', tab, 'diff']);
   const nm = join(path, 'node_modules');
   if (!existsSync(nm)) symlinkSync(join(MAIN, 'node_modules'), nm);
-  console.log(`lane ${branch}: ${path}\nworkspace ${ws} "${branch}", first tab "diff" (hunk diff main --watch)`);
-  { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'linear-hook'); if (existsSync(h)) spawnSync(h, ['open', branch], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook, never blocks a lane
+  console.log(`lane ${branch}: ${path}\nworkspace ${ws} "${branch}", first tab "diff" (hunk diff main --watch)${keys && keys.length ? `\nLinear: ${keys.join(', ')}` : ''}`);
+  { const h = linearHook(); if (h) spawnSync(h, ['open', branch, ...(keys || [])], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook, never blocks a lane
   const t = spawnSync(process.execPath, ['test/run.mjs'], { cwd: path, encoding: 'utf8' });
   const pane = (res.root_pane || {}).pane_id;
   if (pane) { run('herdr', ['pane', 'send-text', pane, 'hunk diff main --watch']); run('herdr', ['pane', 'send-keys', pane, 'Enter']); }
@@ -133,12 +158,12 @@ function withLandLock(branch, fn) {
   return fn();
 }
 
-function close(branch, message) {
+function close(branch, message, noLinear = false) {
   if (!branch) die(USAGE, 2);
-  withLandLock(branch, () => closeLocked(branch, message));
+  withLandLock(branch, () => closeLocked(branch, message, noLinear));
 }
 
-function closeLocked(branch, message) {
+function closeLocked(branch, message, noLinear) {
   if (git('branch', '--show-current') !== 'main') die(`the main checkout ${MAIN} is not on main`);
   if (git('status', '--porcelain')) die('main has uncommitted changes: commit or stash them first');
   const lane = lanes().find((w) => w.branch === branch);
@@ -152,17 +177,29 @@ function closeLocked(branch, message) {
     console.log(`lane ${branch} had no commits beyond main: removed it without a merge (its .tmp went with it)`);
     return;
   }
+  // S69: a lane with no Linear key on record is refused before anything is merged; after the squash it would be too late to move the issue
+  let keys = [];
+  if (!noLinear) {
+    const h = linearHook();
+    if (h) {
+      const c = spawnSync(h, ['check', branch], { encoding: 'utf8', timeout: 60000 });
+      if (c.status !== 0) die(`RED: lane ${branch} has no Linear key on record, nothing was merged or removed.\nFix: bin/linear lane-open ${branch} <KEY...> (the keys the lane carries), then close again; or close with --no-linear for a lane that tracks no issue.`);
+      keys = c.stdout.trim() === 'off' ? [] : c.stdout.trim().split(/\s+/).filter(Boolean);
+    }
+  }
   if (!message) {
     if (commits.length > 1) die(`lane ${branch} has ${commits.length} commits: pass -m with the squash commit message`);
     message = git('log', '-1', '--format=%B', branch);
   }
+  // the CHE key is part of every squash commit subject: appended from the recorded keys when the message has none (git log --grep finds it later)
+  if (keys.length && !/CHE-\d+/.test(message.split('\n')[0])) { const [first, ...more] = message.split('\n'); message = [`${first.trimEnd()} (${keys.join(', ')})`, ...more].join('\n'); }
   const m = spawnSync('git', ['merge', '--squash', branch], { cwd: MAIN, encoding: 'utf8' });
   if (m.status !== 0) { spawnSync('git', ['merge', '--abort'], { cwd: MAIN }); spawnSync('git', ['reset', '--hard', 'HEAD'], { cwd: MAIN }); die(`squash merge of ${branch} failed, main is unchanged:\n${m.stdout}${m.stderr}`); }
   run('git', ['commit', '-q', '-F', '-'], { input: message, stdio: ['pipe', 'pipe', 'pipe'] });
   console.log(`squash merged ${branch} into main: ${git('log', '-1', '--format=%h %s')}`);
   // the lane's release test steps are read from its builder report while the worktree still exists (S54; idempotent after bin/land-lane's own add)
   { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'release-next'); if (path && existsSync(h)) spawnSync(process.execPath, [h, 'add', '--lane', branch, '--dir', path], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook
-  { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'linear-hook'); if (existsSync(h)) spawnSync(h, ['close', branch, git('log', '-1', '--format=%h')], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook
+  { const h = noLinear ? null : linearHook(); if (h) spawnSync(h, ['close', branch, git('log', '-1', '--format=%h')], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 20000 }); }   // optional private hook, a RED line stays visible
   if (lane && lane.open_workspace_id) run('herdr', ['worktree', 'remove', '--workspace', lane.open_workspace_id]);
   else if (path) git('worktree', 'remove', path);
   git('branch', '-D', branch);
@@ -179,12 +216,25 @@ function land(branch, message) {
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
+// open <branch> [--key CHE-n]...  and  close <branch> [-m <msg>] [--no-linear]
+function flags(args, spec) {
+  const out = { pos: [], key: [] };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--key' && spec.key && args[i + 1]) out.key.push(args[++i]);
+    else if (a === '-m' && spec.m && args[i + 1]) out.m = args[++i];
+    else if (a === '--no-linear' && spec.noLinear) out.noLinear = true;
+    else if (a.startsWith('-')) die(USAGE, 2);
+    else out.pos.push(a);
+  }
+  return out;
+}
 try {
-  if (cmd === 'open' && rest.length === 1) open(rest[0]);
+  if (cmd === 'open') { const o = flags(rest, { key: true }); if (o.pos.length !== 1) die(USAGE, 2); open(o.pos[0], o.key); }
   else if (cmd === 'agent' && (rest.length === 3 || (rest.length === 5 && rest[3] === '--model'))) agent(rest[0], rest[1], rest[2], rest[4]);
   else if (cmd === 'list' && !rest.length) list();
   else if (cmd === 'land' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) land(rest[0], rest[2]);
-  else if (cmd === 'close' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) close(rest[0], rest[2]);
+  else if (cmd === 'close') { const o = flags(rest, { m: true, noLinear: true }); if (o.pos.length !== 1) die(USAGE, 2); close(o.pos[0], o.m, !!o.noLinear); }
   else die(USAGE, 2);
 } catch (e) {
   die(`lane ${cmd} failed: ${String(e.stderr || e.message).trim().split('\n').slice(-3).join(' | ')}`);
