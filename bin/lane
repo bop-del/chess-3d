@@ -10,6 +10,8 @@
 //                                       --private (S71): the lane also touches the private repo, so it gets its own git worktree of it,
 //                                       ~/.herdr/worktrees/chess-3d-private/<branch> (private bin/private-lane), and a second hunk tab
 //                                       "diff private". A brief line `Private repo: yes` makes bin/lane agent do the same.
+//                                       --agent <name> <brief> [--model <m>] (CHE-194): after the lane is open and the fast tier green, the same as
+//                                       bin/lane agent <branch> <name> <brief> [--model <m>]: one command for the lane, its private worktree and the builder.
 //   bin/lane agent <branch> <name> <brief> [--model <m>]
 //                                       a tab "<name> agent" in the lane's workspace with a visible Claude session
 //                                       (plus, once per lane, a "diff" tab running hunk diff main --watch)
@@ -36,9 +38,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseLaneFlags } from '../tools/lane-args.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const USAGE = 'usage: bin/lane open <che-n-words | branch --key CHE-n> [--key CHE-n]... [--private] | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
+const USAGE = 'usage: bin/lane open <che-n-words | branch --key CHE-n> [--key CHE-n]... [--private] [--agent <name> <brief> [--model <m>]] | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
 const LEAD = 'chess-3d-lead';   // the lead session\'s Herdr agent name
 const die = (msg, code = 1) => { console.error(msg); process.exit(code); };
 // the main clone, also when this script runs from inside a lane. Every git command below runs there.
@@ -77,11 +80,12 @@ function laneKeys(branch, given) {
   return out === 'off' ? [] : out.split(/\s+/).filter(Boolean);
 }
 
-function open(branch, given = [], withPrivate = false) {
+function open(branch, given = [], withPrivate = false, withAgent = null, model = 'sonnet') {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(branch || '')) die(`branch names are lower case words joined by hyphens, best che-<n>-words\n${USAGE}`, 2);
   if (git('branch', '--list', branch)) die(`branch ${branch} exists already`);
   // owner, 2026-10-04: the Linear key is the only id. A lane named after an old item id (s73-..., n8-...) without --key is refused.
   if (!given.length && !releasePrep(branch) && /^[a-z]+\d+-/.test(branch) && linearHook()) die(`lane ${branch} not opened: it starts with an old item id. Name lanes che-<n>-words (the Linear key is the only id, for example che-177-private-worktrees), or pass --key CHE-n.`);
+  if (withAgent && (!/^[a-z0-9][a-z0-9-]*$/.test(withAgent.name) || !existsSync(withAgent.brief))) die(`lane ${branch} not opened: --agent needs a lower case name and an existing brief file (${withAgent.brief})`, 2);
   if (withPrivate && !privateLaneTool()) die(`lane ${branch} not opened: --private needs ~/code/chess-3d-private/bin/private-lane`);
   const keys = releasePrep(branch) && !given.length ? [] : laneKeys(branch, given);
   const res = herdr('worktree', 'create', '--cwd', MAIN, '--branch', branch, '--base', 'main', '--label', branch, '--no-focus');
@@ -103,6 +107,9 @@ function open(branch, given = [], withPrivate = false) {
   if (pane) { run('herdr', ['pane', 'send-text', pane, 'hunk diff main --watch']); run('herdr', ['pane', 'send-keys', pane, 'Enter']); }
   if (priv) ensurePrivateDiffTab({ open_workspace_id: ws }, priv);
   console.log(t.status === 0 ? 'fast tier green in the lane' : `FAST TIER RED in the lane, fix before building on it:\n${t.stdout}${t.stderr}`);
+  // CHE-194: --agent runs lane open, the private worktree (--private) and bin/lane agent in one go; a red lane starts no agent
+  if (withAgent && t.status !== 0) { console.log(`agent ${withAgent.name} not started: the lane is red`); process.exit(1); }
+  if (withAgent) agent(branch, withAgent.name, withAgent.brief, model);
   process.exit(t.status === 0 ? 0 : 1);
 }
 
@@ -277,22 +284,10 @@ function land(branch, message) {
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
-// open <branch> [--key CHE-n]...  and  close <branch> [-m <msg>] [--no-linear]
-function flags(args, spec) {
-  const out = { pos: [], key: [] };
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === '--key' && spec.key && args[i + 1]) out.key.push(args[++i]);
-    else if (a === '-m' && spec.m && args[i + 1]) out.m = args[++i];
-    else if (a === '--no-linear' && spec.noLinear) out.noLinear = true;
-    else if (a === '--private' && spec.priv) out.priv = true;
-    else if (a.startsWith('-')) die(USAGE, 2);
-    else out.pos.push(a);
-  }
-  return out;
-}
+// open <branch> [--key CHE-n]... [--private] [--agent <name> <brief> [--model <m>]]  and  close <branch> [-m <msg>] [--no-linear]
+const flags = (args, spec) => { try { return parseLaneFlags(args, spec); } catch (e) { die(USAGE, 2); } };
 try {
-  if (cmd === 'open') { const o = flags(rest, { key: true, priv: true }); if (o.pos.length !== 1) die(USAGE, 2); open(o.pos[0], o.key, !!o.priv); }
+  if (cmd === 'open') { const o = flags(rest, { key: true, priv: true, agent: true }); if (o.pos.length !== 1) die(USAGE, 2); open(o.pos[0], o.key, !!o.priv, o.agent, o.model); }
   else if (cmd === 'agent' && (rest.length === 3 || (rest.length === 5 && rest[3] === '--model'))) agent(rest[0], rest[1], rest[2], rest[4]);
   else if (cmd === 'list' && !rest.length) list();
   else if (cmd === 'land' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) land(rest[0], rest[2]);
