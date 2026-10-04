@@ -58,6 +58,9 @@ function lanes() {
   return list.filter((w) => w.is_linked_worktree);
 }
 
+// a release prep lane (v150-release-prep, named by lib/release-start.mjs) tracks no issue: no key at open, none at close
+const releasePrep = (branch) => /^v\d+-release-prep$/.test(branch || '');
+
 const linearHook = () => { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'linear-hook'); return existsSync(h) ? h : null; };   // optional private hook
 
 // The keys a new lane gets, asked before anything is created (S69: lanes were opened seconds before the sync made the CHE key, so
@@ -78,9 +81,9 @@ function open(branch, given = [], withPrivate = false) {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(branch || '')) die(`branch names are lower case words joined by hyphens, best che-<n>-words\n${USAGE}`, 2);
   if (git('branch', '--list', branch)) die(`branch ${branch} exists already`);
   // owner, 2026-10-04: the Linear key is the only id. A lane named after an old item id (s73-..., n8-...) without --key is refused.
-  if (!given.length && /^[a-z]+\d+-/.test(branch) && linearHook()) die(`lane ${branch} not opened: it starts with an old item id. Name lanes che-<n>-words (the Linear key is the only id, for example che-177-private-worktrees), or pass --key CHE-n.`);
+  if (!given.length && !releasePrep(branch) && /^[a-z]+\d+-/.test(branch) && linearHook()) die(`lane ${branch} not opened: it starts with an old item id. Name lanes che-<n>-words (the Linear key is the only id, for example che-177-private-worktrees), or pass --key CHE-n.`);
   if (withPrivate && !privateLaneTool()) die(`lane ${branch} not opened: --private needs ~/code/chess-3d-private/bin/private-lane`);
-  const keys = laneKeys(branch, given);
+  const keys = releasePrep(branch) && !given.length ? [] : laneKeys(branch, given);
   const res = herdr('worktree', 'create', '--cwd', MAIN, '--branch', branch, '--base', 'main', '--label', branch, '--no-focus');
   const path = res.worktree.path, ws = res.workspace.workspace_id, tab = res.tab.tab_id;
   // the first tab shows the lane's changes against main, live (hunk); a lane needs no plain shell tab
@@ -228,7 +231,7 @@ function closeLocked(branch, message, noLinear) {
   }
   // S69: a lane with no Linear key on record is refused before anything is merged; after the squash it would be too late to move the issue
   let keys = [];
-  if (!noLinear) {
+  if (!noLinear && !releasePrep(branch)) {
     const h = linearHook();
     if (h) {
       const c = spawnSync(h, ['check', branch], { encoding: 'utf8', timeout: 60000 });
@@ -257,7 +260,7 @@ function closeLocked(branch, message, noLinear) {
   }
   // the lane's release test steps are read from its builder report while the worktree still exists (S54; idempotent after bin/land-lane's own add)
   { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'release-next'); if (path && existsSync(h)) spawnSync(process.execPath, [h, 'add', '--lane', branch, '--dir', path], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook
-  { const h = noLinear ? null : linearHook(); if (h) spawnSync(h, ['close', branch, git('log', '-1', '--format=%h')], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 20000 }); }   // optional private hook, a RED line stays visible
+  { const h = noLinear || releasePrep(branch) ? null : linearHook(); if (h) spawnSync(h, ['close', branch, git('log', '-1', '--format=%h')], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 20000 }); }   // optional private hook, a RED line stays visible
   if (lane && lane.open_workspace_id) run('herdr', ['worktree', 'remove', '--workspace', lane.open_workspace_id]);
   else if (path) git('worktree', 'remove', path);
   git('branch', '-D', branch);
