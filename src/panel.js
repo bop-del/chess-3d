@@ -47,6 +47,7 @@ export const VIEW_ICONS = {
   top: SVG('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 12h16M12 4v16"/>'),
   side: SVG('<path d="M3 15 12 19l9-4-9-4-9 4Z"/>'),
   iso: SVG('<path d="m12 3 9 5-9 5-9-5 9-5ZM3 8v8l9 5 9-5V8"/>'),
+  pieces: SVG('<path d="M12 3v4M10 5h4M8 20h8M9 20l-1-6c0-2 1-3 2-3.5h4c1 .5 2 1.5 2 3.5l-1 6"/>'),
   symbols: SVG('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M12 8v1.5M10.5 9.5h3M10 16h4M10.7 11.5h2.6l.7 4.5h-4l.7-4.5Z"/>'),
   above: SVG('<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 12h16M12 5v14"/><circle cx="8" cy="8.5" r="1.2" fill="currentColor"/>'),
   play: SVG('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>'),
@@ -191,6 +192,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
     </div>
     <span class="vsep"></span>
     <button class="vb ico" id="btn-flip" type="button" title="Flip to the other side (F)" aria-label="Flip" data-i18n-title="hud.flipTitle" data-i18n-aria="hud.flip">${ICONS.flip}</button>
+    <button class="vb ico toggle" id="btn-symbols" type="button" aria-pressed="false" title="Show symbols instead of pieces" aria-label="Symbols" data-i18n-title="hud.symbolsTitle" data-i18n-aria="tb.symbols">${VIEW_ICONS.symbols}</button>
     <button class="vb ico toggle" id="btn-spin" type="button" title="Auto spin (Space)" aria-label="Spin" data-i18n-title="hud.spinTitle" data-i18n-aria="hud.spin">${ICONS.orbit}</button>
     <button class="vb ico" id="btn-reset" type="button" title="Reset view (R)" aria-label="Reset" data-i18n-title="hud.resetTitle" data-i18n-aria="hud.reset">${ICONS.reset}</button>
     <button class="vb ico toggle" id="btn-lock" type="button" aria-pressed="false" title="Lock the view" aria-label="Lock the view" data-i18n-title="hud.lockTitle" data-i18n-aria="hud.lockView">${ICONS.lock}</button>

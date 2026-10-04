@@ -67,7 +67,7 @@ try {
       const want = phonePortrait || id !== 'play';
       await open(page, size, `&view=${id}&fen=4k3/8/8/8/8/8/4P3/K7%20w%20-%20-%200%201`);   // a lone pawn: no piece stands in front of it
       const info = await page.evaluate(() => !window.__chess?.views ? { cur: 'none', list: [], err: window.__chessError || 'no __chess.views' } : ({ cur: window.__chess.views.current(), list: window.__chess.views.list().map((v) => v.id), err: window.__chessError || null }));
-      if (id === IDS[0]) R.expect(`views list ${tag}`, info.list.includes('play') === phonePortrait && ['symbols', 'above', 'iso'].every((v) => info.list.includes(v)), info.list.join(','), info.list.join(','));
+      if (id === IDS[0]) R.expect(`views list ${tag}`, info.list.includes('play') === phonePortrait && ['above', 'iso'].every((v) => info.list.includes(v)) && !info.list.includes('symbols'), info.list.join(','), info.list.join(','));
       if (!want) { R.expect(`${id} not offered ${tag}`, info.cur !== 'play', `falls back to ${info.cur}`); continue; }
       R.expect(`${id} applies ${tag}`, info.cur === id && !info.err, `${info.cur}`, JSON.stringify(info));
       // picking: click the e2 pawn, then a legal target square
@@ -158,11 +158,20 @@ try {
       R.expect(`?view=${id} opens the default view`, await page.evaluate(() => window.__chess.views.current()) === 'white' && !(await page.evaluate(() => window.__chessError)));
     }
     await page.evaluate(() => localStorage.removeItem('chess3d.view'));   // the load stores the view it opened in
-    // phone cycle: the thumb bar Views button walks Play, Symbols, From above, then the presets
+    // phone cycle: the thumb bar Views button walks Play, From above, then the presets (Symbols has its own toggle)
     await open(page, SIZES[1]);
     const seen = [await page.evaluate(() => window.__chess.views.current())];
     for (let i = 0; i < 3; i++) { await page.tap('.tb[data-act=views]'); await page.evaluate(() => window.__chess.step(1)); seen.push(await page.evaluate(() => window.__chess.views.current())); }
-    R.expect('phone cycle order', seen.join() === 'play,symbols,above,white', seen.join());
+    R.expect('phone cycle order', seen.join() === 'play,above,white,black', seen.join());
+    // CHE-158: the thumb bar Symbols/Pieces toggle (same slot as the old Flip), one tap each way, back to the view before
+    await open(page, SIZES[1]);
+    const tg = async () => page.evaluate(() => { const b = document.querySelector('.tb[data-act=symbols]'); return { cur: window.__chess.views.current(), word: b?.querySelector('span').textContent, flip: !!document.querySelector('.tb[data-act=flip]') }; });
+    const t0 = await tg();
+    await page.tap('.tb[data-act=symbols]'); await page.evaluate(() => window.__chess.step(1));
+    const t1 = await tg();
+    await page.tap('.tb[data-act=symbols]'); await page.evaluate(() => window.__chess.step(1));
+    const t2 = await tg();
+    R.expect('thumb toggle: Symbols, Pieces, back to the view before', t0.word === 'Symbols' && t1.cur === 'symbols' && t1.word === 'Pieces' && t2.cur === t0.cur && t2.word === 'Symbols' && !t0.flip, JSON.stringify([t0, t1, t2]));
     // remembered choice, fallback, keys
     const size = SIZES[1];
     await open(page, size);

@@ -1,6 +1,7 @@
 // Views: the named camera setups the player chooses from (Views button, preset buttons, keys 1 to 5, ?view=). One list is the
 // single source. A view has a kind: 'preset' (a perspective camera preset), 'easy' (style V From above: perspective at 65 degrees with the real pieces,
 // style S Symbols: flat chess diagram symbols on a plain board, perspective at 65 degrees, free orbit) or 'play' (the phone portrait play view: perspective, close, with the follow camera of src/views/play.js).
+// Symbols is unlisted: the Symbols/Pieces toggle (toggleSymbols) switches it, ?view=symbols and a stored 'symbols' still open it (CHE-158).
 // The choice is remembered per device under localStorage 'chess3d.view'. See docs/ARCHITECTURE.md (Views).
 import { DE } from '../i18n.js';
 
@@ -13,7 +14,7 @@ export const VIEWS = [
   { id: 'top', label: 'Top down', kind: 'preset' },
   { id: 'side', label: 'Side', kind: 'preset' },
   { id: 'iso', label: 'Isometric', kind: 'preset' },
-  { id: 'symbols', label: 'Symbols', kind: 'easy', style: 'S', pitch: 65 * DEG, persp: true },
+  { id: 'symbols', label: 'Symbols', unlisted: true, kind: 'easy', style: 'S', pitch: 65 * DEG, persp: true },
   { id: 'above', label: 'From above', kind: 'easy', style: 'V', pitch: 65 * DEG, lock: true, persp: true },
   { id: 'play', label: 'Play', kind: 'play', when: 'phone-portrait', dist: 10.3, pitch: 40 },
 ];
@@ -37,10 +38,10 @@ export function createViews({ controls, stage, game, board, device }) {
   const listeners = [];
   const phonePortrait = () => !!device.phone && !!device.portrait;
   const available = (v) => !v.when || (v.when === 'phone-portrait' && phonePortrait());
-  // On a phone in portrait the cycle starts with the easy views: Play, Symbols, From above, then the presets
-  const EASY_FIRST = ['play', 'symbols', 'above'];
+  // On a phone in portrait the cycle starts with the easy views: Play, From above, then the presets
+  const EASY_FIRST = ['play', 'above'];
   const list = () => {
-    const l = VIEWS.filter(available);
+    const l = VIEWS.filter((v) => available(v) && !v.unlisted);
     if (!phonePortrait()) return l;
     const rank = (v) => { const i = EASY_FIRST.indexOf(v.id); return i < 0 ? EASY_FIRST.length : i; };
     return l.map((v, i) => [v, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map((x) => x[0]);
@@ -52,6 +53,7 @@ export function createViews({ controls, stage, game, board, device }) {
     if (s && BY_ID[s] && available(BY_ID[s])) id = s;
   } catch (e) { /* storage blocked */ }
   let applied = null;
+  let piecesId = fallback();   // the view the Pieces side of the toggle returns to: the last one that was not Symbols
   let focused = false;
 
   function enter(v, { instant = false } = {}) {
@@ -77,6 +79,7 @@ export function createViews({ controls, stage, game, board, device }) {
     if (!v || !available(v)) return false;
     const first = applied === null;
     if (v.id !== applied) {
+      if (v.id === 'symbols' && id !== 'symbols') piecesId = id;
       id = v.id; applied = v.id;
       enter(v, { instant: first || opts.instant });
       if (opts.remember !== false) try { localStorage.setItem(STORE, id); } catch (e) { /* storage blocked */ }
@@ -90,13 +93,19 @@ export function createViews({ controls, stage, game, board, device }) {
     set(l[(i + 1) % l.length].id);
     return id;
   }
+  // The Symbols/Pieces toggle of the thumb bar and the view bar
+  function toggleSymbols() {
+    if (id !== 'symbols') return set('symbols');
+    return set(BY_ID[piecesId] && available(BY_ID[piecesId]) ? piecesId : fallback());
+  }
   // Called every frame: re-checks the device when it turns.
   function update() {
     if (applied && !available(BY_ID[applied])) set(fallback());
   }
 
   const api = {
-    list, current: () => id, set, next, update,
+    list, current: () => id, set, next, update, toggleSymbols,
+    isSymbols: () => id === 'symbols', entry: (k) => BY_ID[k] || null,
     isEasy: () => BY_ID[id].kind === 'easy',
     style: () => BY_ID[id].style || null,
     label: () => BY_ID[id].label,

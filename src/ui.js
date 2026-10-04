@@ -16,6 +16,8 @@ const PHONE_KEYS = [
 const ICON = {
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   new: '<path d="M12 5v14M5 12h14"/>',
+  symbols: '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M12 8v1.5M10.5 9.5h3M10 16h4M10.7 11.5h2.6l.7 4.5h-4l.7-4.5Z"/>',
+  pieces: '<path d="M12 3v4M10 5h4M8 20h8M9 20l-1-6c0-2 1-3 2-3.5h4c1 .5 2 1.5 2 3.5l-1 6"/>',
   flip: '<path d="M8 20V6M4 10l4-4 4 4"/><path d="M16 4v14M12 14l4 4 4-4"/>',
   views: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   learn: '<path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/>',
@@ -199,12 +201,31 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     presetBox.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === views.current()));
     if (!dsk) return;
     vmenu.querySelectorAll('[data-vview]').forEach((b) => { const on = b.dataset.vview === views.current(); b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
-    const cur = views.list().find((v) => v.id === views.current());
+    const cur = views.entry(views.current());
     if (cur) dsk.viewsName.textContent = viewName(cur);
   };
-  views.on(() => { buildViewButtons(); });
+  // Symbols/Pieces toggle: thumb bar button on a phone, view bar button on desktop (CHE-158). It names what a tap shows next.
+  const symBtn = () => document.getElementById('btn-symbols');
+  const markSymbols = () => {
+    const b = symBtn(); if (!b) return;
+    const on = views.isSymbols();
+    b.classList.toggle('on', on);
+    if (b.classList.contains('tb')) {
+      const key = on ? 'tb.pieces' : 'tb.symbols';
+      const sp = b.querySelector('span'); sp.dataset.i18n = key; sp.textContent = t(key, on ? 'Pieces' : 'Symbols');
+      b.querySelector('svg').innerHTML = on ? ICON.pieces : ICON.symbols;
+      b.setAttribute('aria-label', t(key, on ? 'Pieces' : 'Symbols')); b.dataset.i18nAria = key; b.dataset.i18nTitle = key;
+    } else {
+      b.setAttribute('aria-pressed', String(on));
+      b.title = t(on ? 'hud.piecesTitle' : 'hud.symbolsTitle', on ? 'Show the pieces again' : 'Show symbols instead of pieces');
+      b.dataset.i18nTitle = on ? 'hud.piecesTitle' : 'hud.symbolsTitle';
+    }
+  };
+  views.on(() => { buildViewButtons(); markSymbols(); });
   buildViewButtons();
-  $('#btn-flip').addEventListener('click', () => controls.flip());
+  $('#btn-flip')?.addEventListener('click', () => controls.flip());
+  document.getElementById('btn-symbols')?.addEventListener('click', (e) => { if (!e.currentTarget.classList.contains('tb')) views.toggleSymbols(); });
+  markSymbols();
   $('#btn-reset').addEventListener('click', () => controls.reset());
   $('#btn-spin').addEventListener('click', () => controls.toggleSpin());
 
@@ -507,7 +528,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     bar.dataset.i18nAria = 'phone.controls';
     const btn = {};
     // short word on the button (never wraps), the full name stays as aria-label and title
-    for (const [id, short, full, key, shortKey] of [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['flip', 'Flip', 'Flip', 'hud.flip', 'tb.flip'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']]) {
+    for (const [id, short, full, key, shortKey] of [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']]) {
       const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${shortKey}">${short}</span>`);
       b.setAttribute('aria-label', full); b.setAttribute('title', full);
       b.dataset.i18nAria = key; b.dataset.i18nTitle = key;
@@ -650,7 +671,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       e.stopPropagation();
       askNew();
     }, true);
-    btn.flip.addEventListener('click', () => controls.flip());
+    btn.symbols.id = 'btn-symbols';
+    btn.symbols.addEventListener('click', () => views.toggleSymbols());
+    markSymbols();
     btn.views.addEventListener('click', () => {
       views.next();
       toast(t(`preset.${views.label()}`, views.label()), 'info');
@@ -712,6 +735,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     $('#help-keys').innerHTML = keyRows(desk ? deskKeys() : KEYS);
     const pk = $('#phone-keys');
     if (pk) pk.innerHTML = keyRows(PHONE_KEYS);
+    markSymbols();
     if (desk) {
       buildViewButtons();
       selLight.relabel(lightItems()); selQuality.relabel(qualityItems());
