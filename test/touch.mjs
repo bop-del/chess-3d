@@ -340,5 +340,8 @@ async function runForced(size) {
 }
 
 for (const size of SIZES) await guard(`${size.name} run`, () => runSize(size));
+// the forced scenes need a real desktop screen: in chrome-headless-shell setViewport shrinks screen.width too, so they run in full Chrome
+try { await browser?.close(); } catch (e) { /* ignore */ }
+browser = await launchBrowser({ w: 1280, h: 800, full: true });
 for (const size of FORCED) await guard(`forced ${size.name} run`, () => runForced(size));
 await finish();

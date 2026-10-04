@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { ROOT, defaultGl } from './_lib.mjs';
+import { ROOT, defaultGl, browserKind } from './_lib.mjs';
 import { SMOKE } from '../test/smoke-group-list.mjs';
 
 export const RESULTS_DIR = join(homedir(), '.cache', 'chess-3d', 'results');
@@ -36,7 +36,7 @@ export function groupFiles(script, extra = [], root = ROOT) {
 
 export function groupKey([name, script, extra], buildKey, root = ROOT) {
   const h = createHash('sha1');
-  h.update([name, script, ...extra, buildKey, defaultGl()].join('\0'));
+  h.update([name, script, ...extra, buildKey, defaultGl(), browserKind()].join('\0'));
   for (const f of groupFiles(script, extra, root)) { h.update('\0' + f.slice(root.length)); h.update(readFileSync(f)); }
   return h.digest('hex').slice(0, 20);
 }

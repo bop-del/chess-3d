@@ -1,7 +1,7 @@
 // Shared helpers for the test and release tools (test/smoke.mjs, tools/release-check.mjs). Not a tool itself.
 //   ROOT                     repo root
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
-//   launchBrowser(opts)      headless Chrome through puppeteer-core with software GL (swiftshader) by default, so it runs anywhere;
+//   launchBrowser(opts)      chrome-headless-shell (the default when installed and the same version as Chrome, see headlessShell(); full Chrome for the release check, { full: true } or CHESS_BROWSER=chrome; CHESS_BROWSER=<path> overrides) through puppeteer-core with software GL (swiftshader) by default, so it runs anywhere;
 //                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check's extra software pass does).
 //                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 8, three under 16).
 //                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
@@ -115,8 +115,48 @@ export async function proveGpu(page, R, gl = defaultGl()) {
   return r;
 }
 
-export async function launchBrowser({ w = 1280, h = 720, args = [], gl = defaultGl(), executablePath: exe = process.env.CHESS_BROWSER } = {}) {
-  const executablePath = exe || chromePath();   // opt in: { executablePath } or CHESS_BROWSER=<path> (for example a chrome-headless-shell), the default stays Chrome
+const SHELL_ROOT = join(homedir(), '.cache', 'puppeteer', 'chrome-headless-shell');
+const versionOf = (exe) => { try { return (execFileSync(exe, ['--version'], { encoding: 'utf8', timeout: 10000 }).match(/\d+\.\d+\.\d+\.\d+/) || [])[0] || ''; } catch (e) { return ''; } };
+let shellChoice;   // decided once per process: { path, version } or { warn }
+
+/** The chrome-headless-shell in the Puppeteer cache that matches the installed Chrome. { path } when it does, else { warn } with the one line to print (the caller then uses full Chrome). */
+export function headlessShell() {
+  if (shellChoice) return shellChoice;
+  const chrome = chromePath();
+  const chromeVersion = chrome ? versionOf(chrome) : '';
+  const install = `npx @puppeteer/browsers install chrome-headless-shell@${chromeVersion || '<chrome version>'}`;
+  let found;
+  try {
+    for (const dir of readdirSync(SHELL_ROOT).sort().reverse()) {
+      const sub = join(SHELL_ROOT, dir);
+      for (const d of readdirSync(sub)) { const exe = join(sub, d, 'chrome-headless-shell'); if (existsSync(exe)) found = found || { exe, dir }; }
+    }
+  } catch (e) { /* no cache folder */ }
+  if (!found) return (shellChoice = { warn: `chrome-headless-shell not installed, using full Chrome. Install it: ${install}` });
+  const shellVersion = (found.dir.match(/\d+\.\d+\.\d+\.\d+/) || [])[0] || versionOf(found.exe);
+  if (chromeVersion && shellVersion !== chromeVersion) return (shellChoice = { warn: `chrome-headless-shell ${shellVersion} differs from Chrome ${chromeVersion}, using full Chrome. Update it: ${install}` });
+  return (shellChoice = { path: found.exe, version: shellVersion });
+}
+
+/** Which browser a launch uses: { executablePath } or CHESS_BROWSER=<path> wins; { full: true } (the release check) or CHESS_BROWSER=chrome picks full Chrome; otherwise chrome-headless-shell when it is installed and matches Chrome, else full Chrome with one warning line. */
+function pickBrowser(exe, full) {
+  if (exe && exe !== 'chrome') return exe;
+  if (full || exe === 'chrome' || /release-check\.mjs$/.test(process.argv[1] || '')) return chromePath();
+  const s = headlessShell();
+  if (s.path) return s.path;
+  if (!s.said) { console.warn(`WARN  ${s.warn}`); s.said = true; }
+  return chromePath();
+}
+
+/** 'shell', 'chrome' or the CHESS_BROWSER path: which browser a default launch resolves to, for the result cache key. */
+export function browserKind() {
+  const exe = process.env.CHESS_BROWSER;
+  if (exe && exe !== 'chrome') return exe;
+  return exe === 'chrome' || headlessShell().path ? (exe === 'chrome' ? 'chrome' : 'shell') : 'chrome';
+}
+
+export async function launchBrowser({ w = 1280, h = 720, args = [], gl = defaultGl(), executablePath: exe = process.env.CHESS_BROWSER, full = false } = {}) {
+  const executablePath = pickBrowser(exe, full);
   if (!executablePath || !existsSync(executablePath)) { console.error('Chrome not found. Set CHROME_PATH.'); process.exit(2); }
   let lock, waited = 0;
   try { ({ lock, waited } = await acquireLock()); } catch (e) { logWait(-1, gl); throw e; }
