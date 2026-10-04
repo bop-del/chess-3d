@@ -51,11 +51,11 @@ try {
 
   // a capture in Short (level 1) and On (level 2): the pixel gore scene plays, the cube count peaks in range, then a clean board and the victim in the tray
   const cubes = () => ev(() => window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3).length);
-  for (const [mode, lo, hi] of [['short', 9, 60], ['on', 24, 120]]) {
+  for (const [mode, lo, hi] of [['short', 25, 60], ['on', 95, 130]]) {
     await ev((m) => { const c = window.__chess; c.battle.settings.set({ mode: m }); c.game.loadFen('8/8/8/3p4/4P3/8/8/4K2k w - - 0 1'); c.step(2); c.game.move('e4', 'd5'); }, mode);
     let peak = 0;
     for (let i = 0; i < 160 && (i < 4 || (await ev(() => window.__chess.game.busy))); i++) { await ev(async () => { await window.__chess.stepAsync(0.1); }); peak = Math.max(peak, await cubes()); }
-    R.expect(`capture ${mode}: the pixel gore scene plays, cube count in range`, peak >= lo && peak <= hi, `peak ${peak} cubes (${lo} to ${hi})`);
+    R.expect(`capture ${mode}: the pixel gore scene plays, cube count in range (pawn x pawn: two jabs, as strong as the other pairings)`, peak >= lo && peak <= hi, `peak ${peak} cubes (${lo} to ${hi})`);
     await ev(async () => { await window.__chess.stepAsync(5); });
     const after = await ev(() => ({ audit: window.__chess.game.audit(), busy: window.__chess.game.busy, left: window.__chess.game.root.children.filter((o) => o.isMesh && o.geometry?.type === 'BoxGeometry' && o.scale.x < 0.3).length, tray: window.__chess.game.getState().captured.b.length }));
     R.expect(`capture ${mode}: afterwards the board is clean, no cube is left, the victim is in the tray`, !after.audit.length && !after.busy && after.left === 0 && after.tray === 1, JSON.stringify(after));

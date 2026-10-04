@@ -133,7 +133,8 @@ async function gore(ctx) {
 
   // ---------------------------------------------------------------- the six attackers
   if (type === 'p') {
-    const jabs = [1, 2, 3][vw], piv = hold(lance(), { lift: 0.4 * ah, fwd: 0.1 });
+    const jabs = [2, 2, 3][vw],   // a pawn victim gets two jabs like a knight: one jab left a pawn x pawn capture with the weakest gore of all pairings
+       piv = hold(lance(), { lift: 0.4 * ah, fwd: 0.1 });
     piv.rotation.x = -Math.PI / 2 + 0.1; piv.position.y = 0;
     const hit = new THREE.Vector3(C.x - aim.x * 0.28, hV * 0.45, C.z - aim.z * 0.28);
     await Promise.all([stepBack(), s.tw(0.35, grow(piv), outQuad)]);
