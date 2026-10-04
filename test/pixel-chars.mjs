@@ -1,21 +1,20 @@
-// Contract of the Pixelwelt figures, headless, both variants: all 12 build, stand on the board inside their square, keep the blocky
+// Contract of the Pixelwelt figures, headless: all 12 build, stand on the board inside their square, keep the blocky
 // proportions (the head is a cube of 8 pixels with a face), are told apart by height, have the animated parts the rig expects and
 // stay inside a triangle budget. Run: node test/pixel-chars.mjs    Exit 0 pass, 1 on any failed check.
 import * as THREE from 'three';
 import { buildTemplate } from '../src/themes/blocks/rig.js';
-import { buildPixelVox, setPixelVariant } from '../src/themes/pixel/figures.js';
+import { buildPixelVox } from '../src/themes/pixel/figures.js';
 
 const TYPES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
 const mat = new THREE.MeshBasicMaterial();
 let failed = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`); if (!ok) failed++; };
 
-for (const variant of ['a', 'b']) {
-  setPixelVariant(variant);
+{
   const heights = {}, outline = {};
   for (const color of ['w', 'b']) {
     for (const [type, name] of Object.entries(TYPES)) {
-      const tag = `${variant} ${color === 'w' ? 'white' : 'black'} ${name}`;
+      const tag = `${color === 'w' ? 'white' : 'black'} ${name}`;
       const vox = buildPixelVox(color, type);
       const { rig, height } = buildTemplate(color, type, mat, buildPixelVox, { shade: true });
       rig.updateMatrixWorld(true);
@@ -39,8 +38,8 @@ for (const variant of ['a', 'b']) {
   }
   for (const color of ['w', 'b']) {
     const h = (t) => heights[color + t];
-    check(`${variant} ${color}: pawn is the lowest, king and queen stand above the rook`, h('p') < h('r') && h('p') < h('b') && h('r') < h('q') && h('r') < h('k'));
-    check(`${variant} ${color}: queen and king both wear a crown above the head (taller than 1.4)`, h('q') > 1.4 && h('k') > 1.4);
+    check(`${color}: pawn is the lowest, king and queen stand above the rook`, h('p') < h('r') && h('p') < h('b') && h('r') < h('q') && h('r') < h('k'));
+    check(`${color}: queen and king both wear a crown above the head (taller than 1.4)`, h('q') > 1.4 && h('k') > 1.4);
   }
   // the six types are told apart: pairwise by height or outline
   for (const color of ['w', 'b']) {
@@ -48,7 +47,7 @@ for (const variant of ['a', 'b']) {
     for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
       const a = color + ts[i], b = color + ts[j];
       const dh = Math.abs(heights[a] - heights[b]), dw = Math.max(Math.abs(outline[a][0] - outline[b][0]), Math.abs(outline[a][1] - outline[b][1]));
-      check(`${variant} ${color}: ${TYPES[ts[i]]} and ${TYPES[ts[j]]} differ (height ${dh.toFixed(2)}, outline ${dw.toFixed(2)})`, dh >= 0.08 || dw >= 0.1);
+      check(`${color}: ${TYPES[ts[i]]} and ${TYPES[ts[j]]} differ (height ${dh.toFixed(2)}, outline ${dw.toFixed(2)})`, dh >= 0.08 || dw >= 0.1);
     }
   }
 }

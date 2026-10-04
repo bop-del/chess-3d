@@ -1,13 +1,10 @@
 // Pixelwelt ("Pixel world", ?theme=pixel): a world of 16 x 16 pixel blocks and blocky figures, everything drawn in code. Shares the
 // mesher, the rig (animation) and the screen space avoid pass with Blocks; own textures, unlit materials with fixed per face shading,
-// own world (pixel/world.js) and own figures (pixel/figures.js, two variants: ?variant=a closer to the familiar archetypes, b safer).
+// own world (pixel/world.js) and own figures (pixel/figures.js).
 import * as THREE from 'three';
 import { createPixelWorld } from './pixel/world.js';
-import { buildPixelVox, setPixelVariant } from './pixel/figures.js';
+import { buildPixelVox } from './pixel/figures.js';
 import { createPieceStyle } from './blocks/rig.js';
-
-export const DEFAULT_VARIANT = 'b';
-const variantFlag = () => { try { const v = new URLSearchParams(location.search).get('variant'); return v === 'a' || v === 'b' ? v : DEFAULT_VARIANT; } catch (e) { return DEFAULT_VARIANT; } };
 
 /** Board spec: classic squares hidden, labels lifted onto the plank frame. */
 export function board() {
@@ -37,7 +34,6 @@ export function light() {
 // the blob under each figure: a flat dark square on the board, as a block world draws it (the unlit figures cast no shadow map shadow)
 const SHADOW_W = { p: 0.5, r: 0.8, n: 0.7, b: 0.62, q: 0.78, k: 0.62 };
 export function pieceStyle(ctx) {
-  setPixelVariant(variantFlag());
   const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   const mat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const style = createPieceStyle(ctx, {

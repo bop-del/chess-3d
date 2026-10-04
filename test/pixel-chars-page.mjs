@@ -65,11 +65,6 @@ try {
   await ev(async () => { await window.__chess.themes.set('pixel', { persist: false }); window.__chess.step(0.5); window.__chess.draw(); });
   const back = await ev(() => window.__chess.game.root.children.filter((g) => g.userData.piece && g.children[0].children[0]?.name === 'rig').length);
   R.expect('and back to Pixelwelt: the characters return', back === 4, `${back} rigs`);
-  // variant a loads too: 32 rigs and the same 12 figure kinds
-  await page.goto(`${URL0}/?quality=low&manual=1&ai=0&theme=pixel&variant=a`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
-  const va = await ev(() => { const { game, themes } = window.__chess; return { theme: themes.current(), n: game.root.children.filter((g) => g.userData.piece && g.children[0]?.children[0]?.name === 'rig').length, style: game.root.children.filter((g) => g.userData.piece).every((g) => g.userData.style === 'pixel') }; });
-  R.expect('?variant=a: the other figure set loads, 32 rigs', va.theme === 'pixel' && va.n === 32 && va.style, JSON.stringify(va));
   R.expect('no console error or warning', !w.errs.length && !w.warns.length, 'none', [...w.errs, ...w.warns].slice(0, 5).join(' | '));
   process.exitCode = R.summary().nf ? 1 : 0;
 } finally {
