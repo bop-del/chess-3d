@@ -88,7 +88,7 @@ async function boot() {
 
   // camera and views come first: the sequence ends in whatever view the controls hold (the stored or ?view= view, the White
   // view on desktop, the Play view on a phone in portrait), so it reads that pose every frame
-  let game = null, tokens = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null;
+  let game = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null;
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const pick = (cx, cy) => {
@@ -217,18 +217,10 @@ async function boot() {
   // exactly that pose
   const ui = createUI({ game, controls, stage, quality, views });
   controls.onResize(window.innerWidth, window.innerHeight);   // reads the HUD column width
-  const [{ createPlayView }, { createTokens }, { createSymbols }] = await Promise.all([import('./views/play.js'), import('./views/tokens.js'), import('./views/symbols.js')]);
+  const [{ createPlayView }, { createSymbols }] = await Promise.all([import('./views/play.js'), import('./views/symbols.js')]);
   const play = createPlayView({ controls, game, views, device, stage });
-  tokens = createTokens({ gimbal, game, materials, stage });
   symbols = createSymbols({ gimbal, game, stage, themes, size: device.phone ? 256 : 384 });
-  // the view that goes off first, so a body one of them shows again is not shown over the other's hide
-  const showView = () => {
-    const v = views.current();
-    if (v !== 'tokens') tokens.setVisible(false);
-    if (v !== 'symbols') symbols.setVisible(false);
-    if (v === 'tokens') tokens.setVisible(true);
-    if (v === 'symbols') symbols.setVisible(true);
-  };
+  const showView = () => symbols.setVisible(views.current() === 'symbols');
   views.on(showView);
   showView();
   const upLocal = new THREE.Vector3(), gimbalInv = new THREE.Quaternion();
@@ -239,7 +231,7 @@ async function boot() {
   };
   let t = 0;
   // the frame loop runs the whole game from here on (the modules that follow are optional in it until they exist)
-  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); tokens.sync(); symbols.sync(); themes.update(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(); themes.update(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   advance(0.001);   // the Play view's first focus and the HUD measure land in the camera now
   intro?.boardGo();
   intro?.setTarget(0.95);
@@ -340,7 +332,7 @@ async function boot() {
   stage.onQuality((q) => { if (!stepping) adapter.lock('user'); });
   themes.on(() => adapter.hold());   // a theme switch builds textures: its frames are not measured
 
-  window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, tokens, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
+  window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
   window.__chess.clockUi = clockUi;
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));

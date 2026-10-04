@@ -222,9 +222,9 @@ try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720 });
     const watch = await watchPage(page, ['127.0.0.1', 'localhost']);
-    await load(page, SIZES[0], '&view=tokens&open=puzzles');
+    await load(page, SIZES[0], '&view=symbols&open=puzzles');
     const combo = await page.evaluate(() => ({ view: window.__chess.views.current(), tab: document.querySelector('.xtab[aria-selected="true"]')?.dataset.tab }));
-    R.expect('open=puzzles combines with view=tokens', combo.view === 'tokens' && combo.tab === 'puzzles', 'tokens + puzzles', JSON.stringify(combo));
+    R.expect('open=puzzles combines with view=symbols', combo.view === 'symbols' && combo.tab === 'puzzles', 'symbols + puzzles', JSON.stringify(combo));
     seen.errs.push(...watch.errs); seen.foreign.push(...watch.foreign);
   }
   R.expect('no console error, no foreign request', !seen.errs.length && !seen.foreign.length, 'clean', seen.errs.concat(seen.foreign).join(' | '));

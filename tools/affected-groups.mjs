@@ -32,7 +32,7 @@ export const MAP = [
   [/^src\/puzzles\//, ['puzzles', 'fixes']],
   [/^src\/progress\//, ['open', 'puzzles', 'learn', 'fixes']],
   [/^src\/review\//, ['review', 'fixes', 'blocks fixes']],
-  [/^src\/views\//, ['views', 'tokens', 'play', 'fixes']],
+  [/^src\/views\//, ['views', 'play', 'fixes']],
   [/^src\/(trays|trays-setting)\.js$/, ['trays', 'fixes', 'blocks fixes']],
   [/^src\/goodmove\.js$/, ['goodmove']],
   [/^src\/clock(-ui)?\.js$/, ['clock', 'fixes']],
@@ -42,7 +42,7 @@ export const MAP = [
   // test scripts: the group that runs the script
   [/^test\/(battle)\.mjs$/, ['battle']],
   [/^test\/music-page\.mjs$/, ['music']],
-  [/^test\/(themes|textures|intro|views|tokens|play|drill|explain|learn|learnbar|review|puzzles|goodmove|fixes)\.mjs$/, null],   // null: the group named like the file, see below
+  [/^test\/(themes|textures|intro|views|play|drill|explain|learn|learnbar|review|puzzles|goodmove|fixes)\.mjs$/, null],   // null: the group named like the file, see below
   [/^test\/trays-page\.mjs$/, ['trays']],
   [/^test\/blocks-chars-page\.mjs$/, ['blocks chars']],
   [/^test\/blocks-fixes-page\.mjs$/, ['blocks fixes']],

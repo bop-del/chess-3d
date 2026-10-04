@@ -28,7 +28,7 @@ No golden image diffs: software GL renders differ across machines. Take screensh
 - Units: one square = 1.0. Y is up. The board top is at y = 0, centred at x = z = 0.
 - Square file f (0 to 7 = a to h) and rank r (0 to 7 = 1 to 8): x = f - 3.5, z = 3.5 - r. White starts at +z. Rules engine square index is `rank * 8 + file`.
 - Everything on the board lives in the `gimbal` group. The camera orbits outside it.
-- `window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick, ... }` is the test hook (also battle, audio, sfx, openings, puzzles, puzzleProgress, reward, goodMove, views, play, tokens, themes, train, diag; see docs/ARCHITECTURE.md, Test hooks). `?manual=1` stops the render loop and adds `__chess.step(seconds)` and `__chess.draw()` so tests control time.
+- `window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick, ... }` is the test hook (also battle, audio, sfx, openings, puzzles, puzzleProgress, reward, goodMove, views, play, themes, train, diag; see docs/ARCHITECTURE.md, Test hooks). `?manual=1` stops the render loop and adds `__chess.step(seconds)` and `__chess.draw()` so tests control time.
 - URL flags (see the README table): `quality`, `touch`, `light`, `preset`, `yaw`, `pitch`, `dist`, `gx`, `gy`, `gz`, `fen`, `moves`, `select`, `promo`, `ai`, `spin`, `hud`, `help`, `manual`, `diag`, `view`, `theme`, `intro`, `trays`, `open`.
 - The computer opponent is ON by default (you play white, Easy). `?ai=0` turns it off. Any test or script that plays both sides must pass `ai=0`.
 - Architecture and module APIs: docs/ARCHITECTURE.md. Keep it in step with the code.

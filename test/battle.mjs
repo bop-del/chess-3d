@@ -225,12 +225,12 @@ try {
       return seen;
     };
     out.white = await cap('on', 'white'); out.whiteShort = await cap('short', 'white'); out.whiteOff = await cap('off', 'white');
-    out.above = await cap('on', 'above'); out.tokens = await cap('on', 'tokens'); out.symbols = await cap('on', 'symbols');
+    out.above = await cap('on', 'above'); out.symbols = await cap('on', 'symbols');
     c.views.set('white', { remember: false });
     return out;
   });
   R.expect('desktop 1440x900: a capture plays a scene with the setting On, also Short, none with Off', desk.white && desk.whiteShort && !desk.whiteOff, JSON.stringify(desk), JSON.stringify(desk));
-  R.expect('desktop: From above plays a scene, Tokens and Symbols (no 3D pieces) do not', desk.above && !desk.tokens && !desk.symbols, JSON.stringify(desk), JSON.stringify(desk));
+  R.expect('desktop: From above plays a scene, Symbols (no 3D pieces) does not', desk.above && !desk.symbols, JSON.stringify(desk), JSON.stringify(desk));
   await load();   // back to the 1280x720 default for the matrix below
 
   }

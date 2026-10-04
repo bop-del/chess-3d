@@ -249,7 +249,7 @@ async function runSize(size) {
     if (collapsedGame) { await tapEl(gameHdr); await sleep(400); }
     const hudOk = await ev(() => !!document.getElementById('btn-new'));
     R.expect(`${tag}: HUD is built`, hudOk, '');
-    // a view. Phone HUD: the Views button on the thumb bar cycles the views (src/views/registry.js: Play, Tokens, From above, Easy 3D first on a phone in portrait,
+    // a view. Phone HUD: the Views button on the thumb bar cycles the views (src/views/registry.js: Play, Symbols, From above first on a phone in portrait,
     // then White, Black, Top down, Side, Isometric). One tap moves to the next view. Older layouts: the third preset button, which may sit in the Controls drawer.
     const viewsBtn = '.tb[data-act="views"]';
     if (await centre(viewsBtn)) {

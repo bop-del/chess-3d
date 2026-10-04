@@ -16,10 +16,6 @@ The capture trays: captured pieces lie inside the tray, never overlapping, the m
 
 ![Top down view](docs/topdown.jpg)
 
-The Spielsteine view (named Tokens in English): a flat top view with every piece as a thick gold turned disc.
-
-![Tokens view](docs/tokens.jpg)
-
 The Puzzles tab: a path of ten stations per chapter, gold for a clean solve, silver for one that needed help.
 
 ![The puzzle path](docs/puzzles-path.jpg)
@@ -132,7 +128,7 @@ Sliders and buttons (Settings tab; Flip, Spin, Reset and Lock are on the view ba
 
 | Control | What it does |
 |---|---|
-| Views | White view, Black view, Top down, Side, Isometric, plus four easy views: Symbols (flat chess diagram symbols as in chess books, cream and black with an outline, printed on a plain flat board in the theme's colours; free orbit), Tokens (a flat top view, every piece a thick turned disc with its Staunton silhouette in gold), From above (the real 3D pieces, perspective camera steeply from above at 65 degrees) and Easy 3D (a steep orthographic view, pieces about 1.15 times larger). The easy views show the board in the theme's full colour and as large as the screen allows (on a phone in portrait edge to edge); Tokens and From above lock the tilt and turn (Symbols and Easy 3D orbit freely), Flip, zoom and Reset still work. On phones in portrait also Play, the default there: the board as big as the screen allows, and the camera glides sideways so the selected piece and all its moves, the computer's reply and any hint arrow stay in view. Smooth animated transitions. The choice is remembered per device (a stored Easy flat from an older version becomes Tokens). The Views button on a phone cycles Play, Tokens, Symbols, From above, Easy 3D, then the presets. Tokens, Symbols and Easy 3D skip the battle scenes (From above plays them) |
+| Views | White view, Black view, Top down, Side, Isometric, plus two easy views: Symbols (flat chess diagram symbols as in chess books, cream and black with an outline, printed on a plain flat board in the theme's colours; free orbit), and From above (the real 3D pieces, perspective camera steeply from above at 65 degrees). The easy views show the board in the theme's full colour and as large as the screen allows (on a phone in portrait edge to edge); From above locks the tilt and turn (Symbols orbits freely), Flip, zoom and Reset still work. On phones in portrait also Play, the default there: the board as big as the screen allows, and the camera glides sideways so the selected piece and all its moves, the computer's reply and any hint arrow stay in view. Smooth animated transitions. The choice is remembered per device (a stored or linked view that no longer exists, such as Tokens or Easy 3D, opens the device default: Play on a phone in portrait, else White). The Views button on a phone cycles Play, Symbols, From above, then the presets. Symbols skips the battle scenes (From above plays them) |
 | Flip, Spin, Reset | Turn to the other side, toggle auto spin, return to the start view |
 | Board gimbal X, Y, Z | Three sliders from -180 to 180 degrees with a numeric readout, and a Level board button (Settings, under Advanced) |
 | Theme | Classic, Tournament, Wood, Metal, Glass, Blocks, Pixelwelt: board, frame, pieces and lighting change together. Remembered on this device (Settings tab, or the Menu on a phone) |
@@ -193,7 +189,7 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `touch` | `1`, `0` | `1` forces touch mode on (Medium start tier, page gesture blocking), `0` forces it off (desktop behaviour even on a touch device). With `1` the phone layout is decided from the viewport size (a 390 px wide frame on a desktop gets the thumb bar), not from the screen. Without it touch is detected from the primary input. An explicit `quality` wins over the touch start tier |
 | `light` | `Studio`, `Gallery`, `Sunset`, `Night` | Start with this lighting preset |
 | `theme` | `classic`, `tournament`, `wood`, `metal`, `glass`, `blocks`, `pixel` | Start with this theme for this load only (the swatch row remembers the theme you pick, in `localStorage` `chess3d.theme`) |
-| `view` | `white`, `black`, `top`, `side`, `iso`, `tokens`, `symbols`, `above`, `easy-3d`, `play` | Start in this view for this load only (without it the remembered view, or the device default). `play` only exists on a phone in portrait |
+| `view` | `white`, `black`, `top`, `side`, `iso`, `symbols`, `above`, `play` | Start in this view for this load only (without it the remembered view, or the device default). `play` only exists on a phone in portrait |
 | `preset` | `White view`, `Black view`, `Top down`, `Side`, `Isometric` | Jump to a view preset |
 | `yaw`, `pitch` | degrees | Set the camera angles |
 | `dist` | number | Set the camera distance |

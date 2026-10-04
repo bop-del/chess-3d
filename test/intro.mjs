@@ -6,7 +6,7 @@
 //   reduced motion the finished board shows at once, no sequence
 //   fallback       a sequence that cannot start (its glint texture cannot be drawn) falls back to the CSS board and the game boots
 //   phone          390x844 touch: ends in the Play view
-//   easy view      a stored orthographic Easy view cannot be flown to: the sequence ends in the White view and the Easy view takes over
+//   easy view      a stored Symbols view is the view the finished sequence shows
 // Exit codes: 0 pass, 1 a check failed.
 import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
 const args = process.argv.slice(2);
@@ -157,11 +157,11 @@ try {
 
   // ---------------------------------------------------------------- a stored Easy view
   {
-    const { page, watch } = await open(browser, { prep: (p) => p.evaluateOnNewDocument(() => { try { localStorage.setItem('chess3d.view', 'tokens'); } catch (e) { /* ignore */ } }) });
+    const { page, watch } = await open(browser, { prep: (p) => p.evaluateOnNewDocument(() => { try { localStorage.setItem('chess3d.view', 'symbols'); } catch (e) { /* ignore */ } }) });
     await page.goto(url('quality=low&ai=0'), { waitUntil: 'domcontentloaded', timeout: 120000 });
     await ready(page);
     const f = await page.evaluate(finished);
-    R.expect('easy view: the stored Easy view takes over when the sequence ends', f.view === 'tokens' && f.ortho && f.loaderDone && !f.introClass, 'tokens, orthographic', JSON.stringify(f));
+    R.expect('easy view: the stored Easy view takes over when the sequence ends', f.view === 'symbols' && f.loaderDone && !f.introClass, 'symbols', JSON.stringify(f));
     R.expect('easy view: no console error', clean(watch), '', dirty(watch));
     await page.close();
   }

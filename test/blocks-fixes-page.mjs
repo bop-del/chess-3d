@@ -17,7 +17,7 @@ const server = BASE ? { stop() {} } : await startServer({ mode: 'preview', port:
 const URL0 = BASE || `http://127.0.0.1:${PORT}`;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const DESK = { width: 1440, height: 900 }, PHONE = { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 1 };
-const VIEWS = ['white', 'black', 'top', 'side', 'iso', 'tokens', 'symbols', 'above', 'easy-3d'];
+const VIEWS = ['white', 'black', 'top', 'side', 'iso', 'symbols', 'above'];
 const MOVES = [['f2', 'f3'], ['e7', 'e5'], ['g2', 'g4'], ['d8', 'h4']];   // fool's mate for the review strip
 const browser = await launchBrowser({ w: 1440, h: 900 });
 try {
@@ -87,7 +87,7 @@ try {
     }
     return { hits, rays, controls: rects.length, hiddenNow: clouds.filter((g) => g.userData.fade < 0.5).length };
   });
-  for (const [name, vp, views] of [['phone', PHONE, ['play', 'easy-3d', 'above', 'tokens', 'black']], ['desktop', DESK, ['white', 'iso', 'above']]]) {
+  for (const [name, vp, views] of [['phone', PHONE, ['play', 'symbols', 'above', 'black']], ['desktop', DESK, ['white', 'iso', 'above']]]) {
     await load(vp, '&theme=blocks');
     let hits = 0, rays = 0, everHid = 0;
     for (const v of views) {
@@ -100,7 +100,7 @@ try {
     R.expect(`clouds ${name}: none behind a control (${views.join(', ')})`, hits === 0 && rays > 0, `${rays} rays checked, 0 hit`, `${hits} of ${rays} rays hit a cloud`);
   }
   // a cloud really is put aside at a control: park one over the status bar and see it fade
-  await load(PHONE, '&theme=blocks&view=easy-3d');
+  await load(PHONE, '&theme=blocks&view=symbols');
   const park = await page.evaluate(() => {
     const c = window.__chess, world = c.themes.world, cl = world.group.children.find((o) => o.name === 'cloud');
     const r = document.querySelector('.pstatus').getBoundingClientRect(), cam = c.stage.camera, T = c.THREE;

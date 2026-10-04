@@ -47,10 +47,8 @@ export const VIEW_ICONS = {
   top: SVG('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 12h16M12 4v16"/>'),
   side: SVG('<path d="M3 15 12 19l9-4-9-4-9 4Z"/>'),
   iso: SVG('<path d="m12 3 9 5-9 5-9-5 9-5ZM3 8v8l9 5 9-5V8"/>'),
-  tokens: SVG('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/>'),
   symbols: SVG('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M12 8v1.5M10.5 9.5h3M10 16h4M10.7 11.5h2.6l.7 4.5h-4l.7-4.5Z"/>'),
   above: SVG('<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 12h16M12 5v14"/><circle cx="8" cy="8.5" r="1.2" fill="currentColor"/>'),
-  'easy-3d': SVG('<path d="m4 9 8-4 8 4-8 4-8-4Z"/><path d="m4 9 0 4 8 4 8-4V9"/>'),
   play: SVG('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>'),
 };
 

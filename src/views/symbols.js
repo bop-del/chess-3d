@@ -114,7 +114,7 @@ const flatSpec = (color) => ({
 
 // createSymbols({ gimbal, game, stage, themes?, size? }) -> { setVisible(on), sync(), dispose(), visible }
 //   size is the texture size in px (384, or 256 on a phone). sync() is cheap and safe to call every frame; pieces made after
-//   setVisible (promotion) get their symbol at once (root.add is wrapped), like src/views/tokens.js.
+//   setVisible (promotion) get their symbol at once (root.add is wrapped).
 export function createSymbols({ gimbal, game, stage, themes = null, size = 384 }) {
   const root = game.root;
   let planeGeo = null;
