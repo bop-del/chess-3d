@@ -12,7 +12,7 @@
 import { Chess } from '../rules.js';
 import { t, onLanguage, sanDisplay, translateTree } from '../i18n.js';
 import { reviewGame, sentenceFacts } from './classify.js';
-import { sentence } from './strings.js';
+import { sentence, rt } from './strings.js';
 import { createEngine } from './engine.js';
 import './review.css';
 
@@ -72,6 +72,8 @@ export function createReview({ game, hint, engine = null }) {
       active, ply: cursor.ply, suggest: cursor.suggest, details, total: moves.length, moveNo: n,
       analysed, done: analysed >= fens.length && fens.length > 0,
       kinds: moves.map((_, i) => kindOf(i)),
+      drops: moves.map((_, i) => marks()[i]?.drop || 0), movers: moves.map((m) => m.color), sans: moves.map((m) => m.san),
+      thisKind: n ? kindOf(n - 1) : null,
       marked: n && f ? f.kind : null,
       facts: f, text: f ? sentence(f) : '',
       evals: result ? result.evals : [], accuracy: result ? result.accuracy : { w: null, b: null },
@@ -204,7 +206,11 @@ export function mountReview({ game, gimbal, createHint, engine = null, onInset =
   const hint = createHint({ gimbal, persist: false });
   const review = createReview({ game, hint, engine });
 
-  const root = el('section', 'rv');
+  // CHE-155: the two guidance variants, ?review=a (guided strip) or b (summary first, the default); an unknown value is b
+  const flag = new URLSearchParams(location.search).get('review');
+  const variant = flag === 'a' ? 'a' : 'b';
+  review.variant = variant;
+  const root = el('section', 'rv rv-' + variant);
   root.hidden = true;
   root.setAttribute('aria-label', 'Game review');
   root.setAttribute('data-i18n-aria', 'review.title');
@@ -231,7 +237,38 @@ export function mountReview({ game, gimbal, createHint, engine = null, onInset =
   bDet.setAttribute('data-i18n', 'review.details');
   const bClose = mk('rv-close', 'Close', 'review.close', '✕');
   ctl.append(bStart, bBack, pos, bFwd, bDet, bClose);
-  root.append(msg, detailsBox, strip, ctl);
+  const CLASSES = ['best', 'good', 'mistake', 'blunder'];
+  // shared by both variants: the four classes in plain words
+  const classRow = (tap, onTap) => CLASSES.map((k) => {
+    const b = el(tap ? 'button' : 'div', 'rv-cls ' + k);
+    if (tap) { b.type = 'button'; b.addEventListener('click', () => onTap(k)); }
+    b.append(el('span', 'rv-sw ' + k), el('span', 'rv-cn', rt('review.g.' + k)));
+    return b;
+  });
+  // a: coach line, first hint, legend with tap to explain
+  const coach = el('p', 'rv-coach'); coach.setAttribute('aria-live', 'polite');
+  const hintBox = el('p', 'rv-hint');
+  const legend = el('div', 'rv-legend');
+  const explain = el('p', 'rv-explain'); explain.hidden = true;
+  let explainKind = null, hintGone = false;
+  // b: summary card, "So lesen" panel
+  const sum = el('div', 'rv-sum');
+  const how = el('div', 'rv-how'); how.hidden = true;
+  const bHow = el('button', 'btn rv-btn rv-q toggle', '?');
+  bHow.type = 'button';
+  let howOpen = false;
+  function buildGuidance() {
+    if (variant === 'a') {
+      legend.textContent = '';
+      legend.append(...classRow(true, (k) => { explainKind = explainKind === k ? null : k; render(); }));
+    } else {
+      how.textContent = '';
+      how.append(el('b', 'rv-howt', rt('review.howTitle')), ...CLASSES.flatMap((k) => [classRow(false)[CLASSES.indexOf(k)], el('p', 'rv-x', rt('review.x.' + k))]));
+    }
+  }
+  if (variant === 'a') root.append(hintBox, coach, msg, detailsBox, legend, explain, strip, ctl);
+  else { root.append(sum, how, msg, detailsBox, strip, ctl); ctl.insertBefore(bHow, bDet); }
+  buildGuidance();
   document.body.appendChild(root);
   // the strip floats over the bottom of the canvas: tell the camera how much, so the board frame stays above it (it follows the
   // strip's height: the message wraps, Details opens)
@@ -334,7 +371,7 @@ export function mountReview({ game, gimbal, createHint, engine = null, onInset =
     root.hidden = !s.active;
     document.body.classList.toggle('reviewing', s.active);
     if (!s.active) {
-      built = -1; wasActive = wasDetails = false;
+      built = -1; wasActive = wasDetails = false; hintGone = false; explainKind = null; howOpen = false;
       onMoves?.(null);
       placeDetails(s);
       inset();
@@ -370,6 +407,7 @@ export function mountReview({ game, gimbal, createHint, engine = null, onInset =
       msg.append(tag, ' ', s.text);
     } else if (!s.done) msg.textContent = t('review.analysing', 'Looking at the game: {n} of {total}', { n: s.analysed, total: s.total + 1 });
     else msg.textContent = t('review.ready', 'Analysis done');
+    renderGuidance(s);
     detailsBox.hidden = !s.details;
     if (s.details) {
       graphLabel.textContent = t('review.graph', 'Evaluation') + '  ·  ' + t('review.graphHint', 'Tap to jump');
@@ -381,6 +419,57 @@ export function mountReview({ game, gimbal, createHint, engine = null, onInset =
       accBox.textContent = '';
       accBox.append(el('b', null, t('review.accuracy', 'Accuracy') + ' '), t('review.white', 'White') + ' ' + pct(s.accuracy.w) + '  ·  ' + t('review.black', 'Black') + ' ' + pct(s.accuracy.b));
     }
+  }
+  const sideName = (c) => t(c === 'w' ? 'review.white' : 'review.black', c === 'w' ? 'White' : 'Black');
+  function renderGuidance(s) {
+    if (variant === 'a') {
+      if (s.index > 0) hintGone = true;
+      hintBox.hidden = hintGone;
+      hintBox.textContent = rt('review.hint');
+      const v = { n: s.moveNo, total: s.total, side: s.moveNo ? sideName(s.movers[s.moveNo - 1]) : '' };
+      let c;
+      if (!s.moveNo) c = rt('review.coach.start');
+      else if (s.suggest) c = rt('review.coach.suggest', v);
+      else c = rt(s.thisKind ? 'review.coach.' + s.thisKind : 'review.coach.wait', v) + ' ' + (s.moveNo >= s.total ? rt('review.coach.last') : s.thisKind === 'mistake' || s.thisKind === 'blunder' ? '' : rt('review.coach.go'));
+      coach.textContent = c.trim();
+      [...legend.children].forEach((b, i) => { b.classList.toggle('on', explainKind === CLASSES[i]); b.setAttribute('aria-pressed', explainKind === CLASSES[i] ? 'true' : 'false'); b.lastChild.textContent = rt('review.g.' + CLASSES[i]); });
+      explain.hidden = !explainKind;
+      if (explainKind) explain.textContent = rt('review.x.' + explainKind);
+      return;
+    }
+    // b: the summary card shows at the start, once the analysis is in
+    const atStart = s.index === 0;
+    sum.hidden = !atStart;
+    msg.hidden = atStart;
+    if (atStart) renderSummary(s);
+    bHow.classList.toggle('on', howOpen);
+    bHow.setAttribute('aria-pressed', howOpen ? 'true' : 'false');
+    bHow.setAttribute('aria-label', rt('review.how'));
+    how.hidden = !howOpen;
+    if (howOpen) buildGuidance();
+  }
+  function renderSummary(s) {
+    sum.textContent = '';
+    sum.append(el('b', 'rv-sumt', rt('review.sum.title')));
+    if (!s.done) { sum.append(el('p', 'rv-sumx', rt('review.sum.wait', { n: s.analysed, total: s.total + 1 }))); return; }
+    const word = (a) => rt(a == null ? 'review.sum.w2' : a >= 90 ? 'review.sum.w1' : a >= 75 ? 'review.sum.w2' : a >= 55 ? 'review.sum.w3' : 'review.sum.w4');
+    const accRow = el('p', 'rv-sumx rv-accs');
+    for (const c of ['w', 'b']) {
+      const a = s.accuracy[c];
+      if (a != null) accRow.append(el('span', null, rt('review.sum.acc', { side: sideName(c), word: word(a), pct: pct(a) })));
+    }
+    sum.append(accRow);
+    const o = s.kinds.filter((k) => k === 'mistake').length, r = s.kinds.filter((k) => k === 'blunder').length;
+    let big = -1;
+    s.kinds.forEach((k, i) => { if (MARKED(k) && (big < 0 || s.drops[i] > s.drops[big])) big = i; });
+    const row = el('p', 'rv-sumx rv-big', (o + r ? rt('review.sum.counts', { o, r }) : rt('review.sum.none')) + ' ' + (big >= 0 ? rt('review.sum.biggest', { n: big + 1, san: sanDisplay(s.sans[big]), side: sideName(s.movers[big]) }) : rt('review.sum.go')) + ' ');
+    if (big >= 0) {
+      const go = el('button', 'btn rv-show', rt('review.sum.show'));
+      go.type = 'button';
+      go.addEventListener('click', () => review.goMove(big + 1));
+      row.append(go);
+    }
+    sum.append(row);
   }
   // "12. Nf3 Nc6 13. Bb5": the move numbers follow the position the line starts from
   function lineText(s, sanMoves) {
@@ -402,6 +491,7 @@ export function mountReview({ game, gimbal, createHint, engine = null, onInset =
   bFwd.addEventListener('click', () => review.next());
   bDet.addEventListener('click', () => review.setDetails(!review.state().details));
   bClose.addEventListener('click', () => review.close());
+  bHow.addEventListener('click', () => { howOpen = !howOpen; render(); });
   window.addEventListener('keydown', (e) => {
     if (!review.active) return;
     if (e.key === 'ArrowLeft') { review.prev(); e.preventDefault(); }

@@ -198,6 +198,81 @@ export async function runReviewChecks({ page, baseUrl, log = () => {}, shot = nu
     const strip2 = await rect('.rv');
     ok('phone: with Details the sheet still sits above the bar and below the top', strip2.b <= bar.y + 1 && strip2.y > 60, JSON.stringify(strip2));
     await shot?.('review-details-phone');
+
+    // ------------------------------------------------ CHE-155 guidance variants (review=a|b), deep links, unfinished game
+    const MV = 'f2f3,e7e5,g2g4,d8h4';
+    const deep = async (extra, viewport, moves = MV) => {
+      await page.setViewport(viewport);
+      await page.goto(`${baseUrl}/?quality=low&manual=1&ai=0&moves=${moves}&open=review${extra}${viewport.isMobile ? '&touch=1' : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+      await page.waitForFunction("window.__chessReady === true && !!window.__chess.review && window.__chess.review.active", { timeout: 120000 });
+      await step(0.3);
+    };
+    const doc = () => page.evaluate(() => ({ variant: window.__chess.review.variant, coach: document.querySelector('.rv-coach')?.textContent || null, sum: document.querySelector('.rv-sum') && !document.querySelector('.rv-sum').hidden, hint: document.querySelector('.rv-hint') && !document.querySelector('.rv-hint').hidden }));
+    const desk = { width: 1280, height: 800 };
+    await deep('&review=a', desk);
+    let d = await doc();
+    ok('review=a opens the guided strip at once', d.variant === 'a' && /Start of the game/.test(d.coach) && d.hint && !d.sum, JSON.stringify(d));
+    await waitDone();
+    ok('a: the legend names all four classes', await page.evaluate(() => document.querySelectorAll('.rv-legend .rv-cls').length) === 4);
+    await page.evaluate(() => document.querySelectorAll('.rv-legend .rv-cls')[3].click());
+    ok('a: tapping Blunder explains it in one sentence', /Blunder: .*winning chance/.test(await page.evaluate(() => document.querySelector('.rv-explain').textContent)));
+    await page.evaluate(() => document.querySelector('.rv-fwd').click());
+    await step(0.2);
+    d = await doc();
+    ok('a: the first step removes the hint and the coach names the move', !d.hint && /Move 1 of 4/.test(d.coach), JSON.stringify(d));
+    await shot?.('review-a-desktop');
+    await page.evaluate(() => document.querySelectorAll('.rv-chip')[2].click());
+    await step(0.2);
+    ok('a: on a blunder the coach points at the gold arrow', /gold arrow/.test((await doc()).coach) && await arrow());
+    await deep('&review=b', desk);
+    d = await doc();
+    ok('review=b opens the summary first', d.variant === 'b' && d.sum, JSON.stringify(d));
+    await waitDone();
+    await step(0.2);
+    const sm = await page.evaluate(() => document.querySelector('.rv-sum').textContent);
+    ok('b: summary has both accuracies in words, the count and the biggest slip', /White: .*\(\d+%\)/.test(sm) && /Black: /.test(sm) && /orange and \d+ red/.test(sm) && /move 3 \(g4, White\)/.test(sm), sm);
+    await shot?.('review-b-desktop');
+    await page.evaluate(() => document.querySelector('.rv-show').click());
+    await step(0.2);
+    s = await st();
+    ok('b: Show me jumps to the biggest slip with the gold arrow', s.suggest && s.moveNo === 3 && await arrow() && !(await doc()).sum, JSON.stringify({ ply: s.ply, suggest: s.suggest }));
+    await page.evaluate(() => document.querySelector('.rv-q').click());
+    ok('b: the question mark opens the How to read panel with four classes', await page.evaluate(() => !document.querySelector('.rv-how').hidden && document.querySelectorAll('.rv-how .rv-cls').length === 4));
+    await deep('', desk);
+    ok('no flag: the default is b', (await doc()).variant === 'b');
+    await deep('&review=zzz', desk);
+    ok('unknown value: ignored, the default b', (await doc()).variant === 'b');
+    // German
+    await deep('&review=a', desk);
+    await page.evaluate(() => document.querySelector('[data-lang="de"]').click());
+    await step(0.2);
+    ok('German: the coach line', /Start der Partie/.test((await doc()).coach), JSON.stringify(await doc()));
+    await page.evaluate(() => document.querySelector('[data-lang="en"]').click());
+    // unfinished game: three moves, no mate, no end card
+    await deep('&review=b', desk, 'f2f3,e7e5,g2g4');
+    s = await st();
+    const un = await page.evaluate(() => ({ chips: document.querySelectorAll('.rv-chip').length, over: !!window.__chess.game.getState().over, banner: !document.getElementById('banner').hidden, mate: /#/.test(document.querySelector('.rv-strip').textContent) }));
+    ok('unfinished game: strip shows 3 moves, no mate, no end card', un.chips === 3 && !un.over && !un.banner && !un.mate, JSON.stringify(un));
+    await waitDone();
+    ok('unfinished game: the summary still works', /orange and \d+ red/.test(await page.evaluate(() => document.querySelector('.rv-sum').textContent)));
+    // phones: both variants, no clipping, 44 px targets
+    for (const vr of ['a', 'b']) {
+      for (const [w, h, land] of [[390, 844], [375, 667], [844, 390, true]]) {
+        await deep('&review=' + vr, { width: w, height: h, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+        await waitDone();
+        await step(0.3);
+        if (vr === 'a') { await page.evaluate(() => document.querySelectorAll('.rv-legend .rv-cls')[2].click()); await step(0.2); }
+        else if (w === 375) { await page.evaluate(() => document.querySelector('.rv-q').click()); await step(0.2); }
+        const g = await page.evaluate(() => {
+          const rv = document.querySelector('.rv').getBoundingClientRect(), bar = document.querySelector('nav.pbar:not(.plbar)').getBoundingClientRect();
+          const tap = [...document.querySelectorAll('.rv-chip, .rv-btn, .rv-cls, .rv-show')].filter((b) => b.offsetParent).map((b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); });
+          return { top: rv.top, bottom: rv.bottom, left: rv.left, right: rv.right, barTop: bar.top, minTap: Math.min(...tap), scrollW: document.documentElement.scrollWidth, iw: innerWidth };
+        });
+        ok(`phone ${w}x${h} review=${vr}: sits above the bar inside the screen, targets are 44 px`, (land || g.bottom <= g.barTop + 1) && g.bottom <= h && g.left >= 0 && g.right <= w && g.top >= 0 && g.minTap >= 44 && g.scrollW <= g.iw, JSON.stringify(g));
+        await step(2);
+        await shot?.(`review-${vr}-phone-${w}x${h}`);
+      }
+    }
   } finally {
     page.off('pageerror', onErr);
     page.off('console', onConsole);
