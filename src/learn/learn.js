@@ -35,8 +35,10 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   const sheet = ui.learnSheet;                 // null on desktop
   if (sheet) sheet.body.append(idle);
 
-  // the daily store and the badge store are created after this module is mounted (main.js): read them when Export or Import runs
-  const extras = () => { const c = typeof window !== 'undefined' ? window.__chess : null; return { daily: c?.daily || null, badges: c?.badges?.store || null }; };
+  // the daily store and the badge store are created after this module is mounted (main.js): setBadges({ strip, badges, daily })
+  // hands them over, Export and Import read them when they run
+  let extra = { daily: null, badges: null };
+  const extras = () => extra;
 
   // the badge panel is created after this module is mounted (main.js): setBadges({ strip, badges }) hands its strips over
   let badgeStrip = null;
@@ -285,6 +287,7 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
     get tab() { return tab; },
     setBadges(api) {
       badgeStrip = api.strip;
+      extra = { daily: api.daily || null, badges: api.badges };
       api.badges.onChange(() => { if (puzzles.state().phase === 'idle') render(); });
       render();
     },

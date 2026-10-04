@@ -289,7 +289,7 @@ async function boot() {
   });
   badges.evaluate({ silent: true });   // old progress earns its badges without a toast
   const badgePanel = mountBadgesPanel({ badges, ui });
-  learn.setBadges({ strip: badgePanel.strip, badges });
+  learn.setBadges({ strip: badgePanel.strip, badges, daily });
   const lookAgain = () => badges.evaluate();
   puzzleProgress.onChange(lookAgain); store.onChange(lookAgain); daily.onChange(lookAgain);
   game.on('gameover', (over) => { const lv = winLevel(game.getState(), over, game.mode); if (lv) badges.recordWin(lv); });
