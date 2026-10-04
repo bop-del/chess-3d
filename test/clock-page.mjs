@@ -20,7 +20,7 @@ if (!BASE && !args.includes('--skip-build')) build(OUT);
 const server = BASE ? { stop() {} } : await startServer({ mode: 'preview', port: PORT, outDir: OUT });
 const URL0 = BASE || `http://127.0.0.1:${PORT}`;
 mkdirSync(SHOTS, { recursive: true });
-const SIZES = { desktop: { width: 1280, height: 720 }, landscape: { width: 844, height: 390 }, portrait: { width: 390, height: 844 } };
+const SIZES = { desktop: { width: 1280, height: 720 }, rail: { width: 800, height: 600 }, landscape: { width: 844, height: 390 }, portrait: { width: 390, height: 844 } };
 const browser = await launchBrowser({ w: 1280, h: 720 });
 try {
   // a fresh page per load: a phone page reads its screen when it is created, and init scripts must not pile up
@@ -52,6 +52,7 @@ try {
       banner: banner && !banner.hidden ? banner.textContent : null, promo: !document.getElementById('promo').hidden,
       sel: document.querySelector('#sel-clock .chip.on')?.dataset.value, hint: !document.querySelector('.clock-hint')?.hidden, stored: localStorage.getItem('chess3d.clock'),
       status: document.getElementById('turn-main')?.textContent,
+      fen: g.fen.split(' ')[0], hintBtn: !!document.querySelector('.clock-hint:not([hidden]) .clock-now'),
     };
   });
   const shot = async (name) => { await page.evaluate(() => window.__chess.draw()); await new Promise((r) => setTimeout(r, 300)); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
@@ -194,6 +195,98 @@ try {
   const od = await page.evaluate(() => { const e = document.querySelector('#tp-settings #sel-clock'); const r = e?.getBoundingClientRect(); return { tab: document.querySelector('.tab.on')?.dataset.tab, vis: !!r && r.width > 20 && r.height > 20 && r.top >= 0 && r.bottom <= innerHeight }; });
   R.expect('desktop ?open=clock: the Settings tab is open and the chooser is in view', od.tab === 'settings' && od.vis, 'in view', JSON.stringify(od));
   await shot('desktop-open-clock');
+
+  // ---- S36: a clock chosen in a running game, then New game, starts a fresh game with full time and the clock in view
+  const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
+  const inView = (id) => page.evaluate((sel) => {
+    const e = [...document.querySelectorAll(sel)].find((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+    if (!e) return null;
+    const r = e.getBoundingClientRect();
+    return { in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, w: Math.round(r.width), h: Math.round(r.height), text: e.textContent };
+  }, id);
+  const freshFull = (r, base) => r.fen === START && r.moves === 0 && r.s.w === base && r.s.b === base && !r.s.started && !r.over && !r.banner;
+  for (const how of ['button', 'key N', 'hint button']) {
+    await load('&clock=off', 'desktop', { ai: true });
+    await page.evaluate(() => { window.__chess.game.move('e2', 'e4'); window.__chess.step(8); });
+    await page.evaluate(() => document.querySelector('#sel-clock .chip[data-value="5+0"]').click());
+    r = await info();
+    R.expect(`desktop (${how}): a clock chosen in a running game waits, the hint shows`, r.moves >= 1 && r.s.preset === 'off' && r.s.next === '5+0' && r.hint, 'pending', JSON.stringify({ s: r.s, hint: r.hint }));
+    if (how === 'button') await page.evaluate(() => document.getElementById('btn-new').click());
+    else if (how === 'key N') await page.keyboard.press('n');
+    else await page.evaluate(() => document.querySelector('.clock-hint .clock-now').click());
+    await step(1);
+    r = await info();
+    R.expect(`desktop (${how}): New game starts from the start position, 5:00 on both clocks, nothing running`, freshFull(r, 300) && r.s.preset === '5+0' && r.barShown && !r.hint, 'fresh', JSON.stringify({ fen: r.fen, moves: r.moves, s: r.s, bar: r.barShown }));
+    const f = await inView('#pclock .cface:not([hidden]) .ct');
+    R.expect(`desktop (${how}): the clock face is visible in the window and reads 5:00`, !!f && f.in && f.text === '5:00', '5:00', JSON.stringify(f));
+    if (how === 'button') await shot('desktop-s36-new-game');
+  }
+  // a finished game: the choice also waits for the next game (the old board is not a fresh game)
+  await load('&clock=off&fen=7k/5Q2/6K1/8/8/8/8/8%20w%20-%20-%200%201');
+  await mv('f7', 'g7', 2);
+  r = await info();
+  await page.evaluate(() => document.querySelector('#sel-clock .chip[data-value="5+0"]').click());
+  const ro = await info();
+  R.expect('a finished game: the chosen clock waits for the next game and says so', !!r.over && ro.s.preset === 'off' && ro.s.next === '5+0' && ro.hint && ro.hintBtn, 'pending', JSON.stringify({ over: r.over, s: ro.s, hint: ro.hint }));
+  await page.evaluate(() => document.getElementById('btn-new').click());
+  await step(1);
+  r = await info();
+  R.expect('and New game then starts fresh with 5:00', freshFull(r, 300) && r.s.preset === '5+0', 'fresh', JSON.stringify({ fen: r.fen, s: r.s }));
+
+  // the deep link shows the clock at once, on every size (the folded rail of a window under 900 px included)
+  for (const size of ['desktop', 'rail', 'portrait', 'landscape']) {
+    await load('&clock=5%2B0', size, { ai: true });
+    r = await info();
+    const sel = size === 'desktop' ? '#pclock .cface:not([hidden])' : size === 'rail' ? '.rail-clock .cface:not([hidden])' : '.pstatus .cface:not([hidden])';
+    const f = await inView(sel);
+    R.expect(`?clock=5%2B0 on ${size}: the clock is in the window at once, 5:00, nothing running`, r.s.preset === '5+0' && !!f && f.in && f.h >= 20 && /5:00/.test(f.text) && !r.s.running, '5:00', JSON.stringify({ f, s: r.s }));
+    await shot(`s36-deeplink-${size}`);
+  }
+  // the panel folded by hand hides its header: the floating faces take over, and unfolding hands them back
+  await load('&clock=5%2B0', 'desktop', { ai: true });
+  await page.evaluate(() => document.getElementById('btn-rail').click());
+  await new Promise((r2) => setTimeout(r2, 500));
+  let fl = await inView('.rail-clock .cface:not([hidden])');
+  const hd = await inView('#pclock .cface:not([hidden])');
+  R.expect('panel folded to the rail: the floating clock shows, the header copy does not', !!fl && fl.in && !hd, 'floating', JSON.stringify({ fl, hd }));
+  await shot('s36-rail-folded');
+  await page.evaluate(() => document.getElementById('btn-rail-open').click());
+  await new Promise((r2) => setTimeout(r2, 500));
+  fl = await inView('.rail-clock .cface:not([hidden])');
+  R.expect('panel open again: the floating clock is gone', !fl, 'hidden', JSON.stringify(fl));
+
+  // phone: Menu sheet, clock chosen in a running game, New in the thumb bar, Yes: a fresh game with the clock in the status line
+  for (const size of ['portrait', 'landscape']) {
+    await load('&clock=off', size, { ai: true });
+    await page.evaluate(() => { window.__chess.game.move('e2', 'e4'); window.__chess.step(8); });
+    await page.evaluate(() => window.__chess.ui.openPanel?.('clock'));
+    await new Promise((r2) => setTimeout(r2, 700));
+    await page.evaluate(() => document.querySelector('.psheet.open #sel-clock .chip[data-value="5+0"]').click());
+    r = await info();
+    R.expect(`phone ${size}: a clock chosen in a running game waits and says so`, r.s.preset === 'off' && r.s.next === '5+0' && r.hint && r.hintBtn, 'pending', JSON.stringify({ s: r.s, hint: r.hint }));
+    await page.evaluate(() => document.querySelector('.tb[data-act=new]').click());
+    const ask = await page.evaluate(() => { const c = document.querySelector('.pconfirm'); const q = c.getBoundingClientRect(); return { shown: !c.hidden, in: q.left >= 0 && q.right <= innerWidth && q.top >= 0 && q.bottom <= innerHeight }; });
+    R.expect(`phone ${size}: New in the thumb bar asks, the question is on screen`, ask.shown && ask.in, 'confirm', JSON.stringify(ask));
+    await shot(`s36-phone-${size}-confirm`);
+    await page.evaluate(() => document.querySelector('.pconfirm [data-a=yes]').click());
+    await step(1);
+    r = await info();
+    const f = await inView('.pstatus .cface:not([hidden]) .ct');
+    R.expect(`phone ${size}: Yes starts a fresh game from the start position, 5:00, the face in the status line`, freshFull(r, 300) && r.barShown && !!f && f.in && f.text === '5:00', 'fresh', JSON.stringify({ fen: r.fen, s: r.s, f }));
+    await shot(`s36-phone-${size}-new-game`);
+    // the same through the hint button of the sheet
+    await page.evaluate(() => { window.__chess.game.move('e2', 'e4'); window.__chess.step(8); });
+    await page.evaluate(() => window.__chess.ui.openPanel?.('clock'));
+    await new Promise((r2) => setTimeout(r2, 700));
+    await page.evaluate(() => document.querySelector('.psheet.open #sel-clock .chip[data-value="3+2"]').click());
+    const hb = await page.evaluate(() => { const b = document.querySelector('.psheet.open .clock-now'); const q = b?.getBoundingClientRect(); return { h: q ? Math.round(q.height) : 0, shown: !!q && q.width > 0 }; });
+    R.expect(`phone ${size}: the "start now" button is a 44 px tap target`, hb.shown && hb.h >= 44, '44', JSON.stringify(hb));
+    await page.evaluate(() => document.querySelector('.psheet.open .clock-now').click());
+    await new Promise((r2) => setTimeout(r2, 500));
+    r = await info();
+    const open = await page.evaluate(() => !!document.querySelector('.psheet.open'));
+    R.expect(`phone ${size}: the button starts the game with 3:00 and closes the sheet`, freshFull(r, 180) && r.s.preset === '3+2' && !open, 'fresh', JSON.stringify({ fen: r.fen, s: r.s, open }));
+  }
 
   // ---- phone
   for (const size of ['portrait', 'landscape']) {

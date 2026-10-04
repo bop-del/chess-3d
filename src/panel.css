@@ -52,6 +52,13 @@
   font-variant-numeric: tabular-nums; transition: background 0.18s, border-color 0.18s;
 }
 .cface[hidden] { display: none; }
+/* the folded rail hides the panel header, so the faces float beside the rail: compact, the player's face lowest, never takes a tap */
+.rail-clock { display: none; position: absolute; top: 14px; right: calc(var(--pw) + 14px); flex-direction: column; gap: 4px; pointer-events: none; z-index: 5; }
+#hud.rail > .rail-clock:not([hidden]) { display: flex; }
+.rail-clock[data-bottom="b"] { flex-direction: column-reverse; }
+.rail-clock .cface { height: 30px; background: var(--p-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
+.rail-clock .cface .cn { display: none; }
+.rail-clock .cface .ct { font-size: 16px; }
 .cface .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(255, 255, 255, 0.35); }
 .cface .dot.w { background: radial-gradient(circle at 35% 30%, #fff, #d9d4c6 70%); }
 .cface .dot.b { background: radial-gradient(circle at 35% 30%, #4a4d57, #0b0c10 70%); }
@@ -162,6 +169,8 @@ body[data-trays-shown="on"] .cap-sec { display: none; }
 .panel .field.themes > span { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
 .panel .battle-settings h4 { margin-bottom: 8px; }
 .panel .clock-settings .clock-hint { margin: 8px 0 0; }
+.clock-hint p { margin: 0; }
+.clock-hint .clock-now { margin-top: 8px; width: 100%; }
 .panel .stack + .stack { margin-top: 8px; }
 .panel .stack > .switch, .panel .stack > .music-settings .switch { min-height: 30px; }
 .panel .music-settings { margin-top: 4px; }
