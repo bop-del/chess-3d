@@ -28,10 +28,24 @@ export const SIDE_OF = {
   'sicilian-najdorf': 'sicilian-defense', 'sicilian-dragon': 'sicilian-defense', 'sicilian-alapin': 'sicilian-defense',
   'kings-indian-classical': 'kings-indian-defense', 'kings-indian-samisch': 'kings-indian-defense',
 };
+// ?explain=a|b|c: where Explain mode is offered (CHE-179). a (the default): a labelled Explain button on every opening card.
+// b: a big start card at the top of the Openings tab. c: a Menu sheet entry and, on a phone, a chip under the status line while the
+// moves so far are the start of a known line. An unknown value gives the default.
+export const explainVariant = (search = typeof location !== 'undefined' ? location.search : '') => {
+  const v = new URLSearchParams(search).get('explain');
+  return v === 'b' || v === 'c' ? v : 'a';
+};
+// the line whose first moves are the moves played so far (2 to 8 plies), or null
+export function lineForMoves(lines, moves, playable) {
+  const clean = (s) => String(s).replace(/[+#!?]/g, '');
+  if (moves.length < 2 || moves.length > 8) return null;
+  return lines.find((l) => playable(l) && l.moves.length >= moves.length && moves.every((m, i) => clean(m) === clean(l.moves[i].san))) || null;
+}
 const TABS = ['openings', 'mine', 'practise', 'puzzles'];
 
-export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress, reward = null }) {
+export function mountLearn({ ui, game = null, openings, store, drill, puzzles, puzzleProgress, reward = null }) {
   const { explain, idle } = openings;
+  const variant = explainVariant();
   const sheet = ui.learnSheet;                 // null on desktop
   if (sheet) sheet.body.append(idle);
 
@@ -86,6 +100,7 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
     if (kind === 'openings') {
       b.disabled = !ok;
       b.append(nameLine(line, store.isAdopted(line.id)), el('span', 'xside', sideLabel(line)), el('span', 'xidea', ok ? pick(line.idea) : t('explain.soon', 'Coming soon')));
+      if (ok && variant === 'a') { const go = el('span', 'xgo', t('entry.go', 'Explain')); go.setAttribute('aria-hidden', 'true'); b.append(go); }
       b.addEventListener('click', () => walk(line.id));
     } else if (kind === 'mine') {
       b.disabled = !ok;
@@ -116,6 +131,18 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
   function openingsView() {
     const box = el('div', 'xlist');
     box.append(...strip(['openings']));          // only the openings medals, with "3 of 27", at the top
+    if (variant === 'b') {
+      const rec = explain.lines.find((l) => l.id === 'italian-game' && explain.playable(l)) || explain.lines.find((l) => explain.playable(l));
+      if (rec) {
+        const hero = el('button', 'xhero');
+        hero.type = 'button';
+        hero.dataset.id = rec.id;
+        hero.append(el('b', '', t('entry.heroTitle', 'Have an opening explained')), el('span', 'xherol', t('entry.heroLine', 'You play, and every move tells you what it is for.')),
+          el('span', 'xgo', t('entry.heroStart', 'Start with {name}', { name: pick(rec.name) })));
+        hero.addEventListener('click', () => walk(rec.id));
+        box.append(hero);
+      }
+    }
     box.append(el('p', 'xlead', t('explain.lead', 'Pick an opening. You play your moves, the game plays the other side, and every move says what it is for.')));
     // parents first, each followed by its side lines in a group; a side line whose parent is missing stays at the top level
     const all = explain.lines;
@@ -212,6 +239,33 @@ export function mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress
     const view = tab === 'mine' ? mineView() : tab === 'practise' ? practiseView() : tab === 'puzzles' ? puzzlesView() : openingsView();
     view.setAttribute('role', 'tabpanel');
     idle.replaceChildren(tabs, view);
+  }
+
+  // variant c: a Menu sheet entry that opens the Openings tab, and a chip under the status line that starts the matching line
+  if (variant === 'c' && ui.mountEntry) {
+    const menu = el('button', 'xmenu');
+    menu.type = 'button';
+    const chip = el('button', 'xchip');
+    chip.type = 'button';
+    chip.hidden = true;
+    let match = null;
+    const labelsC = () => {
+      menu.replaceChildren(el('b', '', t('entry.menu', 'Explain')), el('span', '', t('entry.menuSub', 'Openings explained move by move')));
+      if (match) chip.textContent = t('entry.chip', 'Looks like {name}. Explain?', { name: pick(match.name) });
+    };
+    const refreshChip = () => {
+      const idle = game && game.mode === 'play' && !game.getState().over && explain.state().phase === 'list' && drill.state().phase === 'idle' && puzzles.state().phase === 'idle';
+      match = idle ? lineForMoves(explain.lines, game.getState().moves, explain.playable) : null;
+      chip.hidden = !match;
+      labelsC();
+    };
+    menu.addEventListener('click', () => { tab = 'openings'; render(); sheet.open(); });
+    chip.addEventListener('click', () => { if (match) walk(match.id); });
+    ui.mountEntry(menu, chip);
+    if (game) { game.on('change', refreshChip); game.on('newgame', refreshChip); }
+    explain.on(refreshChip); drill.on(refreshChip); puzzles.on(refreshChip);
+    onLanguage(labelsC);
+    refreshChip();
   }
 
   store.onChange(render);

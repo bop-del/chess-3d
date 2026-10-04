@@ -217,6 +217,64 @@ try {
     seen.errs.push(...rw.errs); seen.foreign.push(...rw.foreign);
     await rp.close();
   }
+  // ?explain=a|b|c (CHE-179): every variant drives from the board to a running Explain line; unknown values give a; targets are 44 px on a phone
+  const EXP_SIZES = [['phone 390x844', 390, 844, true], ['phone 375x667', 375, 667, true], ['phone landscape', 844, 390, true], ['desktop', 1280, 720, false]];
+  for (const size of EXP_SIZES) {
+    if (!mine()) continue;
+    const ep = await browser.newPage();
+    const ew = await watchPage(ep, ['127.0.0.1', 'localhost']);
+    await ep.setViewport({ width: size[1], height: size[2], deviceScaleFactor: 1, isMobile: size[3], hasTouch: size[3] });
+    await ep.evaluateOnNewDocument((w, h, phone) => { if (phone) for (const [k, v] of [['width', w], ['height', h]]) Object.defineProperty(screen, k, { get: () => v }); }, size[1], size[2], size[3]);
+    const tap = async (sel) => {
+      const r = await ep.evaluate((sel) => {
+        const e = document.querySelector(sel);
+        if (!e) return null;
+        e.scrollIntoView({ block: 'nearest' });
+        const b = e.getBoundingClientRect();
+        return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height, inside: b.left >= -1 && b.right <= innerWidth + 1 && b.top >= -1 && b.bottom <= innerHeight + 1 };
+      }, sel);
+      if (!r) return null;
+      await ep.mouse.click(r.x, r.y);
+      await settleUi(ep);
+      return r;
+    };
+    const walking = () => ep.evaluate(() => window.__chess.openings.explain.state().phase === 'walking');
+    for (const [v, query] of [['a', '&explain=a'], ['a', ''], ['a', '&explain=zzz'], ['b', '&explain=b'], ['c', '&explain=c']]) {
+      const label = `${size[0]}: explain=${query ? query.slice(9) : '(none)'}`;
+      await load(ep, size, query + (v === 'c' ? '&moves=e2e4,e7e5,g1f3' : '') + (size[3] ? '' : '&open=openings'));
+      const steps = []; let ok = true; let minH = 999;
+      const hit = async (sel) => { const r = await tap(sel); steps.push(r ? `${sel}:${Math.round(r.h)}` : `${sel}:missing`); if (!r || !r.inside) { ok = false; steps.push(`(${r ? JSON.stringify(r) : 'none'})`); } else if (size[3]) minH = Math.min(minH, r.h); return r; };
+      if (!size[3]) {   // desktop: the card is on screen, one tap on the opening
+        if (v === 'c') { R.pass(`${label} has no desktop entry of its own`); continue; }
+        if (!query) await ep.screenshot({ path: '.tmp/builder/shots/explain-a-desktop.png' });
+        await hit(v === 'b' ? '.xhero' : '.xline.openings:not(:disabled)');
+      } else if (v === 'c') {
+        await ep.screenshot({ path: `.tmp/builder/shots/explain-c-chip-${size[1]}x${size[2]}.png` });
+        await hit('.xchip');
+        const viaChip = await walking();
+        const chipSteps = steps.join(' ');
+        steps.length = 0;
+        await load(ep, size, query);
+        await hit('.pbar .tb[data-act="menu"]');
+        await ep.screenshot({ path: `.tmp/builder/shots/explain-c-menu-${size[1]}x${size[2]}.png` });
+        await hit('.xmenu'); await hit('.psheet.open .xline.openings:not(:disabled)');
+        R.expect(`${label}: chip (1 tap after the moves) and Menu entry (3 taps) reach a walking line`, ok && viaChip && (await walking()) && minH >= 44, 'both walking, 44 px', `chip ${chipSteps}, menu ${steps.join(' ')}`);
+        continue;
+      } else {
+        await hit('.pbar .tb[data-act="learn"]');
+        await ep.screenshot({ path: `.tmp/builder/shots/explain-${v}-${query ? query.slice(9) : 'default'}-${size[1]}x${size[2]}.png` });
+        await hit(v === 'b' ? '.psheet.open .xhero' : '.psheet.open .xline.openings:not(:disabled) .xgo');
+      }
+      const w = await walking();
+      R.expect(label, ok && w && (!size[3] || minH >= 44) && steps.length === (size[3] ? 2 : 1), `${size[3] ? 2 : 1} taps to a walking line, targets 44 px on a phone`, `${steps.join(' ')} walking ${w}`);
+    }
+    // the deep link opens the variant on the Learn sheet
+    await load(ep, size, '&explain=b&open=learn');
+    const deep = await ep.evaluate((phone) => ({ hero: !!document.querySelector((phone ? '.psheet.open ' : '') + '.xhero'), tab: document.querySelector('.xtab[aria-selected="true"]')?.dataset.tab }), size[3]);
+    R.expect(`${size[0]}: ?explain=b&open=learn shows the start card on the Openings tab`, deep.hero && deep.tab === 'openings', 'hero + openings', JSON.stringify(deep));
+    seen.errs.push(...ew.errs); seen.foreign.push(...ew.foreign);
+    await ep.close();
+  }
   // combines with the other flags
   if (mine()) {
     const page = await browser.newPage();

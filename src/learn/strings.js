@@ -17,5 +17,9 @@ addDE({
   'learn.importUnreadable': 'Die Datei konnte nicht gelesen werden.',
   'lb.controls': 'Lernsteuerung', 'lb.back': 'Zurück', 'lb.show': 'Zeig es mir', 'lb.hint': 'Hinweis', 'lb.end': 'Beenden',
   'lb.help': 'Hilfe', 'lb.next': 'Nächstes', 'lb.path': 'Pfad', 'lb.again': 'Nochmal',
+  'entry.go': 'Erklären', 'entry.heroTitle': 'Eröffnung erklären lassen',
+  'entry.heroLine': 'Du spielst, und jeder Zug sagt dir, wofür er gut ist.', 'entry.heroStart': 'Start: {name}',
+  'entry.menu': 'Erklären', 'entry.menuSub': 'Eröffnungen Zug für Zug erklärt',
+  'entry.chip': 'Das sieht nach „{name}“ aus. Erklären?',
   'explain.addMine': 'Zu meinen Eröffnungen', 'explain.inMine': 'In meinen Eröffnungen',
 });

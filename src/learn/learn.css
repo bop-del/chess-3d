@@ -44,3 +44,30 @@ body.phone.drilling .pframe { top: calc(var(--st) + var(--stat) + var(--gap) * 2
 body.drilling .card[data-card="openings"] { display: none; }
 /* six thumb bar buttons in a column: the short landscape height needs a tighter gap */
 @media (max-height: 340px) { body.phone:not(.portrait) .pbar { gap: 2px; } }
+
+/* CHE-179 entry points (?explain=a|b|c). a: a labelled button on the opening card. b: the start card. c: Menu entry and chip. */
+.xgo {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; min-height: 36px; margin-top: 4px; padding: 0 12px; border-radius: 10px;
+  background: linear-gradient(180deg, #e7c779, #b98f43); color: #20170a; font-weight: 700; font-size: 14px; border: 1px solid rgba(255, 255, 255, 0.35);
+}
+body.phone .xgo { min-height: 44px; }
+.xhero {
+  display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 12px; text-align: left; cursor: pointer; font: inherit; color: var(--text);
+  border: 1px solid rgba(216, 180, 104, 0.6); border-radius: 14px; background: var(--gold-soft);
+}
+.xhero b { font-size: 16px; color: #f3dfa8; }
+.xhero .xherol { color: var(--dim); font-size: 13px; line-height: 1.4; }
+.xhero .xgo { margin-top: 6px; }
+.xmenu {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 44px; margin: 0 0 8px; padding: 10px 14px 12px; text-align: left; cursor: pointer;
+  font: inherit; color: var(--text); border: 1px solid rgba(216, 180, 104, 0.6); border-radius: 12px; background: var(--gold-soft);
+}
+.xmenu b { color: #f3dfa8; font-size: 15px; }
+.xmenu span { color: var(--dim); font-size: 12px; }
+body.phone .xchip {
+  position: fixed; z-index: 12; pointer-events: auto; top: calc(var(--st) + var(--stat) + var(--gap)); left: var(--sl); right: calc(var(--sr) + 44px + var(--gap)); min-height: 44px; padding: 6px 12px;
+  display: flex; align-items: center; justify-content: flex-start; text-align: left; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  color: #20170a; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 12px; background: linear-gradient(180deg, #e7c779, #b98f43);
+}
+.xchip, body:not(.phone) .xmenu { display: none; }
+.xchip[hidden], body.explaining .xchip, body.drilling .xchip, body.puzzling .xchip { display: none !important; }
