@@ -51,5 +51,11 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
     }
   }
 }
+// the teams read apart in greyscale: the mean grey (0 to 255, surface weighted) of every White piece against the Black piece of its type
+{
+  const grey = (c) => 0.299 * ((c >> 16) & 255) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255);
+  const mean = (color, type) => { let a = 0, s = 0; for (const p of buildPixelVox(color, type).parts) { const ar = p.w * p.h + p.w * p.d + p.h * p.d; a += ar; s += ar * grey(p.color); } return s / a; };
+  for (const [type, name] of Object.entries(TYPES)) { const gap = mean('w', type) - mean('b', type); check(`${name}: White is lighter than Black in greyscale`, gap >= (type === 'p' ? 40 : 25), `gap ${gap.toFixed(0)}`); }
+}
 console.log(failed ? `\n${failed} check(s) failed` : '\nPixelwelt figures contract passed');
 process.exit(failed ? 1 : 0);
