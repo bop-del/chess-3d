@@ -319,6 +319,46 @@ try {
   R.expect('phone ?open=clock: the Menu sheet shows the chooser, five chips of at least 44 px height inside the screen', po.open && po.vis && po.chips.length === 5 && po.chips.every(([cw, ch, inside]) => ch >= 44 && cw >= 44 && inside), 'in view', JSON.stringify(po));
   await shot('phone-portrait-open-clock');
 
+  // ---- CHE-161: a new game with a new time control starts at exactly the chosen base time and keeps it until White moves
+  for (const ai of [false, true]) {
+    await load('&clock=off', 'desktop', { ai });
+    const bad = await page.evaluate(async () => {
+      const c = window.__chess, IDS = ['off', '3+2', '5+0', '10+0', '15+10'], BASE = { off: 0, '3+2': 180, '5+0': 300, '10+0': 600, '15+10': 900 };
+      const chip = (id) => document.querySelector(`#sel-clock .chip[data-value="${CSS.escape(id)}"]`).click();
+      const text = (k) => document.querySelector(`#pclock .cface[data-c="${k}"] .ct`).textContent;
+      const fmt = (n) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+      const out = [];
+      const check = (tag, to, when) => {
+        const s = c.clock.state();
+        const ok = s.preset === to && s.w === BASE[to] && s.b === BASE[to] && !s.started && (to === 'off' || (text('w') === fmt(BASE[to]) && (s.untimed === 'b' || text('b') === fmt(BASE[to]))));
+        if (!ok) out.push(`${tag} ${when}: ${JSON.stringify({ p: s.preset, w: s.w, b: s.b, st: s.started, tw: to === 'off' ? '' : text('w'), tb: to === 'off' ? '' : text('b') })}`);
+      };
+      const play = () => { const g = c.game.getState(); if (g.turn === 'w' && !g.over) { c.game.move('e2', 'e4'); c.step(1.5); } };
+      const settle = (tag, to) => { check(tag, to, 'now'); c.step(5); c.draw(); check(tag, to, '+5s'); };
+      for (const from of IDS) for (const to of IDS) {
+        const tag = `${from}>${to}`;
+        // fresh board
+        chip(from); c.game.newGame({ instant: true }); c.step(0.1);
+        chip(to); settle(`${tag} fresh`, to);
+        // during a game, the start now button
+        chip(from); c.game.newGame({ instant: true }); c.step(0.1); play(); c.step(3);
+        chip(to); const nowBtn = document.querySelector('.clock-now'); if (to !== from) nowBtn.click(); else c.game.newGame({ instant: true });
+        settle(`${tag} startnow`, to);
+        // during a game, the normal new game
+        chip(from); c.game.newGame({ instant: true }); c.step(0.1); play(); c.step(3);
+        chip(to); document.getElementById('btn-new').click(); settle(`${tag} newgame`, to);
+        // after a game over
+        chip(from); c.game.newGame({ instant: true }); c.step(0.1); play(); c.game.end({ result: '1-0', winner: 'w', reason: 'resign' }); c.step(1);
+        chip(to); c.game.newGame(); settle(`${tag} over`, to);
+        // after a flag
+        chip(from); c.game.newGame({ instant: true }); c.step(0.1); play(); c.step(2000);
+        chip(to); c.game.newGame(); settle(`${tag} flag`, to);
+      }
+      return out;
+    });
+    R.expect(`new game with a new time control starts at the base time and keeps it (all preset pairs, all paths, ${ai ? 'vs computer' : 'ai=0'})`, !bad.length, 'none', bad.slice(0, 6).join(' | ') + ` (${bad.length})`);
+  }
+
   const errs = watchers.flatMap((x) => x.errs), warns = watchers.flatMap((x) => x.warns);
   R.expect('no console error or warning', !errs.length && !warns.length, 'none', [...errs, ...warns].slice(0, 5).join(' | '));
   await contactSheets(browser, SHOTS, { cols: 3, width: 640 });
