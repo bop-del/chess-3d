@@ -1,7 +1,7 @@
 // Test runner: node test/run.mjs [fast|smoke|phone|all]   (default fast; npm test calls it)
 //   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules, novice level
 //   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on the lane's own port (5303 in the main checkout), only the groups the diff against main affects inside a lane (--all forces every group), cached passes print CACHED, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes, themes
-//   phone  phone sizes and real touch, the three scripts at the same time, each cached by build, scripts and GL backend (CACHED, --no-cache reruns): tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
+//   phone  phone sizes and real touch, the scripts at the same time (install in 2 parts), each cached by build, scripts and GL backend (CACHED, --no-cache reruns): tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes, --affected, --all, --no-cache
 // Exit codes: 0 all pass, 1 a check failed, 2 usage error, 3 nothing failed but a smoke group was skipped (no Chrome slot).
@@ -88,9 +88,9 @@ if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((
 } else if (tier === 'all') console.log('--- smoke tier skipped because the fast tier failed');
 if (tier === 'phone') {
   console.log('--- phone tier (headless Chrome, phone sizes, real touch)');
-  // the three scripts do not share state: one Chrome slot, port and dist folder each, so they run at the same time (the slot lock keeps it to what the machine allows)
-  const shared = rest.filter((a) => !a.startsWith('--port=') && a !== '--no-cache');   // one port for three servers would clash: each script claims its own
-  await runParallel([['phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', shared], ['real touch (test/touch.mjs)', 'test/touch.mjs', shared], ['install reminder and manifest (test/install.mjs)', 'test/install.mjs', shared]], { cache: !rest.includes('--no-cache') });
+  // the scripts do not share state: one Chrome slot, port and dist folder each, so they run at the same time (the slot lock keeps it to what the machine allows)
+  const shared = rest.filter((a) => !a.startsWith('--port=') && a !== '--no-cache');   // one port for several servers would clash: each script claims its own
+  await runParallel([['phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', shared], ['real touch (test/touch.mjs)', 'test/touch.mjs', shared], ['install reminder and manifest 1/2 (test/install.mjs)', 'test/install.mjs', [...shared, '--part=0/2']], ['install reminder and manifest 2/2 (test/install.mjs)', 'test/install.mjs', [...shared, '--part=1/2']]], { cache: !rest.includes('--no-cache') });
 }
 
 const bad = results.filter((r) => !r.ok).length;

@@ -2,7 +2,7 @@
 // Run: node test/affected-groups.mjs    Exit 0 when every case holds, 1 otherwise.
 import { affectedGroups, MAP } from '../tools/affected-groups.mjs';
 import { FAMILIES, GROUPS } from './smoke-group-list.mjs';
-import { groupKey, groupFiles } from '../tools/result-cache.mjs';
+import { groupKey, groupFiles, longestFirst } from '../tools/result-cache.mjs';
 import { slotsFor, lanePorts, startServer, claimPort, portAnswers, safeDecode } from '../tools/_lib.mjs';
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -110,6 +110,15 @@ try {
 
 // hostile URLs in a message must not throw (the release check printed "URI malformed" for %%% once)
 check('safeDecode survives a malformed escape', safeDecode('/?help=%%%') === '/?help=%%%' && safeDecode('/?a=%41') === '/?a=A' && safeDecode('/?hud=%ff') === '/?hud=%ff');
+
+// smoke schedule: longest known group first, groups without a time keep their order after the timed ones
+{
+  const items = [['a'], ['b'], ['c'], ['d'], ['e']].map((x) => ({ g: x }));
+  const names = (l) => l.map((x) => x.g[0]).join('');
+  check('longestFirst sorts by known time, descending', names(longestFirst(items, { a: 5, c: 30, e: 12 })) === 'ceabd');
+  check('longestFirst without any timing keeps the list order', names(longestFirst(items, {})) === 'abcde');
+  check('longestFirst does not change its input', names(items) === 'abcde');
+}
 
 for (const c of cases) console.log(`${c.ok ? 'ok  ' : 'FAIL'} ${c.name}`);
 process.exit(cases.every((c) => c.ok) ? 0 : 1);

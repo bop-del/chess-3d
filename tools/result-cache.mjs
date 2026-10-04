@@ -4,6 +4,8 @@
 // group; a changed test script invalidates the groups that run it.
 //   groupKey(group, buildKey)   the cache key for a [name, script, args] group
 //   getResult(key) / putResult(key, info)
+//   groupTimings(dir)           newest known run time in seconds per group name, from the stored passes of any build (the schedule input of the smoke run)
+//   longestFirst(items, timings)  items ([name, ...] or { g: [name, ...] }) sorted by known time, longest first; groups without a time keep their place after the timed ones
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -52,4 +54,22 @@ export function putResult(key, info) {
     const all = readdirSync(RESULTS_DIR).filter((n) => n.endsWith('.json')).map((n) => ({ n, t: statSync(join(RESULTS_DIR, n)).mtimeMs })).sort((a, b) => b.t - a.t);
     for (const old of all.slice(KEEP)) rmSync(join(RESULTS_DIR, old.n), { force: true });
   } catch (e) { /* the cache is best effort */ }
+}
+
+/** Newest stored run time per group name. Passes of every build count: the time of a group hardly depends on the build, the key does. Cached rows (secs 0) are never stored. */
+export function groupTimings(dir = RESULTS_DIR) {
+  const t = {};
+  try {
+    const rows = readdirSync(dir).filter((n) => n.endsWith('.json')).map((n) => { try { return JSON.parse(readFileSync(join(dir, n), 'utf8')); } catch (e) { return null; } }).filter((r) => r && r.group && r.secs > 0 && r.t);
+    rows.sort((a, b) => (a.t < b.t ? -1 : 1));   // oldest first, so the newest wins
+    for (const r of rows) t[r.group] = r.secs;
+  } catch (e) { /* no cache yet */ }
+  return t;
+}
+
+/** Longest known group first (the long groups then start at once and the short ones fill the gaps at the end). Stable: groups with no timing keep their list order, after the timed ones. */
+export function longestFirst(items, timings, nameOf = (x) => (x.g || x)[0]) {
+  const known = (x) => timings[nameOf(x)] > 0;
+  const timed = items.filter(known).sort((a, b) => timings[nameOf(b)] - timings[nameOf(a)]);
+  return [...timed, ...items.filter((x) => !known(x))];
 }

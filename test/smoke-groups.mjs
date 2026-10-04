@@ -7,6 +7,7 @@
 // outside a lane all of them. --affected forces the diff (--since=<ref> compares with that ref instead of main), --all forces everything (do this before a release). Skipped groups are listed.
 // Result cache: a group that passed cleanly for the same build and scripts prints CACHED, takes no Chrome slot and needs no build. --no-cache
 // (also implied by --shots, --write-budgets and --dev) runs everything for real. Ports: derived from the lane name (tools/_lib.mjs lanePorts).
+// Schedule: the groups to run start longest first, by the run times stored in the result cache (tools/result-cache.mjs groupTimings), groups without a time in list order after them.
 // Options: --port=<lane preview port, 5303 in the main checkout> --dev --dev-port=<lane dev port, 5302> --skip-build --write-budgets --shots --skip-fixes, plus --only=<group,group> to run just those groups, --jobs=<n> to set the number of processes at once (default: the free Chrome slots at start, at least 2, so waiting groups do not hit the 15 minute lock timeout).
 // A group that still finds no slot is reported as SKIPPED (slot starvation), not as a failure: run it alone with node test/smoke.mjs --group=<name>.
 import { spawn, execFileSync } from 'node:child_process';
@@ -14,7 +15,7 @@ import { appendFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, startServer, claimPort } from '../tools/_lib.mjs';
 import { affectedGroups, changedFiles } from '../tools/affected-groups.mjs';
-import { getResult, groupKey, putResult } from '../tools/result-cache.mjs';
+import { getResult, groupKey, groupTimings, longestFirst, putResult } from '../tools/result-cache.mjs';
 import { GROUPS as ALL_GROUPS, SMOKE, family } from './smoke-group-list.mjs';
 import { contactSheets } from '../tools/contact-sheet.mjs';
 
@@ -126,7 +127,7 @@ const runGroup = ({ g: [name, script, extra], key }) => new Promise((resolve) =>
   });
 });
 try {
-  const queue = todo.slice();
+  const queue = longestFirst(todo, groupTimings());   // longest known group first, from the stored run times; no time yet: the list order
   await Promise.all(Array.from({ length: Math.min(JOBS, queue.length) }, async () => { for (let g; (g = queue.shift());) await runGroup(g); }));
 
   if (flag('shots')) {
