@@ -34,8 +34,10 @@ const inPool = (ix, iz) => ix >= POOL.x0 && ix < POOL.x1 && iz >= POOL.z0 && iz 
 function toGroup(m, kit, { cast = false, name } = {}) {
   const g = new THREE.Group();
   if (name) g.name = name;
+  g.userData.boxes = m.boxes;
   for (const [k, geo] of m.geometries()) {
     const mesh = new THREE.Mesh(geo, kit.mats[k] || kit.mats.flat);
+    mesh.name = k;
     if (k === 'water') mesh.renderOrder = 2;
     mesh.castShadow = cast;
     g.add(mesh);
@@ -86,7 +88,8 @@ function buildTerrain(kit) {
   m.box('water', POOL.x0, -1, POOL.z0, POOL.x1 - POOL.x0, 1 - 0.12, POOL.z1 - POOL.z0, { skip: new Set(['px', 'nx', 'pz', 'nz', 'ny']), color: 0xffffff });
   // the oak frame: a ring half a block wide around the board, four log posts in the corners
   const fh = FRAME_H;
-  m.box('planks', -4 - FRAME, 0, -4 - FRAME, 8 + 2 * FRAME, fh, FRAME); m.box('planks', -4 - FRAME, 0, 4, 8 + 2 * FRAME, fh, FRAME);
+  // the planks stop at the posts: no two boxes share a face (rule, test/pixel-rules.mjs)
+  m.box('planks', -4, 0, -4 - FRAME, 8, fh, FRAME); m.box('planks', -4, 0, 4, 8, fh, FRAME);
   m.box('planks', -4 - FRAME, 0, -4, FRAME, fh, 8); m.box('planks', 4, 0, -4, FRAME, fh, 8);
   for (const [px, pz] of [[-4 - FRAME, -4 - FRAME], [4, -4 - FRAME], [-4 - FRAME, 4], [4, 4]]) m.box('logSide', px, 0, pz, FRAME, 0.5, FRAME, { keys: { top: 'logTop', side: 'logSide' } });
   // two crates for the captured pieces: boards two high with corner posts, built around the tray slab (top at y = 0, bottom -0.26)
@@ -136,7 +139,7 @@ function addClouds(parent, kit) {
     const mats = [];
     g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
     const local = new THREE.Box3().setFromObject(g);
-    g.position.set(x, y, z); g.userData = { x0: x, speed, mats, local, fade: 1 };
+    g.position.set(x, y, z); g.userData = { boxes: m.boxes, x0: x, speed, mats, local, fade: 1 };
     parent.add(g); out.push(g);
   }
   return out;

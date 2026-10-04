@@ -13,7 +13,7 @@ A 3D chess game for the browser (three.js 0.186, Vite, fully procedural, no asse
 
 | Tier | Command | What it covers |
 |---|---|---|
-| fast | `node test/run.mjs` | rules perft, piece geometry contract, text lint. No browser, seconds |
+| fast | `node test/run.mjs` | rules perft, piece geometry contract, Pixelwelt rules, text lint. No browser, seconds |
 | smoke | `node test/run.mjs smoke` | build, serve, drive the real page in headless Chrome (chrome-headless-shell by default, full Chrome for the release check, `CHESS_BROWSER=chrome` forces it; the GPU via ANGLE Metal on Apple Silicon, software GL elsewhere or with `CHESS_GL=swiftshader`; builds come from a content hashed cache in ~/.cache/chess-3d), parallel groups (test/smoke-groups.mjs), one Chrome each, the long ones split in parts (open, views, fixes). Inside a lane worktree only the groups the diff against main affects run (`--affected`, the default there; core paths run all; `--all` forces every group, always before a release), and a group that passed for the same build and scripts prints CACHED (`--no-cache` to rerun). About 2 minutes for all groups on a quiet machine |
 | phone | `node test/run.mjs phone` | phone sizes (portrait, landscape, short), tap target audit, real multi touch (pinch, twist, thumb bar). Each script is result cached like a smoke group (CACHED, `--no-cache` reruns). A few minutes uncached |
 | release | `node tools/release-check.mjs` | fresh build, page load on the GPU plus one software (SwiftShader) pass over `/` that only warns, hostile URLs, docs and repo hygiene. Run before a release |
@@ -30,6 +30,7 @@ No golden image diffs: software GL renders differ across machines. Take screensh
 - Everything on the board lives in the `gimbal` group. The camera orbits outside it.
 - `window.__chess = { stage, gimbal, board, game, controls, ui, THREE, pick, ... }` is the test hook (also battle, audio, sfx, openings, puzzles, puzzleProgress, reward, goodMove, views, play, themes, train, diag; see docs/ARCHITECTURE.md, Test hooks). `?manual=1` stops the render loop and adds `__chess.step(seconds)` and `__chess.draw()` so tests control time.
 - URL flags (see the README table): `quality`, `touch`, `light`, `preset`, `yaw`, `pitch`, `dist`, `gx`, `gy`, `gz`, `fen`, `moves`, `select`, `promo`, `ai`, `spin`, `hud`, `help`, `manual`, `diag`, `view`, `theme`, `intro`, `trays`, `open`.
+- Pixelwelt rules (checked by test/pixel-rules.mjs and the smoke group `pixel look`, details in docs/ARCHITECTURE.md): translucent surfaces only over closed ground; no coplanar overlapping faces between boxes; one tile textures clamp (Repeat is an explicit opt in on an allow list); every mesh of the theme is a flat unlit material with a pixel texture, trays included.
 - The computer opponent is ON by default (you play white, Easy). `?ai=0` turns it off. Any test or script that plays both sides must pass `ai=0`.
 - Architecture and module APIs: docs/ARCHITECTURE.md. Keep it in step with the code.
 - Domain language: CONTEXT.md (a glossary, no implementation detail). Architecture decisions: docs/adr/. Both are created when the first term or decision is settled, not before.

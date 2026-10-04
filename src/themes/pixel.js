@@ -5,14 +5,18 @@ import * as THREE from 'three';
 import { createPixelWorld } from './pixel/world.js';
 import { buildPixelVox } from './pixel/figures.js';
 import { createPieceStyle } from './blocks/rig.js';
+import { trayPlanks } from './pixel/textures.js';
+import { SLAB } from '../trays.js';
 
 /** Board spec: classic squares hidden, labels lifted onto the plank frame. */
-export function board() {
+export function board({ track } = {}) {
   return {
     hide: true,
     labelLift: 0.2,
     labels: { color: '#fff2c8', metalness: 0, roughness: 1, envMapIntensity: 0 },
-    tray: { color: '#b68a52', roughness: 1, metalness: 0, clearcoat: 0, clearcoatRoughness: 1 },
+    // the tray floor: the planks texture, unlit like the world. The slab is a lit physical material shared by every theme, so it is
+    // switched to "all emissive": black diffuse, no specular, no clearcoat, the texture as the emission.
+    tray: { color: '#000000', emissive: '#ffffff', emissiveMap: trayPlanks(SLAB.w, SLAB.len, track), emissiveIntensity: 1, roughness: 1, metalness: 0, clearcoat: 0, clearcoatRoughness: 1, specularIntensity: 0, envMapIntensity: 0 },
   };
 }
 

@@ -225,7 +225,7 @@ The build uses relative asset paths (`base: './'`), so `dist/` can be hosted fro
 
 Tests come in four tiers:
 
-    node test/run.mjs            # fast, no browser: rules perft, piece geometry contract, text lint, audit planner rules, openings, puzzles (progress, controller, data), novice level, training core (this is npm test)
+    node test/run.mjs            # fast, no browser: rules perft, piece geometry contract, Pixelwelt rules, text lint, audit planner rules, openings, puzzles (progress, controller, data), novice level, training core (this is npm test)
     node test/run.mjs smoke      # smoke, about 2 minutes on a quiet machine for all groups: build, serve, drive the real page in headless Chrome, then the battle scenes (test/battle.mjs). In a lane worktree only the groups the diff against main affects run (--all for every group, --no-cache to ignore cached passes). The long groups run in parts (open 1/3 to 3/3, views 1/2 and 2/2, fixes 1/2 and 2/2); --only=open runs all parts of a group
     node test/run.mjs phone      # phone, several minutes: phone sizes, tap target audit, real multi touch, the Add to Home Screen reminder. Each of the three scripts is cached by build, scripts and GL backend: a pass for the same build prints CACHED (--no-cache reruns, and takes the screenshots again)
     node tools/release-check.mjs # release: fresh build, page load (GPU, plus a software pass that only warns), hostile URLs, docs and repo hygiene

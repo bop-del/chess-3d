@@ -6,7 +6,10 @@ const rng = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^
 const rgb = (n) => [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 const clamp = (v) => Math.max(0, Math.min(255, v));
 
-function make(seed, draw, size = 16) {
+// Wrap modes (S61): a texture whose faces are one tile clamps, so the sample at a block edge can never wrap to the opposite row (the
+// green hairline). Repeat is an explicit opt in for textures that tile on purpose; test/pixel-rules.mjs holds the allow list.
+export const REPEATING = ['water', 'planks', 'cloud', 'sun'];
+function make(seed, draw, size = 16, repeat = false) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   const x = c.getContext('2d'), r = rng(seed);
   const P = (px, py, hex, j = 0) => {
@@ -19,11 +22,28 @@ function make(seed, draw, size = 16) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  t.wrapS = t.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping; t.anisotropy = 4;
   return t;
 }
 // n clusters of a colour: a pixel and sometimes a neighbour, so the speckle reads like worn material instead of TV noise
 const specks = (g, hex, n, j = 5) => { for (let i = 0; i < n; i++) { const px = Math.floor(g.r() * 16), py = Math.floor(g.r() * 16); g.P(px, py, hex, j); if (g.r() < 0.4) g.P(px + 1, py, hex, j); } };
+
+function drawPlanks(g) {
+  g.fill(0xb68a52, 6);
+  for (let row = 0; row < 4; row++) {
+    const y0 = row * 4;
+    for (let px = 0; px < 16; px++) { g.P(px, y0 + 3, 0x8a6638); g.P(px, y0, 0xc59b62, 4); }
+    const jx = (row * 5 + 3) % 16; for (let py = y0; py < y0 + 3; py++) g.P(jx, py, 0x8a6638);
+    g.P((jx + 7) % 16, y0 + 1, 0x9c7544, 4);
+  }
+}
+
+/** The planks texture tiled to a w x d slab (one tile = one block), for the tray floor. Caller disposes (or passes track). */
+export function trayPlanks(w, d, track = (t) => t) {
+  const t = make(6, drawPlanks, 16, true);
+  t.repeat.set(w, d);
+  return track(t);
+}
 
 export function pixelTextures(track = (t) => t) {
   const T = {};
@@ -48,15 +68,7 @@ export function pixelTextures(track = (t) => t) {
     });
     for (let i = 0; i < 20; i++) g.P(Math.floor(g.r() * 16), Math.floor(g.r() * 16), 0x93959a, 6);
   });
-  T.planks = make(6, (g) => {
-    g.fill(0xb68a52, 6);
-    for (let row = 0; row < 4; row++) {
-      const y0 = row * 4;
-      for (let px = 0; px < 16; px++) { g.P(px, y0 + 3, 0x8a6638); g.P(px, y0, 0xc59b62, 4); }
-      const jx = (row * 5 + 3) % 16; for (let py = y0; py < y0 + 3; py++) g.P(jx, py, 0x8a6638);
-      g.P((jx + 7) % 16, y0 + 1, 0x9c7544, 4);
-    }
-  });
+  T.planks = make(6, drawPlanks, 16, true);
   T.logSide = make(7, (g) => {
     g.fill(0x6b4e2e, 5);
     for (let px = 0; px < 16; px++) if (g.r() < 0.5) for (let py = 0; py < 16; py++) if (g.r() < 0.85) g.P(px, py, 0x4d3720, 5);
@@ -73,9 +85,9 @@ export function pixelTextures(track = (t) => t) {
     for (let i = 0; i < 10; i++) g.x.clearRect(Math.floor(g.r() * 16), Math.floor(g.r() * 16), 1, 1);
   });
   T.sand = make(10, (g) => { g.fill(0xdbcf97, 6); specks(g, 0xc9bb80, 24); specks(g, 0xeadfae, 18); });
-  T.water = make(11, (g) => { g.fill(0x2f5fcf, 8); for (let i = 0; i < 14; i++) { const px = Math.floor(g.r() * 13), py = Math.floor(g.r() * 16); for (let k = 0; k < 3; k++) g.P(px + k, py, 0x5d8df0, 4); } specks(g, 0x2650b0, 18); });
-  T.cloud = make(12, (g) => { g.fill(0xffffff, 4); }, 8);
-  T.sun = make(13, (g) => { g.fill(0xffe27a, 6); for (let i = 0; i < 8; i++) { g.P(i * 2, 0, 0xfff3b8); g.P(0, i * 2, 0xfff3b8); } }, 8);
+  T.water = make(11, (g) => { g.fill(0x2f5fcf, 8); for (let i = 0; i < 14; i++) { const px = Math.floor(g.r() * 13), py = Math.floor(g.r() * 16); for (let k = 0; k < 3; k++) g.P(px + k, py, 0x5d8df0, 4); } specks(g, 0x2650b0, 18); }, 16, true);
+  T.cloud = make(12, (g) => { g.fill(0xffffff, 4); }, 8, true);
+  T.sun = make(13, (g) => { g.fill(0xffe27a, 6); for (let i = 0; i < 8; i++) { g.P(i * 2, 0, 0xfff3b8); g.P(0, i * 2, 0xfff3b8); } }, 8, true);
   for (const k in T) track(T[k]);
   return T;
 }

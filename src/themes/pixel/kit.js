@@ -10,7 +10,7 @@ export function makePixelKit(track = (t) => t) {
   for (const k of ['grassTop', 'grassSide', 'dirt', 'stone', 'cobble', 'sand', 'planks', 'logSide', 'logTop', 'sun']) mats[k] = bas(T[k]);
   mats.crate = bas(T.planks);
   mats.leaves = bas(T.leaves, { alphaTest: 0.5 });
-  mats.water = bas(T.water, { transparent: true, opacity: 0.8, depthWrite: false });
+  mats.water = bas(T.water);   // opaque: a see through pond shows the open sky through the unclosed side (S61, rule: translucent only over closed ground)
   mats.cloud = bas(T.cloud, { transparent: true });
   mats.flat = new THREE.MeshBasicMaterial({ vertexColors: true });
   return { T, mats, dispose() { for (const m of Object.values(mats)) m.dispose(); } };

@@ -1,0 +1,139 @@
+// Pixelwelt rendered look checks (S61, CHE-166) in the real page: node test/pixel-look-page.mjs [--port=5354] [--base=<server>] [--shots=<dir>]
+// Statistics and targeted scans only, no golden images. Quality High at device pixel ratio 2 (the setting of the owner's recording).
+//   pond      the pixels over the water do not depend on what is behind it (frame with everything else hidden gives the same pixels)
+//   posts     the lower part of the corner posts does not change when the plank ring is hidden (no z fighting with the planks)
+//   hairline  orbit sweep (yaw 0 to 3 degrees, 0.1 steps, pitch 14, dist 16): no row of green pixels along the bottom edge of the
+//             grass blocks, where a wrapped texture sample draws the green top row of the side texture
+//   tray      the tray floor does not change with the lights off (unlit), and shows planks colours
+// Exit codes: 0 pass, 1 a check failed.
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
+const args = process.argv.slice(2);
+const PORT = Number((args.find((a) => a.startsWith('--port=')) || '--port=5354').slice(7));
+const SHOTS = (args.find((a) => a.startsWith('--shots=')) || '').slice(8);
+const R = reporter();
+const OUT = '.tmp/pixel-look-dist';
+const BASE = (args.find((a) => a.startsWith('--base=')) || '').slice(7).replace(/\/$/, '');
+if (!BASE && !args.includes('--skip-build')) build(OUT);
+const server = BASE ? { stop() {} } : await startServer({ mode: 'preview', port: PORT, outDir: OUT });
+const URL0 = BASE || `http://127.0.0.1:${PORT}`;
+const browser = await launchBrowser({ w: 1280, h: 720 });
+try {
+  const page = await browser.newPage();
+  const w = await watchPage(page);
+  await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 2 });
+  await page.goto(`${URL0}/?theme=pixel&quality=high&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+  // helpers inside the page
+  await page.evaluate(() => {
+    const C = window.__chess, T = C.THREE, D = Math.PI / 180;
+    C.step(3); for (let i = 0; i < 30; i++) C.stage.render(0.2);
+    const cv = document.querySelector('canvas'), off = document.createElement('canvas'), ox = off.getContext('2d', { willReadFrequently: true });
+    const world = C.gimbal.getObjectByName('pixel-world'), island = world.getObjectByName('island');
+    const meshes = []; C.gimbal.traverse((o) => { if (o.isMesh) meshes.push(o); }); C.game.root.traverse((o) => { if (o.isMesh && !meshes.includes(o)) meshes.push(o); });
+    const rc = new T.Raycaster();
+    const shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };   // the raycaster ignores visibility
+    const inWorld = (o) => { for (let p = o; p; p = p.parent) if (p === world) return true; return false; };
+    const H = {};
+    H.view = (yaw, pitch, dist) => { C.controls.setCamera({ yaw: yaw * D, pitch: pitch * D, dist }); C.step(0.0334, 30); };
+    H.snap = () => { C.draw(); off.width = cv.width; off.height = cv.height; ox.drawImage(cv, 0, 0); return ox.getImageData(0, 0, cv.width, cv.height).data; };
+    H.hit = (px, py) => { rc.setFromCamera(new T.Vector2((px + 0.5) / cv.width * 2 - 1, 1 - (py + 0.5) / cv.height * 2), C.stage.camera); const all = rc.intersectObjects(meshes.filter(shown), false); if (!all[0]) return undefined; all[0].ties = all.filter((x) => x.distance - all[0].distance < 1e-4).map((x) => x.object); return all[0]; };
+    H.screen = (v) => { const p = v.clone().project(C.stage.camera); return [(p.x + 1) / 2 * cv.width, (1 - p.y) / 2 * cv.height]; };
+    H.box = (mesh) => { const b = new T.Box3().setFromObject(mesh), xs = [], ys = []; for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) { const [sx, sy] = H.screen(new T.Vector3(x, y, z)); xs.push(sx); ys.push(sy); } return [Math.max(0, Math.floor(Math.min(...xs))), Math.max(0, Math.floor(Math.min(...ys))), Math.min(cv.width, Math.ceil(Math.max(...xs))), Math.min(cv.height, Math.ceil(Math.max(...ys)))]; };
+    // frame with and without a change: pixels the select(hit) accepts, largest channel difference
+    H.compare = (target, select, change, undo, stride = 3, regions = null) => {
+      const a = H.snap(), pts = [];
+      for (const [x0, y0, x1, y1] of regions || [H.box(target)]) for (let y = Math.max(0, y0); y < Math.min(cv.height, y1); y += stride) for (let x = Math.max(0, x0); x < Math.min(cv.width, x1); x += stride) { const h = H.hit(x, y); if (h && select(h)) pts.push((y * cv.width + x) * 4); }
+      change(); const b = H.snap(); undo();
+      let max = 0, over = 0;
+      for (const i of pts) { const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])); if (d > max) max = d; if (d > 8) over++; }
+      return { n: pts.length, max, over, share: +(over / Math.max(1, pts.length)).toFixed(3) };
+    };
+    // pixels where two different surfaces lie at the same depth: the picture there is decided by rounding (z fighting)
+    H.tied = (regions, stride) => { let n = 0, tied = 0; for (const [x0, y0, x1, y1] of regions) for (let y = Math.max(0, y0); y < Math.min(cv.height, y1); y += stride) for (let x = Math.max(0, x0); x < Math.min(cv.width, x1); x += stride) { const h = H.hit(x, y); if (!h) continue; n++; if (new Set(h.ties.filter(inWorld).map((o) => o.uuid)).size > 1) tied++; } return { n, tied }; };
+    H.hideAllBut = (keep) => { const was = meshes.map((m) => m.visible); meshes.forEach((m) => { if (!keep(m)) m.visible = false; }); return () => meshes.forEach((m, i) => { m.visible = was[i]; }); };
+    H.world = { island, meshes };
+    window.__H = H;
+  });
+  // pond
+  const pond = [];
+  for (const [yaw, pitch, dist] of [[180, 35, 14], [150, 25, 14], [215, 45, 12], [200, 30, 16]]) {
+    pond.push(await page.evaluate((v) => {
+      const H = window.__H; H.view(...v);
+      const water = H.world.island.getObjectByName('water');
+      let undo;
+      return H.compare(water, (h) => h.object === water, () => { undo = H.hideAllBut((m) => m === water); }, () => undo(), 8);
+    }, [yaw, pitch, dist]));
+  }
+  const pn = pond.reduce((s, r) => s + r.n, 0), pm = Math.max(...pond.map((r) => r.max));
+  R.expect('pond: the pixels over the water do not depend on what is behind it', pn > 500 && pond.every((r) => r.share < 0.15), `${pn} pixels in ${pond.length} views, largest difference ${pm} (edge pixels only, the rest equal)`, `${pn} pixels, largest difference ${pm}, views ${JSON.stringify(pond)}`);
+  // posts: no two surfaces at the same depth around the four corner posts (where the plank ring used to share faces with them), and the
+  // lower part of the posts does not change when the plank ring is hidden
+  const posts = [];
+  for (const yaw of [35, 125, 215, 305]) {
+    posts.push(await page.evaluate((yaw) => {
+      const H = window.__H; H.view(yaw, 28, 9);
+      const log = H.world.island.getObjectByName('logSide'), planks = H.world.island.getObjectByName('planks');
+      const T = window.__chess.THREE, regions = [[-4.25, -4.25], [4.25, -4.25], [-4.25, 4.25], [4.25, 4.25]].map(([x, z]) => { const [sx, sy] = H.screen(window.__chess.gimbal.localToWorld(new T.Vector3(x, 0.1, z))); return [sx - 90, sy - 90, sx + 90, sy + 90]; });
+      const r = H.compare(log, (h) => h.ties.includes(log) && h.point.y < 0.19 && h.point.y > 0.01 && Math.abs(h.face.normal.y) < 0.5, () => { planks.visible = false; }, () => { planks.visible = true; }, 2, regions);
+      return { ...r, ...H.tied(regions, 2) };
+    }, yaw));
+  }
+  const kn = posts.reduce((s, r) => s + r.n, 0), tied = posts.reduce((s, r) => s + r.tied, 0);
+  R.expect('posts: no two surfaces at the same depth around the corner posts, posts unchanged without the plank ring', kn > 300 && tied === 0 && posts.every((r) => r.share < 0.04), `${kn} pixels scanned in 4 views, none tied`, `${tied} pixels at equal depth, ${JSON.stringify(posts)}`);
+  // hairline
+  await page.evaluate(() => {
+    const H = window.__H, T = window.__chess.THREE, grass = H.world.island.getObjectByName('grassSide'), pos = grass.geometry.attributes.position, nor = grass.geometry.attributes.normal;
+    const edges = [];
+    for (let q = 0; q + 3 < pos.count; q += 4) if (nor.getZ(q) > 0.9) edges.push([grass.localToWorld(new T.Vector3().fromBufferAttribute(pos, q)), grass.localToWorld(new T.Vector3().fromBufferAttribute(pos, q + 1))]);
+    H.edges = edges;
+    // one frame: along the bottom edge of every grass block face that is not covered, the share of green pixels per row (8 above to 8 below; the dirt and the grass side texture have no green pixel at the block bottom, a wrapped sample is a green row)
+    H.hairFrame = (yaw) => {
+      H.view(yaw, 14, 16);
+      const img = H.snap(), W = window.__chess.stage.renderer.domElement.width;
+      let worst = 0, samples = 0;
+      const pts = [];
+      for (const [a, b] of edges) {
+        const [ax, ay] = H.screen(a), [bx, by] = H.screen(b);
+        for (let s = 0; s <= 24; s++) { const t = s / 24, x = Math.round(ax + (bx - ax) * t), y = Math.round(ay + (by - ay) * t), h = H.hit(x, y + 6); pts.push([x, y, !!h && (h.object.name === 'grassSide' || h.object.name === 'dirt') && h.point.z > 3]); }
+      }
+      for (let e = 0; e < edges.length; e++) for (let dy = -8; dy <= 8; dy++) {
+        let ok = 0, green = 0;
+        for (let s = 0; s <= 24; s++) {
+          const [x, y, v] = pts[e * 25 + s]; if (!v) continue;
+          ok++; const k = ((y + dy) * W + x) * 4; if (img[k + 1] > img[k] + 6 && img[k + 1] > img[k + 2] + 25) green++;
+        }
+        samples += ok;
+        if (ok >= 8 && green / ok > 0.25) worst = Math.max(worst, green / ok);
+      }
+      return [yaw, samples, +worst.toFixed(2)];
+    };
+  });
+  const frames = [];
+  for (let i = 0; i <= 30; i++) frames.push(await page.evaluate((y) => window.__H.hairFrame(y), +(i * 0.1).toFixed(1)));
+  const seen = frames.reduce((s, f) => s + f[1], 0), bad = frames.filter((f) => f[2] > 0);
+  R.expect('hairline: no green row along the bottom of the grass blocks while orbiting', seen > 1000 && bad.length === 0, `${seen} samples in 31 frames`, `${seen} samples, frames with a green row (yaw, samples, share): ${JSON.stringify(bad)}`);
+  // tray
+  const tray = await page.evaluate(() => {
+    const H = window.__H, C = window.__chess;
+    H.view(0, 55, 13);
+    const slabs = H.world.meshes.filter((m) => m.name === 'tray-slab'), regions = slabs.map((m) => H.box(m)), top = (h) => h.object.name === 'tray-slab' && h.face.normal.y > 0.9;
+    const r = H.compare(slabs[0], top, () => C.stage.setDim(0), () => C.stage.setDim(1), 2, regions);
+    const img = H.snap(), W = C.stage.renderer.domElement.width; let planks = 0, n = 0;
+    for (const [x0, y0, x1, y1] of regions) for (let y = Math.max(0, y0); y < Math.min(img.length / 4 / W, y1); y += 2) for (let x = Math.max(0, x0); x < Math.min(W, x1); x += 2) { const h = H.hit(x, y); if (!h || !top(h)) continue; n++; const k = (y * W + x) * 4; if (img[k] > img[k + 2] + 30 && img[k] > 90) planks++; }
+    return { ...r, planks, n };
+  });
+  R.expect('tray: the floor does not change with the lights off', tray.n > 300 && tray.share < 0.04, `${tray.n} pixels, largest difference ${tray.max}`, JSON.stringify(tray));
+  R.expect('tray: the floor shows planks colours (warm brown)', tray.n > 300 && tray.planks / tray.n > 0.9, `${tray.planks} of ${tray.n}`);
+  if (SHOTS) {
+    mkdirSync(SHOTS, { recursive: true });
+    for (const [name, v] of [['pond', [180, 35, 14]], ['posts', [35, 28, 7]], ['tray', [0, 55, 13]]]) {
+      const url = await page.evaluate((v) => { window.__H.view(...v); window.__chess.draw(); return document.querySelector('canvas').toDataURL('image/png'); }, v);
+      writeFileSync(`${SHOTS}/${name}.png`, Buffer.from(url.split(',')[1], 'base64'));
+    }
+  }
+  R.expect('no console error or warning', w.errs.length === 0, '', w.errs.slice(0, 3).join(' | '));
+} finally { await browser.close(); server.stop(); }
+const s = R.summary();
+console.log(s.nf ? '\nPIXEL LOOK FAILED' : '\nPIXEL LOOK PASSED');
+process.exit(s.nf ? 1 : 0);

@@ -15,8 +15,26 @@ const col = new THREE.Color();
 // Fixed per face brightness (Pixelwelt): top brightest, two side pairs darker, bottom darkest. No smooth gradients.
 export const SHADE = { py: 1, pz: 0.8, nz: 0.8, px: 0.6, nx: 0.6, ny: 0.5 };
 
+/** Z fighting finder: two boxes that both draw a face on the same plane, the same way round, over an area, and look different
+ *  (another texture key or colour). Returns [{ a, b, face }]. Rotated boxes are not checked. */
+export function coplanarOverlaps(boxes, eps = 1e-6) {
+  const AX = { px: [0, 1], nx: [0, 0], py: [1, 1], ny: [1, 0], pz: [2, 1], nz: [2, 0] };   // [axis of the normal, plane at the far side]
+  const lo = (b, ax) => [b.x, b.y, b.z][ax], size = (b, ax) => [b.w, b.h, b.d][ax];
+  const out = [];
+  for (const f of Object.keys(AX)) {
+    const [ax, hi] = AX[f], axes = [0, 1, 2].filter((i) => i !== ax);
+    const list = boxes.filter((b) => !b.ry && b.faces[f]).map((b) => ({ b, plane: lo(b, ax) + (hi ? size(b, ax) : 0) })).sort((p, q) => p.plane - q.plane);
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length && list[j].plane - list[i].plane < eps; j++) {
+      const A = list[i].b, B = list[j].b;
+      if (A.faces[f] === B.faces[f] && A.color === B.color) continue;
+      if (axes.every((k) => Math.min(lo(A, k) + size(A, k), lo(B, k) + size(B, k)) - Math.max(lo(A, k), lo(B, k)) > eps)) out.push({ a: A, b: B, face: f });
+    }
+  }
+  return out;
+}
+
 export class Mesher {
-  constructor({ shade = false } = {}) { this.buckets = new Map(); this.quads = 0; this.shade = shade; }
+  constructor({ shade = false } = {}) { this.buckets = new Map(); this.quads = 0; this.shade = shade; this.boxes = []; }
   bucket(k) {
     if (!this.buckets.has(k)) this.buckets.set(k, { pos: [], nor: [], uv: [], col: [], idx: [] });
     return this.buckets.get(k);
@@ -27,6 +45,8 @@ export class Mesher {
     col.set(o.color ?? 0xffffff);
     const cx = x + w / 2, cy = y + h / 2, cz = z + d / 2;
     const off = o.off || [0, 0];
+    const rec = { x, y, z, w, h, d, ry, color: col.getHex(), faces: {} };
+    this.boxes.push(rec);
     for (const f of NAMES) {
       if (o.skip && o.skip.has(f)) continue;
       let k = key;
@@ -34,6 +54,7 @@ export class Mesher {
         const ks = o.keys;
         k = ks[f] || (f === 'py' ? ks.top : f === 'ny' ? ks.bottom : ks.side) || key;
       }
+      rec.faces[f] = k;
       const B = this.bucket(k), face = F[f], base = B.pos.length / 3, sh = this.shade ? SHADE[f] : 1;
       const a = (f === 'px' || f === 'nx') ? d : w, bb = (f === 'py' || f === 'ny') ? d : h;
       let nx = face.n[0], nz = face.n[2];
