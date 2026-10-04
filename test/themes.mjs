@@ -190,6 +190,58 @@ try {
   await page.evaluate(async () => { await window.__chess.themes.set('wood', { persist: false }); });
   const gone2 = await page.evaluate(() => ({ world: !!window.__chess.gimbal.getObjectByName('pixel-world'), shown: window.__chess.board.group.getObjectByName('squares-light').visible }));
   R.expect('leaving Pixelwelt removes the world and shows the classic board again', !gone2.world && gone2.shown, JSON.stringify(gone2));
+  // S37: every theme button switches the theme from any current theme (desktop click, phone tap), the scene really changes
+  const sceneLook = () => page.evaluate(() => { const { board, themes } = window.__chess; const m = board.group.getObjectByName('squares-dark'); return `${m.material.color.getHexString()}|${m.visible}|${!!themes.world}|${themes.textureCount}`; });
+  const clickAll = async (label, start, press) => {
+    await load(start ? `&theme=${start}` : '', label === 'phone' ? { width: 390, height: 844 } : undefined);
+    if (label === 'desktop') await page.evaluate(() => document.querySelector('#tab-settings')?.click());
+    else {
+      await page.tap('.tb[data-act="menu"]');
+      await page.waitForSelector('.psheet.open', { timeout: 10000 });
+      await page.evaluate(() => { const c = document.querySelector('.card[data-card="scene"]'); if (c.classList.contains('collapsed')) c.querySelector('header').click(); });
+    }
+    const bad = [];
+    for (const id of IDS) {
+      const before = await sceneLook();
+      await press(id);
+      const on = await page.waitForFunction((id) => window.__chess.themes.current() === id, { timeout: 60000 }, id).then(() => true, () => false);
+      await page.evaluate(() => { window.__chess.step(1); window.__chess.draw(); });
+      const after = await sceneLook();
+      const marked = await page.evaluate(() => document.querySelector('[data-settings="themes"] .swatch.on')?.dataset.theme);
+      if (!on || marked !== id || (before === after && (await cur()) !== id)) bad.push(`${id}: current ${await cur()}, mark ${marked}`);
+    }
+    R.expect(`${label}: every theme button switches the theme, starting on ${start || 'classic'}`, !bad.length, 'all seven', bad.join('; '));
+  };
+  const desktopClick = (id) => page.evaluate((id) => document.querySelector(`.swatch[data-theme="${id}"]`).scrollIntoView({ block: 'center' }), id).then(() => page.click(`.swatch[data-theme="${id}"]`));
+  const phoneTap = async (id) => { await page.evaluate((id) => document.querySelector(`.swatch[data-theme="${id}"]`).scrollIntoView({ block: 'center' }), id); await new Promise((r) => setTimeout(r, 900)); await page.tap(`.swatch[data-theme="${id}"]`); };
+  await page.evaluate(() => localStorage.removeItem('chess3d.theme'));
+  for (const start of [null, 'wood', 'pixel']) await clickAll('desktop', start, desktopClick);
+  for (const start of [null, 'pixel']) await clickAll('phone', start, phoneTap);
+  // a theme chunk that fails once is retried, one that keeps failing leaves the current theme on and the mark back on it
+  const cdp = await page.createCDPSession();
+  await cdp.send('Network.enable');
+  const block = (on) => cdp.send('Network.setBlockedURLs', { urls: on ? ['*pixel-*.js'] : [] });
+  await load('&theme=wood');
+  await page.evaluate(() => document.querySelector('#tab-settings')?.click());
+  await block(true);   // fail the first attempt only: the retry comes 400 ms later
+  await page.click('.swatch[data-theme="pixel"]');
+  await new Promise((r) => setTimeout(r, 150));
+  await block(false);
+  const retried = await page.waitForFunction("window.__chess.themes.current() === 'pixel'", { timeout: 30000 }).then(() => true, () => false);
+  R.expect('a theme chunk that fails once is retried and the theme switches', retried, 'pixel', await cur());
+  await page.evaluate(() => window.__chess.themes.set('wood', { persist: false }));
+  await block(true);   // keep failing
+  await page.click('.swatch[data-theme="pixel"]');
+  await new Promise((r) => setTimeout(r, 4000));
+  const kept = await page.evaluate(() => ({ cur: window.__chess.themes.current(), mark: document.querySelector('[data-settings="themes"] .swatch.on')?.dataset.theme }));
+  R.expect('a theme chunk that keeps failing leaves the current theme on, the mark stays on it', kept.cur === 'wood' && kept.mark === 'wood', 'wood, wood', JSON.stringify(kept));
+  await block(false);   // let it through again: later switches still work
+  await page.click('.swatch[data-theme="pixel"]');
+  const later = await page.waitForFunction("window.__chess.themes.current() === 'pixel'", { timeout: 30000 }).then(() => true, () => false);
+  R.expect('after a failed load a later switch still works', later, 'pixel', await cur());
+  await cdp.detach();
+  w.warns.splice(0, w.warns.length, ...w.warns.filter((x) => !/theme failed to load|Failed to load resource|ERR_FAILED/.test(x)));
+  w.errs.splice(0, w.errs.length, ...w.errs.filter((x) => !/theme failed to load|Failed to load resource|ERR_FAILED|pixel-/.test(x)));
   R.expect('no console error or warning', !w.errs.length && !w.warns.length, 'none', [...w.errs, ...w.warns].slice(0, 5).join(' | '));
   process.exitCode = R.summary().nf ? 1 : 0;
 } finally {

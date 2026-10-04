@@ -67,8 +67,23 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
   let chain = Promise.resolve();
   const listeners = [];
 
+  // a theme chunk can fail (stale deploy, flaky network) or stall. A browser remembers a failed import() of a URL for the page's life,
+  // so the plain retry is the same rejection: the failure message names the chunk URL, and a fresh query string asks the network again.
+  // The timeout keeps a stuck request from blocking later switches.
+  const withTimeout = (p, ms) => new Promise((ok, no) => { const t = setTimeout(() => no(new Error('theme chunk timed out')), ms); p.then((v) => { clearTimeout(t); ok(v); }, (e) => { clearTimeout(t); no(e); }); });
+  const tries = {};
+  async function load(id) {
+    try { return await withTimeout(LOADERS[id](), 15000); } catch (e) {
+      const url = /https?:\/\/[^\s'"]+?\.js/.exec(String(e?.message))?.[0];
+      if (!url) throw e;
+      await new Promise((r) => setTimeout(r, 400));
+      tries[id] = (tries[id] || 0) + 1;
+      return withTimeout(import(/* @vite-ignore */ `${url.split('?')[0]}?retry=${tries[id]}`), 15000);
+    }
+  }
+
   async function build(id) {
-    const mod = LOADERS[id] ? await LOADERS[id]() : null;
+    const mod = LOADERS[id] ? await load(id) : null;
     const fresh = [];
     const ctx = { THREE, quality: stage.quality, base: board.base, view: screenView, track: (tex) => { fresh.push(tex); return tex; } };
     const b = mod?.board?.(ctx) || null;
@@ -99,10 +114,11 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
     if (id === current || want !== id) return;
     let built;
     try { built = await build(id); } catch (e) {
-      // a chunk that failed to load (offline, stale deploy): stay on Classic and keep later switches working
-      console.warn('theme failed to load, using Classic', id, e);
-      if (want === id) want = 'classic';
-      if (current !== 'classic') show('classic', { fresh: [], board: null, pieces: null, light: null });
+      // a chunk that failed to load (offline, stale deploy): keep the current theme, move the mark back and keep later switches working
+      console.warn('theme failed to load, keeping', current, id, e);
+      if (current === '') show('classic', { fresh: [], board: null, pieces: null, light: null });   // a rebuild after a quality change failed: Classic
+      if (want === id) want = current;
+      listeners.forEach((fn) => fn(current));
       return;
     }
     if (want !== id) { for (const tex of built.fresh) tex.dispose(); return; }   // a later pick overtook this one
