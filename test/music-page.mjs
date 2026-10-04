@@ -1,8 +1,14 @@
 // Background music in the real page: node test/music-page.mjs [--port=5404] [--base=http://...]
 // Quiet before the first gesture; starts after it; Mute, the Music switch and a hidden tab stop it (and resume it); the sliders
 // change and persist the settings; a sound effect ducks the music bus; German labels; no console error or warning.
-// Exit codes: 0 pass, 1 a check failed.
-import { reporter, launchBrowser, watchPage, startServer, build, sleep } from '../tools/_lib.mjs';
+// ?musicset=a|b picks the pieces (no flag: set b, unknown: ignored, nothing stored), a piece is its own lazy chunk, and every piece of
+// set b is rendered offline with the real piano (test/music-render.js): level, no clipping, no silence of 3 s inside the piece, nothing
+// ringing on after the end, no click. Exit codes: 0 pass, 1 a check failed.
+import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
+import { extname, join } from 'node:path';
+import { reporter, launchBrowser, watchPage, startServer, build, sleep, ROOT } from '../tools/_lib.mjs';
+import { SETS } from '../src/music/pieces/index.js';
 const args = process.argv.slice(2);
 const PORT = Number((args.find((a) => a.startsWith('--port=')) || '--port=5404').slice(7));
 const R = reporter();
@@ -14,6 +20,8 @@ const browser = await launchBrowser({ w: 1280, h: 720 });
 try {
   const page = await browser.newPage();
   const w = await watchPage(page);
+  const chunks = [];   // piece chunks requested by the page, by piece id (vite names a chunk <id>-<hash>.js)
+  page.on('request', (rq) => { const id = [...Object.keys(SETS.a), ...Object.keys(SETS.b)].find((k) => rq.url().includes(`/assets/${k}-`)); if (id) chunks.push(id); });
   const load = async (query = '', lang = 'en') => {
     await page.evaluateOnNewDocument((l) => { try { if (!sessionStorage.getItem('m')) { localStorage.clear(); sessionStorage.setItem('m', '1'); } localStorage.setItem('chess3d.lang', l); } catch (e) { /* ignore */ } }, lang);
     await page.goto(`${BASE || `http://127.0.0.1:${PORT}`}/?quality=low&manual=1&ai=0${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -64,10 +72,61 @@ try {
   await load();
   const back = await ev(() => ({ ...window.__chess.music.settings, v: document.querySelector('#music-volume').value, t: document.querySelector('#music-tempo').value }));
   R.expect('settings are remembered per device', back.vol === 0.55 && back.tempo === 0.9 && back.v === '55' && back.t === '90', 'restored', JSON.stringify(back));
+  // ?musicset: the set for this load only
+  const info = () => ev(() => ({ set: window.__chess.music.pieceSet, ids: window.__chess.music.PIECE_IDS, stored: Object.keys(localStorage).filter((k) => /musicset|pieceset/i.test(k) || /musicset|pieceset/i.test(localStorage.getItem(k) || '')) }));
+  const gesture = () => ev(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' })); });
+  const A = Object.keys(SETS.a), B = Object.keys(SETS.b), same = (x, y) => x.length === y.length && x.every((v, i) => v === y[i]);
+  for (const [q, want, label] of [['&musicset=a', 'a', 'musicset=a'], ['&musicset=b', 'b', 'musicset=b'], ['', 'b', 'no flag'], ['&musicset=zzz', 'b', 'an unknown value'], ['&musicset=', 'b', 'an empty value'], ['&musicset=A', 'a', 'a capital letter']]) {
+    await load(q);
+    const i = await info();
+    R.expect(`${label}: the player has set ${want} (${want === 'a' ? 'today\'s five' : 'the calm set'}), nothing stored`, i.set === want && same(i.ids, want === 'a' ? A : B) && i.stored.length === 0, `set ${want}`, JSON.stringify(i));
+  }
+  for (const [q, set, label] of [['&musicset=a', A, 'set a'], ['', B, 'the default set b']]) {
+    await load(q);
+    chunks.length = 0;
+    const before = chunks.length;
+    await gesture();
+    const ok = await until(() => window.__chess.music.state === 'playing' && window.__chess.music.notes > 4, 30000);
+    const got = await ev(() => window.__chess.music.piece);
+    R.expect(`${label}: the first piece played belongs to it and is its own lazy chunk (no other piece loaded)`, ok && set.includes(got) && before === 0 && chunks.length === 1 && chunks[0] === got, `${set.join('|')} one chunk`, `${got} chunks ${chunks.join(',') || 'none'}`);
+  }
+  await load('&musicset=a');
+  const ls = await ev(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]))));
+  R.expect('the set is for this load only: no storage key or value names it', !/musicset|pieceset/i.test(ls), 'none', ls.slice(0, 120));
+  await load();
+  R.expect('the next load without the flag is back on set b', (await info()).set === 'b', 'b');
   // German
   await load('', 'de');
   const de = await ev(() => [...document.querySelectorAll('[data-settings="music"] label, [data-settings="music"] em')].map((l) => l.textContent.trim()));
   R.expect('German labels: Lautstärke, Klang, Tempo, Raum', ['Lautstärke', 'Klang', 'Tempo', 'Raum'].every((l) => de.includes(l)), 'present', de.join('|'));
+  // every piece of set b rendered offline with the real piano: a small static server for the music modules, no game page
+  const srv = createServer((q, r) => {
+    const u = q.url.split('?')[0];
+    if (u === '/') { r.setHeader('content-type', 'text/html'); return r.end('<!doctype html><title>music render</title>'); }
+    try { const b = readFileSync(join(ROOT, u.replace(/\.\./g, ''))); r.setHeader('content-type', extname(u) === '.js' ? 'text/javascript' : 'text/plain'); r.end(b); } catch (e) { r.statusCode = 404; r.end('not found'); }
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  const rp = await browser.newPage();
+  const rerr = []; rp.on('pageerror', (e) => rerr.push(e.message)); rp.on('console', (m) => { if (m.type() === 'error') rerr.push(m.text()); });
+  try {
+    await rp.goto(`http://127.0.0.1:${srv.address().port}/`);
+    const ids = Object.keys(SETS.b);   // all at once: the contexts render on their own threads (about 70 s instead of 200 s)
+    const results = await Promise.all(ids.map((id) => rp.evaluate(async (id) => { const { renderPiece } = await import('/test/music-render.js'); const p = (await import(`/src/music/pieces/${id}.js`)).default; return renderPiece(p); }, id)));
+    const peaks = results.map((r) => r.peak);
+    ids.forEach((id, k) => {
+      const r = results[k], bad = [];
+      if (!(r.peak > 0.05 && r.peak < 0.95)) bad.push(`peak ${r.peak.toFixed(2)} outside 0.05 to 0.95`);
+      if (r.clipped > 0) bad.push(`${r.clipped} clipped samples`);
+      if (r.silence >= 3) bad.push(`${r.silence.toFixed(1)} s of silence inside the piece`);
+      if (r.tail > 4) bad.push(`sound ${r.tail.toFixed(1)} s after the end`);
+      if (r.lastStart > r.seconds) bad.push('a note starts after the end');
+      if (r.step > 0.45) bad.push(`click: step ${r.step.toFixed(2)} of the peak`);
+      R.expect(`set b ${id}, rendered offline: peak ${r.peak.toFixed(2)}, longest silence ${r.silence.toFixed(1)} s, step ${r.step.toFixed(2)}`, bad.length === 0, 'no clipping, silence under 3 s, no click', bad.join('; '));
+    });
+    const lo = Math.min(...peaks), hi = Math.max(...peaks);
+    R.expect('set b pieces are about equally loud (loudest peak at most 1.6 times the quietest)', hi / lo <= 1.6, 'ratio at most 1.6', `${lo.toFixed(2)} to ${hi.toFixed(2)}`);
+    R.expect('the offline page logged no error', rerr.length === 0, 'clean', rerr.slice(0, 2).join(' | '));
+  } finally { srv.close(); }
   R.expect('no console errors or warnings', w.errs.length === 0 && w.warns.length === 0, 'clean', [...w.errs, ...w.warns].slice(0, 3).join(' | '));
   process.exitCode = R.summary().nf ? 1 : 0;
 } finally { await browser.close(); server.stop(); }

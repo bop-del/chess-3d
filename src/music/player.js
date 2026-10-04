@@ -6,6 +6,7 @@
 //   music.onChange(fn)                       fn(settings) after every change
 //   music.state                              'idle' | 'playing' | 'gap' | 'paused', with .piece (id) for tests and the settings UI
 //   music.skip()                             next piece now
+//   music.pieceSet, music.PIECE_IDS          the set this page plays ('a' or 'b') and its piece ids; `?musicset=a|b` picks it, for this load only
 //
 // Endless random playlist (every piece once per round, never the same twice in a row) with 4 to 8 s of silence between pieces.
 // Notes are scheduled with the audio clock 2.5 s ahead by one 0.8 s timer: nothing runs per frame. It pauses while the tab is
@@ -14,8 +15,8 @@
 import { device } from '../device.js';
 import { createPiano, DEFAULT_KLANG, DEFAULT_RAUM } from './piano.js';
 import { prepare } from './score.js';
-import { LOADERS, PIECE_IDS } from './pieces/index.js';
-export { PIECE_IDS };
+import { SETS, chooseSet, setIds } from './pieces/index.js';
+export { SETS, chooseSet };
 
 export const TEMPO_MIN = 0.8, TEMPO_MAX = 1.1;
 const STORE = 'chess3d.music';
@@ -36,14 +37,15 @@ function normalise(s) {
 }
 function save(s) { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) { /* private window or blocked storage */ } }
 
-export function createMusic({ audio }) {
+export function createMusic({ audio, search = typeof location === 'undefined' ? '' : location.search }) {
   const settings = load();
+  const pieceSet = chooseSet(new URLSearchParams(search).get('musicset')), PIECE_IDS = setIds(pieceSet);
   const listeners = [];
   let vol = null, piano = null;
   let piece = null, events = null, idx = 0, anchorQ = 0, anchorT = 0, endT = 0, resumeQ = 0;
   let timer = 0, gapUntil = 0, token = 0, loading = false, first = true;
   let playlist = [], lastId = '';
-  const music = { settings, state: 'idle', piece: '', notes: 0, PIECE_IDS };   // notes: count of keys scheduled so far (tests)
+  const music = { settings, state: 'idle', piece: '', notes: 0, pieceSet, PIECE_IDS };   // notes: count of keys scheduled so far (tests)
 
   const spq = () => 60 / (piece.bpm * settings.tempo);
   const canPlay = () => settings.on && !audio.muted && !document.hidden && !!audio.ac && audio.ac.state === 'running';
@@ -69,7 +71,7 @@ export function createMusic({ audio }) {
     loading = true;
     const mine = token;
     try {
-      const mod = await LOADERS[nextId()]();
+      const mod = await SETS[pieceSet][nextId()]();
       if (mine !== token) return;
       piece = mod.default; events = prepare(piece); idx = 0; music.piece = piece.id;
       if (!canPlay()) { resumeQ = 0; music.state = 'paused'; return; }

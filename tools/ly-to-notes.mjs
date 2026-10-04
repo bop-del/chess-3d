@@ -25,7 +25,7 @@ function strip(src, keepDefs = false) {
 }
 
 const DUR = String.raw`\d+\.*(?:\*\d+(?:\/\d+)?)?`;
-const TOKEN = new RegExp(String.raw`<<|>>|\\\\|\\[a-zA-Z]+|\\[<>!]|#[^\s]*|[{}<>~|()[\]]|[a-g][a-z]*[',]*[!?]*(?:${DUR})?|[rRs](?:${DUR})?|${DUR}|[-_^][^\s]*|[=\w/.,':]+`, 'g');
+const TOKEN = new RegExp(String.raw`<<|>>|\\\\|\\[a-zA-Z]+|\\[<>!]|#[^\s]*|[{}<>~|()[\]]|[a-g][a-z]*[',]*[!?]*(?:${DUR})?|[rRs](?:${DUR})?|\d+\/\d+|${DUR}|[-_^][^\s]*|[=\w/.,':]+`, 'g');
 
 // name = { ... } definitions (also name = \relative c' { ... }), expanded textually where \name is used
 function defs(text) {
@@ -54,7 +54,7 @@ export function parse(file, { use } = {}) {
   const toks = (source ? source.flatMap((b) => ['{', ...(b.match(TOKEN) || []), '}']) : stripped.match(TOKEN)) || [];
   let p = 0, last = null, lastChord = [], dur = { n: 4, dots: 0 };
   const peek = () => toks[p], next = () => toks[p++];
-  const durOf = (d) => (4 / d.n) * (2 - 2 ** -d.dots);
+  const durOf = (d) => (4 / d.n) * (2 - 2 ** -d.dots) * (d.mul || 1);   // mul: the *2/3 of a scaled duration, which LilyPond carries on to the next notes
   const octOf = (marks) => { let o = 0; for (const c of marks) o += c === "'" ? 1 : -1; return o; };
 
   function pitch(name, relative) {
@@ -70,8 +70,8 @@ export function parse(file, { use } = {}) {
   }
   const parseDur = (tok) => {
     const m = /^(\d+)(\.*)(?:\*(\d+)(?:\/(\d+))?)?$/.exec(tok);
-    dur = { n: Number(m[1]), dots: m[2].length };
-    return durOf(dur) * (m[3] ? Number(m[3]) / Number(m[4] || 1) : 1);
+    dur = { n: Number(m[1]), dots: m[2].length, mul: m[3] ? Number(m[3]) / Number(m[4] || 1) : 1 };
+    return durOf(dur);
   };
   const trailing = () => { let tie = false; while (['~', '(', ')', '[', ']'].includes(peek()) || (peek() && /^[-_^]/.test(peek())) || (peek() && /^\\[<>!]/.test(peek()))) { if (next().includes('~')) tie = true; } return tie; };
 
@@ -128,7 +128,7 @@ export function parse(file, { use } = {}) {
 
   function command(t, rel, tr) {
     switch (t) {
-      case '\\relative': { const m = /^([a-g])([',]*)/.exec(/^[a-g]/.test(peek()) ? next() : 'c'); last = { li: LETTER.indexOf(m[1]), o: octOf(m[2]), midi: 0 }; return element(true, tr); }
+      case '\\relative': { const m = /^([a-g])(?:is|es|s|f)*([',]*)/.exec(/^[a-g]/.test(peek()) ? next() : 'c'); last = { li: LETTER.indexOf(m[1]), o: octOf(m[2]), midi: 0 }; return element(true, tr); }
       case '\\transpose': { const sh = (x) => { const m = /^([a-g])([',]*)/.exec(x); return STEP[m[1]] + octOf(m[2]) * 12; }; const a = next(), b = next(); return element(rel, tr + sh(b) - sh(a)); }
       case '\\repeat': {
         next(); const n = Number(next()); const body = element(rel, tr); let alts = null;
