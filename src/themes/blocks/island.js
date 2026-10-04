@@ -136,7 +136,7 @@ function buildTree(kit) {
   return { group, cells };
 }
 
-const CLOUDS = [[-14, -6, -12, 5, 0.3], [12, 0, -16, 4, 0.22], [-18, 4, 6, 4, 0.38], [16, -9, 8, 5, 0.28], [2, -14, -20, 5, 0.2], [-8, 8, -22, 4, 0.25], [24, 5, -6, 3, 0.33]];
+const CLOUDS = [[-14, -6, -15, 5, 0.3], [12, 0, -16, 4, 0.22], [-18, 4, 6, 4, 0.38], [16, -9, 8, 5, 0.28], [2, -14, -20, 5, 0.2], [-8, 8, -22, 4, 0.25], [24, 5, -19, 3, 0.33]];
 /** Each cloud is its own group so it drifts at its own (slow) speed. */
 function addClouds(parent, kit) {
   const R = rnd(5), out = [];

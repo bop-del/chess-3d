@@ -9,7 +9,7 @@
 // Run: node test/pixel-rules.mjs    Exit 0 pass, 1 on any failed check.
 import * as THREE from 'three';
 
-globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({ fillRect() {}, clearRect() {} }) }) };
+globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({ fillRect() {}, clearRect() {}, drawImage() {}, getImageData: () => ({ data: new Uint8ClampedArray(4) }), putImageData() {} }) }) };
 const { createPixelWorld } = await import('../src/themes/pixel/world.js');
 const { pixelTextures } = await import('../src/themes/pixel/textures.js');
 const { board } = await import('../src/themes/pixel.js');
@@ -79,6 +79,28 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
   const ok = t && t.emissiveMap?.isTexture && t.color === '#000000' && t.emissive === '#ffffff' && t.specularIntensity === 0 && t.clearcoat === 0 && t.envMapIntensity === 0 && !t.map
     && t.emissiveMap.wrapS === THREE.RepeatWrapping;
   check('tray floor: planks texture, fully emissive (no lit part)', !!ok);
+}
+
+// 5 no cloud through the tree (CHE-184): every cloud swept over the full drift span (x from -35 to 35) and the full lift range
+// (0 to LIFT 14 in steps of 0.5, buildAvoid lifts clouds for a low camera) never intersects the tree box (trunk and leaves)
+{
+  const trees = [['Pixelwelt', world]];
+  try { const { createWorld } = await import('../src/themes/blocks/island.js'); trees.push(['Blocks', createWorld({})]); } catch (e) { console.log('NOTE  Blocks world not built in node: ' + e.message); }
+  for (const [name, w] of trees) {
+    w.group.updateMatrixWorld(true);
+    const treeBox = new THREE.Box3();
+    w.group.traverse((o) => { if (o.name === 'tree') treeBox.union(new THREE.Box3().setFromObject(o)); });
+    const clouds = w.group.children.filter((o) => o.name === 'cloud');
+    const hits = [];
+    clouds.forEach((c, i) => {
+      const { local, y0 } = c.userData, pz = c.position.z;
+      for (let lift = 0; lift <= 14; lift += 0.5) for (let x = -35; x <= 35; x += 0.5) {
+        const b = new THREE.Box3(new THREE.Vector3(local.min.x + x, local.min.y + y0 + lift, local.min.z + pz), new THREE.Vector3(local.max.x + x, local.max.y + y0 + lift, local.max.z + pz));
+        if (b.intersectsBox(treeBox)) { hits.push(`cloud ${i} (z ${pz}) at x ${x} lift ${lift}`); return; }
+      }
+    });
+    check(`${name}: no cloud passes through the tree (${clouds.length} clouds, drift span and lift range swept)`, !treeBox.isEmpty() && clouds.length === 7 && hits.length === 0, hits.join('; '));
+  }
 }
 
 console.log(failed ? `\n${failed} CHECK(S) FAILED` : '\nPIXEL RULES PASSED');
