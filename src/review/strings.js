@@ -12,7 +12,7 @@ addDE({
   'review.legend': 'Orange: ungenau. Rot: Patzer.',
   'review.graph': 'Bewertung', 'review.graphHint': 'Antippen, um zu der Stelle zu springen',
   'review.line': 'Beste Folge', 'review.accuracy': 'Genauigkeit', 'review.white': 'Weiß', 'review.black': 'Schwarz',
-  'review.noLine': 'Hier ist die Partie zu Ende.', 'review.waiting': 'Noch nicht berechnet',
+  'review.noMoves': 'Noch nichts zum Ansehen: häng ?moves=... an den Link', 'review.noLine': 'Hier ist die Partie zu Ende.', 'review.waiting': 'Noch nicht berechnet',
   'review.mate': 'Besser war {san}: Schachmatt!',
   'review.allowsMate': 'Damit kann die andere Seite Matt setzen. Besser war {san}.',
   'review.win': 'Besser war {san}: Das gewinnt {piece}.',

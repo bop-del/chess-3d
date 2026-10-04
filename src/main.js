@@ -372,7 +372,7 @@ async function boot() {
   }
   boot.ready = performance.now();
   adapter.arm();   // the start sequence is over: the adapter's warm up starts now
-  applyLateParams({ game, ui, stage, controls, learn });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
+  applyLateParams({ game, ui, stage, controls, learn, review });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
   window.__chessReady = true;
@@ -446,7 +446,7 @@ function applyGameParams({ game }) {
 }
 
 // the rest, applied when the start sequence is over
-function applyLateParams({ game, ui, stage, controls, learn }) {
+function applyLateParams({ game, ui, stage, controls, learn, review }) {
   if (params.get('hud') === '0') ui.toggleHud(true);
   if (params.get('help') === '1') ui.toggleHelp();
   const light = params.get('light');
@@ -454,14 +454,18 @@ function applyLateParams({ game, ui, stage, controls, learn }) {
   if (params.get('spin') === '1') controls.toggleSpin();
   const promo = params.get('promo');
   if (promo) game.clickSquare(game.nameSq(promo.slice(0, 2))), game.clickSquare(game.nameSq(promo.slice(2, 4)));
-  openFlag(params.get('open'), { ui, learn });
+  openFlag(params.get('open'), { ui, learn, review });
 }
 
 // ?open=<id>: one panel or tab, shown when the game is ready. An unknown value does nothing, quietly.
 const LEARN_OPEN = { learn: 'openings', openings: 'openings', mine: 'mine', drill: 'practise', practise: 'practise', puzzles: 'puzzles' };
-function openFlag(id, { ui, learn }) {
+function openFlag(id, { ui, learn, review }) {
   if (!id) return;
   try {
+    if (id === 'review') {   // the game review of the game on the board (played by ?moves or ?fen then moves), finished or not
+      if (!review.open()) ui.toast(t('review.noMoves', 'Nothing to review yet: add ?moves=... to the link'), 'info', 4200);
+      return;
+    }
     if (Object.hasOwn(LEARN_OPEN, id)) learn.open(LEARN_OPEN[id]);
     else ui.openPanel(id);
   } catch (e) { /* a panel that is missing is not worth a message */ }

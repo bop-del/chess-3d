@@ -174,6 +174,31 @@ try {
     R.expect(`a mate in one, ${query}, ${want.wins.length ? 'records the win and earns the badge' : 'records nothing'}`, w.over && w.wins.join() === want.wins.join() && w.earned.join() === want.earned.join(), JSON.stringify(want), JSON.stringify(w));
     await wp.close();
   }
+  // ?open=review: the moves are played, the game review opens at once (finished game, unfinished game, no moves)
+  for (const size of [SIZES[0], SIZES[1]]) {
+    if (!mine()) continue;
+    const rp = await browser.newPage();
+    const rw = await watchPage(rp, ['127.0.0.1', 'localhost']);
+    await rp.setViewport({ width: size[1], height: size[2], deviceScaleFactor: 1, isMobile: size[3], hasTouch: size[3] });
+    await rp.evaluateOnNewDocument((w, h, phone) => { if (phone) for (const [k, v] of [['width', w], ['height', h]]) Object.defineProperty(screen, k, { get: () => v }); }, size[1], size[2], size[3]);
+    const probe = () => rp.evaluate(() => {
+      const c = window.__chess, st = c.review.state(), strip = document.querySelector('.rv'), r = strip.getBoundingClientRect(), bar = document.querySelector('.thumbbar, #thumbbar, .tbar')?.getBoundingClientRect();
+      const toast = document.getElementById('toast');
+      return { active: st.active, total: st.total, banner: !document.getElementById('banner').hidden, strip: !strip.hidden && r.width > 100 && r.bottom <= innerHeight + 1 && r.left >= -1 && r.right <= innerWidth + 1, aboveBar: bar ? r.bottom <= bar.top + 1 : true, toast: toast.classList.contains('show') ? toast.textContent : '' };
+    });
+    await load(rp, size, '&moves=f2f3,e7e5,g2g4,d8h4&open=review');
+    await rp.evaluate(() => { for (let i = 0; i < 8; i++) window.__chess.step(0.5); });   // the game over timer runs out: its card must not cover the review
+    let g = await probe();
+    R.expect(`${size[0]}: open=review after a mate plays the moves and opens the review`, g.active && g.total === 4 && !g.banner && g.strip && g.aboveBar, 'review open on 4 moves, no game over card', JSON.stringify(g));
+    await load(rp, size, '&moves=e2e4,e7e5,g1f3&open=review');
+    g = await probe();
+    R.expect(`${size[0]}: open=review on a game that is not over reviews the moves so far`, g.active && g.total === 3 && g.strip && g.aboveBar, 'review open on 3 moves', JSON.stringify(g));
+    await load(rp, size, '&open=review');
+    g = await probe();
+    R.expect(`${size[0]}: open=review with no moves says why and opens nothing`, !g.active && /moves=/.test(g.toast), 'a message, no review', JSON.stringify(g));
+    seen.errs.push(...rw.errs); seen.foreign.push(...rw.foreign);
+    await rp.close();
+  }
   // combines with the other flags
   if (mine()) {
     const page = await browser.newPage();
