@@ -7,7 +7,7 @@
 //   page zoom blocked              visualViewport.scale stays 1 through a pinch off the board and a double tap on the board, and device.js
 //                                  calls preventDefault on the second tap of a double tap and on a two finger move off the canvas
 //   forced touch on a desktop    ?touch=1 on a large screen: 390x844 and 844x390 viewports get body.phone and the thumb bar, 1280x800 does not
-//   HUD buttons                    New game, the Controls drawer and a view preset respond to taps
+//   HUD buttons                    Play, the Controls drawer and a view preset respond to taps
 // Exit codes: 0 pass (warnings allowed), 1 a check failed, 2 setup error.
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -317,7 +317,7 @@ async function runSize(size) {
     }
     await settleUi(page); await step(2.5);
     s = await state();
-    R.expect(`${tag}: tapping New game, then Yes, resets the game`, tapped && s.moves.length === 0 && s.turn === 'w' && s.audit.length === 0, 'start position', `tapped ${tapped}, asked ${!!asked}, moves ${s.moves.length}`);
+    R.expect(`${tag}: tapping Play, then Yes, resets the game`, tapped && s.moves.length === 0 && s.turn === 'w' && s.audit.length === 0, 'start position', `tapped ${tapped}, asked ${!!asked}, moves ${s.moves.length}`);
     R.expect(`${tag}: no console or page error during the touch run`, watch.errs.length === 0, 'clean', watch.errs.slice(0, 3).join(' | '));
   } finally { await page.close().catch(() => {}); }
 }

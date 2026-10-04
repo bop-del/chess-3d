@@ -41,7 +41,7 @@ export async function runReviewChecks({ page, baseUrl, log = () => {}, shot = nu
     await load();
     ok('review is not open before a game ends', !(await st()).active);
     await playGame();
-    ok('game over: the card has Review the game next to New game', await bannerUp() && await page.evaluate(() => { const r = document.querySelector('#banner .row'); return [...r.children].map((c) => c.textContent).join('|'); }) === 'New game|Review the game|Review board');
+    ok('game over: the card has Review the game next to Play', await bannerUp() && await page.evaluate(() => { const r = document.querySelector('#banner .row'); return [...r.children].map((c) => c.textContent).join('|'); }) === 'Play|Review the game|Review board');
     await step(1.5);
     if (shot) await settleUi(page);
     await shot?.('review-gameover-desktop');
@@ -167,7 +167,7 @@ export async function runReviewChecks({ page, baseUrl, log = () => {}, shot = nu
     await page.evaluate(() => document.getElementById('btn-new').click());
     await step(0.2);
     const nw = await page.evaluate(() => ({ active: window.__chess.review.active, n: window.__chess.game.chess.history.length, body: document.body.classList.contains('reviewing'), arrow: false }));
-    ok('New game ends the review and starts fresh', !nw.active && nw.n === 0 && !nw.body && !(await arrow()), JSON.stringify(nw));
+    ok('Play ends the review and starts fresh', !nw.active && nw.n === 0 && !nw.body && !(await arrow()), JSON.stringify(nw));
 
     // ------------------------------------------------ the computer opponent comes back after a review
     await page.goto(`${baseUrl}/?quality=low&manual=1`, { waitUntil: 'domcontentloaded', timeout: 120000 });

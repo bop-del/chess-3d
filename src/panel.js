@@ -124,7 +124,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
       <div class="logo" aria-hidden="true">&#x265E;&#xFE0E;</div>
       <div class="turn" id="turn"><i class="dot w"></i><div class="status"><b id="turn-main">White to move</b><small id="turn-sub">&nbsp;</small></div></div>
       <div class="hbtns">
-        <button class="ib gold" id="btn-new" type="button" title="New game (N)" aria-label="New game" data-i18n-title="hud.newGameTitle" data-i18n-aria="hud.newGame">${ICONS.plus}</button>
+        <button class="ib gold" id="btn-new" type="button" title="Play (N)" aria-label="Play" data-i18n-title="hud.newGameTitle" data-i18n-aria="hud.newGame">${ICONS.plus}</button>
         <button class="ib" id="btn-undo" type="button" title="Undo (U)" aria-label="Undo" data-i18n-title="hud.undoTitle" data-i18n-aria="hud.undo">${ICONS.undo}</button>
         <button class="ib" id="btn-rail" type="button" title="Fold the panel (H)" aria-label="Fold the panel" data-i18n-title="panel.collapse" data-i18n-aria="panel.collapse">${ICONS.collapse}</button>
       </div>

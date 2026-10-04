@@ -117,12 +117,12 @@ Keyboard
 | R | Reset the view |
 | Space | Auto spin on and off |
 | U | Undo |
-| N | New game |
+| N | Play (starts a new game) |
 | H | Fold the panel to the rail and unfold it (on a phone: hide and show the HUD) |
 | ? or / | Keyboard shortcut overlay |
 | Esc | Close the overlay, the game over banner or the promotion chooser |
 
-The panel (computers and tablets): one panel on the right with the tabs Play, Learn and Settings, a header with the game status, New game and Undo, and a floating view bar over the board. The rail button (or H) folds the panel to a 60 px icon strip so the board gets the screen; the choice is remembered, and a window under 900 px wide starts as the rail. Starting a lesson or puzzle switches the panel to Learn. Choices are visible chips and swatches, not dropdowns. Phones keep the thumb bar and the Menu sheet.
+The panel (computers and tablets): one panel on the right with the tabs Play, Learn and Settings, a header with the game status, Play and Undo, and a floating view bar over the board. The rail button (or H) folds the panel to a 60 px icon strip so the board gets the screen; the choice is remembered, and a window under 900 px wide starts as the rail. Starting a lesson or puzzle switches the panel to Learn. Choices are visible chips and swatches, not dropdowns. Phones keep the thumb bar and the Menu sheet.
 
 Sliders and buttons (Settings tab; Flip, Spin, Reset and Lock are on the view bar)
 
@@ -134,13 +134,13 @@ Sliders and buttons (Settings tab; Flip, Spin, Reset and Lock are on the view ba
 | Theme | Classic, Tournament, Wood, Metal, Glass, Blocks, Pixelwelt: board, frame, pieces and lighting change together. Remembered on this device (Settings tab, or the Menu on a phone) |
 | Lighting | Studio, Gallery, Sunset, Night |
 | Quality | Low, Medium, High |
-| New game, Undo, Keyboard shortcuts | Header buttons and the link at the foot of the Play tab (on a phone: the thumb bar and the Menu) |
+| Play, Undo, Keyboard shortcuts | Header buttons and the link at the foot of the Play tab (on a phone: the thumb bar and the Menu) |
 | vs computer | On by default (you play white, Easy). Switch, your side (play white or black) and strength (Novice about 700, Easy about 900, Normal about 1200, Hard about 1450, estimated, see below; the choice is remembered on the device). In the Play tab, Good move? shows one good move with the hint arrow (a bulb in the status line on a phone) |
-| Review the game | When a game ends, the card has a Review the game button (German: Partie ansehen) next to New game. Step back and forward through the whole game on a move strip under the board (above the thumb bar on a phone, arrow keys on a desktop; on a desktop the board makes room so the strip never covers it); mistakes are orange, blunders red. On a marked move the board shows the position before it, the gold arrow shows a better move and one friendly sentence says why. Details adds an evaluation graph (tap or drag to jump), the best line in notation and the accuracy of each side; on a desktop it opens in the panel beside the board. The Moves list in the panel shows the reviewed game with the move on the board highlighted, and a click on a move jumps there. The analysis is Hard's search in a Web Worker, so the strip fills in while you look |
+| Review the game | When a game ends, the card has a Review the game button (German: Partie ansehen) next to Play. Step back and forward through the whole game on a move strip under the board (above the thumb bar on a phone, arrow keys on a desktop; on a desktop the board makes room so the strip never covers it); mistakes are orange, blunders red. On a marked move the board shows the position before it, the gold arrow shows a better move and one friendly sentence says why. Details adds an evaluation graph (tap or drag to jump), the best line in notation and the accuracy of each side; on a desktop it opens in the panel beside the board. The Moves list in the panel shows the reviewed game with the move on the board highlighted, and a click on a move jumps there. The analysis is Hard's search in a Web Worker, so the strip fills in while you look |
 
 Home Screen: on an iPhone or iPad the game can be added to the Home Screen from Safari (Share, then Add to Home Screen) and then runs full screen with its own icon (a web app manifest, no service worker). In a Safari tab it shows a short reminder with the three steps once after the first load, and at most twice more a few visits later. Later or a tap outside closes it at once. It never shows when the game is already installed, on desktop, or with any URL parameter below. The link preview used by chat apps and social sites is `public/og-image.png`.
 
-Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view (the lock on the view bar, a switch in the Menu on a phone) stops all camera gestures. On a phone, while a lesson, a drill, a Practise session or a puzzle runs, the thumb bar turns into the learning controls (for example Back, Show me, Hint and End), the view stays on Play and a short text card sits on top; End gives the normal bar back. Otherwise the game has a status line on top, a thumb bar with big icons and one short word each (Undo, New, Flip, View, Learn, Menu), and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
+Touch: a tap selects and moves (a tap just next to a legal square counts for it), a one finger drag orbits the camera, two fingers pinch to zoom and twist to turn the board, and the sliders tilt it. Lock view (the lock on the view bar, a switch in the Menu on a phone) stops all camera gestures. On a phone, while a lesson, a drill, a Practise session or a puzzle runs, the thumb bar turns into the learning controls (for example Back, Show me, Hint and End), the view stays on Play and a short text card sits on top; End gives the normal bar back. Otherwise the game has a status line on top, a thumb bar with big icons and one short word each (Undo, Play, Flip, View, Learn, Menu), and a Menu sheet with the game settings, the move list, the view and the help. Portrait and landscape both work.
 
 
 ## Features
@@ -168,7 +168,7 @@ Rendering
 Battle scenes and sound
 
 - When a piece captures in a game, the camera swoops in and the two pieces fight it out in a short scene that suits the attacker (pawn, knight, bishop, rook, queen or king), about three seconds, then the victim goes to its tray
-- The Battle scenes setting (Scene card, or Menu on a phone) picks On, Short (about twice as fast) or Off; the choice is kept in your browser. A tap or any key skips a scene. Undo, New game and loaded positions never play one, nor does Openings
+- The Battle scenes setting (Scene card, or Menu on a phone) picks On, Short (about twice as fast) or Off; the choice is kept in your browser. A tap or any key skips a scene. Undo, Play and loaded positions never play one, nor does Openings
 - Synthesised sound for moves, captures, check and the battle scenes, made in the browser with no audio files. The Mute switch sits next to Battle scenes and is remembered; sound starts only after your first tap or key
 - Quiet piano music in the background, on by default, starting softly after your first tap or key: Satie (Gymnopédie No. 1, 2 and 3) and Bach (Prelude in C, the Air from the Orchestral Suite No. 3) in a random endless playlist with a few seconds of silence between pieces. The piano is synthesized in the browser (no audio files); the notes are public domain scores stored as data. Sound effects and battle scenes dip it, it pauses when the tab is hidden, and Mute silences everything. The Music switch and the sliders Volume, Tone (bright to warm), Tempo (0.8x to 1.1x) and Room (reverb) sit below Mute (Scene card, or Menu on a phone) and are remembered per device. Scores are the public domain typesettings of the Mutopia Project (mutopiaproject.org), credited in the header of each piece in src/music/pieces
 

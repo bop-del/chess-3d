@@ -34,7 +34,7 @@ const KEYS = [
   ['key.qe', 'Q / E', 'Board roll (Z)'], ['key.ws', 'W / S', 'Board pitch (X)'], ['key.ad', 'A / D', 'Board yaw (Y)'],
   ['key.arrows', 'Arrow keys', 'Orbit camera'], ['key.plusMinus', '+ / -', 'Zoom'], ['key.r', 'R', 'Reset view'], ['key.f', 'F', 'Flip to other side'],
   ['key.v', 'V', 'Top down'], ['key.1to5', '1 to 5', 'View presets'], ['key.space', 'Space', 'Auto spin'], ['key.u', 'U', 'Undo'],
-  ['key.n', 'N', 'New game'], ['key.h', 'H', 'Hide / show HUD'],
+  ['key.n', 'N', 'Play'], ['key.h', 'H', 'Hide / show HUD'],
 ];
 // the H key folds the panel on desktop and tablets, and hides the whole HUD on phones (which have no key)
 const deskKeys = () => KEYS.map((r) => (r[0] === 'key.h' ? ['key.h', 'H', 'Fold / unfold the panel'] : r));
@@ -117,7 +117,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       <header><h2 data-i18n="hud.game">Game</h2><span class="chev"></span></header>
       <div class="body">
         <div class="row three">
-          <button class="btn primary" id="btn-new" title="New game (N)" data-i18n="hud.newGame" data-i18n-title="hud.newGameTitle">New game</button>
+          <button class="btn primary" id="btn-new" title="Play (N)" data-i18n="hud.newGame" data-i18n-title="hud.newGameTitle">Play</button>
           <button class="btn" id="btn-undo" title="Undo (U)" data-i18n="hud.undo" data-i18n-title="hud.undoTitle">Undo</button>
           <button class="btn" id="btn-help" title="Keyboard shortcuts (?)" data-i18n="hud.keys" data-i18n-title="hud.keysTitle">Keys</button>
         </div>
@@ -443,7 +443,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
     const sub = mate || timeLoss ? t('banner.wins', '{side} wins', { side: sideName(st.winner) }) : st.reason === 'time' ? t('reason.timeDraw', 'Time out, draw: the opponent has only a king') : t(`reason.${st.reason}`, cap(st.reason));
     banner.innerHTML = `<div class="banner-card"><small>${st.result}</small><h2>${title}</h2><p>${sub}</p>
-      <div class="row"><button class="btn primary" id="bn-new">${t('hud.newGame', 'New game')}</button><button class="btn" id="bn-view">${t('banner.review', 'Review board')}</button></div></div>`;
+      <div class="row"><button class="btn primary" id="bn-new">${t('hud.newGame', 'Play')}</button><button class="btn" id="bn-view">${t('banner.review', 'Review board')}</button></div></div>`;
     banner.hidden = false;
     banner.querySelector('#bn-new').onclick = () => { game.newGame(); hideBanner(); };
     banner.querySelector('#bn-view').onclick = hideBanner;
@@ -494,7 +494,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   }
 
   // ------------------------------------------------------------ phone HUD
-  // Status line on top, thumb bar (Undo, New game, Flip, Views, Menu) at the bottom (a column on the right in landscape) and a
+  // Status line on top, thumb bar (Undo, Play, Flip, Views, Menu) at the bottom (a column on the right in landscape) and a
   // Menu bottom sheet that takes over the existing cards: Game, Moves, View and gimbal, Scene, Help. A hidden probe element
   // (.pframe) is positioned by the stylesheet to the free area between them; its rectangle goes to controls.setFrame.
   function buildPhone() {
@@ -507,7 +507,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     bar.dataset.i18nAria = 'phone.controls';
     const btn = {};
     // short word on the button (never wraps), the full name stays as aria-label and title
-    for (const [id, short, full, key, shortKey] of [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'New', 'New game', 'hud.newGame', 'tb.new'], ['flip', 'Flip', 'Flip', 'hud.flip', 'tb.flip'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']]) {
+    for (const [id, short, full, key, shortKey] of [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['flip', 'Flip', 'Flip', 'hud.flip', 'tb.flip'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']]) {
       const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${shortKey}">${short}</span>`);
       b.setAttribute('aria-label', full); b.setAttribute('title', full);
       b.dataset.i18nAria = key; b.dataset.i18nTitle = key;

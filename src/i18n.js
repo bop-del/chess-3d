@@ -27,7 +27,7 @@ export const DE = {
   'phone.views': 'Ansichten', 'phone.viewsD': 'Kameraansichten durchschalten',
   'phone.newAsk': 'Neue Partie beginnen?', 'phone.yes': 'Ja', 'phone.cancel': 'Abbrechen',
   'phone.menu': 'Menü', 'phone.closeMenu': 'Menü schließen', 'phone.controls': 'Spielsteuerung',
-  'tb.undo': 'Zurück', 'tb.new': 'Neu', 'tb.flip': 'Wenden', 'tb.view': 'Ansicht', 'tb.learn': 'Lernen', 'tb.menu': 'Menü',
+  'tb.undo': 'Zurück', 'tb.new': 'Spielen', 'tb.flip': 'Wenden', 'tb.view': 'Ansicht', 'tb.learn': 'Lernen', 'tb.menu': 'Menü',
   'phone.viewGimbal': 'Ansicht und Kardan', 'phone.help': 'Hilfe', 'phone.last': 'Zuletzt: {move}',
 
   // HUD
@@ -44,7 +44,7 @@ export const DE = {
   'hud.levelBoard': 'Brett ausrichten',
   'hud.lighting': 'Licht', 'hud.quality': 'Qualität',
   'hud.low': 'Niedrig', 'hud.medium': 'Mittel', 'hud.high': 'Hoch',
-  'hud.newGame': 'Neue Partie', 'hud.newGameTitle': 'Neue Partie (N)',
+  'hud.newGame': 'Spielen', 'hud.newGameTitle': 'Spielen (N)',
   'hud.undo': 'Zurück', 'hud.undoTitle': 'Zug zurücknehmen (U)',
   'hud.keys': 'Tasten', 'hud.keysTitle': 'Tastenkürzel (?)',
   'hud.vsComputer': 'gegen Computer', 'hud.yourSide': 'Deine Seite',
@@ -87,7 +87,7 @@ export const DE = {
   'key.1to5': '1 bis 5', 'key.1to5D': 'Ansichtsvorlagen',
   'key.space': 'Leertaste', 'key.spaceD': 'Automatisch drehen',
   'key.u': 'U', 'key.uD': 'Zug zurücknehmen',
-  'key.n': 'N', 'key.nD': 'Neue Partie',
+  'key.n': 'N', 'key.nD': 'Spielen',
   'key.h': 'H', 'key.hD': 'HUD aus- und einblenden',
 
   // view presets and lighting names (names come from controls.js and scene.js)
