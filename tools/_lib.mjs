@@ -3,7 +3,7 @@
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
 //   launchBrowser(opts)      chrome-headless-shell (the default when installed and the same version as Chrome, see headlessShell(); full Chrome for the release check, { full: true } or CHESS_BROWSER=chrome; CHESS_BROWSER=<path> overrides) through puppeteer-core with software GL (swiftshader) by default, so it runs anywhere;
 //                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check's extra software pass does).
-//                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 8, three under 16).
+//                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 12, three under 24).
 //                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
 //   pageRenderer(page)       the WebGL renderer the page itself draws with (the app's own context, UNMASKED_RENDERER), logged by the smoke, phone and release tiers as proof of the GPU
 //   proveGpu(page, R)        prints pageRenderer once, a WARN when the GPU was asked for and the page reports software
@@ -49,7 +49,7 @@ export function chromePath() {
 }
 
 // Headless Chromes at a time on this machine, across lanes and agents, adaptive by load: two slots always, a third
-// while the 1 minute load is under 12, a fourth under 6. With CHESS_GL=metal (the GPU does the drawing): four under load 8, three under 16, else two. Each slot is a lock directory in the temp folder holding its
+// while the 1 minute load is under 12, a fourth under 6. With CHESS_GL=metal (the GPU does the drawing): four under load 12, three under 24, else two. Each slot is a lock directory in the temp folder holding its
 // owner's pid (slot 0 keeps the original lock name, so older checkouts still count). A lock whose pid is gone is stale
 // and taken over. Released when the browser closes or the process exits.
 const SLOTS = ['', '.1', '.2', '.3'].map((x) => join(tmpdir(), 'chess-3d-chrome.lock' + x));
@@ -58,8 +58,8 @@ export const defaultGl = () => {
   return want === 'metal' ? 'metal' : 'swiftshader';
 };
 const metalOn = () => defaultGl() === 'metal';
-/** Slots for a 1 minute load. With Metal (the GPU does the drawing): under 8 gives 4, under 16 gives 3, else 2. Without: under 6 gives 4, under 12 gives 3, else 2. */
-export const slotsFor = (load, metal) => metal ? (load < 8 ? 4 : load < 16 ? 3 : 2) : (load < 6 ? 4 : load < 12 ? 3 : 2);
+/** Slots for a 1 minute load. With Metal (the GPU does the drawing): under 12 gives 4, under 24 gives 3, else 2. Without: under 6 gives 4, under 12 gives 3, else 2. */
+export const slotsFor = (load, metal) => metal ? (load < 12 ? 4 : load < 24 ? 3 : 2) : (load < 6 ? 4 : load < 12 ? 3 : 2);
 const allowedSlots = () => slotsFor(loadavg()[0], metalOn());
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 /** Slots free right now at this load (at least 0). Used by test/smoke-groups.mjs to size its parallelism. */
@@ -86,7 +86,12 @@ const GL_ARGS = {
   swiftshader: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist'],
   metal: ['--enable-gpu', '--use-angle=metal', '--use-gl=angle', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],   // swiftshader stays allowed as a fallback, the renderer log shows which one won
 };
-const logWait = (secs, gl) => { try { mkdirSync(join(ROOT, '.tmp'), { recursive: true }); appendFileSync(join(ROOT, '.tmp', 'chrome-waits.jsonl'), JSON.stringify({ t: new Date().toISOString(), script: process.argv[1] ? process.argv[1].split('/').slice(-2).join('/') : '', waitSecs: Math.round(secs * 10) / 10, load: Math.round(loadavg()[0] * 10) / 10, freePct: Math.round(freemem() / totalmem() * 100), slots: allowedSlots(), gl }) + '\n'); } catch (e) { /* ignore */ } };
+/** Free memory in percent, the figure the memory brake uses: macOS memory_pressure "free percentage" (os.freemem reads 2 to 6 when the system is fine, it counts cache as used). Falls back to os.freemem elsewhere. */
+const freePct = () => {
+  try { const m = /free percentage:\s*(\d+)%/.exec(execFileSync('/usr/bin/memory_pressure', { encoding: 'utf8', timeout: 3000 })); if (m) return Number(m[1]); } catch (e) { /* not macOS */ }
+  return Math.round(freemem() / totalmem() * 100);
+};
+const logWait = (secs, gl) => { try { mkdirSync(join(ROOT, '.tmp'), { recursive: true }); appendFileSync(join(ROOT, '.tmp', 'chrome-waits.jsonl'), JSON.stringify({ t: new Date().toISOString(), script: process.argv[1] ? process.argv[1].split('/').slice(-2).join('/') : '', waitSecs: Math.round(secs * 10) / 10, load: Math.round(loadavg()[0] * 10) / 10, freePct: freePct(), slots: allowedSlots(), gl }) + '\n'); } catch (e) { /* ignore */ } };
 async function logRenderer(browser) {
   try {
     const pg = await browser.newPage();
