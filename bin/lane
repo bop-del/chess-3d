@@ -15,7 +15,9 @@
 //                                       `red: <step>` or `conflict: <files>` (exit 0, 1, 3). Needs the private repo's bin/land-lane.
 //   bin/lane close <branch> [-m <msg>]  squash merge into main (the main checkout, which must be on main), then remove the
 //                                       workspace, the worktree and the branch. Without -m the lane's only commit message
-//                                       is reused; a lane with several commits needs -m.
+//                                       is reused; a lane with several commits needs -m. With the private tools present it takes the land
+//                                       lock first (bin/land-lock; a lock held by this same lane counts as ours) and records the lane's
+//                                       release test steps from its report before the worktree is removed.
 // Exit codes: 0 done, 1 a step failed (nothing after it ran), 2 usage error.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -118,8 +120,25 @@ function list() {
   for (const w of ls) console.log(`${(w.branch || '?').padEnd(28)} ${w.path}${w.open_workspace_id ? `  (workspace ${w.open_workspace_id})` : '  (no workspace)'}`);
 }
 
+// S54: a hand run `bin/lane close` takes the land lock (private bin/land-lock) so it never overlaps the land script or a land agent, which
+// hold the lock themselves while they close (--same-lane-ok: a lock held by this lane counts as ours). Without the private tool: no lock.
+function withLandLock(branch, fn) {
+  const tool = process.env.LAND_LOCK_BIN || join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'land-lock');
+  if (!existsSync(tool)) return fn();
+  const t = spawnSync(process.execPath, [tool, 'take', '--lane', branch, '--agent', 'close', '--same-lane-ok', '--wait', process.env.LAND_LOCK_WAIT_MIN || '20'], { encoding: 'utf8' });
+  if (t.status !== 0) die(`the land lock is busy, nothing was closed: ${(t.stdout || t.stderr).trim()}`);
+  const mine = !/held by this lane/.test(t.stdout);
+  // die() exits the process, so the release hangs on 'exit' rather than a finally
+  if (mine) process.once('exit', () => { spawnSync(process.execPath, [tool, 'release', '--lane', branch, '--agent', 'close'], { stdio: 'ignore' }); });
+  return fn();
+}
+
 function close(branch, message) {
   if (!branch) die(USAGE, 2);
+  withLandLock(branch, () => closeLocked(branch, message));
+}
+
+function closeLocked(branch, message) {
   if (git('branch', '--show-current') !== 'main') die(`the main checkout ${MAIN} is not on main`);
   if (git('status', '--porcelain')) die('main has uncommitted changes: commit or stash them first');
   const lane = lanes().find((w) => w.branch === branch);
@@ -141,6 +160,8 @@ function close(branch, message) {
   if (m.status !== 0) { spawnSync('git', ['merge', '--abort'], { cwd: MAIN }); spawnSync('git', ['reset', '--hard', 'HEAD'], { cwd: MAIN }); die(`squash merge of ${branch} failed, main is unchanged:\n${m.stdout}${m.stderr}`); }
   run('git', ['commit', '-q', '-F', '-'], { input: message, stdio: ['pipe', 'pipe', 'pipe'] });
   console.log(`squash merged ${branch} into main: ${git('log', '-1', '--format=%h %s')}`);
+  // the lane's release test steps are read from its builder report while the worktree still exists (S54; idempotent after bin/land-lane's own add)
+  { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'release-next'); if (path && existsSync(h)) spawnSync(process.execPath, [h, 'add', '--lane', branch, '--dir', path], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook
   { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'linear-hook'); if (existsSync(h)) spawnSync(h, ['close', branch, git('log', '-1', '--format=%h')], { stdio: 'ignore', timeout: 20000 }); }   // optional private hook
   if (lane && lane.open_workspace_id) run('herdr', ['worktree', 'remove', '--workspace', lane.open_workspace_id]);
   else if (path) git('worktree', 'remove', path);
