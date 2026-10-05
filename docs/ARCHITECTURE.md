@@ -342,25 +342,31 @@ Builds the HUD into `#hud`. Desktops and tablets get the one panel of `src/panel
 - Ducking: `audio.bus.music` is a bus like fx and scene. `audio.play()` calls `audio.duckMusic(level, hold)` for every sound (0.5 for 0.55 s, scene voices 0.25 for 1.2 s); `sfx.sceneActive = true` holds it at 0.2 for the whole battle scene and releases when the scene ends. A new puzzle chime or any other voice played through `audio.play` ducks the music with no extra code. Mute: `audio.onMute(fn)`.
 - Test: `test/music.mjs` (fast tier: the sets and the `musicset` choice, a public domain or CC0 credit line in every piece file, every piece well formed and in range, expansion, tempo scale, set `b` slow and soft and without a 3 s gap), `test/music-page.mjs` (smoke group `music`: starts after a gesture, Mute, the switch and a hidden tab stop and resume it, sliders persist, ducking, German labels, no console errors; `?musicset` in the real page; every piece rendered offline through `test/music-render.js` with the real piano: peak, no clipping, no silence of 3 s inside a piece, nothing sounding long after the end, no click).
 
-### `src/openings/explain.js`, `explain-panel.js`, `arrow.js`
+### `src/openings/explain.js`, `explain-panel.js`, `lineview.js`, `goal.js`, `arrow.js`
 
-Explain mode: walk one of the starter lines on the 3D board.
+Explain mode: walk one of the starter lines on the 3D board. A line opens on its goal screen, then is walked with a text card between the moves.
 
-    createExplain({ game, hint, lines, pause = 900, onSide }) -> {
-      state(),                  // { phase: 'list' | 'walking' | 'finished', line, ply, total, message, due, hint, canBack }
-      start(id), stop(), restart(), next(), back(), setHint(on),
-      tick(dt),                 // every frame: plays the opponent move once the pause has run, keeps the hint in step
+    createExplain({ game, hint, marks, lines, pause = 900, onSide }) -> {
+      state(),                  // { phase: 'list' | 'preview' | 'walking' | 'finished', line, ply, total, message, card, canContinue, due, goal, hint, canBack }
+      start(id, { preview = true }), go(), weiter(), stop(), restart(), next(), back(), setHint(on),
+      tick(dt),                 // every frame: plays the opponent move once the pause has run (never while a card waits), keeps the hint in step
       on(fn), lines, playable(line)
     }
+    goalOf(line) -> { fen, marks: [{ sq, own }] }    // pure: the position after the last move and where the moved pieces stand
     createHint({ gimbal }) -> { show(fromSq, toSq), hide(), enabled, visible }
-    mountExplain({ game, controls, ui, gimbal, pause }) -> { explain, hint, card, strip, tick }
+    createMarks({ gimbal }) -> { show([{ sq, own }]), hide(), visible, count }      // the goal screen's gold squares, group `goal-marks`
+    createLineView({ ui, owner }) -> { desktop(desc), show(desc | null), phone, top, cardEl }
+    mountExplain({ game, controls, ui, gimbal, pause }) -> { explain, hint, marks, card, view, tick }
 
 - The player makes the own moves on the board; `game.setMoveGuard(fn)` lets the controller refuse every other move (the piece does not move, the message says what the line plays). The opponent moves are played with `game.playSan` after `pause` milliseconds, counted in `tick(dt)` while the board is at rest, so `?manual=1` tests step time and `pause = 0` plays on the next tick.
+- Goal screen (`phase: 'preview'`, CHE-129): `start(id)` loads `goalOf(line).fen` with `game.loadFen`, the guard refuses every move, `marks` draws gold squares (strong for the line's side, quiet for the other). `go()` (Los) starts from the start position. Deep link `?line=<id>`.
+- Text card: after every move `state().card` is `{ ply }` (`{ ply, last }` for the last move) and `canContinue` is true. The opponent move, the hint and the player's moves wait until `weiter()` (Weiter). After the last card the ending text shows (`card.ending`). No timer. `message` is only `{ type: 'refused', san }` now. Texts are picked by language in the panel, so a language switch redraws them.
 - `game.setMode('explain')` stops the computer opponent and the two move undo; `stop()` returns to play on a fresh board.
-- `message` is a descriptor (`intro`, `move` with its ply, `refused`), never text: the panel picks the line text by language, so a language switch redraws it. Positions come from the rules engine (`moveFromSan` gives the from and to squares of the due move).
-- The hint is a flat gold overlay in the gimbal group: the from-square faint, the to-square strong, a straight arrow between them. It is shown only while the board listens for an own move. The switch is stored under `chess3d.hint` in localStorage.
-- Phone: the card in the Menu sheet holds the list; while a line runs a strip under the status line carries the sentence and the buttons, and `body.explaining` moves the camera frame below it (`--xh` is the strip height).
-- `window.__chess.openings` is the test hook: `{ explain, hint, card, strip, tick }`.
+- The hint is a flat gold overlay in the gimbal group: the from-square faint, the to-square strong, a straight arrow between them. It is shown only while the board listens for an own move and no card waits. The switch is stored under `chess3d.hint`.
+- `lineview.js` is the one look of a running line for Explain and Drill: a descriptor `{ action, title, side, card, buttons, close, extra }` becomes, on a phone, the top bar `.xtop` (only what to do now), the card `.xcard` and the learning bar (`ui.setLearnBar`: Weiter, Hinweis, Nochmal, Beenden), and on a desktop the stacked panel card. `body.lines` is set while one runs; `body.phone.lines` overrides `--stat` (top bar height) and `.pframe`: portrait reserves a card slot `--xcard-h` under the board, landscape a column `--xcard-w` left of it, so the camera frame is the free area between top bar, card and bar and the board is never cut off. The goal sentences (`GOALS`, English and German) and the `lines.*` strings are in `src/i18n.js`.
+- Drill uses the same view; its text card follows only the player's own move (`drill.weiter()`), moves the drill plays itself show no card, a miss shows the sentence at once. `drill.restart()` repeats a practise run.
+- Phone board labels: `board.setLabelScale(1.5)` (main.js, phones only) rebuilds the edge labels 1.5 times bigger on the same centres.
+- `window.__chess.openings` is the test hook: `{ explain, hint, marks, card, view, tick }`.
 - Entry point (CHE-179, CHE-221, in `src/learn/learn.js`): a `.xgo` Explain button inside every playable opening row of the Learn Openings tab, starting through `explain.start(id)`. The earlier `?explain=a|b|c` variants (start card, Menu entry with chip) were dropped; the flag is ignored. Tests: the explain block in `test/open-flag.mjs`.
 
 ### `src/puzzles/`

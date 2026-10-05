@@ -49,6 +49,7 @@ export async function runDrillChecks({ page, baseUrl, log = () => {}, shot = nul
     for (let i = 0; i < 60; i++) {
       const s = await st();
       if (s.awaiting || s.phase !== 'running') return s;
+      await page.evaluate(() => window.__chess.train.drill.weiter());   // the own move's text card waits for Weiter
       await step(1.5);
     }
     return st();

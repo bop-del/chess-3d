@@ -102,11 +102,19 @@ export const DE = {
   'explain.lead': 'Wähle eine Eröffnung. Du spielst deine Züge, das Spiel spielt die andere Seite, und jeder Zug sagt, wofür er gut ist.',
   'explain.soon': 'Kommt bald',
   'explain.forWhite': 'Du spielst Weiß', 'explain.forBlack': 'Du spielst Schwarz',
-  'explain.yourMove': 'Du bist am Zug.', 'explain.opponentMoves': 'Der Gegner antwortet.', 'explain.done': 'Linie abgeschlossen.',
-  'explain.notThisMove': 'Nicht dieser Zug. Die Linie spielt',
+  'explain.yourMove': 'Du bist am Zug.', 'explain.opponentMoves': 'Der Gegner antwortet.', 'explain.done': 'Eröffnung abgeschlossen.',
+  'explain.notThisMove': 'Nicht dieser Zug. Die Eröffnung spielt',
   'explain.back': 'Ein Zug zurück', 'explain.again': 'Nochmal', 'explain.showMe': 'Zeig es mir',
-  'explain.all': 'Alle Eröffnungen', 'explain.another': 'Andere Linie wählen',
+  'explain.all': 'Alle Eröffnungen', 'explain.another': 'Andere Eröffnung wählen',
   'explain.hintOn': 'Hinweis zeigen', 'explain.hintOff': 'Hinweis ausblenden',
+
+  // Linien lernen (CHE-129): top bar, buttons, goal screen. The goal sentences are in GOALS below.
+  'lines.play': 'Spiele {san}', 'lines.wrong': 'Nicht dieser Zug. Spiele {san}.', 'lines.tapNext': 'Lies in Ruhe, dann zeig den nächsten Zug.',
+  'lines.tapCont': 'Lies in Ruhe, dann tippe auf Weiter.', 'lines.opponent': 'Der Gegner antwortet.', 'lines.yourMove': 'Du bist am Zug.', 'lines.done': 'Eröffnung geschafft.',
+  'lines.goalLabel': 'Ziel', 'lines.goalGeneric': 'die Stellung nach {n} Zügen',
+  'lines.legend': 'Goldene Felder: wohin die Figuren ziehen. Tippe auf Los, dann beginnst du von vorn.',
+  'lines.go': 'Los', 'lines.next': 'Zeig nächsten Zug', 'lines.cont': 'Weiter', 'lines.hint': 'Hinweis', 'lines.again': 'Nochmal', 'lines.end': 'Beenden',
+  'lines.drillMiss': 'Nicht ganz. Versuch es nochmal.',
 
   // loader and notices
   'loader.sub': 'Brett und Figuren werden gebildet', 'loader.start': 'Start',
@@ -168,3 +176,34 @@ export function sanDisplay(san, lang = language) {
   if (lang !== 'de' || !san) return san;
   return san.replace(/^[KQRBN]/, (c) => DE_LETTER[c]).replace(/=([QRBN])/, (m, c) => `=${DE_LETTER[c]}`);
 }
+
+// The one line goal of every starter line, shown on the goal screen as "Goal: ..." (CHE-129). Keyed by line id.
+export const GOALS = {
+  'italian-game': { en: 'Take the centre with e4 and d4, bishop on c4', de: 'Zentrum mit e4 und d4, Läufer auf c4' },
+  'ruy-lopez': { en: 'Bishop on a4 eyes the knight, castle early', de: 'Läufer auf a4 zielt auf den Springer, früh rochieren' },
+  'scotch-game': { en: 'Open the centre early, knight on d4', de: 'Zentrum früh öffnen, Springer auf d4' },
+  'vienna-game': { en: 'Bishop on c4 and queen on h5 aim at f7', de: 'Läufer auf c4 und Dame auf h5 zielen auf f7' },
+  'kings-gambit': { en: 'A fast attack with the pawns on e4, f4 and h4', de: 'Schneller Angriff mit den Bauern e4, f4 und h4' },
+  'london-system': { en: 'Solid set-up: pawns d4 and e3, bishop on f4', de: 'Solider Aufbau: Bauern d4 und e3, Läufer auf f4' },
+  'london-system-c5': { en: 'The London set-up that keeps d4 guarded against c5', de: 'London-Aufbau, der d4 gegen c5 gedeckt hält' },
+  'london-system-bf5': { en: 'London set-up, bishops traded, king castled', de: 'London-Aufbau, Läufer getauscht, rochiert' },
+  'queens-gambit': { en: 'Pawns on d4 and c4 take the centre, bishop on g5', de: 'Bauern auf d4 und c4 nehmen das Zentrum, Läufer auf g5' },
+  'queens-gambit-accepted': { en: 'Win the c4 pawn back and castle', de: 'Den Bauern auf c4 zurückholen und rochieren' },
+  'slav-defense': { en: 'Win the c4 pawn back, keep a solid centre', de: 'Den Bauern auf c4 zurückholen, Zentrum halten' },
+  'scandinavian-defense': { en: 'Queen on a5, knight on f6, ready to castle', de: 'Dame auf a5, Springer auf f6, bald rochieren' },
+  'scandinavian-queen-d6': { en: 'Queen on d6, bishops traded, pawn on e6', de: 'Dame auf d6, Läufer getauscht, Bauer auf e6' },
+  'scandinavian-modern': { en: 'Bishop on g7, castled, knight on b6', de: 'Läufer auf g7, rochiert, Springer auf b6' },
+  'caro-kann': { en: 'Bishop out on f5 behind the c6 pawn', de: 'Läufer draußen auf f5, der Bauer auf c6 deckt' },
+  'caro-kann-advance': { en: 'Bishop on f5, then c5 hits White’s pawn chain', de: 'Läufer auf f5, dann greift c5 die weiße Kette an' },
+  'caro-kann-panov': { en: 'Knights on f6 and d5, bishop on e7', de: 'Springer auf f6 und d5, Läufer auf e7' },
+  'french-defense': { en: 'Pawns on e6 and d5, then c5 hits the centre', de: 'Bauern auf e6 und d5, dann greift c5 die Mitte an' },
+  'french-tarrasch': { en: 'Pawns on e6 and d5, c5 hits the base of the chain', de: 'Bauern auf e6 und d5, c5 greift den Fuß der Kette an' },
+  'french-advance': { en: 'c5 and the queen on b6 hit the base of the chain', de: 'c5 und Dame auf b6 greifen den Fuß der Kette an' },
+  'sicilian-defense': { en: 'The c-pawn traded, knight on f6, ready to counterattack', de: 'Der c-Bauer ist getauscht, Springer auf f6, bereit zum Gegenangriff' },
+  'sicilian-najdorf': { en: 'a6 and e5: the fight on the queenside', de: 'a6 und e5: der Kampf am Damenflügel' },
+  'sicilian-dragon': { en: 'Bishop on g7 on the long diagonal, castled', de: 'Läufer auf g7 auf der langen Diagonale, rochiert' },
+  'sicilian-alapin': { en: 'Strike back with d5, develop and castle', de: 'Mit d5 zurückschlagen, entwickeln und rochieren' },
+  'kings-indian-defense': { en: 'Bishop on g7 and pawn on d6 aim at the white centre', de: 'Läufer auf g7 und Bauer auf d6 zielen auf das weiße Zentrum' },
+  'kings-indian-classical': { en: 'Castled, e5 hits the centre, knight on c6', de: 'Rochiert, e5 greift die Mitte an, Springer auf c6' },
+  'kings-indian-samisch': { en: 'Castled, e5 and c6 strike at the centre', de: 'Rochiert, e5 und c6 greifen die Mitte an' },
+};

@@ -77,7 +77,10 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
     await page.evaluate(() => { const s = window.__chess.train.sweep; window.__sweepCalls = []; const p = s.play.bind(s); s.play = (a) => { window.__sweepCalls.push(a); return p(a); }; });
     await page.evaluate(() => document.querySelector('.xline.openings[data-id="italian-game"]').click());
     await step(page, 0.3);
-    ok('learn: tapping a row walks the line in Explain', await page.evaluate(() => window.__chess.openings.explain.state().phase === 'walking'));
+    ok('learn: tapping a row opens the line on its goal screen', await page.evaluate(() => window.__chess.openings.explain.state().phase === 'preview'));
+    await page.evaluate(() => window.__chess.openings.explain.go());
+    await step(page, 0.3);
+    ok('learn: Go walks the line in Explain', await page.evaluate(() => window.__chess.openings.explain.state().phase === 'walking'));
     ok('learn: no adopt control while the line runs', (await count(page, '.xadopt')) === 0);
     for (let i = 0; i < 12; i++) { await page.evaluate(() => window.__chess.openings.explain.next()); await step(page, 1.5); }
     ok('learn: the end of the line offers "Add to my openings"', (await text(page, '.xadopt')) === 'Add to my openings', await text(page, '.xadopt'));
@@ -123,6 +126,10 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
     // the Symbols view: a line walks in Explain with the symbols on, the hint arrow is drawn over them (render order above the symbols)
     await tapTab(page, 'openings');
     await page.evaluate(() => { window.__chess.views.set('symbols', { remember: false, instant: true }); document.querySelector('.xline.openings[data-id="italian-game"]').click(); });
+    await step(page, 0.5);
+    const gm = await page.evaluate(() => { const c = window.__chess; let order = 0; c.gimbal.children.forEach((o) => { if (o.name === 'goal-marks' && o.visible) o.traverse((m) => { if (m.isMesh) order = Math.max(order, m.renderOrder); }); }); const sym = c.game.root.children.find((g) => g.userData.sym)?.userData.sym.children[0].renderOrder; return { order, sym }; });
+    ok('learn: the goal marks are drawn above the symbols', gm.order > gm.sym, JSON.stringify(gm));
+    await page.evaluate(() => window.__chess.openings.explain.go());
     await step(page, 1.5);
     const sy = await page.evaluate(() => {
       const c = window.__chess, arrows = [];
@@ -218,13 +225,14 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
       if (w === 390) {
         await pp.evaluate(() => document.querySelector('.plearn .xline.openings[data-id="italian-game"]').click());
         await step(pp, 0.4);
-        ok(`learn ${tag}: a row closes the sheet and walks the line`, !(await pp.evaluate(() => document.querySelector('.plearn').classList.contains('open'))) && (await pp.evaluate(() => window.__chess.openings.explain.state().phase === 'walking')));
+        ok(`learn ${tag}: a row closes the sheet and opens the goal screen`, !(await pp.evaluate(() => document.querySelector('.plearn').classList.contains('open'))) && (await pp.evaluate(() => window.__chess.openings.explain.state().phase === 'preview')));
+        await pp.evaluate(() => window.__chess.openings.explain.go());
         for (let i = 0; i < 12; i++) { await pp.evaluate(() => window.__chess.openings.explain.next()); await step(pp, 1.5); }
-        ok(`learn ${tag}: the adopt control sits in the strip at the line end`, (await text(pp, '.xstrip .xadopt')) === 'Add to my openings');
-        const ab = await visibleBox(pp, '.xstrip .xadopt');
+        ok(`learn ${tag}: the adopt control sits in the card at the line end`, (await text(pp, '.xcard .xadopt')) === 'Add to my openings');
+        const ab = await visibleBox(pp, '.xcard .xadopt');
         ok(`learn ${tag}: the adopt control is 44 px and on screen`, ab && ab.h >= 43.5 && ab.y + ab.h <= h, JSON.stringify(ab));
         await snap(pp, `learn-phone-adopt-${tag}`);
-        await pp.evaluate(() => document.querySelector('.xstrip .xadopt').click());
+        await pp.evaluate(() => document.querySelector('.xcard .xadopt').click());
         await step(pp, 1.5);
         ok(`learn ${tag}: adopting works on the phone`, await pp.evaluate(() => window.__chess.train.store.isAdopted('italian-game')));
         await pp.evaluate(() => window.__chess.openings.explain.stop());

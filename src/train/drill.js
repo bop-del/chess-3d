@@ -13,6 +13,10 @@
 // card is answered once, with whether the first try was right. Sibling moves of the card are accepted. Practise mode
 // quizzes the same way but never calls store.answer.
 //
+// Texts (CHE-129): the player's own move leaves a text card that stays until Weiter (weiter()); the next step starts only
+// after it. Moves the drill plays itself (the opponent, the fill-in of known moves) show no card: they are not what is
+// being learned. A miss shows the move's sentence at once, without waiting.
+//
 // Time is counted in tick(dt) only, like Explain (ADR 0007): `pause` is in milliseconds, tests pass 0.
 import { LINES } from '../openings/lines.js';
 import { planSession, planPractise } from './planner.js';
@@ -34,6 +38,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
   let internal = 0;            // > 0 while the drill itself moves, undoes or resets, so game events are its own
   let hintOn = false;          // the player's Hint switch in the learning bar: the arrow for the move that is asked
   let lastSide = 'w';
+  let card = null;             // { lineId, ply }: the text of the player's own move, waiting for Weiter
 
   const step = () => steps[idx] || null;
   const lineOf = (s) => (s ? byId(s.lineId) : null);
@@ -43,7 +48,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
   function state() {
     const s = step();
     const line = phase === 'idle' ? null : lineOf(s) || lineOf(steps[steps.length - 1]);
-    return { phase, mode, line, ply: s ? s.ply : (line ? line.moves.length : 0), message, awaiting, hint: hintOn };
+    return { phase, mode, line, ply: s ? s.ply : (line ? line.moves.length : 0), message, awaiting, hint: hintOn, card, canContinue: !!card };
   }
 
   function acceptable(s) {
@@ -85,6 +90,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
     missed = false;
     hint?.hide();
     message = { type: 'move', lineId: s.lineId, ply: s.ply };
+    card = { lineId: s.lineId, ply: s.ply };
     lastSide = line.side;
     idx += 1;
     wait = pause / 1000;
@@ -95,7 +101,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
   game.on('newgame', () => { if (phase === 'running' && !internal) stop(); });
 
   function begin(list, m) {
-    steps = list; idx = 0; mode = m; awaiting = false; missed = false; wait = 0; message = null;
+    steps = list; idx = 0; mode = m; awaiting = false; missed = false; wait = 0; message = null; card = null;
     phase = 'running';
     internal++;
     game.setMode('drill');
@@ -126,7 +132,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
   function stop() {
     if (phase === 'idle') return;
     const wasMine = game.mode === 'drill';
-    phase = 'idle'; steps = []; idx = 0; awaiting = false; missed = false; message = null; wait = 0; hintOn = false;
+    phase = 'idle'; steps = []; idx = 0; awaiting = false; missed = false; message = null; card = null; wait = 0; hintOn = false;
     hint?.hide();
     hint?.force(false);
     if (wasMine) {
@@ -205,6 +211,14 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
       return true;
     },
     stop,
+    // Weiter: the waiting text card is done, the drill goes on after its pause.
+    weiter() { if (!card) return; card = null; wait = pause / 1000; emit(); },
+    // Again (Nochmal): a practise run from its start. A scheduled session answers real cards, so it never repeats.
+    restart() {
+      if (phase === 'idle' || mode !== 'practise' || !steps.length) return false;
+      begin(steps, mode);
+      return true;
+    },
     // The Hint switch: the arrow for the move that is asked stays on while it is on.
     setHint(on) { hintOn = !!on; if (!hintOn && !missed) hint?.hide(); emit(); },
     // Show me: the asked move is played for the player. The card counts as missed, like a wrong first try.
@@ -221,7 +235,7 @@ export function createDrill({ game, hint = null, store, sweep = null, lines = LI
       if (phase !== 'running') return;
       const s = step();
       if (awaiting && s && !game.busy && !game.pendingPromotion) { showHint(missed || hintOn); return; }
-      if (awaiting || game.busy || game.pendingPromotion) return;
+      if (awaiting || card || game.busy || game.pendingPromotion) return;
       wait -= dt;
       if (wait <= 0) { wait = 0; advance(); }
     },

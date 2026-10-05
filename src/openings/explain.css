@@ -28,17 +28,50 @@ body:not(.phone) .xtext { max-height: 30vh; overflow-y: auto; }
 .xrow .xhint { flex: 0 1 auto; font-size: 12px; color: var(--dim); }
 .xmore { width: 100%; }
 
-/* phone: the strip sits under the status line and the camera frame moves below it (--xh is its measured height) */
-.xstrip { display: none; }
-body.phone .xstrip {
-  display: block; position: fixed; z-index: 11; left: var(--sl); right: var(--sr); top: calc(var(--st) + var(--stat) + var(--gap));
-  padding: 10px 12px; border-radius: 12px; background: var(--glass-strong); border: 1px solid var(--line); pointer-events: auto;
-}
-body.phone .xstrip .xtext { max-height: none; overflow: visible; font-size: 14px; }   /* the whole text, never cut: the camera frame follows the strip height */
-body.phone .xstrip .btn, body.phone .xline { min-height: 44px; }
-body.phone .xstrip .xclose { min-width: 44px; padding: 0; }
-body.phone .xstrip .xside { display: none; }
-body.phone .xstrip .xmeta { color: #c9cad3; font-size: 12px; }   /* the card's secondary text: readable on the dark glass */
+/* Linien lernen (CHE-129): the running line. Desktop: action line, text card and buttons stacked in the panel card. */
+.xlines { gap: 10px; }
+.xaction { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.35; }
+.xaction[data-kind="refused"] { color: #ffb3a9; }
+.xcardbox { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); }
+/* one fixed height on the desktop too, whatever the text length (the longest text of a line fits; longer would scroll) */
+body:not(.phone) .xcardbox { height: 18em; overflow-y: auto; box-sizing: border-box; }
+.xcardbox[data-kind="goal"] { border-color: rgba(216, 180, 104, 0.45); }
+.xcardbox[data-kind="refused"] .xcardhead { color: #ffb3a9; }
+.xcardempty { background: transparent; border-style: dashed; }
+.xcardhead { color: var(--gold); font-size: 14px; font-weight: 650; }
+.xcardtext { margin: 0; font-size: 14px; line-height: 1.45; }
+.xbuttons .btn.on { background: var(--gold-soft); border-color: rgba(216, 180, 104, 0.6); color: #f3dfa8; }
+.xbuttons .btn:disabled { opacity: 0.4; }
+
+/* phone: a top bar with the one thing to do, a text card in a fixed slot (under the board in portrait, left of it in landscape)
+   and the learning bar at the bottom. The camera frame (.pframe) is the free area between them, so the board is never cut off. */
+.xtop, .xcard { display: none; }
 body.phone.learnbar .pstatus .ps-sub, body.phone.learnbar .pstatus .ps-last { display: none; }   /* learning: one short phrase, no Last: */
-body.phone.explaining .pframe { top: calc(var(--st) + var(--stat) + var(--gap) * 2 + var(--xh, 0px)); }
-body.phone:not(.portrait) .xstrip { right: calc(var(--sr) + var(--barw) + var(--gap)); }
+body.phone.lines { --stat: 48px; --xcard-h: clamp(150px, 28vh, 200px); --xcard-w: clamp(230px, 36vw, 340px); }
+body.phone.lines .pstatus, body.phone.lines .pgood { display: none; }
+body.phone .xtop {
+  display: flex; align-items: center; position: fixed; z-index: 12; left: var(--sl); right: var(--sr); top: var(--st); height: var(--stat);
+  padding: 0 14px; border-radius: 12px; background: var(--glass-strong); border: 1px solid var(--line-strong); overflow: hidden;
+  font-size: 16px; font-weight: 650; line-height: 1.2; pointer-events: none;
+}
+body.phone .xtop[data-kind="refused"] { color: #ffb3a9; }
+body.phone .xcard {
+  display: flex; flex-direction: column; gap: 4px; position: fixed; z-index: 12; left: var(--sl); right: var(--sr);
+  bottom: calc(var(--sb) + var(--bar) + var(--gap) * 2); height: var(--xcard-h); overflow-y: auto; overscroll-behavior: contain;
+  padding: 10px 14px; border-radius: 12px; background: var(--glass-strong); border: 1px solid var(--line); pointer-events: auto;
+}
+body.phone .xtop[hidden], body.phone .xcard[hidden] { display: none; }
+body.phone .xcard .xcardbox { padding: 0; border: 0; background: none; min-height: 0; }
+body.phone .xcard .xcardtext { font-size: 14.5px; line-height: 1.4; }
+body.phone .xcard .xside { color: var(--gold); font-size: 12px; }
+body.phone .xcard .xcardhead { font-size: 15px; }
+body.phone .xcard .xadopt { margin-top: 8px; min-height: 44px; }
+body.phone.lines .pframe { top: calc(var(--st) + var(--stat) + var(--gap)); bottom: calc(var(--sb) + var(--bar) + var(--gap) * 3 + var(--xcard-h)); }
+body.phone:not(.portrait) .xtop { right: calc(var(--sr) + var(--barw) + var(--gap)); }
+body.phone:not(.portrait) .xcard { right: auto; width: var(--xcard-w); top: calc(var(--st) + var(--stat) + var(--gap)); bottom: var(--sb); height: auto; }
+body.phone:not(.portrait).lines .pframe { top: calc(var(--st) + var(--stat) + var(--gap)); bottom: var(--sb); left: calc(var(--sl) + var(--xcard-w) + var(--gap)); }
+body.phone.lines .btn, body.phone .xline { min-height: 44px; }
+/* the learning bar button "Zeig nächsten Zug" wraps to two short lines instead of being cut */
+body.phone .plbar .tb[data-act="next"] span { white-space: normal; text-align: center; line-height: 1.05; font-size: 11px; }
+body.phone .plbar .tb[data-act="next"] { flex: 1.35 1 0; gap: 1px; }
+body.phone .plbar .tb[data-act="next"] svg { width: 20px; height: 20px; }

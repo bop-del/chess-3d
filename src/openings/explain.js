@@ -1,10 +1,14 @@
-// Explain mode controller: walk one line on the 3D board. The player makes the own moves, the game plays the opponent
-// moves after a pause, every move shows its sentence. No DOM and no rendering here: the panel reads state() and the
-// hint arrow is driven through `hint`. Legality is the rules engine's answer, the line decides which legal move is due.
+// Explain mode controller: walk one line on the 3D board. A line opens on its goal screen (phase 'preview': the position
+// its last move reaches, the pieces that moved marked, go() starts the walk). Then the player makes the own moves, the game
+// plays the opponent moves after a pause, and every move leaves a text card that stays until the player taps Weiter
+// (weiter()): the next opponent move waits for it, no timer. No DOM and no rendering here: the panel reads state(), the
+// hint arrow is driven through `hint`, the goal marks through `marks`. Legality is the rules engine's answer, the line
+// decides which legal move is due.
 //
 // The opponent pause is a parameter (ADR 0007): the game passes about 900 (milliseconds), tests pass 0. It is counted in
 // tick(dt) while the board is at rest, so a test that steps time controls it and no real clock is involved.
 import * as data from './lines.js';
+import { goalOf } from './goal.js';
 
 const clean = (san) => String(san).replace(/[+#!?]+$/, '');
 
@@ -16,11 +20,13 @@ export function playable(line) {
   return !!line?.moves?.length && line.moves.every((m) => m.en && m.de);
 }
 
-export function createExplain({ game, hint = null, lines = LINES, pause = 900, onSide = null }) {
+export function createExplain({ game, hint = null, marks = null, lines = LINES, pause = 900, onSide = null }) {
   const listeners = [];
   let line = null;
   let ply = 0;
-  let message = null;       // { type: 'intro' | 'move' | 'refused' | 'yourMove', ply?, san? }
+  let message = null;       // { type: 'refused', san } after a wrong move, else null
+  let card = null;          // the text card that waits for Weiter: { ply } of the move it explains, { ply, last } for the last move, { ending } once the line is through
+  let previewing = false;   // the goal screen is up: the board shows the line's last position, nothing can be moved
   let wait = null;          // seconds left before the due opponent move is played, null when nothing is waiting
   let internal = 0;         // > 0 while the controller itself moves or undoes, so the game events are its own
   let hintOn = hint ? hint.enabled : true;
@@ -41,18 +47,20 @@ export function createExplain({ game, hint = null, lines = LINES, pause = 900, o
   function syncHint() {
     if (!hint) return;
     const due = dueMove();
-    const show = hintOn && due && isOwn(ply) && !game.busy && !game.pendingPromotion;
+    const show = hintOn && due && isOwn(ply) && !card && !previewing && !game.busy && !game.pendingPromotion;
     const sq = show && squares();
     if (sq) hint.show(sq.from, sq.to); else hint.hide();
   }
 
   function state() {
     return {
-      phase: !line ? 'list' : finished() ? 'finished' : 'walking',
-      line, ply, total: total(), message,
-      due: dueMove() ? { ...dueMove(), own: isOwn(ply) } : null,
+      phase: !line ? 'list' : previewing ? 'preview' : finished() ? 'finished' : 'walking',
+      line, ply, total: total(), message, card,
+      canContinue: !!card && !card.ending,   // Weiter is live: a card waits
+      due: dueMove() && !previewing ? { ...dueMove(), own: isOwn(ply) } : null,
+      goal: line ? goalOf(line) : null,
       hint: hintOn,
-      canBack: !!line && ply > 0,
+      canBack: !!line && !previewing && ply > 0,
     };
   }
 
@@ -60,7 +68,7 @@ export function createExplain({ game, hint = null, lines = LINES, pause = 900, o
 
   function guard(move) {
     const due = dueMove();
-    if (!line || !due || !isOwn(ply)) return false;
+    if (!line || !due || !isOwn(ply) || card) return false;   // a waiting card holds the board: Weiter first
     if (clean(move.san) === clean(due.san)) return true;
     say({ type: 'refused', san: due.san });
     emit();
@@ -69,8 +77,8 @@ export function createExplain({ game, hint = null, lines = LINES, pause = 900, o
 
   function afterMove() {
     wait = null;
-    if (finished()) { say({ type: 'move', ply: ply - 1, end: true }); }
-    else say({ type: 'move', ply: ply - 1 });
+    message = null;
+    card = finished() ? { ply: ply - 1, last: true } : { ply: ply - 1 };
     syncHint();
     emit();
   }
@@ -82,19 +90,35 @@ export function createExplain({ game, hint = null, lines = LINES, pause = 900, o
     ply += 1;
     afterMove();
   });
-  game.on('undo', () => { if (line && !internal) { ply = game.chess.history.length; wait = null; say(ply ? { type: 'move', ply: ply - 1 } : { type: 'intro' }); syncHint(); emit(); } });
-  game.on('newgame', () => { if (line && !internal) { ply = 0; wait = null; say({ type: 'intro' }); syncHint(); emit(); } });
+  game.on('undo', () => { if (line && !internal && !previewing) { ply = game.chess.history.length; wait = null; message = null; card = ply ? { ply: ply - 1 } : null; syncHint(); emit(); } });
+  game.on('newgame', () => { if (line && !internal) { ply = 0; wait = null; message = null; card = null; previewing = false; marks?.hide(); syncHint(); emit(); } });
 
   function begin() {
+    previewing = false;
+    marks?.hide();
     internal++;
     game.setMode('explain');
     game.setMoveGuard(guard);
     game.newGame({ instant: true });
     internal--;
-    ply = 0; wait = null;
-    say({ type: 'intro' });
+    ply = 0; wait = null; message = null; card = null;
     onSide?.(line.side);
     syncHint();
+    emit();
+  }
+
+  // The goal screen: the board shows where the line ends, the pieces that moved are marked, the guard refuses every move.
+  function preview() {
+    previewing = true;
+    internal++;
+    game.setMode('explain');
+    game.setMoveGuard(() => false);
+    game.loadFen(goalOf(line).fen);
+    internal--;
+    ply = 0; wait = null; message = null; card = null;
+    hint?.hide();
+    marks?.show(goalOf(line).marks);
+    onSide?.(line.side);
     emit();
   }
 
@@ -102,30 +126,44 @@ export function createExplain({ game, hint = null, lines = LINES, pause = 900, o
     state, lines, playable,
     on(fn) { listeners.push(fn); },
 
-    start(id) {
+    // A line opens on its goal screen; `{ preview: false }` walks it at once.
+    start(id, { preview: goal = true } = {}) {
       const l = typeof id === 'string' ? lines.find((x) => x.id === id) : id;
       if (!l || !playable(l)) return false;
       line = l;
-      begin();
+      if (goal) preview(); else begin();
       return true;
+    },
+    // Los: from the goal screen back to the start position, the walk begins.
+    go() { if (line && previewing) begin(); },
+    // Weiter: the waiting text card is done. The last move's card gives way to the ending text, which stays.
+    weiter() {
+      if (!card || card.ending) return;
+      const last = card.last;
+      message = null;
+      card = last && line.ending ? { ending: true } : null;
+      syncHint();
+      emit();
     },
     // Back to the list: the ordinary game takes the board again.
     stop() {
       if (!line) return;
-      line = null; ply = 0; wait = null; message = null;
+      line = null; ply = 0; wait = null; message = null; card = null; previewing = false;
       hint?.hide();
+      marks?.hide();
       internal++;
       game.setMode('play');
       game.newGame({ instant: true });
       internal--;
       emit();
     },
-    restart() { if (line) begin(); },
+    restart() { if (line) begin(); },   // Nochmal: the walk from the start (not the goal screen)
 
     // The due move, played for the player (or the opponent's move without its pause).
     next() {
       const due = dueMove();
-      if (!due) return;
+      if (!due || previewing) return;
+      card = null;
       game.finishAnimations();
       game.playSan(due.san, { animate: true });
     },
@@ -138,8 +176,7 @@ export function createExplain({ game, hint = null, lines = LINES, pause = 900, o
       internal++;
       while (game.chess.history.length > target) { game.undo(); game.finishAnimations(); }
       internal--;
-      ply = target; wait = null;
-      say(ply ? { type: 'move', ply: ply - 1 } : { type: 'intro' });
+      ply = target; wait = null; message = null; card = ply ? { ply: ply - 1 } : null;
       syncHint();
       emit();
     },
@@ -155,7 +192,7 @@ export function createExplain({ game, hint = null, lines = LINES, pause = 900, o
     tick(dt) {
       if (!line) return;
       syncHint();
-      if (!dueMove() || isOwn(ply)) { wait = null; return; }
+      if (previewing || card || !dueMove() || isOwn(ply)) { wait = null; return; }
       if (game.busy || game.pendingPromotion) return;
       if (wait === null) wait = pause / 1000;
       wait -= dt;

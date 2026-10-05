@@ -6,7 +6,7 @@ addDE({
   'learn.button': 'Lernen', 'learn.title': 'Lernen', 'learn.close': 'Schließen', 'learn.tabs': 'Lernen',
   'learn.tab.openings': 'Eröffnungen', 'learn.tab.mine': 'Meine', 'learn.tab.practise': 'Üben',
   'learn.mark': 'In meinen Eröffnungen',
-  'learn.mineEmpty': 'Hier erscheinen die Eröffnungen, die du übernimmst. Geh eine Linie bis zum Ende durch und wähle unter Eröffnungen „Zu meinen Eröffnungen“.',
+  'learn.mineEmpty': 'Hier erscheinen die Eröffnungen, die du übernimmst. Geh eine Eröffnung bis zum Ende durch und wähle unter Eröffnungen „Zu meinen Eröffnungen“.',
   'learn.edit': 'Bearbeiten', 'learn.done': 'Fertig', 'learn.remove': 'Entfernen',
   'learn.removeOne': '{name} entfernen', 'learn.progress': 'Fortschritt',
   'learn.practiseLead': 'Eine Eröffnung zum Üben wählen. Das ändert nichts an deinem Fortschritt.',

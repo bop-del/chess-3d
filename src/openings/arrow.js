@@ -120,3 +120,44 @@ export function createHint({ gimbal, persist = true }) {
     },
   };
 }
+
+// The marks of a goal screen (CHE-129): gold squares on the board where the line's pieces end up. A strong mark (own) is the
+// hint's "to" square plus a ring, a quiet mark (the other side) is the hint's "from" square. Named `goal-marks`, not
+// `move-hint`, so the Play view's follow camera and the hint tests do not take them for a hint arrow. Squares are rules
+// engine indices; `show([{ sq, own }])` replaces what is drawn, `hide()` clears it.
+export function createMarks({ gimbal }) {
+  const group = new THREE.Group();
+  group.name = 'goal-marks';
+  group.visible = false;
+  gimbal.add(group);
+  const fill = (opacity) => new THREE.MeshBasicMaterial({
+    color: GOLD, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  const ownMat = fill(0.5), quietMat = fill(0.22), ringMat = fill(0.9);
+  const square = new THREE.PlaneGeometry(0.94, 0.94).rotateX(-Math.PI / 2);
+  const ring = new THREE.RingGeometry(0.36, 0.44, 28).rotateX(-Math.PI / 2);
+  const applyStyle = () => {
+    ownMat.color.set(style.to); quietMat.color.set(style.from); ringMat.color.set(style.arrow);
+    ownMat.opacity = style.toOp; quietMat.opacity = style.fromOp; ringMat.opacity = Math.min(0.95, style.arrowOp + 0.12);
+  };
+  live.add(applyStyle);
+  applyStyle();
+  return {
+    group,
+    show(list) {
+      group.clear();
+      for (const { sq, own } of list || []) {
+        const m = new THREE.Mesh(square, own ? ownMat : quietMat);
+        m.position.set(sqX(sq), LIFT, sqZ(sq)); m.renderOrder = 12;
+        group.add(m);
+        if (own) { const r = new THREE.Mesh(ring, ringMat); r.position.set(sqX(sq), LIFT * 2, sqZ(sq)); r.renderOrder = 12; group.add(r); }
+      }
+      group.visible = group.children.length > 0;
+    },
+    hide() { group.clear(); group.visible = false; },
+    get visible() { return group.visible; },
+    get count() { return group.children.filter((c) => c.geometry === square).length; },
+    dispose() { gimbal.remove(group); live.delete(applyStyle); square.dispose(); ring.dispose(); ownMat.dispose(); quietMat.dispose(); ringMat.dispose(); },
+  };
+}

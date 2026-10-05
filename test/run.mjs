@@ -74,6 +74,7 @@ if (tier === 'fast' || tier === 'all') {
   run('bin/lane agent identity prepend (test/lane-identity.mjs)', 'test/lane-identity.mjs');
   run('affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
+  run('goal screens: target position, marks, goal sentences (test/goal.mjs)', 'test/goal.mjs');
   run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
   run('puzzle controller (test/puzzle-controller.mjs)', 'test/puzzle-controller.mjs');
   run('daily puzzle and streak (test/daily.mjs)', 'test/daily.mjs');

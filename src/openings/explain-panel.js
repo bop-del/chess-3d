@@ -1,12 +1,15 @@
-// Explain panel: the line in progress (title, sentence, Back, Show me, hint switch, finish, Add to my openings).
-// The line list moved to src/learn (the Openings tab). Desktop: one card in the right column, the tabs while idle and the
-// walking UI while a line runs. Phone: while a line is walked the sentence and buttons sit in a strip under the status
-// line, because the sentence is about the position and a sheet would hide it. Every string goes through t(); line texts come in { en, de } pairs and are picked by language.
+// Explain panel: the line in progress. Top says what to do now, the bottom holds only buttons (Weiter, Hinweis, Nochmal,
+// Beenden), the move text waits on a card between the moves until the player taps Weiter, and a line opens on its goal screen
+// with Los (CHE-129). The layout lives in lineview.js; this file turns the controller state into one descriptor.
+// The line list lives in src/learn (the Openings tab). Desktop: one card in the right column, the tabs while idle and the
+// walking UI while a line runs. Phone: no card, the top bar, the text card and the learning bar of lineview.js.
+// Every string goes through t(); line texts come in { en, de } pairs and are picked by language.
 import * as I18N from '../i18n.js';
 import { device } from '../device.js';
 import { createExplain } from './explain.js';
+import { createLineView } from './lineview.js';
 import '../learn/strings.js';
-import { createHint } from './arrow.js';
+import { createHint, createMarks } from './arrow.js';
 import './explain.css';
 
 const { t, onLanguage, i18n } = I18N;
@@ -21,33 +24,31 @@ const pick = (pair) => (pair ? pair[i18n.language] || pair.en || '' : '');
 // German piece letters are the i18n layer's job; until it exports a converter the English letters show.
 const show = (san) => (typeof I18N.san === 'function' ? I18N.san(san, i18n.language) : san);
 
+// The one line goal of a line, "Goal: ...", from GOALS in src/i18n.js. A line without a written goal (a player's own line)
+// gets the plain one.
+export function goalText(line) {
+  const g = I18N.GOALS[line.id];
+  const label = t('lines.goalLabel', 'Goal');
+  return `${label}: ${g ? g[i18n.language] || g.en : t('lines.goalGeneric', 'the position after {n} moves', { n: line.moves.length })}`;
+}
+
 export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = null, sweep = null }) {
   const hint = createHint({ gimbal });
+  const marks = createMarks({ gimbal });
   // face the board from the line's side; leave the view alone when it already does (the drill uses it too)
   const onSide = (side) => {
     const facesBlack = Math.cos(controls.camera.yaw) < 0;
     if ((side === 'b') !== facesBlack) controls.flip();
   };
-  const explain = createExplain({ game, hint, pause, onSide });
+  const explain = createExplain({ game, hint, marks, pause, onSide });
 
   // `idle` is the element src/learn fills with the tabs (Openings, Mine, Practise). Desktop: it sits in this card while no line
-  // runs. Phone: it lives in the Learn sheet and the card is not mounted at all, the walking UI is in the strip.
+  // runs. Phone: it lives in the Learn sheet and the card is not mounted at all, the walking UI is the top bar, card and bar.
   const root = el('div', 'xp');
   const idle = el('div', 'xidle');
   const card = device.phone ? null : ui.mountPanel('openings', root, { title: t('learn.title', 'Learn') });
-  const strip = device.phone ? el('section', 'xstrip') : null;
-  if (strip) {
-    strip.hidden = true;
-    strip.setAttribute('aria-live', 'polite');
-    document.getElementById('hud').append(strip);
-  }
+  const view = createLineView({ ui, owner: 'explain' });
 
-  function button(label, cls, fn) {
-    const b = el('button', `btn ${cls || ''}`.trim(), label);
-    b.type = 'button';
-    b.addEventListener('click', fn);
-    return b;
-  }
   const ownSquares = (side) => {
     const out = [];
     game.chess.board.forEach((p, sq) => { if (p && (p === p.toUpperCase()) === (side === 'w')) out.push(sq); });
@@ -55,7 +56,9 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
   };
   function adoptControl(s) {
     const adopted = store.isAdopted(s.line.id);
-    const b = button(adopted ? t('explain.inMine', 'In my openings') : t('explain.addMine', 'Add to my openings'), adopted ? 'xadopt done' : 'xadopt primary', () => {
+    const b = el('button', `btn ${adopted ? 'xadopt done' : 'xadopt primary'}`, adopted ? t('explain.inMine', 'In my openings') : t('explain.addMine', 'Add to my openings'));
+    b.type = 'button';
+    b.addEventListener('click', () => {
       if (store.isAdopted(s.line.id)) return;   // inert once adopted
       store.adopt(s.line.id);
       try { sweep?.play({ side: s.line.side, squares: ownSquares(s.line.side) }); } catch (e) { console.warn('sweep failed', e); }
@@ -65,86 +68,64 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
     return b;
   }
 
-  // ------------------------------------------------------------ pieces
-  function sentence(s) {
-    const m = s.message;
-    if (!m) return '';
-    if (m.type === 'intro') return pick(s.line.intro);
-    if (m.type === 'refused') return `${t('explain.notThisMove', 'Not this move. The line plays')} ${show(m.san)}.`;
-    const text = pick(s.line.moves[m.ply]);
-    return m.end && s.line.ending ? `${text} ${pick(s.line.ending)}` : text;
-  }
-  function status(s) {
-    if (s.phase === 'finished') return t('explain.done', 'Line complete.');
-    return s.due.own ? t('explain.yourMove', 'Your move.') : t('explain.opponentMoves', 'The opponent replies.');
-  }
   const sideLabel = (l) => t(l.side === 'w' ? 'explain.forWhite' : 'explain.forBlack', l.side === 'w' ? 'You play White' : 'You play Black');
 
-  function controlsRow(s) {
-    const row = el('div', 'xrow');
-    const back = button(t('explain.back', 'Back'), '', () => explain.back());
-    back.disabled = !s.canBack;
-    row.append(back);
-    if (s.phase === 'finished') {
-      row.append(button(t('explain.again', 'Again'), 'primary', () => explain.restart()));
-    } else {
-      row.append(button(t('explain.showMe', 'Show me'), 'primary', () => explain.next()));
+  // ------------------------------------------------------------ the descriptor
+  function describe(s) {
+    const L = s.line;
+    const base = { title: pick(L.name), side: sideLabel(L), close: { label: t('explain.all', 'All openings'), run: () => explain.stop() } };
+    const end = { id: 'end', icon: 'end', label: t('lines.end', 'End'), aria: t('explain.all', 'All openings'), run: () => explain.stop() };
+    const again = (primary) => ({ id: 'again', icon: 'undo', label: t('lines.again', 'Again'), aria: t('lines.again', 'Again'), primary, run: () => explain.restart() });
+    if (s.phase === 'preview') {
+      return {
+        ...base, action: goalText(L),
+        card: { title: `${base.title}, ${base.side}`, text: t('lines.legend', 'Gold squares: where the pieces that move end up. Tap Go to start from the beginning.'), kind: 'goal' },
+        buttons: [{ id: 'go', icon: 'show', label: t('lines.go', 'Go'), aria: t('lines.go', 'Go'), primary: true, run: () => explain.go() }, end],
+      };
     }
-    const hintBtn = button(t(s.hint ? 'explain.hintOff' : 'explain.hintOn', s.hint ? 'Hide the hint' : 'Show the hint'), 'xhint', () => explain.setHint(!s.hint));
-    row.append(hintBtn);
-    return row;
-  }
-
-  function walking(s, { compact }) {
-    const box = el('div', 'xwalk');
-    const head = el('div', 'xhead');
-    const title = el('div', 'xtitle');
-    title.append(el('b', '', pick(s.line.name)), el('span', 'xside', sideLabel(s.line)));
-    head.append(title);
-    if (!compact) head.append(button(t('explain.all', 'All openings'), 'xclose', () => explain.stop()));   // phone: Beenden sits in the learning bar
-    const text = el('p', 'xtext', sentence(s));
-    text.dataset.kind = s.message?.type || '';
-    const meta = el('div', 'xmeta');
-    meta.append(el('span', '', status(s)), el('span', '', `${Math.min(s.ply, s.total)} / ${s.total}`));
-    box.append(head, text, meta);
-    if (!compact) box.append(controlsRow(s));
-    if (s.phase === 'finished' && store) box.append(adoptControl(s));
-    if (s.phase === 'finished' && !compact) box.append(button(t('explain.another', 'Choose another line'), 'xmore', () => explain.stop()));
-    return box;
-  }
-
-  // phone: the thumb bar becomes the controls (Back, Show me, Hint, End), the card keeps only the text
-  function learnBar(s) {
-    const fin = s.phase === 'finished';
-    const out = [{ id: 'back', icon: 'undo', label: t('lb.back', 'Back'), aria: t('explain.back', 'Back'), disabled: !s.canBack, run: () => explain.back() }];
-    out.push(fin ? { id: 'again', icon: 'show', label: t('lb.again', 'Again'), aria: t('explain.again', 'Again'), primary: true, run: () => explain.restart() }
-      : { id: 'show', icon: 'show', label: t('lb.show', 'Show me'), aria: t('explain.showMe', 'Show me'), primary: true, run: () => explain.next() });
-    if (!fin) out.push({ id: 'hint', icon: 'good', label: t('lb.hint', 'Hint'), aria: t(s.hint ? 'explain.hintOff' : 'explain.hintOn', s.hint ? 'Hide the hint' : 'Show the hint'), on: s.hint, pressed: s.hint, run: () => explain.setHint(!s.hint) });
-    out.push({ id: 'end', icon: 'end', label: t('lb.end', 'End'), aria: t('explain.all', 'All openings'), run: () => explain.stop() });
-    return out;
+    if (s.phase === 'finished') {
+      const ending = s.card && s.card.ending ? pick(L.ending) : '';
+      return {
+        ...base, action: t('lines.done', 'Line complete.'),
+        card: s.card ? (s.card.ending ? { title: t('lines.done', 'Line complete.'), text: ending, kind: 'ending' } : { title: show(L.moves[s.card.ply].san), text: pick(L.moves[s.card.ply]), kind: 'move' }) : null,
+        buttons: [again(true), end],
+        extra: store ? adoptControl(s) : null,
+      };
+    }
+    const waiting = s.canContinue;
+    const nextLabel = s.card && s.card.last ? t('lines.cont', 'Continue') : t('lines.next', 'Show next move');   // after the last move there is none to show
+    let action, kind = '';
+    if (waiting) action = t('lines.tapNext', 'Read it, then show the next move.');
+    else if (s.message && s.message.type === 'refused') { action = t('lines.wrong', 'Not this move. Play {san}.', { san: show(s.message.san) }); kind = 'refused'; }
+    else if (s.due && s.due.own) action = t('lines.play', 'Play {san}', { san: show(s.due.san) });
+    else action = t('lines.opponent', 'The opponent replies.');
+    return {
+      ...base, action, actionKind: kind,
+      card: s.card ? { title: show(L.moves[s.card.ply].san), text: pick(L.moves[s.card.ply]), kind: 'move' } : null,
+      buttons: [
+        { id: 'next', icon: 'next', label: nextLabel, aria: nextLabel, primary: waiting, disabled: !waiting, run: () => explain.weiter() },
+        { id: 'hint', icon: 'good', label: t('lines.hint', 'Hint'), aria: t(s.hint ? 'explain.hintOff' : 'explain.hintOn', s.hint ? 'Hide the hint' : 'Show the hint'), on: s.hint, pressed: s.hint, run: () => explain.setHint(!s.hint) },
+        again(false), end,
+      ],
+    };
   }
 
   // ------------------------------------------------------------ render
   function render() {
     const s = explain.state();
+    const live = s.phase !== 'list';
+    const desc = live ? describe(s) : null;
     if (card) {
       card.querySelector('h2').textContent = t('learn.title', 'Learn');
-      root.replaceChildren(s.phase === 'list' ? idle : walking(s, { compact: false }));
+      root.replaceChildren(live ? view.desktop(desc) : idle);
     }
-    document.body.classList.toggle('explaining', s.phase !== 'list');
-    if (!strip) return;
-    ui.setLearnBar?.('explain', s.phase === 'list' ? null : learnBar(s));
-    strip.hidden = s.phase === 'list';
-    if (s.phase !== 'list') {
-      strip.replaceChildren(walking(s, { compact: true }));
-      document.body.style.setProperty('--xh', `${strip.offsetHeight}px`);
-    } else document.body.style.setProperty('--xh', '0px');
+    document.body.classList.toggle('explaining', live);
+    view.show(desc);
   }
   explain.on(render);
   store?.onChange(() => { if (explain.state().phase === 'finished') render(); });
   onLanguage(render);
-  if (strip && window.ResizeObserver) new ResizeObserver(() => { if (!strip.hidden) document.body.style.setProperty('--xh', `${strip.offsetHeight}px`); }).observe(strip);
   render();
 
-  return { explain, hint, card, strip, idle, onSide, tick: (dt) => explain.tick(dt) };
+  return { explain, hint, marks, card, view, idle, onSide, tick: (dt) => explain.tick(dt) };
 }

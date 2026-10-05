@@ -1,2 +1,1 @@
-/* Drill strip: it reuses the Explain classes (explain.css); only the room it takes from the camera frame is its own. */
-body.phone.drilling .pframe { top: calc(var(--st) + var(--stat) + var(--gap) * 2 + var(--dh, 0px)); }
+/* Drill: it reuses the Explain classes and the lines layout (explain.css, lineview.js); nothing of its own. */

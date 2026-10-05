@@ -217,6 +217,22 @@ try {
     seen.errs.push(...rw.errs); seen.foreign.push(...rw.foreign);
     await rp.close();
   }
+  // ?line=<id>: the goal screen of that line (CHE-129), the target position marked and the goal in the top bar on a phone
+  for (const size of SIZES) {
+    if (!mine()) continue;
+    const lp = await browser.newPage();
+    const lw = await watchPage(lp, ['127.0.0.1', 'localhost']);
+    await lp.setViewport({ width: size[1], height: size[2], deviceScaleFactor: 1, isMobile: size[3], hasTouch: size[3] });
+    await lp.evaluateOnNewDocument((w, h, phone) => { if (phone) for (const [k, v] of [['width', w], ['height', h]]) Object.defineProperty(screen, k, { get: () => v }); }, size[1], size[2], size[3]);
+    await load(lp, size, '&line=italian-game');
+    const g = await lp.evaluate(() => { const c = window.__chess, s = c.openings.explain.state(), top = document.querySelector('.xtop'); return { phase: s.phase, line: s.line && s.line.id, marks: c.openings.marks.count, top: top && !top.hidden ? top.textContent : null, cls: document.body.classList.contains('lines') }; });
+    R.expect(`${size[0]}: line=italian-game opens its goal screen`, g.phase === 'preview' && g.line === 'italian-game' && g.marks >= 5 && g.cls && (size[3] ? /^Goal:/.test(g.top || '') : true), 'goal screen, marks, goal line', JSON.stringify(g));
+    await load(lp, size, '&line=nope');
+    const n = await lp.evaluate(() => window.__chess.openings.explain.state().phase);
+    R.expect(`${size[0]}: line=nope is ignored`, n === 'list', 'list', n);
+    seen.errs.push(...lw.errs); seen.foreign.push(...lw.foreign);
+    await lp.close();
+  }
   // CHE-221: the labelled Explain button on every opening card drives from the board to a running line; the retired explain= flag is ignored; targets are 44 px on a phone
   const EXP_SIZES = [['phone 390x844', 390, 844, true], ['phone 375x667', 375, 667, true], ['phone landscape', 844, 390, true], ['desktop', 1280, 720, false]];
   for (const size of EXP_SIZES) {
@@ -238,7 +254,7 @@ try {
       await settleUi(ep);
       return r;
     };
-    const walking = () => ep.evaluate(() => window.__chess.openings.explain.state().phase === 'walking');
+    const walking = () => ep.evaluate(() => window.__chess.openings.explain.state().phase === 'preview');   // a line opens on its goal screen (CHE-129)
     for (const query of ['', '&explain=b']) {
       const label = `${size[0]}: Explain button${query ? ` (ignored ${query.slice(1)})` : ''}`;
       await load(ep, size, query + (size[3] ? '' : '&open=openings'));
@@ -251,7 +267,7 @@ try {
         await hit('.psheet.open .xline.openings:not(:disabled) .xgo');
       }
       const w = await walking();
-      R.expect(label, ok && w && (!size[3] || minH >= 44) && steps.length === (size[3] ? 2 : 1), `${size[3] ? 2 : 1} taps to a walking line, targets 44 px on a phone`, `${steps.join(' ')} walking ${w}`);
+      R.expect(label, ok && w && (!size[3] || minH >= 44) && steps.length === (size[3] ? 2 : 1), `${size[3] ? 2 : 1} taps to the goal screen of a line, targets 44 px on a phone`, `${steps.join(' ')} walking ${w}`);
     }
     // the deep link opens the Learn sheet on the Openings tab with an Explain button on each playable card
     await load(ep, size, '&open=learn');

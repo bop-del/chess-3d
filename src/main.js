@@ -189,6 +189,7 @@ async function boot() {
   // phones and Low quality get 512 px textures; the pixels come from a cache or Workers, and the bar moves per texture
   await prepareTextures({ cap: device.phone || quality === 'low' ? 512 : 1024, onStep: (n, m) => progress(0.3 + 0.08 * n / m) });
   const board = createBoard();
+  if (device.phone) board.setLabelScale(1.5);   // CHE-129: the edge labels are 1.5 times bigger on a phone
   gimbal.add(board.group);
   intro?.attachBoard(board);
   compile();
@@ -364,7 +365,7 @@ async function boot() {
   }
   boot.ready = performance.now();
   adapter.arm();   // the start sequence is over: the adapter's warm up starts now
-  applyLateParams({ game, ui, stage, controls, learn, review });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
+  applyLateParams({ game, ui, stage, controls, learn, review, openings });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
   window.__chessReady = true;
@@ -434,7 +435,7 @@ function applyGameParams({ game }) {
 }
 
 // the rest, applied when the start sequence is over
-function applyLateParams({ game, ui, stage, controls, learn, review }) {
+function applyLateParams({ game, ui, stage, controls, learn, review, openings }) {
   if (params.get('hud') === '0') ui.toggleHud(true);
   if (params.get('help') === '1') ui.toggleHelp();
   const light = params.get('light');
@@ -443,6 +444,9 @@ function applyLateParams({ game, ui, stage, controls, learn, review }) {
   const promo = params.get('promo');
   if (promo) game.clickSquare(game.nameSq(promo.slice(0, 2))), game.clickSquare(game.nameSq(promo.slice(2, 4)));
   openFlag(params.get('open'), { ui, learn, review });
+  // ?line=<line id>: the goal screen of that line (CHE-129). An unknown or unfinished id does nothing, quietly.
+  const lineId = params.get('line');
+  if (lineId) { try { openings?.explain.start(lineId); } catch (e) { /* a missing line is not worth a message */ } }
 }
 
 // ?open=<id>: one panel or tab, shown when the game is ready. An unknown value does nothing, quietly.

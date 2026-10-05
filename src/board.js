@@ -398,7 +398,8 @@ export function createBoard() {
 
   // ---- labels
   const atlas = makeLabelAtlas();
-  const LH = 0.15, LY = 0.0615, LR = 4.29;
+  let LH = 0.15;                       // half the label size; setLabelScale() makes it bigger on phones
+  const LY = 0.0615, LR = 4.29;
   const addLabel = (lb, cx, cz, right, up, col, row) => {
     const u0 = col / 8 + 0.004, u1 = (col + 1) / 8 - 0.004, v1 = 1 - row * 0.5 - 0.004, v0 = 1 - (row + 1) * 0.5 + 0.004;
     const corner = (sr, su) => [cx + right[0] * LH * sr + up[0] * LH * su, LY, cz + right[2] * LH * sr + up[2] * LH * su];
@@ -469,6 +470,12 @@ export function createBoard() {
     squareCenter(file, rank) { return new THREE.Vector3(file - 3.5, 0, 3.5 - rank); },
     setHighlights(list) { hl.set(list); },
     clearHighlights() { hl.set([]); },
+    /** The edge labels (a to h, 1 to 8) at `k` times their normal size, same centres (phones use 1.5). */
+    setLabelScale(k = 1) {
+      LH = 0.15 * k;
+      labelsW.geometry.dispose(); labelsW.geometry = buildLabels(W_R, W_U);
+      labelsB.geometry.dispose(); labelsB.geometry = buildLabels(B_R, B_U);
+    },
     /** upLocal: the screen-up direction expressed in board space. Picks the label set that reads upright. */
     orientLabels(upLocal) {
       if (upLocal.z < -0.05) { labelsW.visible = true; labelsB.visible = false; }

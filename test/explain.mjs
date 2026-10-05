@@ -22,7 +22,7 @@ export async function runExplainChecks({ page, baseUrl, log = () => {}, shot = n
   const step = (s) => page.evaluate((x) => { window.__chess.step(x); window.__chess.draw(); }, s);
   const st = () => page.evaluate(() => {
     const c = window.__chess, s = c.openings.explain.state();
-    return { phase: s.phase, ply: s.ply, msg: s.message && s.message.type, due: s.due && s.due.san, own: s.due && s.due.own, placement: c.game.chess.fen().split(' ')[0], hint: c.openings.hint.visible };
+    return { phase: s.phase, ply: s.ply, msg: s.message && s.message.type, due: s.due && s.due.san, own: s.due && s.due.own, placement: c.game.chess.fen().split(' ')[0], hint: c.openings.hint.visible, card: !!s.canContinue, ending: !!(s.card && s.card.ending), marks: c.openings.marks.count };
   });
   const play = async (from, to) => {
     await page.evaluate((a, b) => { const g = window.__chess.game; g.clickSquare(g.nameSq(a)); g.clickSquare(g.nameSq(b)); }, from, to);
@@ -38,6 +38,15 @@ export async function runExplainChecks({ page, baseUrl, log = () => {}, shot = n
     ok('explain: the Italian Game starts', await page.evaluate(() => window.__chess.openings.explain.start('italian-game')));
     await step(0.3);
     let s = await st();
+    ok('explain: a line opens on its goal screen: the last position, the moved pieces marked, no hint', s.phase === 'preview' && s.placement !== START && s.marks >= 5 && !s.hint, JSON.stringify(s));
+    await play('e2', 'e4');
+    s = await st();
+    ok('explain: on the goal screen no move is possible', s.placement !== START && s.phase === 'preview', JSON.stringify(s));
+    await shot?.('explain-goal');
+    await page.evaluate(() => window.__chess.openings.explain.go());
+    await step(0.3);
+    s = await st();
+    ok('explain: Los starts from the start position, the marks are gone', s.phase === 'walking' && s.placement === START && s.marks === 0, JSON.stringify(s));
     ok('explain: first own move e4 is due and the hint shows', s.due === 'e4' && s.own && s.hint, JSON.stringify(s));
     await shot?.('explain-start');
     await play('d2', 'd4');
@@ -45,13 +54,24 @@ export async function runExplainChecks({ page, baseUrl, log = () => {}, shot = n
     ok('explain: a wrong move is refused, the board does not change', s.ply === 0 && s.msg === 'refused' && s.placement === START, JSON.stringify(s));
     await play('e2', 'e4');
     s = await st();
-    ok('explain: own move e4 is accepted, the opponent reply is pending', s.ply === 1 && s.due === 'e5' && !s.own && !s.hint, JSON.stringify(s));
+    ok('explain: own move e4 is accepted and its text card waits for Weiter', s.ply === 1 && s.due === 'e5' && !s.own && !s.hint && s.card, JSON.stringify(s));
+    await step(4);
+    s = await st();
+    ok('explain: the opponent does not move while the card waits, however long', s.ply === 1 && s.card, JSON.stringify(s));
+    await page.evaluate(() => window.__chess.openings.explain.weiter());
+    s = await st();
+    ok('explain: Weiter clears the card', !s.card, JSON.stringify(s));
     await step(2.5);
     s = await st();
-    ok('explain: the opponent plays e5 after the pause', s.ply === 2 && s.due === 'Nf3' && s.own && s.hint, JSON.stringify(s));
+    ok('explain: after Weiter the opponent plays e5, its card waits', s.ply === 2 && s.due === 'Nf3' && s.card && !s.hint, JSON.stringify(s));
+    await page.evaluate(() => window.__chess.openings.explain.weiter());
+    s = await st();
+    ok('explain: after the second Weiter it is the player\'s move with the hint', !s.card && s.own && s.hint, JSON.stringify(s));
     await shot?.('explain-walking');
     await play('g1', 'f3');
+    await page.evaluate(() => window.__chess.openings.explain.weiter());
     await step(2.5);
+    await page.evaluate(() => window.__chess.openings.explain.weiter());
     s = await st();
     ok('explain: Nf3 then the opponent Nc6', s.ply === 4 && s.due === 'Bc4', JSON.stringify(s));
     await page.evaluate(() => window.__chess.openings.explain.back());
@@ -65,13 +85,16 @@ export async function runExplainChecks({ page, baseUrl, log = () => {}, shot = n
     }
     s = await st();
     ok('explain: the Italian Game walks to its end', s.phase === 'finished' && s.ply === 9 && !s.hint, JSON.stringify(s));
+    await page.evaluate(() => window.__chess.openings.explain.weiter());
+    s = await st();
+    ok('explain: the last card gives way to the ending text', s.ending && !s.card, JSON.stringify(s));
     ok('explain: board consistent at the end', (await page.evaluate(() => window.__chess.game.audit())).length === 0);
     await shot?.('explain-finished');
     await page.evaluate(() => window.__chess.openings.explain.stop());
     await step(0.5);
     s = await st();
     ok('explain: leaving returns to the list on a fresh board', s.phase === 'list' && s.placement === START, JSON.stringify(s));
-    await page.evaluate(() => window.__chess.openings.explain.start('scandinavian-defense'));
+    await page.evaluate(() => { const e = window.__chess.openings.explain; e.start('scandinavian-defense'); e.go(); });
     await step(2.5);
     s = await st();
     ok('explain: the Scandinavian starts with the opponent e4', s.ply === 1 && s.due === 'd5' && s.own, JSON.stringify(s));

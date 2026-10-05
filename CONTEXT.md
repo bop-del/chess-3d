@@ -77,6 +77,18 @@ and Drill come later. Adopt is an act rather than a place, so only some modes ar
 tabs.
 _Avoid_: screen (that is one view), tab (that is the control), section
 
+**Goal screen**:
+The first screen of a line: the position its last move reaches, the squares where
+the pieces that moved end up marked in gold, one line of goal at the top, and Go
+(German Los) to start from the beginning. The same for a starter line and for one
+the player added.
+_Avoid_: preview (the code's phase name, not the player's), intro, target
+
+**Text card**:
+The card between two moves that holds the move text until the player taps Next
+(German Weiter). The other side replies only after it. No timer.
+_Avoid_: card (that is a Drill position), popup, tooltip, subtitle
+
 **Explain**:
 The mode that walks a line with a sentence per move: the player makes the own
 moves, the game plays the opponent moves, and each move shows its text.
