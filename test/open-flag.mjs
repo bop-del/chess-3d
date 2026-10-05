@@ -59,13 +59,13 @@ const SIZES = [['desktop', 1280, 720, false], ['phone portrait', 390, 844, true]
 // seeded: one adopted opening, so the Practise tab is not locked
 const SEED = JSON.stringify({ version: 1, ever: true, adopted: ['italian-game'], cards: {} });
 
-async function load(page, [, w, h, phone], query) {
+async function load(page, [, w, h, phone], query, { settle = true } = {}) {
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
   await page.goto(`${server.base}?quality=low&manual=1&ai=0&intro=0${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   const err = await page.evaluate(() => window.__chessError || null);
   if (err) throw new Error('page failed to start: ' + err);
-  await settleUi(page);   // the sheet slide (0.3 s of CSS, real time even with manual=1)
+  if (settle) await settleUi(page);   // the sheet slide (0.3 s of CSS, real time even with manual=1); an ignored value opens nothing, so it skips the wait (the flag is applied before __chessReady)
 }
 
 // the element exists, has a size, is on screen and no ancestor card is collapsed or sheet closed
@@ -110,7 +110,7 @@ try {
       let logs = 0;
       const on = () => { logs++; };
       page.on('console', on);
-      await load(page, size, `&open=${encodeURIComponent(bad)}`);
+      await load(page, size, `&open=${encodeURIComponent(bad)}`, { settle: false });
       page.off('console', on);
       const open = await page.evaluate(() => !!document.querySelector('.psheet.open'));
       R.expect(`${size[0]}: open=${JSON.stringify(bad)} is ignored`, !open && !watch.errs.length && !watch.warns.length && logs === 0, 'nothing opened, silent', `sheet ${open}, errs ${watch.errs.join('|')}, warns ${watch.warns.join('|')}, console ${logs}`);
@@ -246,23 +246,19 @@ try {
       const hit = async (sel) => { const r = await tap(sel); steps.push(r ? `${sel}:${Math.round(r.h)}` : `${sel}:missing`); if (!r || !r.inside) { ok = false; steps.push(`(${r ? JSON.stringify(r) : 'none'})`); } else if (size[3]) minH = Math.min(minH, r.h); return r; };
       if (!size[3]) {   // desktop: the card is on screen, one tap on the opening
         if (v === 'c') { R.pass(`${label} has no desktop entry of its own`); continue; }
-        if (!query) await ep.screenshot({ path: '.tmp/builder/shots/explain-a-desktop.png' });
         await hit(v === 'b' ? '.xhero' : '.xline.openings:not(:disabled)');
       } else if (v === 'c') {
-        await ep.screenshot({ path: `.tmp/builder/shots/explain-c-chip-${size[1]}x${size[2]}.png` });
         await hit('.xchip');
         const viaChip = await walking();
         const chipSteps = steps.join(' ');
         steps.length = 0;
         await load(ep, size, query);
         await hit('.pbar .tb[data-act="menu"]');
-        await ep.screenshot({ path: `.tmp/builder/shots/explain-c-menu-${size[1]}x${size[2]}.png` });
         await hit('.xmenu'); await hit('.psheet.open .xline.openings:not(:disabled)');
         R.expect(`${label}: chip (1 tap after the moves) and Menu entry (3 taps) reach a walking line`, ok && viaChip && (await walking()) && minH >= 44, 'both walking, 44 px', `chip ${chipSteps}, menu ${steps.join(' ')}`);
         continue;
       } else {
         await hit('.pbar .tb[data-act="learn"]');
-        await ep.screenshot({ path: `.tmp/builder/shots/explain-${v}-${query ? query.slice(9) : 'default'}-${size[1]}x${size[2]}.png` });
         await hit(v === 'b' ? '.psheet.open .xhero' : '.psheet.open .xline.openings:not(:disabled) .xgo');
       }
       const w = await walking();
