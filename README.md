@@ -44,12 +44,13 @@ Game review after a game: a move strip with marked mistakes, a gold arrow for th
 
 ![Game review with Details open: evaluation graph, best line and accuracy](docs/review-details.jpg)
 
-On a phone, in portrait: the game with its thumb bar, the Menu sheet, a lesson running with the learning bar, and the puzzle path.
+On a phone, in portrait: the game with its thumb bar, the Menu sheet, the Learn sheet with an Explain button on every opening, an opening's goal screen, and the puzzle path.
 
 <p>
   <img src="docs/phone-portrait.jpg" alt="Phone, portrait: status line, board and thumb bar" width="240">
   <img src="docs/phone-menu.jpg" alt="Phone, portrait: the Menu sheet" width="240">
-  <img src="docs/phone-learning.jpg" alt="Phone, portrait: an opening lesson with the learning bar" width="240">
+  <img src="docs/phone-learning.jpg" alt="Phone, portrait: the Learn sheet with an Explain button on every opening" width="240">
+  <img src="docs/phone-line.jpg" alt="Phone, portrait: the goal screen of an opening with Go and End" width="240">
   <img src="docs/phone-puzzles.jpg" alt="Phone, portrait: the puzzle path in the Learn sheet" width="240">
 </p>
 
