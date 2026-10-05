@@ -228,6 +228,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     }
   };
   views.on(() => { buildViewButtons(); markSymbols(); });
+  views.onSymbols(markSymbols);
   buildViewButtons();
   $('#btn-flip')?.addEventListener('click', () => controls.flip());
   document.getElementById('btn-symbols')?.addEventListener('click', (e) => { if (!e.currentTarget.classList.contains('tb')) views.toggleSymbols(); });

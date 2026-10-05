@@ -6,7 +6,7 @@
 //   reduced motion the finished board shows at once, no sequence
 //   fallback       a sequence that cannot start (its glint texture cannot be drawn) falls back to the CSS board and the game boots
 //   phone          390x844 touch: ends in the Play view
-//   easy view      a stored Symbols view is the view the finished sequence shows
+//   easy view      a stored Symbols view is the default view with Symbols on after the finished sequence
 // Exit codes: 0 pass, 1 a check failed.
 import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
 const args = process.argv.slice(2);
@@ -160,7 +160,8 @@ try {
     await page.goto(url('quality=low&ai=0'), { waitUntil: 'domcontentloaded', timeout: 120000 });
     await ready(page);
     const f = await page.evaluate(finished);
-    R.expect('easy view: the stored Easy view takes over when the sequence ends', f.view === 'symbols' && f.loaderDone && !f.introClass, 'symbols', JSON.stringify(f));
+    const symOn = await page.evaluate(() => window.__chess.views.isSymbols() && window.__chess.symbols.visible && localStorage.getItem('chess3d.symbols') === '1' && localStorage.getItem('chess3d.view') !== 'symbols');
+    R.expect('symbols: a stored Symbols view becomes the default view with Symbols on when the sequence ends', f.view !== 'symbols' && symOn && f.loaderDone && !f.introClass, 'default view + symbols', JSON.stringify({ f, symOn }));
     R.expect('easy view: no console error', clean(watch), '', dirty(watch));
     await page.close();
   }

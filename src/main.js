@@ -223,9 +223,9 @@ async function boot() {
   const [{ createPlayView }, { createSymbols }] = await Promise.all([import('./views/play.js'), import('./views/symbols.js')]);
   const play = createPlayView({ controls, game, views, device, stage });
   symbols = createSymbols({ gimbal, game, stage, themes, size: device.phone ? 256 : 384 });
-  const showView = () => symbols.setVisible(views.current() === 'symbols');
-  views.on(showView);
-  showView();
+  const showSymbols = () => symbols.setVisible(views.isSymbols());
+  views.onSymbols(showSymbols);
+  showSymbols();
   const upLocal = new THREE.Vector3(), gimbalInv = new THREE.Quaternion();
   const orientLabels = () => {
     // screen-up expressed in board space decides which side the labels read upright from
@@ -234,11 +234,11 @@ async function boot() {
   };
   let t = 0;
   // the frame loop runs the whole game from here on (the modules that follow are optional in it until they exist)
-  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(); themes.update(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(dt); themes.update(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   advance(0.001);   // the Play view's first focus and the HUD measure land in the camera now
   intro?.boardGo();
   intro?.setTarget(0.95);
-  battle = createDirector({ game, controls, stage, ui, themes, gore: params.get('gore') });
+  battle = createDirector({ game, controls, stage, ui, themes, symbols, gore: params.get('gore') });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
   mountTraysSetting({ ui, game, controls, flag: params.get('trays') });   // Captured pieces at the side, below Battle scenes
   const clock = createGameClock({ game, preset: initialPreset(params.get('clock')) });   // the chess clock: off unless chosen (or ?clock=5+0)
@@ -398,6 +398,8 @@ function applyViewParams({ controls, views }) {
   const view = params.get('view');
   // ?view= is for this load only; without it the remembered choice (or the device default) is applied
   if (!(view && views.set(view, { instant: true, remember: false }))) views.set(views.current(), { instant: true });
+  const sym = params.get('symbols');   // ?symbols=1 or 0 switches the flat symbols for this load only (CHE-227)
+  if (sym === '1' || sym === '0') views.setSymbols(sym === '1', { remember: false });
   const preset = params.get('preset');
   if (preset) {
     controls.setPreset(preset);

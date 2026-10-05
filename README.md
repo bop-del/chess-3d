@@ -20,9 +20,9 @@ The Puzzles tab: a path of ten stations per chapter, gold for a clean solve, sil
 
 ![The puzzle path](docs/puzzles-path.jpg)
 
-The Symbols view: flat chess diagram symbols as in chess books, on a plain board in the theme's colours.
+The Symbols switch: flat chess diagram symbols as in chess books, lying on a plain board in the theme's colours, in any view and theme.
 
-![Symbols view](docs/symbols.jpg)
+![Symbols switch](docs/symbols.jpg)
 
 The Tournament theme (vinyl green and warm cream squares), the Blocks theme (block heroes against block critters on a floating island) and the Pixelwelt theme (a world of 16 pixel blocks with blocky figures).
 
@@ -131,7 +131,7 @@ Sliders and buttons (Settings tab; Flip, Spin, Reset and Lock are on the view ba
 
 | Control | What it does |
 |---|---|
-| Views | White view, Black view, Top down, Side, Isometric, plus two easy views: Symbols (flat chess diagram symbols as in chess books, cream and black with an outline, printed on a plain flat board in the theme's colours; free orbit), and From above (the real 3D pieces, perspective camera steeply from above at 65 degrees). The easy views show the board in the theme's full colour and as large as the screen allows (on a phone in portrait edge to edge); From above locks the tilt and turn (Symbols orbits freely), Flip, zoom and Reset still work. On phones in portrait also Play, the default there: the board as big as the screen allows, and the camera glides sideways so the selected piece and all its moves, the computer's reply and any hint arrow stay in view. Smooth animated transitions. The choice is remembered per device (a stored or linked view that no longer exists, such as Tokens or Easy 3D, opens the device default: Play on a phone in portrait, else White). The Views button on a phone cycles Play, From above, then the presets. Symbols is no longer in that cycle or in the views list: a Symbols/Pieces toggle switches it (thumb bar button on a phone, in the slot where Flip was; button on the desktop view bar). Pieces returns to the view you had before. Turning the board stays on the gesture (twist, drag), the Menu's View card (Flip), the key F and the White/Black views. Symbols skips the battle scenes (From above plays them) |
+| Views | White view, Black view, Top down, Side, Isometric, plus one easy view, From above (the real 3D pieces, perspective camera steeply from above at 65 degrees). The easy views show the board in the theme's full colour and as large as the screen allows (on a phone in portrait edge to edge); From above locks the tilt and turn, Flip, zoom and Reset still work. On phones in portrait also Play, the default there: the board as big as the screen allows, and the camera glides sideways so the selected piece and all its moves, the computer's reply and any hint arrow stay in view. Smooth animated transitions. The choice is remembered per device (a stored or linked view that no longer exists, such as Tokens or Easy 3D, opens the device default: Play on a phone in portrait, else White). The Views button on a phone cycles Play, From above, then the presets. Symbols is not a view but a switch over every view and every theme (Turnier, Blocks, Pixelwelt): flat chess diagram symbols as in chess books, cream and black with an outline, lie on the board, which keeps its theme look. The Symbols/Pieces toggle (thumb bar button on a phone, in the slot where Flip was; button on the desktop view bar) turns it on and off without changing the view or the camera; the state is remembered per browser (`chess3d.symbols`). Turning the board stays on the gesture (twist, drag), the Menu's View card (Flip), the key F and the White/Black views. Symbols on skips the battle scenes (in Pixelwelt the captured symbol fades out; From above with the real pieces plays them) |
 | Flip, Spin, Reset | Turn to the other side, toggle auto spin, return to the start view |
 | Board gimbal X, Y, Z | Three sliders from -180 to 180 degrees with a numeric readout, and a Level board button (Settings, under Advanced) |
 | Theme | Classic, Tournament, Wood, Metal, Glass, Blocks, Pixelwelt: board, frame, pieces and lighting change together. Remembered on this device (Settings tab, or the Menu on a phone) |
@@ -195,7 +195,8 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `theme` | `classic`, `tournament`, `wood`, `metal`, `glass`, `blocks`, `pixel` | Start with this theme for this load only (the swatch row remembers the theme you pick, in `localStorage` `chess3d.theme`) |
 | `pixlight` | `a`, `b` | Pixelwelt light variant for this load only: `a` the plain daylight world, `b` the warm evening mood of Blocks done the Pixelwelt way (peach sky, a warm tint on the unlit materials, a little vignette and bloom). Default `b`. Example: `?theme=pixel&pixlight=a` |
 | `gore` | `0`, `1` | Pixelwelt blood: `0` off (the capture scene plays with no red), `1` on, for this load only (the Blood setting in the Scene card, or Menu on a phone, remembers your choice in `localStorage` `chess3d.battle`; the flag beats it). Open the setting by link with `?theme=pixel&open=scene` |
-| `view` | `white`, `black`, `top`, `side`, `iso`, `symbols`, `above`, `play` | Start in this view for this load only (without it the remembered view, or the device default). `play` only exists on a phone in portrait |
+| `view` | `white`, `black`, `top`, `side`, `iso`, `above`, `play`, `symbols` | Start in this view for this load only (without it the remembered view, or the device default). `play` only exists on a phone in portrait. `symbols` is the device default view with Symbols switched on (the old Symbols view) |
+| `symbols` | `0`, `1` | Symbols on or off for this load only, over any view and theme (the toggle remembers your choice in `localStorage` `chess3d.symbols`; the flag beats it). Example: `?view=above&symbols=1` |
 | `preset` | `White view`, `Black view`, `Top down`, `Side`, `Isometric` | Jump to a view preset |
 | `yaw`, `pitch` | degrees | Set the camera angles |
 | `dist` | number | Set the camera distance |

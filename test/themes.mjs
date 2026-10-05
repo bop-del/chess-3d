@@ -64,7 +64,7 @@ try {
   R.expect('the seven themes look different', new Set(Object.values(shots)).size === 7, '7 distinct frames', JSON.stringify(shots));
   R.expect('switching is quick (software GL, set plus one frame)', Math.max(...times) < 4000, `max ${Math.round(Math.max(...times))} ms`);
 
-  // the Symbols view takes the plain squares from every theme and gives the theme's own look back when it is left
+  // the Symbols switch takes the plain squares from every theme and gives the theme's own look back when it is left
   await page.evaluate(() => window.__chess.views.set('symbols', { instant: true, remember: false }));
   const PLAIN_LIGHT = { classic: 'ddd8ca', tournament: 'f0eed6', wood: 'e6c28c', metal: 'a9acb4', glass: 'b4c8d8' };
   for (const id of IDS) {
@@ -74,13 +74,13 @@ try {
       return { hex: m.color.getHexString(), map: !!m.map, vc: m.vertexColors, on: window.__chess.symbols.visible, hidden: !o.visible };
     }, id);
     // Blocks hides the classic squares: its island blocks are the plain board, so the symbols sit on those
-    if (id === 'blocks' || id === 'pixel') R.expect(id + ': the Symbols view sits on the island squares (classic squares stay hidden)', r.on && r.hidden, JSON.stringify(r));
-    else R.expect(`${id}: the Symbols view has plain squares in the theme's colours`, r.on && !r.map && !r.vc && r.hex === PLAIN_LIGHT[id], JSON.stringify(r));
+    if (id === 'blocks' || id === 'pixel') R.expect(id + ': the Symbols switch sits on the island squares (classic squares stay hidden)', r.on && r.hidden, JSON.stringify(r));
+    else R.expect(`${id}: the Symbols switch has plain squares in the theme's colours`, r.on && !r.map && !r.vc && r.hex === PLAIN_LIGHT[id], JSON.stringify(r));
     shots['symbols-' + id] = await shot();
   }
-  R.expect('the Symbols view looks different in every theme', new Set(IDS.map((id) => shots['symbols-' + id])).size === IDS.length, `${IDS.length} distinct frames`);
-  await page.evaluate(async () => { window.__chess.views.set('white', { instant: true, remember: false }); await window.__chess.themes.set('classic'); for (let i = 0; i < 40; i++) window.__chess.draw(0.05); });
-  R.expect('leaving the Symbols view restores the theme squares', JSON.stringify(await classicLook()) === JSON.stringify(look0), 'identical Classic look');
+  R.expect('the Symbols switch looks different in every theme', new Set(IDS.map((id) => shots['symbols-' + id])).size === IDS.length, `${IDS.length} distinct frames`);
+  await page.evaluate(async () => { window.__chess.views.setSymbols(false, { remember: false }); await window.__chess.themes.set('classic'); for (let i = 0; i < 40; i++) window.__chess.draw(0.05); });
+  R.expect('leaving the Symbols switch restores the theme squares', JSON.stringify(await classicLook()) === JSON.stringify(look0), 'identical Classic look');
 
   // a piece moves and a capture flies to the tray while a theme is on
   await page.evaluate(async () => { await window.__chess.themes.set('wood'); const g = window.__chess.game; g.finishAnimations(); g.move('c3', 'd5'); window.__chess.step(3); window.__chess.draw(); });

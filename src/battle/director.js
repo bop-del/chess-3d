@@ -64,7 +64,7 @@ function restore(snap, { keepHidden = false } = {}) {
   if (keepHidden && hidden) g.visible = false;
 }
 
-export function createDirector({ game, controls, stage, ui, themes, gore }) {
+export function createDirector({ game, controls, stage, ui, themes, symbols, gore }) {
   const settings = createSettings({ ui, themes, gore });
   let active = null;                       // the run in progress
   let fxModule, sfxModule;                 // loaded on first use
@@ -165,6 +165,8 @@ export function createDirector({ game, controls, stage, ui, themes, gore }) {
   handler.stage = true;
   handler.enabled = () => settings.mode !== 'off' && viewsAllowBattle();
   game.onCapture(handler);
+  // Symbols on: no scene (the handler above is disabled); in Pixelwelt the captured symbol fades out instead (CHE-227). A plain hook, always called.
+  game.onCapture((info) => { if (symbols?.visible && themes?.current?.() === 'pixel' && !info.signal?.aborted) symbols.fadeOut(info.victimObj); });
 
   const abortion = (r) => new Promise((res) => { if (r.ac.signal.aborted) res(); else r.ac.signal.addEventListener('abort', res, { once: true }); });
 

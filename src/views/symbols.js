@@ -112,7 +112,7 @@ const flatSpec = (color) => ({
   envMapIntensity: 0.15, transparent: false, transmission: 0, specularIntensity: 1, color,
 });
 
-// createSymbols({ gimbal, game, stage, themes?, size? }) -> { setVisible(on), sync(), dispose(), visible }
+// createSymbols({ gimbal, game, stage, themes?, size? }) -> { setVisible(on), sync(dt), fadeOut(obj), dispose(), visible }
 //   size is the texture size in px (384, or 256 on a phone). sync() is cheap and safe to call every frame; pieces made after
 //   setVisible (promotion) get their symbol at once (root.add is wrapped).
 export function createSymbols({ gimbal, game, stage, themes = null, size = 384 }) {
@@ -129,6 +129,7 @@ export function createSymbols({ gimbal, game, stage, themes = null, size = 384 }
   let on = false;
   let yaw = 0;
   const holders = new Set();
+  const fades = [];   // Pixelwelt: a captured symbol fades out ({ obj, card, orig, t, seen })
 
   function attach(group) {
     const info = group.userData.piece;
@@ -195,8 +196,27 @@ export function createSymbols({ gimbal, game, stage, themes = null, size = 384 }
   const onTheme = () => { if (on) { skin = null; flatten(); } };
   themes?.on?.(onTheme);
 
+  const FADE = 0.5;
+  function endFade(f) { f.card.material.dispose(); f.card.material = f.orig; }
+  function fadeOut(obj) {
+    const card = obj?.group?.userData?.sym?.children[0];
+    if (!card || fades.some((f) => f.obj === obj)) return;
+    const orig = card.material;
+    card.material = orig.clone();   // the shared material of the type stays opaque
+    fades.push({ obj, card, orig, t: 0, seen: false });
+  }
+  function stepFades(dt) {
+    for (let i = fades.length - 1; i >= 0; i--) {
+      const f = fades[i];
+      if (f.obj.sq < 0) f.seen = true;
+      if (!f.card.parent || (f.seen && f.obj.sq >= 0)) { if (f.card.parent) endFade(f); fades.splice(i, 1); continue; }   // back on the board (undo): opaque again
+      f.t += dt;
+      f.card.material.opacity = Math.max(0, 1 - f.t / FADE);
+    }
+  }
   // off: the symbols and their textures go (about 4 MB on a phone), the next entry draws them again
   function release() {
+    for (const f of fades.splice(0)) if (f.card.material !== f.orig) f.card.material.dispose();
     eachPiece((g) => { g.userData.sym?.removeFromParent(); g.userData.sym = null; });
     holders.clear();
     for (const m of mats) { m.map?.dispose(); m.dispose(); }
@@ -214,9 +234,11 @@ export function createSymbols({ gimbal, game, stage, themes = null, size = 384 }
       eachPiece(apply);
       if (on) orient(); else release();
     },
-    sync() {
+    fadeOut,
+    sync(dt = 0) {
       if (!on) return;
       eachPiece(apply);
+      if (fades.length) stepFades(dt);
       orient();
     },
     get visible() { return on; },

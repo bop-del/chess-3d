@@ -226,7 +226,7 @@ try {
     };
     out.white = await cap('on', 'white'); out.whiteShort = await cap('short', 'white'); out.whiteOff = await cap('off', 'white');
     out.above = await cap('on', 'above'); out.symbols = await cap('on', 'symbols');
-    c.views.set('white', { remember: false });
+    c.views.set('white', { remember: false }); c.views.setSymbols(false, { remember: false });
     return out;
   });
   R.expect('desktop 1440x900: a capture plays a scene with the setting On, also Short, none with Off', desk.white && desk.whiteShort && !desk.whiteOff, JSON.stringify(desk), JSON.stringify(desk));

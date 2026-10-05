@@ -15,7 +15,7 @@ const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); ret
 const PORT = Number(opt('port', 5361));
 const OUT = '.tmp/views-dist';
 const SIZES = [{ w: 1280, h: 720, touch: 0 }, { w: 390, h: 844, touch: 1 }, { w: 844, h: 390, touch: 1 }, { w: 844, h: 290, touch: 1 }];
-const IDS = ['white', 'black', 'top', 'side', 'iso', 'symbols', 'above', 'play'];
+const IDS = ['white', 'black', 'top', 'side', 'iso', 'above', 'play'];
 const [PI, PN] = opt('part', '0/1').split('/').map(Number);   // --part=i/n runs every n-th unit, so the group can run in separate browsers (test/smoke-group-list.mjs)
 let unitNo = 0;
 const mine = () => unitNo++ % PN === PI;
@@ -97,8 +97,8 @@ try {
       }
     }
   }
-  // From above locks the orbit; Symbols stays free
-  if (mine()) for (const [id, locked] of [['symbols', false], ['above', true]]) {
+  // From above locks the orbit
+  if (mine()) for (const [id, locked] of [['white', false], ['above', true]]) {
     await open(page, SIZES[0], `&view=${id}`);
     const c0 = await page.evaluate(() => window.__chess.controls.camera);
     await page.mouse.move(300, 300); await page.mouse.down(); await page.mouse.move(380, 360, { steps: 6 }); await page.mouse.up();
@@ -107,7 +107,7 @@ try {
     const same = Math.abs(c1.yaw - c0.yaw) < 1e-6 && Math.abs(c1.pitch - c0.pitch) < 1e-6;
     R.expect(`${id} orbit ${locked ? 'locked' : 'free'}`, same === locked, `yaw and pitch ${same ? 'unchanged' : 'changed'} by a drag`);
   }
-  // Symbols: perspective at 65 degrees, a flat symbol on every piece, the 3D bodies hidden, a plain board; everything comes back on leaving
+  // Symbols is a switch over every view (CHE-227): a flat symbol on every piece, the 3D bodies hidden, a plain board; the view and the camera stay
   if (mine()) for (const size of [SIZES[0], SIZES[1]]) {
     const tag = `${size.w}x${size.h}`;
     await open(page, size, '&view=symbols');
@@ -115,23 +115,60 @@ try {
       const c = window.__chess, sq = c.gimbal.getObjectByName('squares-light').material;
       const bodies = c.game.root.children.filter((g) => g.userData.piece).map((g) => g.children.filter((ch) => !ch.userData.hit && ch.name !== 'symbol' && ch.visible).length);
       const syms = c.game.root.children.filter((g) => g.userData.piece && g.userData.sym?.visible).length;
-      const map = g => g;
-      return { on: c.symbols.visible, pitch: Math.round(c.controls.camera.pitch * 180 / Math.PI), battle: c.views.isEasy(), syms, bodies: bodies.reduce((a, b) => a + b, 0), pieces: bodies.length, map: !!sq.map, vc: sq.vertexColors, inlay: c.gimbal.getObjectByName('gold-inlay')?.visible };
+      return { on: c.symbols.visible, view: c.views.current(), cam: { ...c.controls.camera }, syms, bodies: bodies.reduce((a, b) => a + b, 0), pieces: bodies.length, map: !!sq.map, vc: sq.vertexColors, inlay: c.gimbal.getObjectByName('gold-inlay')?.visible };
     });
+    const dflt = size.touch && size.h > size.w ? 'play' : 'white';
     const a = await look();
-    R.expect(`symbols ${tag}: 65 degrees, an easy view, no battle scenes`, a.pitch === 65 && a.battle && a.on, JSON.stringify(a));
+    R.expect(`symbols ${tag}: ?view=symbols is the default view (${dflt}) plus Symbols on`, a.on && a.view === dflt, JSON.stringify(a));
     R.expect(`symbols ${tag}: 32 symbols, no 3D body shows`, a.syms === 32 && a.pieces === 32 && a.bodies === 0, JSON.stringify(a));
     R.expect(`symbols ${tag}: plain flat squares, no inlay`, !a.map && !a.vc && a.inlay === false, JSON.stringify(a));
-    // switching between Symbols and the White view in both directions: the symbols and the bodies swap cleanly
-    for (const [to, wantSym] of [['white', false], ['symbols', true], ['white', false]]) {
-      await page.evaluate((v) => { window.__chess.views.set(v, { instant: true, remember: false }); window.__chess.step(0.3); window.__chess.draw(); }, to);
-      const b = await look();
-      const hidden = b.bodies === 0;
-      const sym32 = b.syms === 32;
-      R.expect(`symbols ${tag}: to ${to}: symbols ${wantSym ? 'on' : 'off'}, bodies ${wantSym ? 'hidden' : 'shown'}`,
-        b.on === wantSym && sym32 === wantSym && hidden === wantSym, JSON.stringify(b));
-      if (to === 'white') R.expect(`symbols ${tag}: leaving restores the board look`, b.map && b.vc && b.inlay !== false, JSON.stringify(b));
+    // the switch over several views: the view stays, the camera does not move, symbols and bodies swap cleanly
+    const views = size.touch && size.h > size.w ? ['above', 'black'] : ['top', 'above', 'iso'];
+    for (const v of views) {
+      await page.evaluate((v) => { window.__chess.views.set(v, { instant: true, remember: false }); window.__chess.step(0.3); window.__chess.draw(); }, v);
+      const on = await look();
+      R.expect(`symbols ${tag}: stays on in ${v}`, on.view === v && on.on && on.syms === 32 && on.bodies === 0, JSON.stringify(on));
+      await page.evaluate(() => { window.__chess.views.toggleSymbols(); window.__chess.step(0.3); window.__chess.draw(); });
+      const off = await look();
+      R.expect(`symbols ${tag}: toggling off in ${v} keeps view and camera, brings the bodies back`, off.view === v && !off.on && off.syms === 0 && off.bodies === off.pieces && off.map && off.vc && off.inlay !== false && JSON.stringify(off.cam) === JSON.stringify(on.cam), JSON.stringify({ on: on.cam, off: off.cam }));
+      await page.evaluate(() => { window.__chess.views.toggleSymbols(); window.__chess.step(0.3); window.__chess.draw(); });
+      const back = await look();
+      R.expect(`symbols ${tag}: toggling on in ${v} keeps view and camera`, back.view === v && back.on && back.syms === 32 && JSON.stringify(back.cam) === JSON.stringify(on.cam), JSON.stringify(back));
     }
+  }
+  await page.evaluate(() => localStorage.removeItem('chess3d.symbols'));
+  // Pixelwelt with Symbols on: no battle scene, the captured symbol fades out; undo brings it back opaque
+  if (mine()) {
+    await open(page, SIZES[0], '&theme=pixel&symbols=1&fen=4k3/8/8/3p4/4P3/8/8/4K3%20w%20-%20-%200%201');
+    const fade = await page.evaluate(async () => {
+      const c = window.__chess, vic = () => c.game.root.children.find((g) => g.userData.piece?.type === 'p' && g.userData.piece.color === 'b');
+      const op = () => vic().userData.sym.children[0].material.opacity;
+      const v = vic(); c.game.move('e4', 'd5');
+      let scene = false;
+      for (let i = 0; i < 40; i++) { await c.stepAsync(0.05); if (c.battle.active) scene = true; }
+      const faded = op();
+      const shared = c.game.root.children.filter((g) => g.userData.piece && g !== v).every((g) => g.userData.sym.children[0].material.opacity === 1);
+      c.game.undo(); for (let i = 0; i < 40; i++) await c.stepAsync(0.05);
+      return { scene, faded, shared, back: op(), same: vic() === v };
+    });
+    R.expect('pixel + symbols: no battle scene, the captured symbol fades out, undo restores it', !fade.scene && fade.faded === 0 && fade.shared && fade.back === 1, JSON.stringify(fade));
+  }
+  // remembered per browser, URL flag, old stored view
+  if (mine()) {
+    await page.evaluate(() => localStorage.removeItem('chess3d.symbols'));   // the switch tests above store it
+    await open(page, SIZES[0]);
+    await page.evaluate(() => { window.__chess.views.toggleSymbols(); });
+    await open(page, SIZES[0]);
+    R.expect('symbols: the switch is remembered per browser', await page.evaluate(() => window.__chess.views.isSymbols() && window.__chess.symbols.visible));
+    await open(page, SIZES[0], '&symbols=0');
+    R.expect('symbols=0 switches it off for this load', await page.evaluate(() => !window.__chess.views.isSymbols()));
+    await page.evaluate(() => localStorage.removeItem('chess3d.symbols'));
+    await open(page, SIZES[0], '&symbols=1');
+    R.expect('symbols=1 switches it on and does not store it', await page.evaluate(() => window.__chess.views.isSymbols() && localStorage.getItem('chess3d.symbols') === null));
+    await page.evaluate(() => { localStorage.setItem('chess3d.view', 'symbols'); localStorage.removeItem('chess3d.symbols'); });
+    await open(page, SIZES[0]);
+    R.expect('a stored view symbols migrates to the default view plus Symbols on', await page.evaluate(() => window.__chess.views.current() === 'white' && window.__chess.views.isSymbols() && localStorage.getItem('chess3d.symbols') === '1'));
+    await page.evaluate(() => { localStorage.removeItem('chess3d.symbols'); localStorage.removeItem('chess3d.view'); });
   }
   if (mine()) {
     // a promotion in the Symbols view gets its symbol at once
@@ -165,13 +202,13 @@ try {
     R.expect('phone cycle order', seen.join() === 'play,above,white,black', seen.join());
     // CHE-158: the thumb bar Symbols/Pieces toggle (same slot as the old Flip), one tap each way, back to the view before
     await open(page, SIZES[1]);
-    const tg = async () => page.evaluate(() => { const b = document.querySelector('.tb[data-act=symbols]'); return { cur: window.__chess.views.current(), word: b?.querySelector('span').textContent, flip: !!document.querySelector('.tb[data-act=flip]') }; });
+    const tg = async () => page.evaluate(() => { const b = document.querySelector('.tb[data-act=symbols]'); return { cur: window.__chess.views.current(), on: window.__chess.views.isSymbols(), word: b?.querySelector('span').textContent, flip: !!document.querySelector('.tb[data-act=flip]') }; });
     const t0 = await tg();
     await page.tap('.tb[data-act=symbols]'); await page.evaluate(() => window.__chess.step(1));
     const t1 = await tg();
     await page.tap('.tb[data-act=symbols]'); await page.evaluate(() => window.__chess.step(1));
     const t2 = await tg();
-    R.expect('thumb toggle: Symbols, Pieces, back to the view before', t0.word === 'Symbols' && t1.cur === 'symbols' && t1.word === 'Pieces' && t2.cur === t0.cur && t2.word === 'Symbols' && !t0.flip, JSON.stringify([t0, t1, t2]));
+    R.expect('thumb toggle: Symbols, Pieces, back; the view stays', t0.word === 'Symbols' && !t0.on && t1.on && t1.word === 'Pieces' && t1.cur === t0.cur && !t2.on && t2.cur === t0.cur && t2.word === 'Symbols' && !t0.flip, JSON.stringify([t0, t1, t2]));
     // remembered choice, fallback, keys
     const size = SIZES[1];
     await open(page, size);
