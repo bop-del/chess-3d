@@ -3,6 +3,23 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.7.0', date: '2026-10-05',
+    de: [
+      'Neues Menü: Spielen, Lernen und Optionen sind jetzt drei gleichwertige Orte.',
+      'Symbole sind ein Schalter: flache Schachsymbole in jeder Ansicht und jedem Thema.',
+      'Pixelwelt: Gras bis ans Brett, Buchstaben und Zahlen auf dem Gras, Bauern mit Speer in beiden Händen.',
+      'Lebendige Figuren: ab und zu zeigt eine Figur ihren eigenen Auftritt, in Pixelwelt fliegen Vögel vorbei.',
+      'Neu: Versionszeile und diese Neuigkeiten.',
+    ],
+    en: [
+      'New menu: Play, Learn and Options are now three equal places.',
+      'Symbols is a switch: flat chess symbols in every view and every theme.',
+      'Pixelwelt: grass up to the board, letters and numbers on the grass, pawns with a spear in both hands.',
+      'Living pieces: now and then a piece plays its own show, and in Pixelwelt birds fly by.',
+      'New: a version line and this News window.',
+    ],
+  },
+  {
     version: '1.6.0', date: '2026-10-05',
     de: [
       'Neu bei den Eröffnungen: der Knopf Erklären zeigt dir zuerst das Ziel auf dem Brett.',
