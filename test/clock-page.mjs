@@ -36,7 +36,7 @@ try {
       try { if (!k) localStorage.removeItem('chess3d.clock'); localStorage.setItem('chess3d.lang', l); } catch (e) { /* ignore */ }
       if (ph) for (const [key, v] of [['width', sw], ['height', sh]]) Object.defineProperty(screen, key, { get: () => v });
     }, lang, keep, phone, s.width, s.height);
-    await page.goto(`${URL0}/?quality=low&manual=1&intro=0${ai ? '' : '&ai=0'}${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.goto(`${URL0}/?quality=low&manual=1&intro=0&menu=old${ai ? '' : '&ai=0'}${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
   };
   const step = (secs) => page.evaluate((n) => { window.__chess.step(n); window.__chess.draw(); }, secs);

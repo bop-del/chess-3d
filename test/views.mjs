@@ -46,7 +46,7 @@ try {
 
 async function open(page, size, query = '') {
   await page.setViewport({ width: size.w, height: size.h, deviceScaleFactor: 1, isMobile: !!size.touch, hasTouch: !!size.touch });
-  await page.goto(`${server.base}?quality=low&manual=1&ai=0&touch=${size.touch}${query}`, { waitUntil: 'load', timeout: 60000 });
+  await page.goto(`${server.base}?quality=low&manual=1&ai=0&touch=${size.touch}&menu=old${query}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   await page.evaluate(() => { window.__chess.step(2); window.__chess.draw(); });
 }

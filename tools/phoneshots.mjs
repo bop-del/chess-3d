@@ -214,9 +214,9 @@ try {
 
       // Menu sheet (phone layout)
       await load();
-      const tapped = await tapEl('.tb[data-act="menu"]');
-      const open = await page.evaluate(() => !!document.querySelector('.psheet')?.classList.contains('open'));
-      R.expect(`${name} Menu sheet opens by tap`, tapped && open, '', tapped ? 'sheet did not open' : 'no Menu button visible');
+      const tapped = await tapEl('.tb[data-act="options"]');
+      const open = await page.evaluate(() => !!document.querySelector('.psheet.open'));
+      R.expect(`${name} Options sheet opens by tap`, tapped && open, '', tapped ? 'sheet did not open' : 'no Options button visible');
       await shot('menu');
 
       // help panel

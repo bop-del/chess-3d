@@ -22,7 +22,7 @@ try {
   const w = await watchPage(page);
   const load = async (query = '', size = { width: 1280, height: 720 }) => {
     await page.setViewport(size.width < 500 ? { ...size, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : size);
-    await page.goto(`${URL0}/?quality=low&manual=1&ai=0${size.width < 500 ? '&touch=1' : ''}${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.goto(`${URL0}/?quality=low&manual=1&ai=0&menu=old${size.width < 500 ? '&touch=1' : ''}${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
     await page.evaluate(() => { window.__chess.step(1); window.__chess.draw(); });
   };

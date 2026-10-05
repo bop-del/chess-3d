@@ -206,8 +206,8 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
       perr = await open(pp, '&touch=1');
       const tag = `${w}x${h}`;
       const bar = await pp.evaluate(() => [...document.querySelectorAll('.pbar .tb')].map((b) => { const r = b.getBoundingClientRect(); return { act: b.dataset.act, x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom }; }));
-      ok(`learn ${tag}: six thumb bar buttons, Learn is the fifth, all 44 px and inside the screen`,
-        bar.length === 6 && bar[4].act === 'learn' && bar.every((b) => b.w >= 43.5 && b.h >= 43.5 && b.r <= w + 0.5 && b.b <= h + 0.5 && b.x >= -0.5 && b.y >= -0.5), JSON.stringify(bar.map((b) => [b.act, Math.round(b.w), Math.round(b.h), Math.round(b.b)])));
+      ok(`learn ${tag}: six thumb bar buttons, Learn is the second, all 44 px and inside the screen`,
+        bar.length === 6 && bar[1].act === 'learn' && bar.every((b) => b.w >= 43.5 && b.h >= 43.5 && b.r <= w + 0.5 && b.b <= h + 0.5 && b.x >= -0.5 && b.y >= -0.5), JSON.stringify(bar.map((b) => [b.act, Math.round(b.w), Math.round(b.h), Math.round(b.b)])));
       const overlap = bar.some((a, i) => bar.some((b, j) => j > i && a.x < b.r - 0.5 && b.x < a.r - 0.5 && a.y < b.b - 0.5 && b.y < a.b - 0.5));
       ok(`learn ${tag}: thumb bar buttons do not overlap`, !overlap);
       await pp.evaluate(() => document.querySelector('.tb[data-act="learn"]').click());
@@ -241,9 +241,9 @@ export async function runLearnChecks({ browser, baseUrl, log = () => {}, shotsDi
         await tapTab(pp, 'mine');
         await snap(pp, `learn-phone-mine-${tag}`);
         ok(`learn ${tag}: Mine shows the line`, (await count(pp, '.plearn .xline.mine')) === 1);
-        await pp.evaluate(() => document.querySelector('.tb[data-act="menu"]').click());
+        await pp.evaluate(() => document.querySelector('.tb[data-act="options"]').click());
         await settleUi(pp);
-        ok(`learn ${tag}: opening Menu closes the Learn sheet`, !(await pp.evaluate(() => document.querySelector('.plearn').classList.contains('open'))));
+        ok(`learn ${tag}: opening Options closes the Learn sheet`, !(await pp.evaluate(() => document.querySelector('.plearn').classList.contains('open'))));
       }
     } catch (e) {
       ok(`learn ${w}x${h}: phone run completed`, false, e && e.stack || e);

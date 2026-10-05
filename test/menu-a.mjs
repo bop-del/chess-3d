@@ -1,7 +1,7 @@
-// Menu structure A (?menu=a, CHE-223): node test/menu-a.mjs [--port=5371] [--skip-build] [--base=<server>]
+// Menu structure A (the default since CHE-226, ?menu=old is the old menu; CHE-223): node test/menu-a.mjs [--port=5371] [--skip-build] [--base=<server>]
 // ai=0, quality=low, manual=1, intro=0. Phone portrait and landscape and desktop: the bar and the places, Back hidden until the first move,
 // the abandon question (Play button, N key, the daily Start), the daily card always first in Play, the clock in Play, the views sheet,
-// the Options sections, the badges in Learn only, the old open= values as aliases, and the default menu untouched without the flag.
+// the Options sections, the badges in Learn only, the old open= values as aliases, and the old menu behind ?menu=old.
 // Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { reporter, launchBrowser, watchPage, startServer, build, settleUi } from '../tools/_lib.mjs';
 
@@ -38,7 +38,7 @@ const PHONE = ['phone portrait', 390, 844, true], LAND = ['phone landscape', 844
 const MOVES = '&moves=e2e4,e7e5';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function load(page, [, w, h, phone], query = '', { menu = 'a' } = {}) {
+async function load(page, [, w, h, phone], query = '', { menu = '' } = {}) {
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
   await page.goto(`${server.base}?quality=low&manual=1&ai=0&intro=0${phone ? '&touch=1' : ''}${menu ? `&menu=${menu}` : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
@@ -56,7 +56,7 @@ async function phoneChecks(page, size) {
   const tag = size[0];
   await load(page, size);
   const bar = await ev(page, () => [...document.querySelectorAll('.pbar:not(.plbar) .tb')].map((b) => b.dataset.act).join(','));
-  R.expect(`${tag}: the bar is Back, Play, Symbols, View, Learn, Options`, bar === 'undo,new,symbols,views,learn,options', bar, bar);
+  R.expect(`${tag}: the bar is Play, Learn, Back, Symbols, View, Options`, bar === 'new,learn,undo,symbols,views,options', bar, bar);
   R.expect(`${tag}: Back is hidden before the first move, its place stays`, await ev(page, () => { const b = document.querySelector('.tb[data-act=undo]'); return getComputedStyle(b).visibility === 'hidden' && b.getBoundingClientRect().width > 40; }));
   await click(page, '.tb[data-act=new]');
   R.expect(`${tag}: Play opens the Play sheet`, (await openSheet(page)) === 'pplay', await openSheet(page));
@@ -131,6 +131,8 @@ async function deskChecks(page, size) {
   R.expect(`${tag}: the clock sits in Play, not in Options`, await shown(page, '#tp-play #sel-clock') && await ev(page, () => !document.querySelector('#tp-settings #sel-clock')));
   const tabs = await ev(page, () => [...document.querySelectorAll('.tab span')].map((s) => s.textContent).join(','));
   R.expect(`${tag}: the tabs are Play, Learn, Options`, tabs === 'Play,Learn,Options', tabs, tabs);
+  await click(page, '.tab[data-tab=learn]');
+  R.expect(`${tag}: the idle Learn badges are folded, one tap opens them`, !(await shown(page, '.lcard[data-card=badges] .bdgrid')) && await (async () => { await click(page, '.lcard[data-card=badges] > header'); return shown(page, '.lcard[data-card=badges] .bdgrid'); })());
   await load(page, size, MOVES);
   R.expect(`${tag}: Back shows from the first move and the daily card stays`, await shown(page, '#tp-play #btn-undo') && await shown(page, '#tp-play .dailycard'));
   await click(page, '#btn-new');
@@ -158,11 +160,11 @@ try {
   await phoneChecks(page, PHONE);
   await phoneChecks(page, LAND);
   await deskChecks(page, DESK);
-  // the default menu is untouched without the flag
-  await load(page, PHONE, '', { menu: '' });
-  R.expect('default phone: the bar still ends in Menu and Back is in place', await ev(page, () => [...document.querySelectorAll('.pbar:not(.plbar) .tb')].map((b) => b.dataset.act).join(',') === 'undo,new,symbols,views,learn,menu' && !document.body.classList.contains('menu-a')));
-  await load(page, DESK, '', { menu: '' });
-  R.expect('default desktop: Play and Back stay in the header', await ev(page, () => !!document.querySelector('.phead #btn-new') && !!document.querySelector('.phead #btn-undo')));
+  // the old menu behind ?menu=old
+  await load(page, PHONE, '', { menu: 'old' });
+  R.expect('menu=old phone: the bar still ends in Menu and Back is in place', await ev(page, () => [...document.querySelectorAll('.pbar:not(.plbar) .tb')].map((b) => b.dataset.act).join(',') === 'undo,new,symbols,views,learn,menu' && !document.body.classList.contains('menu-a')));
+  await load(page, DESK, '', { menu: 'old' });
+  R.expect('menu=old desktop: Play and Back stay in the header', await ev(page, () => !!document.querySelector('.phead #btn-new') && !!document.querySelector('.phead #btn-undo')));
   R.expect('no console errors', !watch.errs.length, '', watch.errs.slice(0, 2).join(' | '));
   R.expect('no foreign requests', !watch.foreign.length, '', watch.foreign.slice(0, 2).join(' | '));
   await page.close();

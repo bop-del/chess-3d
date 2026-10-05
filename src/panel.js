@@ -119,7 +119,7 @@ const BAR_FADE_MS = 3200;
 
 /** Builds the panel, the rail, the view bar and the help overlay inside `hud`. Returns what ui.js needs to wire. */
 export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fade = true, menuA = false }) {
-  // menuA (?menu=a, CHE-223): the first tab owns the Play button, Back and the clock, the header keeps only the fold button, the last tab is Options
+  // menuA (menu A, CHE-223): the first tab owns the Play button, Back and the clock, the header keeps only the fold button, the last tab is Options
   const tabsDef = [['play', 'Play', ICONS.play], ['learn', 'Learn', ICONS.learn], ['settings', menuA ? 'Options' : 'Settings', ICONS.gear]];
   const headBtns = menuA ? '' : `
         <button class="ib gold" id="btn-new" type="button" title="Play (N)" aria-label="Play" data-i18n-title="hud.newGameTitle" data-i18n-aria="hud.newGame">${ICONS.plus}</button>

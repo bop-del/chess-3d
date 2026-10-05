@@ -61,7 +61,7 @@ const SEED = JSON.stringify({ version: 1, ever: true, adopted: ['italian-game'],
 
 async function load(page, [, w, h, phone], query, { settle = true } = {}) {
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
-  await page.goto(`${server.base}?quality=low&manual=1&ai=0&intro=0${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
+  await page.goto(`${server.base}?quality=low&manual=1&ai=0&intro=0&menu=old${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   const err = await page.evaluate(() => window.__chessError || null);
   if (err) throw new Error('page failed to start: ' + err);

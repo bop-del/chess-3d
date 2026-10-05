@@ -255,13 +255,18 @@ async function runSize(size) {
     // then White, Black, Top down, Side, Isometric). One tap moves to the next view. Older layouts: the third preset button, which may sit in the Controls drawer.
     const viewsBtn = '.tb[data-act="views"]';
     if (await centre(viewsBtn)) {
-      const before = (await state()).pitch;
-      const viewBefore = await ev(() => window.__chess.views?.current());
-      await tapEl(viewsBtn); await step(2);
+      // Menu A (CHE-226): View opens a sheet with every view, a chip picks one
+      await tapEl(viewsBtn); await settleUi(page);
+      const sheetOpen = await ev(() => !!document.querySelector('.psheet.pview.open'));
+      const chip = '.pview [data-view="top"]';
+      const chipTapped = await tapEl(chip); await step(2); await settleUi(page);
       s = await state();
       const viewAfter = await ev(() => window.__chess.views?.current());
-      await ev(() => { try { localStorage.removeItem('chess3d.view'); } catch (e) { /* storage blocked */ } });   // the cycle may have stored a locked easy view: later sizes start from the default
-      R.expect(`${tag}: tapping Views on the thumb bar cycles the views`, viewAfter !== viewBefore, `view ${viewBefore} to ${viewAfter}, pitch ${(before * 57.3).toFixed(0)} to ${(s.pitch * 57.3).toFixed(0)} deg`);
+      await ev(() => { try { localStorage.removeItem('chess3d.view'); } catch (e) { /* storage blocked */ } });   // the pick may have stored a locked easy view: later sizes start from the default
+      R.expect(`${tag}: tapping View opens the View sheet and a chip picks that view`, sheetOpen && chipTapped && viewAfter === 'top', `sheet ${sheetOpen}, view ${viewAfter}`);
+      const vx = await centre('.pview .psheet-x');
+      if (vx) await tap(vx.x, vx.y);
+      await settleUi(page);
     } else {
     const presetSel = '#presets .preset:nth-child(3)';
     let c = await centre(presetSel);
@@ -280,22 +285,22 @@ async function runSize(size) {
     }
     }
     // Menu sheet (phone HUD): Menu opens it, the close button closes it
-    if (await centre('.tb[data-act="menu"]')) {
-      await tapEl('.tb[data-act="menu"]');
+    if (await centre('.tb[data-act="options"]')) {
+      await tapEl('.tb[data-act="options"]');
       // the sheet slides in with a CSS transition: poll (software GL is slow) until its close button can be hit
       // and until it stopped moving: a point sampled mid-slide is stale by the time the finger lands
       let x = null, prev = null;
       for (let k = 0; k < 40 && !x; k++) {
         await sleep(100);
-        const c = await centre('.psheet-x');
+        const c = await centre('.psheet.poptions .psheet-x');
         if (c && prev && Math.abs(c.x - prev.x) < 0.5 && Math.abs(c.y - prev.y) < 0.5) x = c;
         prev = c;
       }
-      const open = await ev(() => document.querySelector('.psheet')?.classList.contains('open'));
-      R.expect(`${tag}: Menu on the thumb bar opens the sheet`, open && !!x, 'sheet open, close button reachable', `open ${open}, close button ${x ? 'reachable' : 'covered or off screen'}`);
+      const open = await ev(() => document.querySelector('.psheet.poptions')?.classList.contains('open'));
+      R.expect(`${tag}: Options on the thumb bar opens the sheet`, open && !!x, 'sheet open, close button reachable', `open ${open}, close button ${x ? 'reachable' : 'covered or off screen'}`);
       if (x) await tap(x.x, x.y);
       let closed = false;
-      for (let k = 0; k < 30 && !closed; k++) { await sleep(100); closed = !(await ev(() => document.querySelector('.psheet')?.classList.contains('open'))); }
+      for (let k = 0; k < 30 && !closed; k++) { await sleep(100); closed = !(await ev(() => document.querySelector('.psheet.poptions')?.classList.contains('open'))); }
       R.expect(`${tag}: the sheet's close button closes it`, closed, 'closed', 'still open');
       await settleUi(page);
     }
@@ -305,12 +310,13 @@ async function runSize(size) {
     let tapped = await tapEl(newBtn) || await tapEl('#btn-new');
     if (!tapped) { await tapEl('.drawer-btn'); await settleUi(page); tapped = await tapEl('#btn-new'); }
     await settleUi(page);
+    if (await centre('.pplay #btn-new')) { await tapEl('.pplay #btn-new'); await settleUi(page); }   // Menu A: the Play button opens the Play sheet, Start asks
     const asked = await centre('.pconfirm [data-a="no"]');
     if (asked) {
       await tap(asked.x, asked.y); await settleUi(page); await step(0.5);
       s = await state();
       R.expect(`${tag}: Cancel on the new game question keeps the game`, s.moves.length === before && before > 0 && !(await centre('.pconfirm [data-a="no"]')), `${before} moves kept, question closed`, `moves ${s.moves.length} of ${before}`);
-      await tapEl(newBtn); await settleUi(page);
+      if (!(await centre('.pconfirm [data-a="yes"]'))) { await tapEl('.pplay #btn-new'); await settleUi(page); }
       const yes = await centre('.pconfirm [data-a="yes"]');
       if (yes) await tap(yes.x, yes.y);
       else R.fail(`${tag}: the Yes button of the new game question can be tapped`, 'not reachable');

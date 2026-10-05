@@ -1,5 +1,5 @@
-/* Menu structure A (?menu=a, CHE-223): three equal places. Phone: the sheets Play, View, Options (and Learn) behind the thumb bar.
-   Desktop: the Play button, Back and the clock sit in the Play tab. Everything is scoped by body.menu-a, so the default menu is untouched. */
+/* Menu structure A (default since CHE-226, ?menu=old for the old menu; CHE-223): three equal places. Phone: the sheets Play, View, Options (and Learn) behind the thumb bar.
+   Desktop: the Play button, Back and the clock sit in the Play tab. Everything is scoped by body.menu-a, so ?menu=old is untouched. */
 
 /* Back keeps its place in the thumb bar but nothing grey stands there before the first move */
 body.menu-a .tb.gone { visibility: hidden; }
@@ -51,8 +51,8 @@ body.menu-a .playrow .ghost.back { flex: 0 0 auto; width: auto; min-height: 48px
 body.menu-a .playrow .ghost[hidden] { display: none; }
 
 /* landscape and short screens: the sheets keep the head small so more than two rows show (finding 3) */
-body.menu-a.phone:not(.portrait) .psheet-head { height: 36px; }
-body.menu-a.phone:not(.portrait) .psheet-x { width: 36px; height: 36px; }
+body.menu-a.phone:not(.portrait) .psheet-head { height: 44px; }
+body.menu-a.phone:not(.portrait) .psheet-x { width: 44px; height: 44px; }
 /* landscape Play: two columns so the choice and Start show without scrolling (the daily card and Start left, opponent and clock right) */
 body.menu-a.phone:not(.portrait) .psheet.pplay { max-width: 700px; }
 body.menu-a.phone:not(.portrait) .psheet.pplay .card[data-card="game"] > .body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; align-items: start; padding-top: 6px; }
@@ -61,3 +61,8 @@ body.menu-a.phone:not(.portrait) .psheet.pplay .row.ai { grid-column: 2; grid-ro
 body.menu-a.phone:not(.portrait) .psheet.pplay .pclockslot { grid-column: 2; grid-row: 2; }
 body.menu-a.phone:not(.portrait) .psheet.pplay .pclockslot .clock-settings { margin-top: 0; }
 body.menu-a.phone:not(.portrait) .psheet.pplay .row.start { grid-column: 1 / -1; margin-top: 0; }
+
+/* desktop Learn tab: the badges card is folded, its title is the opener (CHE-226) */
+body.menu-a .lcard.bfold > header { display: flex; min-height: 40px; align-items: center; justify-content: space-between; cursor: pointer; }
+body.menu-a .lcard.bfold > header h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--dim); }
+body.menu-a .lcard.bfold > header .chev { display: block; }

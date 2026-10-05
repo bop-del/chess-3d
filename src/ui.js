@@ -59,9 +59,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // into the Menu sheet. Both layouts use the same ids, so the wiring below serves either.
   const desk = !device.phone;
   const manual = new URLSearchParams(location.search).get('manual') === '1';
-  // ?menu=a (CHE-223): the menu structure "three equal places" as a preview. Play, View (phone), Options and Learn are the places;
-  // the default menu stays until the owner's go. See docs/ARCHITECTURE.md, Menu structure A.
-  const menuA = new URLSearchParams(location.search).get('menu') === 'a';
+  // Menu structure A (CHE-223, default since CHE-226): "three equal places". Play, View (phone), Options and Learn are the places.
+  // ?menu=old brings back the old menu for one release. See docs/ARCHITECTURE.md, Menu structure A.
+  const menuA = new URLSearchParams(location.search).get('menu') !== 'old';
   document.body.classList.toggle('menu-a', menuA);
   let left = null, right = null, help = null, drawerBtn = null, dsk = null;
   const showBtn = el('button', 'show-btn', 'Show HUD');
@@ -552,7 +552,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     // short word on the button (never wraps), the full name stays as aria-label and title
     // menu A: Back (hidden until the first move), Play (a sheet with the choice), Symbols, View (a sheet), Learn, Options (no Menu)
     const BAR_BUTTONS = menuA
-      ? [['undo', 'Back', 'Back', 'tb.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'View', 'tb.view', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['options', 'Options', 'Options', 'phone.options', 'tb.options']]
+      ? [['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['undo', 'Back', 'Back', 'tb.undo', 'tb.undo'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'View', 'tb.view', 'tb.view'], ['options', 'Options', 'Options', 'phone.options', 'tb.options']]
       : [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']];
     for (const [id, short, full, key, shortKey] of BAR_BUTTONS) {
       const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${shortKey}">${short}</span>`);
@@ -850,7 +850,14 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // CONTRACT (lead): other modules mount their own panels and settings blocks. Desktop: a panel goes into the Learn tab, a
   // settings block into its slot of the Settings tab (by id, unknown ids land at the end). Phone: both become sections of the Menu sheet.
   function mountPanel(id, element, { title = id } = {}) {
-    if (dsk) { const c = dsk.mountPanel(id, element, { title }); translateTree(c); return c; }
+    if (dsk) {
+      const c = dsk.mountPanel(id, element, { title }); translateTree(c);
+      if (menuA && id === 'badges') {   // idle Learn tab: the badges start folded, one tap on the title opens them
+        c.classList.add('collapsed', 'bfold'); c.querySelector('header').insertAdjacentHTML('beforeend', '<span class="chev"></span>');
+        c.querySelector('header').addEventListener('click', () => c.classList.toggle('collapsed'));
+      }
+      return c;
+    }
     const card = el('section', 'card');
     card.dataset.card = id;
     card.innerHTML = `<header><h2>${title}</h2><span class="chev"></span></header><div class="body"></div>`;
@@ -925,11 +932,11 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     };
     if (phoneUI) {
       phoneUI.openSheet(place);
-      if (id === 'badges') hud.querySelector('.card[data-card="badges"]')?.classList.remove('collapsed');
     } else if (dsk) {
       dsk.setTab(A_TAB[place]);
       if (dsk.rail) dsk.setRail(false, { persist: false });
     } else return false;
+    if (id === 'badges') hud.querySelector('.card[data-card="badges"]')?.classList.remove('collapsed');
     const go = () => target()?.scrollIntoView?.({ block: id === 'music' || id === 'clock' ? 'start' : 'nearest' });
     go();
     if (dsk) setTimeout(go, 450);

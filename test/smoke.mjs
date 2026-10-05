@@ -34,8 +34,8 @@ const child = GROUP !== 'all';   // a group run started by smoke-groups.mjs: it 
 const R = reporter();
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
-const URLQ = '?quality=low&manual=1&ai=0';   // human against human, deterministic
-const URL_DEFAULT = '?quality=low&manual=1';   // no ai flag: the computer plays black
+const URLQ = '?quality=low&manual=1&ai=0&menu=old';   // human against human, deterministic
+const URL_DEFAULT = '?quality=low&manual=1&menu=old';   // no ai flag: the computer plays black
 if (flag('shots') && !child) {   // start empty, so the contact sheet shows this run only
   mkdirSync(SHOTS, { recursive: true });
   for (const f of readdirSync(SHOTS)) if (f.endsWith('.png')) rmSync(join(SHOTS, f));

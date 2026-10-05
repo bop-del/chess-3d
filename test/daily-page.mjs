@@ -6,7 +6,7 @@
 import { pathToFileURL } from 'node:url';
 import { settleUi } from '../tools/_lib.mjs';
 
-const FLAGS = 'quality=low&manual=1&ai=0&intro=0';
+const FLAGS = 'quality=low&manual=1&ai=0&intro=0&menu=old';
 
 export async function runDailyChecks({ page, baseUrl, log = () => {}, shot = null }) {
   const out = [];
