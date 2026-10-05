@@ -58,10 +58,12 @@ const RUNNING = ['explaining', 'drilling', 'puzzling'];
 
 /** Builds the card, mounts it through ui.mountDaily and keeps it hidden while a game or a lesson runs. */
 export function mountDailyCard({ daily, ui, game, puzzles, onStart = () => {} }) {
-  const card = dailyCard({ daily, onStart: () => { onStart(); puzzles.startDaily(daily.puzzle()); } });
+  // menu A (?menu=a): the card is always the first line of Play; Start while a game runs asks first, like the Play button
+  const start = () => { onStart(); puzzles.startDaily(daily.puzzle()); };
+  const card = dailyCard({ daily, onStart: () => (ui.menuA && ui.confirmAbandon ? ui.confirmAbandon(start) : start()) });
   const host = ui.mountDaily(card);
   const sync = () => {
-    const running = RUNNING.some((c) => document.body.classList.contains(c)) || game.getState().moves.length > 0;
+    const running = RUNNING.some((c) => document.body.classList.contains(c)) || (!ui.menuA && game.getState().moves.length > 0);
     card.hidden = running;
   };
   game.on('change', sync);

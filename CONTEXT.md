@@ -174,6 +174,10 @@ player operates: the header, the tabs Play, Learn and Settings, and their conten
 Phones have no panel; they have the thumb bar and the Menu sheet.
 _Avoid_: sidebar, HUD (the HUD is everything drawn over the board, panel included), column, card
 
+**Place** (menu A preview, `?menu=a`):
+One of the three equal destinations of the menu: Play, Learn, Options. On desktop a tab of the panel, on a phone a sheet opened from the thumb bar. The View button opens a small fourth sheet with all views.
+_Avoid_: section, screen, menu page
+
 **Rail**:
 The panel folded to a 60 px strip of icons, so the board gets the screen. Opened by
 the fold button or the H key, remembered per browser.

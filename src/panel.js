@@ -19,6 +19,8 @@ addDE({
   'panel.kind.openings': 'Eröffnung', 'panel.kind.drill': 'Übung', 'panel.kind.puzzles': 'Rätsel',
   'audio.mute': 'Ton aus',
   'key.hDesk': 'Panel ein- und ausklappen',
+  'panel.advancedHintA': 'Brett neigen, Fortschritt sichern',
+  'panel.abandon': 'Partie wirklich abbrechen?', 'panel.yes': 'Ja', 'panel.cancel': 'Abbrechen',
 });
 
 const SVG = (body, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${body}</svg>`;
@@ -116,8 +118,19 @@ export function chipGroup(id, items, { label = '', cls = 'chips' } = {}) {
 const BAR_FADE_MS = 3200;
 
 /** Builds the panel, the rail, the view bar and the help overlay inside `hud`. Returns what ui.js needs to wire. */
-export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fade = true }) {
-  const tabsDef = [['play', 'Play', ICONS.play], ['learn', 'Learn', ICONS.learn], ['settings', 'Settings', ICONS.gear]];
+export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fade = true, menuA = false }) {
+  // menuA (?menu=a, CHE-223): the first tab owns the Play button, Back and the clock, the header keeps only the fold button, the last tab is Options
+  const tabsDef = [['play', 'Play', ICONS.play], ['learn', 'Learn', ICONS.learn], ['settings', menuA ? 'Options' : 'Settings', ICONS.gear]];
+  const headBtns = menuA ? '' : `
+        <button class="ib gold" id="btn-new" type="button" title="Play (N)" aria-label="Play" data-i18n-title="hud.newGameTitle" data-i18n-aria="hud.newGame">${ICONS.plus}</button>
+        <button class="ib" id="btn-undo" type="button" title="Undo (U)" aria-label="Undo" data-i18n-title="hud.undoTitle" data-i18n-aria="hud.undo">${ICONS.undo}</button>`;
+  const playRow = !menuA ? '' : `
+        <div class="sec" data-slot="clock"></div>
+        <div class="playrow" id="playrow">
+          <button class="pbtn-start" id="btn-new" type="button" title="Play (N)" data-i18n-title="hud.newGameTitle"><span data-i18n="hud.newGame">Play</span></button>
+          <button class="ghost back" id="btn-undo" type="button" title="Undo (U)" data-i18n-title="hud.undoTitle" hidden>${ICONS.undo}<span data-i18n="tb.undo">Back</span></button>
+        </div>
+        <div class="abandon" id="abandon" role="alertdialog" hidden><p data-i18n="panel.abandon">Really abandon the game?</p><div class="row"><button class="pbtn-start" type="button" data-a="yes" data-i18n="panel.yes">Yes</button><button class="ghost" type="button" data-a="no" data-i18n="panel.cancel">Cancel</button></div></div>`;
   const root = el('aside', 'panel');
   root.id = 'panel';
   root.innerHTML = `
@@ -125,8 +138,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
       <div class="logo" aria-hidden="true">&#x265E;&#xFE0E;</div>
       <div class="turn" id="turn"><i class="dot w"></i><div class="status"><b id="turn-main">White to move</b><small id="turn-sub">&nbsp;</small></div></div>
       <div class="hbtns">
-        <button class="ib gold" id="btn-new" type="button" title="Play (N)" aria-label="Play" data-i18n-title="hud.newGameTitle" data-i18n-aria="hud.newGame">${ICONS.plus}</button>
-        <button class="ib" id="btn-undo" type="button" title="Undo (U)" aria-label="Undo" data-i18n-title="hud.undoTitle" data-i18n-aria="hud.undo">${ICONS.undo}</button>
+${headBtns}
         <button class="ib" id="btn-rail" type="button" title="Fold the panel (H)" aria-label="Fold the panel" data-i18n-title="panel.collapse" data-i18n-aria="panel.collapse">${ICONS.collapse}</button>
       </div>
       <div class="pclock" id="pclock" hidden></div>
@@ -140,7 +152,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
           <h4 data-i18n="panel.opponent">Opponent</h4>
           <label class="switch row-switch"><input type="checkbox" id="chk-ai"><span class="track"><i></i></span><em data-i18n="hud.vsComputer">vs computer</em></label>
           <div class="opp" id="opp"></div>
-        </div>
+        </div>${playRow}
         <button class="ghost" id="btn-good" type="button" title="Show one good move" data-i18n-title="good.title">${ICONS.bulb}<span data-i18n="good.label">Good move?</span></button>
         <div class="rvd" id="rv-host" hidden></div>
         <div class="sec grow">
@@ -160,14 +172,14 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
         <div class="sec" data-slot="themes"></div>
         <div class="sec"><h4 data-i18n="panel.light">Light</h4><div id="light-slot"></div></div>
         <div class="sec" data-slot="battle"></div>
-        <div class="sec" data-slot="clock"></div>
+        ${menuA ? '' : '<div class="sec" data-slot="clock"></div>'}
         <div class="sec"><h4 data-i18n="panel.sound">Sound</h4><div class="stack" data-slot="audio"></div><div class="stack" data-slot="music"></div></div>
         <div class="sec"><h4 data-i18n="panel.quality">Quality</h4><div id="quality-slot"></div></div>
         <div class="sec"><h4 data-i18n="panel.language">Language</h4>
           <div class="lang" role="group" aria-label="Language" data-i18n-aria="lang.label"><button class="lang-btn" type="button" data-lang="en" aria-label="English">EN</button><button class="lang-btn" type="button" data-lang="de" aria-label="Deutsch">DE</button></div></div>
         <div class="sec" data-slot="more"></div>
         <details class="fold" id="advanced">
-          <summary><span data-i18n="panel.advanced">Advanced</span><small data-i18n="panel.advancedHint">Gimbal, back up progress</small>${ICONS.chev}</summary>
+          <summary><span data-i18n="panel.advanced">Advanced</span><small data-i18n="${menuA ? 'panel.advancedHintA' : 'panel.advancedHint'}">${menuA ? 'Tilt the board, back up progress' : 'Gimbal, back up progress'}</small>${ICONS.chev}</summary>
           <div class="fold-body">
             <div class="sliders" id="sliders"></div>
             <div class="stack" data-slot="train-data"></div>
@@ -334,5 +346,6 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
     get tab() { return tab; }, get rail() { return rail; },
     viewsName: $('#views-name', bar), vmenu, wake,
     chips: { chipGroup },
+    abandon: menuA ? $('#abandon') : null, undoBtn: $('#btn-undo'),
   };
 }

@@ -29,6 +29,7 @@ export const DE = {
   'tb.undo': 'Zurück', 'tb.new': 'Spielen', 'tb.flip': 'Wenden', 'tb.view': 'Ansicht', 'tb.learn': 'Lernen', 'tb.menu': 'Menü',
   // CHE-158: Symbols/Pieces toggle
   'tb.symbols': 'Symbole', 'tb.pieces': 'Figuren', 'hud.symbolsTitle': 'Symbole statt Figuren zeigen', 'hud.piecesTitle': 'Wieder die Figuren zeigen',
+  'tb.options': 'Optionen', 'phone.options': 'Optionen', 'menu.abandon': 'Partie wirklich abbrechen?', 'menu.look': 'Aussehen',
   'phone.viewGimbal': 'Ansicht und Kardan', 'phone.help': 'Hilfe', 'phone.last': 'Zuletzt: {move}',
 
   // HUD

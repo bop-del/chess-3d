@@ -5,6 +5,7 @@ import { device } from './device.js';
 import './learn/strings.js';
 import { t, setLanguage, onLanguage, translateTree, sanDisplay, i18n } from './i18n.js';
 import { createDesktop, chipGroup, VIEW_ICONS } from './panel.js';
+import './menu-a.css';
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const g = (t) => GLYPH[t] + '︎';
 const VAL = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
@@ -22,6 +23,7 @@ const ICON = {
   views: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   learn: '<path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  options: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
   show: '<path d="M7 4.5v15l12-7.5z"/>',
   end: '<path d="M6 6l12 12M18 6 6 18"/>',
   next: '<path d="M5 12h14M13 6l6 6-6 6"/>',
@@ -57,6 +59,10 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // into the Menu sheet. Both layouts use the same ids, so the wiring below serves either.
   const desk = !device.phone;
   const manual = new URLSearchParams(location.search).get('manual') === '1';
+  // ?menu=a (CHE-223): the menu structure "three equal places" as a preview. Play, View (phone), Options and Learn are the places;
+  // the default menu stays until the owner's go. See docs/ARCHITECTURE.md, Menu structure A.
+  const menuA = new URLSearchParams(location.search).get('menu') === 'a';
+  document.body.classList.toggle('menu-a', menuA);
   let left = null, right = null, help = null, drawerBtn = null, dsk = null;
   const showBtn = el('button', 'show-btn', 'Show HUD');
   showBtn.dataset.i18n = 'hud.show';
@@ -67,7 +73,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   const hostFns = [];   // told when the desktop panel changes width (folded or unfolded): the review moves its Details box
   const deskFrame = () => controls.setFrame({ ...(deskW ? { right: deskW } : {}), ...(deskBottom ? { bottom: deskBottom } : {}) });
   if (desk) {
-    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => { deskW = w; deskFrame(); hostFns.forEach((fn) => fn()); }, fade: !manual });
+    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => { deskW = w; deskFrame(); hostFns.forEach((fn) => fn()); }, fade: !manual, menuA });
     hud.append(showBtn);
   } else {
   // ------------------------------------------------------------ left column
@@ -291,7 +297,21 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   stage.onQuality?.((q) => { selQuality.value = q; });   // the adaptive governor (src/adapt.js) steps down without the chip: it follows
 
   // ------------------------------------------------------------ game buttons
-  $('#btn-new').addEventListener('click', () => { game.newGame(); hideBanner(); });
+  // menu A: Play while a game runs asks first (desktop Play button, phone Start, N key, the daily puzzle's Start)
+  let abandonRun = null;
+  const abandonBox = () => (phoneUI ? phoneUI.confirmBox : dsk?.abandon);
+  function confirmAbandon(run) {
+    const st = game.getState(), box = abandonBox();
+    if (!box || !st.moves.length || st.over) { run(); return; }
+    abandonRun = run; box.hidden = false;
+  }
+  function wireAbandon(box) {
+    box.querySelector('[data-a=yes]').addEventListener('click', () => { const r = abandonRun; abandonRun = null; box.hidden = true; r?.(); });
+    box.querySelector('[data-a=no]').addEventListener('click', () => { abandonRun = null; box.hidden = true; });
+  }
+  const startGame = () => { game.newGame(); hideBanner(); phoneUI?.close(); };
+  if (menuA && dsk) wireAbandon(dsk.abandon);
+  $('#btn-new').addEventListener('click', () => { if (menuA) confirmAbandon(startGame); else { game.newGame(); hideBanner(); } });
   $('#btn-undo').addEventListener('click', () => { game.undo(); hideBanner(); });
   $('#btn-help').addEventListener('click', toggleHelp);
   const storeLevel = (v) => { try { localStorage.setItem('chess3d.level', v); } catch (e) { /* storage may be blocked */ } };
@@ -357,7 +377,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   $('#btn-hide')?.addEventListener('click', () => toggleHud(true));
   showBtn.addEventListener('click', () => toggleHud(false));
   controls.hooks.undo = () => { game.undo(); hideBanner(); };
-  controls.hooks.newGame = () => { game.newGame(); hideBanner(); };
+  controls.hooks.newGame = () => { if (menuA) confirmAbandon(startGame); else { game.newGame(); hideBanner(); } };
   controls.hooks.toggleHud = () => toggleHud();
   controls.hooks.toggleHelp = toggleHelp;
   window.addEventListener('keydown', (e) => {
@@ -430,6 +450,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     $('#adv-b').textContent = st.advantage < 0 ? `+${-st.advantage}` : '';
 
     $('#btn-undo').disabled = !st.canUndo;
+    if (menuA && dsk) dsk.undoBtn.hidden = !st.canUndo;   // Back shows from the first move
     if (st.check && !lastCheck && !st.over) toast(t('turn.check', 'Check'));
     lastCheck = st.check;
     if (chkAi.checked !== st.vsComputer) chkAi.checked = st.vsComputer;
@@ -439,6 +460,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     phoneUI?.status(st);
   }
   game.on('change', render);
+  game.on('newgame', () => { abandonRun = null; const b = abandonBox(); if (b) b.hidden = true; });
   render(game.getState());
 
   // ------------------------------------------------------------ promotion chooser
@@ -528,7 +550,11 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     bar.dataset.i18nAria = 'phone.controls';
     const btn = {};
     // short word on the button (never wraps), the full name stays as aria-label and title
-    for (const [id, short, full, key, shortKey] of [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']]) {
+    // menu A: Back (hidden until the first move), Play (a sheet with the choice), Symbols, View (a sheet), Learn, Options (no Menu)
+    const BAR_BUTTONS = menuA
+      ? [['undo', 'Back', 'Back', 'tb.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'View', 'tb.view', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['options', 'Options', 'Options', 'phone.options', 'tb.options']]
+      : [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']];
+    for (const [id, short, full, key, shortKey] of BAR_BUTTONS) {
       const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${shortKey}">${short}</span>`);
       b.setAttribute('aria-label', full); b.setAttribute('title', full);
       b.dataset.i18nAria = key; b.dataset.i18nTitle = key;
@@ -559,44 +585,89 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     const confirmBox = el('div', 'pconfirm');
     confirmBox.hidden = true;
     confirmBox.setAttribute('role', 'alertdialog');
-    confirmBox.innerHTML = '<p data-i18n="phone.newAsk">Start a new game?</p><div class="row"><button class="btn primary" data-a="yes" data-i18n="phone.yes">Yes</button><button class="btn" data-a="no" data-i18n="phone.cancel">Cancel</button></div>';
+    confirmBox.innerHTML = `<p data-i18n="${menuA ? 'menu.abandon' : 'phone.newAsk'}">${menuA ? 'Really abandon the game?' : 'Start a new game?'}</p><div class="row"><button class="btn primary" data-a="yes" data-i18n="phone.yes">Yes</button><button class="btn" data-a="no" data-i18n="phone.cancel">Cancel</button></div>`;
+    if (menuA) wireAbandon(confirmBox);
     const probe = el('div', 'pframe');
     probe.setAttribute('aria-hidden', 'true');
 
     const scrim = el('div', 'pscrim');
-    const sheet = el('section', 'psheet');
-    sheet.setAttribute('role', 'dialog');
-    sheet.setAttribute('aria-label', 'Menu');
-    sheet.dataset.i18nAria = 'phone.menu';
-    sheet.innerHTML = '<div class="psheet-head"><i class="grip"></i><b data-i18n="phone.menu">Menu</b><button class="psheet-x" aria-label="Close menu" data-i18n-aria="phone.closeMenu">&#x2715;</button></div><div class="psheet-body"></div>';
-    const sheetBody = sheet.querySelector('.psheet-body');
-    // Learn sheet: the second bottom sheet, filled by src/learn (tabs Openings, Mine, Practise). Only one sheet is open at a time.
-    const learnSheet = el('section', 'psheet plearn');
-    learnSheet.setAttribute('role', 'dialog');
-    learnSheet.setAttribute('aria-label', 'Learn');
-    learnSheet.dataset.i18nAria = 'learn.title';
-    learnSheet.innerHTML = '<div class="psheet-head"><i class="grip"></i><b data-i18n="learn.title">Learn</b><button class="psheet-x" aria-label="Close" data-i18n-aria="learn.close">&#x2715;</button></div><div class="psheet-body"></div>';
-    const learnBody = learnSheet.querySelector('.psheet-body');
-
-    // sections: the existing cards move here. Gimbal sliders join the View card, captured pieces stay in the 3D trays.
+    // a bottom sheet: grip, title, close button, a scrolling body. Only one is open at a time.
+    const mkSheet = (cls, titleKey, title, label, closeKey, closeLabel) => {
+      const sh = el('section', `psheet${cls ? ' ' + cls : ''}`);
+      sh.setAttribute('role', 'dialog');
+      sh.setAttribute('aria-label', label);
+      sh.dataset.i18nAria = titleKey;
+      sh.innerHTML = `<div class="psheet-head"><i class="grip"></i><b data-i18n="${titleKey}">${title}</b><button class="psheet-x" aria-label="${closeLabel}" data-i18n-aria="${closeKey}">&#x2715;</button></div><div class="psheet-body"></div>`;
+      return { el: sh, body: sh.querySelector('.psheet-body') };
+    };
+    // Learn sheet: filled by src/learn (tabs Openings, Mine, Practise, Puzzles).
+    const learnS = mkSheet('plearn', 'learn.title', 'Learn', 'Learn', 'learn.close', 'Close');
+    const learnSheet = learnS.el, learnBody = learnS.body;
+    const cards = [];
+    let sheet = null, sheetBody = null, sheetsA = null, optSlots = null, helpC = null, openCard = () => {};
     const gameC = cardOf('game'), movesC = cardOf('moves'), viewC = cardOf('view'), sceneC = cardOf('scene');
-    viewC.querySelector('h2').dataset.i18n = 'phone.viewGimbal';
-    viewC.querySelector('h2').textContent = 'View and gimbal';
     const sl = $('#sliders');
     sl.classList.remove('body');
-    viewC.querySelector('.body').append(sl);
-    const helpC = el('section', 'card');
-    helpC.dataset.card = 'help';
-    helpC.innerHTML = `<header><h2 data-i18n="phone.help">Help</h2><span class="chev"></span></header><div class="body"><dl class="keys" id="phone-keys">${keyRows(PHONE_KEYS)}</dl></div>`;
-    const cards = [gameC, movesC, viewC, sceneC, helpC];
-    sheetBody.append(...cards);
-    const openCard = (c) => {
-      cards.forEach((x) => x.classList.toggle('collapsed', x !== c));
-      sheetBody.scrollTop = Math.max(0, c.offsetTop - sheetBody.offsetTop - 4);
-    };
-    openCard(gameC);
-    for (const c of cards) {
-      c.querySelector('header').addEventListener('click', () => { if (c.classList.contains('collapsed')) openCard(c); else c.classList.add('collapsed'); });
+    if (!menuA) {
+      // Menu sheet: the existing cards move here. Gimbal sliders join the View card, captured pieces stay in the 3D trays.
+      const m = mkSheet('', 'phone.menu', 'Menu', 'Menu', 'phone.closeMenu', 'Close menu');
+      sheet = m.el; sheetBody = m.body;
+      viewC.querySelector('h2').dataset.i18n = 'phone.viewGimbal';
+      viewC.querySelector('h2').textContent = 'View and gimbal';
+      viewC.querySelector('.body').append(sl);
+      helpC = el('section', 'card');
+      helpC.dataset.card = 'help';
+      helpC.innerHTML = `<header><h2 data-i18n="phone.help">Help</h2><span class="chev"></span></header><div class="body"><dl class="keys" id="phone-keys">${keyRows(PHONE_KEYS)}</dl></div>`;
+      cards.push(gameC, movesC, viewC, sceneC, helpC);
+      sheetBody.append(...cards);
+      openCard = (c) => {
+        cards.forEach((x) => x.classList.toggle('collapsed', x !== c));
+        sheetBody.scrollTop = Math.max(0, c.offsetTop - sheetBody.offsetTop - 4);
+      };
+      openCard(gameC);
+      for (const c of cards) {
+        c.querySelector('header').addEventListener('click', () => { if (c.classList.contains('collapsed')) openCard(c); else c.classList.add('collapsed'); });
+      }
+    } else {
+      // Menu A: Play (the choice, the clock, Start, the moves), View (the views and what turns them), Options (look, sound, quality,
+      // language, advanced, help). The cards of the old Menu are taken apart; ids and handlers stay.
+      const play = mkSheet('pplay', 'hud.newGame', 'Play', 'Play', 'phone.closeMenu', 'Close menu');
+      const view = mkSheet('pview', 'tb.view', 'View', 'View', 'phone.closeMenu', 'Close menu');
+      const opts = mkSheet('poptions', 'tb.options', 'Options', 'Options', 'phone.closeMenu', 'Close menu');
+      sheetsA = { play, view, options: opts, learn: learnS };
+      for (const c of [gameC, movesC, viewC]) c.classList.remove('collapsed');
+      // Play: [daily card, mounted later] opponent, clock, Start; then the moves. Back and Keys stay in the DOM, hidden (the bar has Back).
+      const gb = gameC.querySelector('.body'), ai = gb.querySelector('.row.ai');
+      const startRow = el('div', 'row start'), clockSlot = el('div', 'pclockslot'), unused = el('div');
+      unused.hidden = true;
+      const newBtn = $('#btn-new');
+      newBtn.classList.add('big');
+      startRow.append(newBtn);
+      unused.append($('#btn-undo'), $('#btn-help'), gb.querySelector('.row.good'));
+      gb.replaceChildren(ai, clockSlot, startRow, unused);
+      play.body.append(gameC, movesC);
+      view.body.append(viewC);
+      // Options
+      const sec = (id, key, title) => {
+        const x = el('section', 'osec'); x.dataset.sec = id;
+        x.innerHTML = `<h4 data-i18n="${key}">${title}</h4><div class="obody"></div>`;
+        return x;
+      };
+      const look = sec('look', 'menu.look', 'Look'), sound = sec('sound', 'panel.sound', 'Sound'), quality = sec('quality', 'panel.quality', 'Quality'), lang = sec('language', 'panel.language', 'Language');
+      const slot = (n) => { const d = el('div', 'stack'); d.dataset.slot = n; return d; };
+      const lookBody = look.querySelector('.obody'), soundBody = sound.querySelector('.obody');
+      lookBody.append(slot('themes'), slot('light'), slot('battle'), slot('more'));
+      soundBody.append(slot('audio'), slot('music'));
+      lookBody.querySelector('[data-slot=light]').append(sceneC.querySelector('#sel-light').closest('.field'));
+      quality.querySelector('.obody').append(sceneC.querySelector('#sel-quality').closest('.field'));
+      const adv = el('details', 'fold');
+      adv.id = 'advanced';
+      adv.innerHTML = '<summary><span data-i18n="panel.advanced">Advanced</span><small data-i18n="panel.advancedHintA">Tilt the board, back up progress</small></summary><div class="fold-body"></div>';
+      adv.querySelector('.fold-body').append(sl, slot('train-data'));
+      const help = sec('help', 'phone.help', 'Help');
+      help.querySelector('.obody').innerHTML = `<dl class="keys" id="phone-keys">${keyRows(PHONE_KEYS)}</dl>`;
+      opts.body.append(look, sound, quality, lang, adv, help);
+      optSlots = { themes: lookBody.children[0], battle: lookBody.children[2], more: lookBody.children[3], audio: soundBody.children[0], music: soundBody.children[1], clock: clockSlot, 'train-data': adv.querySelector('[data-slot="train-data"]'), language: lang.querySelector('.obody'), help, adv };
     }
 
     // the "Good move?" bulb: a 44 px target at the right end of the status line
@@ -606,16 +677,27 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     goodBtns.push(bulb);
     if (goodMove) bulb.addEventListener('click', () => goodMove.ask());
 
-    hud.append(status, bulb, bar, lbar, probe, scrim, sheet, learnSheet, confirmBox);
+    const allSheets = menuA ? Object.values(sheetsA).map((x) => x.el) : [sheet, learnSheet];
+    hud.append(status, bulb, bar, lbar, probe, scrim, ...allSheets, confirmBox);
 
     // sheet open and close; swipe down on the header closes it
     const isOpen = () => sheet.classList.contains('open');
     const isLearnOpen = () => learnSheet.classList.contains('open');
+    const sheetBtns = menuA ? [btn.new, btn.views, btn.options, btn.learn] : [btn.menu, btn.learn];
     function close() {
-      confirmBox.hidden = true;
-      sheet.classList.remove('open'); learnSheet.classList.remove('open'); scrim.classList.remove('open');
-      btn.menu.classList.remove('on'); btn.learn.classList.remove('on');
+      confirmBox.hidden = true; abandonRun = null;
+      for (const sh of allSheets) sh.classList.remove('open');
+      scrim.classList.remove('open');
+      for (const b of sheetBtns) b.classList.remove('on');
     }
+    // menu A: open one of the sheets (play, view, options) from its bar button, or toggle it shut
+    function openSheet(name) {
+      const x = sheetsA[name], b = { play: btn.new, view: btn.views, options: btn.options, learn: btn.learn }[name];
+      close();
+      x.el.classList.add('open'); scrim.classList.add('open'); b.classList.add('on');
+      if (name === 'play') movesEl.scrollTop = movesEl.scrollHeight;
+    }
+    const isSheetOpen = (name) => sheetsA[name].el.classList.contains('open');
     function open(card) {
       close();
       sheet.classList.add('open'); scrim.classList.add('open'); btn.menu.classList.add('on');
@@ -625,11 +707,12 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       if (!movesC.classList.contains('collapsed')) movesEl.scrollTop = movesEl.scrollHeight;
     }
     function openLearn() {
+      if (menuA) { openSheet('learn'); return; }
       close();
       learnSheet.classList.add('open'); scrim.classList.add('open'); btn.learn.classList.add('on');
     }
     scrim.addEventListener('click', close);
-    for (const sh of [sheet, learnSheet]) {
+    for (const sh of allSheets) {
       sh.querySelector('.psheet-x').addEventListener('click', close);
       const head = sh.querySelector('.psheet-head');
       let drag = null;
@@ -658,27 +741,33 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     // thumb bar
     btn.undo.addEventListener('click', () => { game.undo(); hideBanner(); });
     // New game: one tap at the start or after the game ended, a small confirm while a game is in progress
-    const startNew = () => { confirmBox.hidden = true; game.newGame(); hideBanner(); close(); };
-    const askNew = () => {
-      const st = game.getState();
-      if (st.moves.length && !st.over) { confirmBox.hidden = !confirmBox.hidden; } else startNew();
-    };
-    confirmBox.querySelector('[data-a=yes]').addEventListener('click', startNew);
-    confirmBox.querySelector('[data-a=no]').addEventListener('click', () => { confirmBox.hidden = true; });
-    btn.new.addEventListener('click', askNew);
-    sheetBody.addEventListener('click', (e) => {
-      if (!e.target.closest('#btn-new')) return;
-      e.stopPropagation();
-      askNew();
-    }, true);
+    if (!menuA) {
+      const startNew = () => { confirmBox.hidden = true; game.newGame(); hideBanner(); close(); };
+      const askNew = () => {
+        const st = game.getState();
+        if (st.moves.length && !st.over) { confirmBox.hidden = !confirmBox.hidden; } else startNew();
+      };
+      confirmBox.querySelector('[data-a=yes]').addEventListener('click', startNew);
+      confirmBox.querySelector('[data-a=no]').addEventListener('click', () => { confirmBox.hidden = true; });
+      btn.new.addEventListener('click', askNew);
+      sheetBody.addEventListener('click', (e) => {
+        if (!e.target.closest('#btn-new')) return;
+        e.stopPropagation();
+        askNew();
+      }, true);
+    }
     btn.symbols.id = 'btn-symbols';
     btn.symbols.addEventListener('click', () => views.toggleSymbols());
     markSymbols();
-    btn.views.addEventListener('click', () => {
-      views.next();
-      toast(t(`preset.${views.label()}`, views.label()), 'info');
-    });
-    btn.menu.addEventListener('click', () => (isOpen() ? close() : open()));
+    if (menuA) {
+      for (const [name, b] of [['play', btn.new], ['view', btn.views], ['options', btn.options]]) b.addEventListener('click', () => (isSheetOpen(name) ? close() : openSheet(name)));
+    } else {
+      btn.views.addEventListener('click', () => {
+        views.next();
+        toast(t(`preset.${views.label()}`, views.label()), 'info');
+      });
+      btn.menu.addEventListener('click', () => (isOpen() ? close() : open()));
+    }
     btn.learn.addEventListener('click', () => (isLearnOpen() ? close() : openLearn()));
 
     // free area for the camera
@@ -700,6 +789,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       const last = st.moves.length ? t('phone.last', 'Last: {move}', { move: sanDisplay(st.moves[st.moves.length - 1]) }) : '';
       const key = `${st.turn}|${main}|${sub}|${last}|${!!st.check}|${!!st.thinking}`;
       btn.undo.disabled = !st.canUndo;
+      if (menuA) btn.undo.classList.toggle('gone', !st.canUndo);   // the place stays, nothing grey stands there
       if (key === lastKey) return;
       lastKey = key;
       status.querySelector('.dot').className = 'dot ' + st.turn;
@@ -710,10 +800,15 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       status.classList.toggle('think', !!st.thinking);
     }
     return {
-      status: statusRender, close, frame, setLearnBar, resetStatus() { lastKey = ''; },
+      status: statusRender, close, frame, setLearnBar, resetStatus() { lastKey = ''; }, confirmBox,
       learn: { body: learnBody, open: openLearn, close, get isOpen() { return isLearnOpen(); } },
-      toggleHelp() { if (isOpen() && !helpC.classList.contains('collapsed')) close(); else open(helpC); },
+      toggleHelp() {
+        if (menuA) { if (isSheetOpen('options')) close(); else { openSheet('options'); optSlots.help.scrollIntoView?.({ block: 'start' }); } return; }
+        if (isOpen() && !helpC.classList.contains('collapsed')) close(); else open(helpC);
+      },
       openCard(id) { const c = id ? cardOf(id) : null; if (id && !c) return false; open(c || undefined); return true; },
+      // menu A
+      openSheet, optSlots, learnBody, playBody: sheetsA?.play.body, sheets: sheetsA,
     };
   }
   if (device.phone) {
@@ -725,7 +820,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // The two buttons sit in the brand card (desktop) and move into the Menu sheet on phones. Everything marked data-i18n is
   // translated in place; the parts built from tables or state (key help, preset and lighting names, move list, status) are redone.
   const langBox = $('.lang');
-  if (phoneUI) hud.querySelector('.psheet-body').prepend(langBox);
+  if (phoneUI) { if (menuA) phoneUI.optSlots.language.append(langBox); else hud.querySelector('.psheet-body').prepend(langBox); }
   langBox.addEventListener('click', (e) => {
     const b = e.target.closest('[data-lang]');
     if (b) setLanguage(b.dataset.lang);
@@ -762,6 +857,11 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     translateTree(card);
     card.querySelector('.body').append(element);
     card.querySelector('header').addEventListener('click', () => card.classList.toggle('collapsed'));
+    if (menuA && phoneUI) {   // menu A: the badges live in Learn; the other cards stay hidden until a lesson shows them
+      if (id === 'badges') card.classList.add('collapsed');
+      phoneUI.learnBody.append(card);
+      return card;
+    }
     const sheetBody = hud.querySelector('.psheet-body');
     if (document.body.classList.contains('phone') && sheetBody) sheetBody.append(card);
     else right.insertBefore(card, right.querySelector('.card[data-card="moves"]'));
@@ -770,6 +870,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   function mountSettings(id, element) {
     element.dataset.settings = id;
     if (dsk) { dsk.mountSettings(id, element); return element; }
+    if (menuA && phoneUI) { (phoneUI.optSlots[id] || phoneUI.optSlots.more).append(element); return element; }
     const scene = hud.querySelector('.card[data-card="scene"] .body') || hud.querySelector('.card[data-card="scene"]');
     scene.append(element);
     return element;
@@ -787,6 +888,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // into view. 'settings' is the Scene card (or the Menu sheet itself on a phone), 'music' the music block inside it.
   // Returns false for an id that is not a panel here.
   function openPanel(id) {
+    if (menuA) return openPanelA(id);
     const PANELS = { settings: 'scene', menu: 'scene', scene: 'scene', music: 'scene', clock: 'scene', moves: 'moves', daily: 'daily', openings: 'openings', drill: 'drill', puzzles: 'puzzles', badges: 'badges' };
     if (!Object.hasOwn(PANELS, id)) return false;
     const card = PANELS[id];
@@ -810,6 +912,30 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     return true;
   }
 
+  // Menu A: the old names stay valid as aliases (settings, scene, menu, music, clock, moves, daily, badges) next to the new game, view and
+  // options. Phone: the sheet that holds it; desktop: the panel tab. A learn value (openings, drill, puzzles) is src/learn's.
+  const A_PLACE = { game: 'play', daily: 'play', moves: 'play', clock: 'play', view: 'view', options: 'options', settings: 'options', scene: 'options', menu: 'options', music: 'options', badges: 'learn' };
+  const A_TAB = { play: 'play', view: 'settings', options: 'settings', learn: 'learn' };
+  function openPanelA(id) {
+    if (!Object.hasOwn(A_PLACE, id)) return false;
+    const place = A_PLACE[id];
+    const target = () => {
+      const q = (x) => hud.querySelector(x);
+      return { daily: q('.dailycard'), moves: q('#moves'), clock: q('.clock-settings'), music: q('.music-settings'), badges: q('.card[data-card="badges"]'), view: dsk ? q('#presets') : null }[id] || null;
+    };
+    if (phoneUI) {
+      phoneUI.openSheet(place);
+      if (id === 'badges') hud.querySelector('.card[data-card="badges"]')?.classList.remove('collapsed');
+    } else if (dsk) {
+      dsk.setTab(A_TAB[place]);
+      if (dsk.rail) dsk.setRail(false, { persist: false });
+    } else return false;
+    const go = () => target()?.scrollIntoView?.({ block: id === 'music' || id === 'clock' ? 'start' : 'nearest' });
+    go();
+    if (dsk) setTimeout(go, 450);
+    return true;
+  }
+
   // Phone only: the Learn sheet { body, open(), close(), isOpen }, null elsewhere. src/learn fills the body.
   /** px at the bottom of the canvas that something floating covers (the review strip): the desktop camera fits the board above it */
   function setBottomInset(px) { px = Math.max(0, Math.round(px)); if (px === deskBottom) return; deskBottom = px; if (dsk) deskFrame(); }
@@ -824,5 +950,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     on: (fn) => { hostFns.push(fn); },
   };
 
-  return { sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  return { menuA, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }

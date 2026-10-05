@@ -50,6 +50,8 @@ export const MAP = [
   [/^test\/pixel-look-page\.mjs$/, ['pixel look']],
   [/^test\/cloud-mask-page\.mjs$/, ['cloud mask']],
   [/^test\/open-flag\.mjs$/, ['open']],
+  [/^test\/menu-a\.mjs$/, ['menu a']],
+  [/^src\/menu-a\.css$/, ['menu a', 'open', 'fixes', 'core']],
   [/^test\/clock-page\.mjs$/, ['clock']],
   [/^test\/adapt-page\.mjs$/, ['adapt']],
   [/^test\/adapt\.mjs$/, []],
