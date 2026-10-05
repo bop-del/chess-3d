@@ -13,11 +13,11 @@ const ISLAND = { rx: 7.2, rz: 5.7, n: 3 };                 // half sizes and squ
 const SLABS = { cx: 5.75, cz: 0.96, w: 1.45, len: 4.9 };   // the tray slab (src/trays.js SLAB): the crates are built around it
 const BED_DROP = 0.3;                                      // the crate beds sit this much lower than the grass
 const POOL = { x0: 4, x1: 6, z0: -5, z1: -3 };             // the pond, in whole blocks
+const FALL_B = -5.5, FALL_T = 0.3;                         // bottom and thickness of the waterfall sheet
 const FRAME = 0.5;
 export const PIXEL_EDGE = 4 + FRAME;                       // half size of board plus frame
 const FRAME_H = 0.2;
-const TREE = { x: -7, z: -6, trunk: 4 };
-const TREE_MIN = 0.4;   // CHE-220: the tree shrinks out of the board's way but never vanishes
+const TREE = { x: -9, z: -8, trunk: 4 };
 const KINDS = {
   grass: { top: 'grassTop', side: 'grassSide', bottom: 'dirt' },
   dirt: { top: 'dirt', side: 'dirt', bottom: 'dirt' },
@@ -60,7 +60,7 @@ function buildTerrain(kit) {
   const R = rnd(31), m = new Mesher({ shade: true }), grid = new Map(), NZ = noise2(9);
   const K = (ix, iy, iz) => ((ix + 256) * 512 + (iy + 256)) * 512 + (iz + 256);
   const onGrass = new Set();
-  for (let ix = -8; ix < 8; ix++) for (let iz = -7; iz < 7; iz++) {
+  for (let ix = -8; ix < 8; ix++) for (let iz = -8; iz < 7; iz++) {
     const x = ix + 0.5, z = iz + 0.5, tray = inTray(x, z), board = inBoard(x, z), pool = inPool(ix, iz);
     const tree = ix >= TREE.x && ix <= TREE.x + 1 && iz >= TREE.z && iz <= TREE.z + 1;
     const sq = Math.pow(Math.pow(Math.abs(x) / ISLAND.rx, ISLAND.n) + Math.pow(Math.abs(z) / ISLAND.rz, ISLAND.n), 1 / ISLAND.n) + (NZ(x * 1.7, z * 1.7) - 0.5) * 0.14;
@@ -87,6 +87,8 @@ function buildTerrain(kit) {
   }
   // the pond: water blocks a little below the grass (two blocks wide and deep, only the surface is drawn)
   m.box('water', POOL.x0, -1, POOL.z0, POOL.x1 - POOL.x0, 1 - 0.12, POOL.z1 - POOL.z0, { skip: new Set(['px', 'nx', 'pz', 'nz', 'ny']), color: 0xffffff });
+  // the waterfall (CHE-222): a sheet of water over the back edge of the pond, down past the island; the pond lip and the sheet meet at its top
+  m.box('fall', POOL.x0 + 0.25, FALL_B, POOL.z0 - FALL_T, POOL.x1 - POOL.x0 - 0.5, -0.12 - FALL_B, FALL_T, { skip: new Set(['pz', 'ny']) });
   // the oak frame: a ring half a block wide around the board, four log posts in the corners
   const fh = FRAME_H;
   // the planks stop at the posts: no two boxes share a face (rule, test/pixel-rules.mjs)
@@ -166,11 +168,13 @@ export function createPixelWorld({ track, view } = {}) {
   const sun = toGroup(sunM, kit, { name: 'sun' });
   sun.position.set(-12, 17, -34);
   group.add(sun);
-  const avoid = buildAvoid(group, tree, clouds, view, PIXEL_EDGE, TREE_MIN);
+  const avoid = buildAvoid(group, tree, clouds, view, PIXEL_EDGE, true);
   let time = 2.2, tick = -1;
   const anim = (t) => {
     const f = Math.floor(t * 3);   // the water steps like animation frames: a pixel row every few frames
-    if (f !== tick) { tick = f; kit.T.water.offset.y = (f % 16) / 16; kit.T.water.offset.x = (Math.floor(f / 5) % 16) / 16; }
+    // the pond drifts toward its back edge (-z, where the fall is: a top face's v grows toward -z, so the offset counts down) and the
+    // fall runs down (a side face's v grows with y, so the offset counts up)
+    if (f !== tick) { tick = f; kit.T.water.offset.y = ((16 - f % 16) % 16) / 16; kit.T.fall.offset.y = (f % 16) / 16; }
     for (const c of clouds) { const span = 70, x = c.userData.x0 + t * c.userData.speed; c.position.x = ((x + 35) % span + span) % span - 35; }
   };
   anim(time);

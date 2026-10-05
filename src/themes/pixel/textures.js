@@ -8,7 +8,7 @@ const clamp = (v) => Math.max(0, Math.min(255, v));
 
 // Wrap modes (S61): a texture whose faces are one tile clamps, so the sample at a block edge can never wrap to the opposite row (the
 // green hairline). Repeat is an explicit opt in for textures that tile on purpose; test/pixel-rules.mjs holds the allow list.
-export const REPEATING = ['water', 'planks', 'cloud', 'sun'];
+export const REPEATING = ['water', 'fall', 'planks', 'cloud', 'sun'];
 function make(seed, draw, size = 16, repeat = false) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   const x = c.getContext('2d'), r = rng(seed);
@@ -86,6 +86,8 @@ export function pixelTextures(track = (t) => t) {
   });
   T.sand = make(10, (g) => { g.fill(0xdbcf97, 6); specks(g, 0xc9bb80, 24); specks(g, 0xeadfae, 18); });
   T.water = make(11, (g) => { g.fill(0x2f5fcf, 8); for (let i = 0; i < 14; i++) { const px = Math.floor(g.r() * 13), py = Math.floor(g.r() * 16); for (let k = 0; k < 3; k++) g.P(px + k, py, 0x5d8df0, 4); } specks(g, 0x2650b0, 18); }, 16, true);
+  // the waterfall (CHE-222): vertical streaks, scrolls down the sheet (repeat on purpose, like the pond)
+  T.fall = make(12, (g) => { g.fill(0x3a6bd8, 8); for (let i = 0; i < 9; i++) { const px = Math.floor(g.r() * 16), py = Math.floor(g.r() * 12); for (let k = 0; k < 2 + Math.floor(g.r() * 4); k++) g.P(px, (py + k) % 16, 0xdce9ff, 4); } specks(g, 0x2a55b8, 14); }, 16, true);
   T.cloud = make(12, (g) => { g.fill(0xffffff, 4); }, 8, true);
   T.sun = make(13, (g) => { g.fill(0xffe27a, 6); for (let i = 0; i < 8; i++) { g.P(i * 2, 0, 0xfff3b8); g.P(0, i * 2, 0xfff3b8); } }, 8, true);
   for (const k in T) track(T[k]);

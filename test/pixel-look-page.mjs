@@ -126,24 +126,35 @@ try {
   });
   R.expect('tray: the floor does not change with the lights off', tray.n > 300 && tray.share < 0.04, `${tray.n} pixels, largest difference ${tray.max}`, JSON.stringify(tray));
   R.expect('tray: the floor shows planks colours (warm brown)', tray.n > 300 && tray.planks / tray.n > 0.9, `${tray.planks} of ${tray.n}`);
-  // CHE-220: the tree never vanishes. Yaw 0 to 330 times pitch 2 to 89 times distance 6, 19, 40: visible, at least its minimum scale,
-  // and drawn (the pixels differ from a frame with the tree hidden) in most cameras that look at it; the board stays clear when the tree can step aside
+  // CHE-220/222: the tree never vanishes and never scales. Yaw 0 to 330 times pitch 2 to 89 times distance 6, 19, 40: visible at
+  // scale 1 and drawn (the pixels differ from a frame with the tree hidden) in most cameras that look at it; `treeCovers` counts the
+  // cameras where its screen hull meets the board hull (CHE-222: 92 of 216 before the move to the far corner)
   const tree = await page.evaluate(() => {
     const H = window.__H, C = window.__chess, world = C.themes.world, foot = world.group.getObjectByName('tree-foot'), D = Math.PI / 180;
-    let cams = 0, gone = [], drawn = 0, small = 0;
+    let cams = 0, gone = [], drawn = 0, small = 0, covers = 0;
     for (const yaw of [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]) for (const pitch of [2, 10, 25, 46, 70, 89]) for (const dist of [6, 19, 40]) {
       C.controls.setCamera({ yaw: yaw * D, pitch: pitch * D, dist }); C.step(0.2, 30); world.settle(); C.stage.camera.updateMatrixWorld();
       cams++;
-      if (!foot.visible || foot.scale.x < 0.39 || world.avoid.treeHidden) { gone.push([yaw, pitch, dist, +foot.scale.x.toFixed(2)]); continue; }
-      if (foot.scale.x < 1) small++;
-      const a = H.snap().slice(); foot.visible = false; const b = H.snap(); foot.visible = true;
+      if (world.avoid.treeCovers) covers++;
+      if (!foot.visible || foot.scale.x !== 1 || world.avoid.treeHidden) { gone.push([yaw, pitch, dist, +foot.scale.x.toFixed(2)]); continue; }
+            const a = H.snap().slice(); foot.visible = false; const b = H.snap(); foot.visible = true;
       let diff = 0; for (let i = 0; i < a.length; i += 16) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) > 30) diff++;
       if (diff > 3) drawn++;
     }
-    return { cams, gone: gone.slice(0, 5), goneN: gone.length, drawn, small };
+    return { cams, gone: gone.slice(0, 5), goneN: gone.length, drawn, small, covers };
   });
-  R.expect('tree: visible at its minimum scale or more in every camera of the sweep', tree.goneN === 0, `${tree.cams} cameras, ${tree.small} with a shrunk tree`, JSON.stringify(tree));
+  R.expect('tree: visible at scale 1 in every camera of the sweep', tree.goneN === 0, `${tree.cams} cameras, ${tree.goneN} not at scale 1`, JSON.stringify(tree));
+  R.expect('tree: covers the board hull in clearly fewer cameras than the 92 before CHE-222', tree.covers <= 70, `${tree.covers} of ${tree.cams} cameras`);
   R.expect('tree: drawn on screen in the cameras that look at it', tree.drawn > tree.cams * 0.3, `${tree.drawn} of ${tree.cams} cameras`);
+  // CHE-222: the waterfall stands over the pond's back edge and runs down; the pond drifts toward it (a top face's v grows toward -z)
+  const fall = await page.evaluate(() => {
+    const world = window.__chess.themes.world, mesh = world.group.getObjectByName('island').getObjectByName('fall'), T = world.kit.T;
+    if (!mesh) return { mesh: false };
+    const b = new window.__chess.THREE.Box3().setFromObject(mesh), f0 = T.fall.offset.y, w0 = T.water.offset.y;
+    window.__chess.step(0.4, 30);
+    return { mesh: true, top: +b.max.y.toFixed(2), bottom: +b.min.y.toFixed(2), zBack: +b.min.z.toFixed(2), down: (T.fall.offset.y - f0 + 1) % 1 > 0 && (T.fall.offset.y - f0 + 1) % 1 < 0.5, pond: (w0 - T.water.offset.y + 1) % 1 > 0 && (w0 - T.water.offset.y + 1) % 1 < 0.5 };
+  });
+  R.expect('waterfall: a sheet over the back edge of the pond, running down, the pond drifting toward it', fall.mesh && fall.bottom < -4 && fall.top > -0.5 && fall.down && fall.pond, JSON.stringify(fall));
   if (SHOTS) {
     mkdirSync(SHOTS, { recursive: true });
     for (const [name, v] of [['pond', [180, 35, 14]], ['posts', [35, 28, 7]], ['tray', [0, 55, 13]]]) {

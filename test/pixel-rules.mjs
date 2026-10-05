@@ -60,7 +60,7 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
 
 // 3 wrap modes
 {
-  const ALLOW_REPEAT = ['water', 'planks', 'cloud', 'sun'];
+  const ALLOW_REPEAT = ['water', 'fall', 'planks', 'cloud', 'sun'];
   const T = pixelTextures();
   const wrong = Object.entries(T).filter(([k, t]) => {
     const want = ALLOW_REPEAT.includes(k) ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;

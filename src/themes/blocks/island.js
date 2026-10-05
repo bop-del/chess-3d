@@ -206,10 +206,10 @@ export const approach = (cur, target, step) => (cur < target ? Math.min(target, 
  * Keeps the tree and the clouds out of the way. view() gives { camera, w, h, rects } (the camera, the canvas size in px and the UI
  * controls as DOMRect like objects). The tree shrinks into the ground while it would cover a board square or the frame on screen
  * and grows back when the view moves on; a cloud fades out while it would pass behind a control. Each test runs on the full size
- * tree and the full cloud, so nothing flickers. `state` is read by the smoke tests. With minTree > 0 (Pixelwelt, CHE-220) the tree
- * never goes below that scale: it shrinks to the largest of a few steps that clears the board, else to minTree, and stays drawn.
+ * tree and the full cloud, so nothing flickers. `state` is read by the smoke tests. With fixedTree (Pixelwelt, CHE-222) the tree
+ * keeps scale 1 in every camera and only `treeCovers` reports whether it covers the board.
  */
-export function buildAvoid(group, tree, clouds, view, edge = EDGE, minTree = 0) {
+export function buildAvoid(group, tree, clouds, view, edge = EDGE, fixedTree = false) {
   const hullTmp = [], state = { treeHidden: false, treeCovers: false, treeScale: 1, cloudsHidden: 0, boardAvoid: true, lift: 0 };
   // the board and its frame (10 x 10) up to the height of the pieces, in world space, as the hull of the corners on screen
   const ground = [];
@@ -244,11 +244,9 @@ export function buildAvoid(group, tree, clouds, view, edge = EDGE, minTree = 0) 
           }
           return false;
         };
-        let want = 0;
-        if (minTree > 0) { want = minTree; for (const s of [1, 0.75, 0.55]) if (s > minTree && !coversAt(s)) { want = s; break; } }
-        else if (!coversAt(1)) want = 1;
-        state.treeCovers = want < 1;
-        state.treeScale = want;
+        const covers = coversAt(1);
+        state.treeCovers = covers;
+        state.treeScale = fixedTree || !covers ? 1 : 0;
       }
       grow = approach(grow, state.treeScale, dt / 0.35);
       tree.group.scale.setScalar(Math.max(grow, 0.0001));
