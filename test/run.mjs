@@ -73,6 +73,7 @@ if (tier === 'fast' || tier === 'all') {
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
   run('bin/lane flag parsing (test/lane-args.mjs)', 'test/lane-args.mjs');
   run('bin/lane agent identity prepend (test/lane-identity.mjs)', 'test/lane-identity.mjs');
+  run('bin/lane kickoff verify and resend (test/kickoff.mjs)', 'test/kickoff.mjs');
   run('affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
   run('goal screens: target position, marks, goal sentences (test/goal.mjs)', 'test/goal.mjs');

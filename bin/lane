@@ -20,6 +20,8 @@
 //                                       bin/agent-stop-hook present, the agent also gets a Stop hook that saves its report.
 //                                       With the private agents/builder.md present, the prompt starts with it, then `Mode for this brief:`
 //                                       builder or engineer, from the brief's `Mode:` line (builder when missing; tools/lane-identity.mjs, CHE-104).
+//                                       CHE-241: the kickoff is verified (tools/kickoff.mjs): the agent must turn working within 60 s, else the prompt is
+//                                       resent, 3 times at most, then a RED line and exit 1. The text is kept in <lane>/.tmp/<name>/kickoff.txt.
 //   bin/lane list                       open lanes of this repo
 //   bin/lane land <branch> [-m <msg>]   land a green lane with no agent (the private bin/land-lane): lock, merge main, fast tier, the
 //                                       lane's affected smoke groups, release-next add, then close below; prints `landed <sha>`,
@@ -42,6 +44,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseLaneFlags } from '../tools/lane-args.mjs';
 import { agentPrompt } from '../tools/lane-identity.mjs';
+import { sendKickoff } from '../tools/kickoff.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USAGE = 'usage: bin/lane open <che-n-words | branch --key CHE-n> [--key CHE-n]... [--private] [--agent <name> <brief> [--model <m>]] | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
@@ -189,8 +192,16 @@ function agent(branch, name, brief, model = 'sonnet') {
     + 'If the send is refused (the lead may be waiting on the owner), retry every 2 minutes, at most 10 times. '
     + 'Then stop and wait; the lead may message you with follow ups.';
   // CHE-104: the private agents/builder.md (identity, owner, goals, mode) goes first when it exists
-  run('herdr', ['agent', 'prompt', id, agentPrompt(prompt, brief)]);
-  console.log(`agent ${id} started in tab "${name} agent" of workspace ${lane.open_workspace_id} (${model}); it reports to ${LEAD}`);
+  // CHE-241: the kickoff is verified: the agent must turn working within 60 s, else it is resent (3 times at most), then a red line.
+  // The text is kept in .tmp/<name>/kickoff.txt of the lane: the board loop resends it once for an agent that never worked.
+  const text = agentPrompt(prompt, brief);
+  try { mkdirSync(join(lane.path, '.tmp', name), { recursive: true }); writeFileSync(join(lane.path, '.tmp', name, 'kickoff.txt'), text); } catch (e) { /* the loop then only reports */ }
+  const k = sendKickoff({ id, text, io: {
+    prompt: (t) => run('herdr', ['agent', 'prompt', id, t]),
+    status: () => { try { return herdr('agent', 'get', id).agent.agent_status; } catch (e) { return ''; } },
+    sleep: (ms) => spawnSync('sleep', [String(ms / 1000)]), now: () => Date.now() } });
+  console.log(`agent ${id} started in tab "${name} agent" of workspace ${lane.open_workspace_id} (${model}); it reports to ${LEAD}${k.ok ? (k.sent > 1 ? `; kickoff resent ${k.sent - 1}x until it worked` : '; working') : ''}`);
+  if (!k.ok) die(k.line);
 }
 
 function list() {

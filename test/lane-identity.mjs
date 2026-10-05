@@ -32,6 +32,6 @@ try {
   // land and merge agents start through the same function with their generated brief, so they get it too
   assert.ok(agentPrompt('You are the "land" agent of lane che-1-x.', plain, id).startsWith('# Who you are'));
   // bin/lane agent sends the prompt through agentPrompt with the brief
-  assert.match(readFileSync(new URL('../bin/lane', import.meta.url), 'utf8'), /\['agent', 'prompt', id, agentPrompt\(prompt, brief\)\]/);
+  assert.match(readFileSync(new URL('../bin/lane', import.meta.url), 'utf8'), /const text = agentPrompt\(prompt, brief\);[\s\S]*sendKickoff\(\{ id, text,[\s\S]*\['agent', 'prompt', id, t\]/);
 } finally { rmSync(dir, { recursive: true, force: true }); }
 console.log('lane identity tests ok');
