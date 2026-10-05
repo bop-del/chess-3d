@@ -126,6 +126,24 @@ try {
   });
   R.expect('tray: the floor does not change with the lights off', tray.n > 300 && tray.share < 0.04, `${tray.n} pixels, largest difference ${tray.max}`, JSON.stringify(tray));
   R.expect('tray: the floor shows planks colours (warm brown)', tray.n > 300 && tray.planks / tray.n > 0.9, `${tray.planks} of ${tray.n}`);
+  // CHE-220: the tree never vanishes. Yaw 0 to 330 times pitch 2 to 89 times distance 6, 19, 40: visible, at least its minimum scale,
+  // and drawn (the pixels differ from a frame with the tree hidden) in most cameras that look at it; the board stays clear when the tree can step aside
+  const tree = await page.evaluate(() => {
+    const H = window.__H, C = window.__chess, world = C.themes.world, foot = world.group.getObjectByName('tree-foot'), D = Math.PI / 180;
+    let cams = 0, gone = [], drawn = 0, small = 0;
+    for (const yaw of [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]) for (const pitch of [2, 10, 25, 46, 70, 89]) for (const dist of [6, 19, 40]) {
+      C.controls.setCamera({ yaw: yaw * D, pitch: pitch * D, dist }); C.step(0.2, 30); world.settle(); C.stage.camera.updateMatrixWorld();
+      cams++;
+      if (!foot.visible || foot.scale.x < 0.39 || world.avoid.treeHidden) { gone.push([yaw, pitch, dist, +foot.scale.x.toFixed(2)]); continue; }
+      if (foot.scale.x < 1) small++;
+      const a = H.snap().slice(); foot.visible = false; const b = H.snap(); foot.visible = true;
+      let diff = 0; for (let i = 0; i < a.length; i += 16) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) > 30) diff++;
+      if (diff > 3) drawn++;
+    }
+    return { cams, gone: gone.slice(0, 5), goneN: gone.length, drawn, small };
+  });
+  R.expect('tree: visible at its minimum scale or more in every camera of the sweep', tree.goneN === 0, `${tree.cams} cameras, ${tree.small} with a shrunk tree`, JSON.stringify(tree));
+  R.expect('tree: drawn on screen in the cameras that look at it', tree.drawn > tree.cams * 0.3, `${tree.drawn} of ${tree.cams} cameras`);
   if (SHOTS) {
     mkdirSync(SHOTS, { recursive: true });
     for (const [name, v] of [['pond', [180, 35, 14]], ['posts', [35, 28, 7]], ['tray', [0, 55, 13]]]) {

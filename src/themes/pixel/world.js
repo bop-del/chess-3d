@@ -17,6 +17,7 @@ const FRAME = 0.5;
 export const PIXEL_EDGE = 4 + FRAME;                       // half size of board plus frame
 const FRAME_H = 0.2;
 const TREE = { x: -7, z: -6, trunk: 4 };
+const TREE_MIN = 0.4;   // CHE-220: the tree shrinks out of the board's way but never vanishes
 const KINDS = {
   grass: { top: 'grassTop', side: 'grassSide', bottom: 'dirt' },
   dirt: { top: 'dirt', side: 'dirt', bottom: 'dirt' },
@@ -165,7 +166,7 @@ export function createPixelWorld({ track, view } = {}) {
   const sun = toGroup(sunM, kit, { name: 'sun' });
   sun.position.set(-12, 17, -34);
   group.add(sun);
-  const avoid = buildAvoid(group, tree, clouds, view, PIXEL_EDGE);
+  const avoid = buildAvoid(group, tree, clouds, view, PIXEL_EDGE, TREE_MIN);
   let time = 2.2, tick = -1;
   const anim = (t) => {
     const f = Math.floor(t * 3);   // the water steps like animation frames: a pixel row every few frames
