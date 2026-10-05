@@ -291,6 +291,43 @@ async function checkContextLoss(page, baseUrl, log) {
   return out;
 }
 
+// ---------------------------------------------------------------- (e) camera fit: zero insets fit like a small margin
+// setFrame({}) must fit the board into the whole canvas as large as setFrame with an 8 px inset (r23 finding 7: 11.4 against 27 percent).
+async function checkFrameFit(page, baseUrl, log) {
+  await load(page, baseUrl, '', { width: 1280, height: 720 });
+  const r = await page.evaluate(() => {
+    const { THREE, stage, controls } = window.__chess;
+    const share = (insets) => {
+      controls.setFrame(insets);
+      stage.scene.updateMatrixWorld(true); stage.camera.updateMatrixWorld(true);
+      let l = Infinity, rr = -Infinity;
+      for (const x of [-4, 4]) for (const z of [-4, 4]) { const p = new THREE.Vector3(x, 0, z).project(stage.camera); const sx = (p.x + 1) / 2 * innerWidth; l = Math.min(l, sx); rr = Math.max(rr, sx); }
+      return (rr - l) / innerWidth * 100;
+    };
+    const zero = share({}), small = share({ left: 8, right: 8, top: 8, bottom: 8 });
+    return { zero, small };
+  });
+  const pass = r.zero > 0 && Math.abs(r.zero - r.small) < 2 && r.zero > 20;
+  log?.(`frame fit: ${pass ? 'ok' : 'FAIL'}`);
+  return [{ name: 'setFrame with zero insets fits the board as large as with an 8 px inset', pass, detail: `board width ${r.zero.toFixed(1)}% (zero) against ${r.small.toFixed(1)}% (8 px)` }];
+}
+
+// Phone Help lists only things the bar or the touch controls really have: no Flip/Wenden row (CHE-158 removed that button).
+async function checkPhoneHelp(page, baseUrl, log) {
+  const out = [];
+  for (const lang of ['en', 'de']) {
+    await load(page, baseUrl, 'touch=1', { width: 390, height: 844 });
+    await page.evaluate((l) => localStorage.setItem('chess3d.lang', l), lang);
+    await load(page, baseUrl, 'touch=1', { width: 390, height: 844 });
+    const rows = await page.evaluate(() => [...document.querySelectorAll('#phone-keys dt')].map((e) => e.textContent.trim()));
+    const pass = rows.length >= 4 && !rows.some((x) => /^(flip|wenden)$/i.test(x));
+    out.push({ name: `phone Help has no Flip row (${lang})`, pass, detail: rows.join(', ') });
+  }
+  await page.evaluate(() => localStorage.removeItem('chess3d.lang'));
+  log?.(`phone help: ${out.every((o) => o.pass) ? 'ok' : 'FAIL'}`);
+  return out;
+}
+
 // One unit of work is one fresh page load plus its checks. Units are independent, so they run in several tabs of the one browser
 // when the caller passes newPage; results keep the order of the units either way.
 const UNITS = [
@@ -299,6 +336,8 @@ const UNITS = [
   ...TRAY_SIZES.map((a) => ['trays', checkTrays, a]),
   ...DEVICE_CASES.map((a) => ['device', checkDevice, a]),
   ['device', checkContextLoss],
+  ['frame', checkFrameFit],
+  ['phone', checkPhoneHelp],
 ];
 
 export async function runFixChecks({ page, baseUrl, log = () => {}, newPage = null, tabs = 4, part = '' }) {

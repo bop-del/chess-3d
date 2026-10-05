@@ -17,7 +17,7 @@ const FALL_B = -5.5, FALL_T = 0.3;                         // bottom and thickne
 const FRAME = 0.5;
 export const PIXEL_EDGE = 4 + FRAME;                       // half size of board plus frame
 const FRAME_H = 0.2;
-const TREE = { x: -9, z: -8, trunk: 4 };
+const TREE = { x: -9, z: -9, trunk: 4 };
 const KINDS = {
   grass: { top: 'grassTop', side: 'grassSide', bottom: 'dirt' },
   dirt: { top: 'dirt', side: 'dirt', bottom: 'dirt' },
@@ -60,7 +60,7 @@ function buildTerrain(kit) {
   const R = rnd(31), m = new Mesher({ shade: true }), grid = new Map(), NZ = noise2(9);
   const K = (ix, iy, iz) => ((ix + 256) * 512 + (iy + 256)) * 512 + (iz + 256);
   const onGrass = new Set();
-  for (let ix = -8; ix < 8; ix++) for (let iz = -8; iz < 7; iz++) {
+  for (let ix = Math.min(-8, TREE.x); ix < 8; ix++) for (let iz = Math.min(-8, TREE.z); iz < 7; iz++) {
     const x = ix + 0.5, z = iz + 0.5, tray = inTray(x, z), board = inBoard(x, z), pool = inPool(ix, iz);
     const tree = ix >= TREE.x && ix <= TREE.x + 1 && iz >= TREE.z && iz <= TREE.z + 1;
     const sq = Math.pow(Math.pow(Math.abs(x) / ISLAND.rx, ISLAND.n) + Math.pow(Math.abs(z) / ISLAND.rz, ISLAND.n), 1 / ISLAND.n) + (NZ(x * 1.7, z * 1.7) - 0.5) * 0.14;
@@ -129,7 +129,7 @@ function buildTree(kit) {
 }
 
 // clouds are flat slabs of white blocks, square from every side, drifting slowly
-const CLOUDS = [[-14, -6, -15, 5, 0.3], [12, 0, -16, 4, 0.22], [-18, 4, 6, 4, 0.38], [16, -9, 8, 5, 0.28], [2, -14, -20, 5, 0.2], [-8, 8, -22, 4, 0.25], [24, 5, -19, 3, 0.33]];
+const CLOUDS = [[-14, -6, -17, 5, 0.3], [12, 0, -16, 4, 0.22], [-18, 4, 6, 4, 0.38], [16, -9, 8, 5, 0.28], [2, -14, -20, 5, 0.2], [-8, 8, -22, 4, 0.25], [24, 5, -19, 3, 0.33]];
 function addClouds(parent, kit) {
   const R = rnd(5), out = [];
   for (const [x, y, z, n, speed] of CLOUDS) {

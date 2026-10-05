@@ -11,7 +11,7 @@ const VAL = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
 const PHONE_KEYS = [
   ['phone.tapPiece', 'Tap a piece', 'Select it, then tap a square'], ['phone.drag', 'Drag', 'Orbit camera'],
   ['phone.two', 'Two fingers', 'Pinch to zoom'], ['phone.undo', 'Undo', 'Take back a move'],
-  ['phone.flip', 'Flip', 'View from the other side'], ['phone.views', 'Views', 'Cycle the camera views'],
+  ['phone.views', 'Views', 'Cycle the camera views'],
 ];
 const ICON = {
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',

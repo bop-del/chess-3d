@@ -64,7 +64,8 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   const gq = new THREE.Quaternion(), gEuler = new THREE.Euler(0, 0, 0, 'YXZ');
   const fRight = new THREE.Vector3(), fUp = new THREE.Vector3(), fFwd = new THREE.Vector3();
   const pts = corners.map(() => new THREE.Vector3());
-  const framed = () => frame.top > 0 || frame.right > 0 || frame.bottom > 0 || frame.left > 0;
+  let framedOn = false;                         // setFrame has been called: even with all insets zero the board is fitted to the free area (no tray-free fit() margin)
+  const framed = () => framedOn;
   // returns the distance (before the user's zoom) and the in-plane target shift { sx, sy } in world units
   function frameFit() {
     const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
@@ -440,6 +441,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   // insets of the free canvas area in CSS px (see the framing block above); the camera re-fits at once
   function setFrame(insets = {}) {
     const n = (v) => (Number.isFinite(v) && v > 0 ? v : 0);
+    framedOn = true;
     frame = { top: n(insets.top), right: n(insets.right), bottom: n(insets.bottom), left: n(insets.left) };
     apply();
   }

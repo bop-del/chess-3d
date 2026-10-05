@@ -23,7 +23,6 @@ export const DE = {
   'phone.drag': 'Ziehen', 'phone.dragD': 'Kamera drehen',
   'phone.two': 'Zwei Finger', 'phone.twoD': 'Zum Zoomen spreizen',
   'phone.undo': 'Zurück', 'phone.undoD': 'Einen Zug zurücknehmen',
-  'phone.flip': 'Wenden', 'phone.flipD': 'Von der anderen Seite ansehen',
   'phone.views': 'Ansichten', 'phone.viewsD': 'Kameraansichten durchschalten',
   'phone.newAsk': 'Neue Partie beginnen?', 'phone.yes': 'Ja', 'phone.cancel': 'Abbrechen',
   'phone.menu': 'Menü', 'phone.closeMenu': 'Menü schließen', 'phone.controls': 'Spielsteuerung',

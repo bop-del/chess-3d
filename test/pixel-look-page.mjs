@@ -58,7 +58,7 @@ try {
   });
   // pond
   const pond = [];
-  for (const [yaw, pitch, dist] of [[180, 35, 14], [150, 25, 14], [215, 45, 12], [200, 30, 16]]) {
+  for (const [yaw, pitch, dist] of [[180, 35, 19], [150, 25, 19], [215, 45, 17], [200, 30, 22]]) {
     pond.push(await page.evaluate((v) => {
       const H = window.__H; H.view(...v);
       const water = H.world.island.getObjectByName('water');
