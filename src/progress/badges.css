@@ -50,3 +50,4 @@ body.phone .bdsub { font-size: 12px; }
   100% { transform: scale(1); filter: brightness(1); }
 }
 @media (prefers-reduced-motion: reduce) { .bdg.fresh .bdart { animation: none; } }
+body.explaining .card[data-card="badges"], body.drilling .card[data-card="badges"], body.puzzling .card[data-card="badges"] { display: none; }   /* CHE-225: a running lesson or puzzle shows only its own card */
