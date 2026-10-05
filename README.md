@@ -209,6 +209,7 @@ All optional. They are meant for screenshots and tests, but work for anyone.
 | `rqueen` | `a`, `b`, `c` | Blocks only: the look of the red queen. `a` (the default) a silver tiara with an icy gem, `b` a gold crown with a fan of three blue-white gems and a dark red veil, `c` a violet-red body with a gold crown and a small orb. An unknown value is ignored. Example: `?theme=blocks&rqueen=b&view=white&yaw=0&pitch=38&dist=9` frames the red back rank |
 | `trays` | `0`, `1` | Capture trays at the side of the board: `0` off, `1` on, for this load only (the Captured pieces at the side switch remembers your choice in `localStorage` `chess3d.trays`; the flag beats it) |
 | `ai` | `0`, `1`, `2`, `3`, `4` | The computer opponent is on by default (plays black, Easy). `ai=0` turns it off for two players, `ai=1` is Novice, `ai=2` Easy, `ai=3` Normal, `ai=4` Hard (a level given here beats the remembered one) |
+| `sound` | `0`, `1` | `sound=0` mutes music and sound effects for this load only (nothing is stored, the Mute sound switch in the settings still turns them on); `sound=1` unmutes for this load. The flag beats the remembered switch. The owner test links add `sound=0` |
 | `spin` | `1` | Start with auto spin on |
 | `hud` | `0` | Start with the HUD hidden |
 | `help` | `1` | Open the keyboard shortcut sheet |

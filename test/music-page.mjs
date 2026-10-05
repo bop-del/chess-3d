@@ -127,6 +127,14 @@ try {
     R.expect('set b pieces are about equally loud (loudest peak at most 1.6 times the quietest)', hi / lo <= 1.6, 'ratio at most 1.6', `${lo.toFixed(2)} to ${hi.toFixed(2)}`);
     R.expect('the offline page logged no error', rerr.length === 0, 'clean', rerr.slice(0, 2).join(' | '));
   } finally { srv.close(); }
+  // ?sound=0 (CHE-240): muted for this load only, nothing stored, music stays quiet after a gesture, the switch turns it on
+  await load('&sound=0');
+  await ev(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' })); });
+  await sleep(1700);
+  const s0 = await ev(() => ({ muted: window.__chess.audio.muted, stored: localStorage.getItem('chess3d.muted'), state: window.__chess.music.state, notes: window.__chess.music.notes, box: document.querySelector('[data-audio-mute]')?.checked }));
+  R.expect('?sound=0 mutes music and effects for this load, stores nothing, the switch shows it', s0.muted === true && s0.stored !== '1' && s0.state !== 'playing' && s0.notes === 0 && s0.box === true, 'muted, no notes, nothing stored', JSON.stringify(s0));
+  await ev(() => window.__chess.audio.setMuted(false));
+  R.expect('with ?sound=0 the player can still turn sound on', await until(() => window.__chess.music.state === 'playing' && window.__chess.music.notes > 0, 30000), 'playing after unmuting');
   R.expect('no console errors or warnings', w.errs.length === 0 && w.warns.length === 0, 'clean', [...w.errs, ...w.warns].slice(0, 3).join(' | '));
   process.exitCode = R.summary().nf ? 1 : 0;
 } finally { await browser.close(); server.stop(); }

@@ -3,7 +3,7 @@
 //
 //   audio.unlock()            call from a user gesture; window listeners do it on the first tap or key and stay armed until the
 //                             context really runs (iOS accepts touchend, pointerup, click and keydown, not pointerdown)
-//   audio.muted / setMuted()  mute switch, stored per device (localStorage, guarded)
+//   audio.muted / setMuted()  mute switch, stored per device (localStorage, guarded); ?sound=0 mutes music and effects for this load, ?sound=1 unmutes
 //   audio.play(voice, opts)   voice(env) schedules nodes and returns its length in seconds. opts: { at, volume, pitch, bus, name }
 //   audio.duckMusic(level, hold)  dips the background music bus for `hold` seconds (every audio.play does it; src/music/player.js)
 //   audio.onMute(fn)          called when the mute switch changes
@@ -104,7 +104,10 @@ export function noise(e, o) {
 
 // ---- the audio singleton ----
 
-function readMuted() { try { return localStorage.getItem(STORE) === '1'; } catch (e) { return false; } }
+function readMuted() {
+  try { const f = new URLSearchParams(location.search).get('sound'); if (f === '0') return true; if (f === '1') return false; } catch (e) { /* no location */ }   // ?sound=0|1 beats the stored switch for this load only (CHE-240)
+  try { return localStorage.getItem(STORE) === '1'; } catch (e) { return false; }
+}
 function saveMuted(m) { try { localStorage.setItem(STORE, m ? '1' : '0'); } catch (e) { /* private window */ } }
 
 export const audio = {

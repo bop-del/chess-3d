@@ -42,7 +42,7 @@ A short tour of how Chess 3D is put together. Plain ES modules on top of three.j
     src/clock.js, clock-ui.js  Chess clock: pure core, faces and chooser
     src/install-hint.js  Add to Home Screen reminder for iPhone and iPad Safari (loaded only on iOS outside the installed app)
     src/dev/diag.js      on device diagnostics box, loaded only for ?diag=1
-    src/audio.js         WebAudio context and plumbing (unlock on the first gesture, buses, Mute switch, stopScene), no audio files
+    src/audio.js         WebAudio context and plumbing (unlock on the first gesture, buses, Mute switch, stopScene), no audio files; `?sound=0` mutes music and effects for this load only (nothing stored, the switch still turns them on), `?sound=1` unmutes, the flag beats the stored switch (CHE-240)
     src/battle/          capture scenes: director.js, settings.js, fx.js (effects kit), sfx.js (the voices, also the move sounds), scenes/ (see Battle scenes)
     src/battle/scenes/   one module per attacker (pawn, knight, bishop, rook, queen, king), kit-a.js (helpers of the first three), _kit.js (helpers of the other three)
     src/openings/        Explain mode: lines.js (the starter lines), pgn.js (PGN with variations into a tree of positions), explain.js, explain-panel.js, arrow.js (the hint arrow); catalogue.js names a position (ECO and name) from catalogue-data.js, a generated lazy chunk (tools/build-catalogue.mjs)
