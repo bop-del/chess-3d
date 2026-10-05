@@ -221,14 +221,14 @@ function update(dt, root) {
       if (d < 20 * dt && d > 1e-5) {                     // a jump (undo, a new game) is not a walk
         dist = d; speed = d / dt;
         // face the way it goes: relative to the piece's own turn (knights turn with their rank) and the wrapper's
-        if (s.w > 0.3) {
+        if (s.w > 0.3 && !wrap.userData.noTurn) {      // a capture scene may ask a piece to keep its facing (the Pixelwelt pawn with its spear)
           const want = wrapPi(Math.atan2(-dx, -dz) - inner.rotation.y - wrap.rotation.y);
           s.yaw += wrapPi(want - s.yaw) * Math.min(1, dt * 12);
         }
       }
       s.last.set(p.x, p.y, p.z);
     } else s.last = new THREE.Vector3(p.x, p.y, p.z);
-    if (speed === 0 && s.w < 0.3) s.yaw += wrapPi(0 - s.yaw) * Math.min(1, dt * 8);
+    if ((speed === 0 && s.w < 0.3) || wrap.userData.noTurn) s.yaw += wrapPi(0 - s.yaw) * Math.min(1, dt * 8);
     animate(s, dt, speed, dist);
     s.rig.rotation.y = Math.PI + s.yaw + s.spin;
   }

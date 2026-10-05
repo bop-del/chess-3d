@@ -57,5 +57,20 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
   const mean = (color, type) => { let a = 0, s = 0; for (const p of buildPixelVox(color, type).parts) { const ar = p.w * p.h + p.w * p.d + p.h * p.d; a += ar; s += ar * grey(p.color); } return s / a; };
   for (const [type, name] of Object.entries(TYPES)) { const gap = mean('w', type) - mean('b', type); check(`${name}: White is lighter than Black in greyscale`, gap >= (type === 'p' ? 40 : 25), `gap ${gap.toFixed(0)}`); }
 }
+// CHE-219: both pawns hold the spear in both hands in front of the body, point forward; ?pawngore picks the capture variant
+{
+  const { pawnVariant } = await import('../src/battle/scenes/pixel-gore.js');
+  const { SPEAR, PAWN_UNIT } = await import('../src/themes/pixel/seta.js');
+  for (const color of ['w', 'b']) {
+    const tag = color === 'w' ? 'white pawn' : 'black pawn';
+    const vox = buildPixelVox(color, 'p'), sp = vox.parts.filter((p) => p.g === 'spear');
+    const tip = Math.max(...sp.map((p) => p.z + p.d / 2)), tail = Math.min(...sp.map((p) => p.z - p.d / 2));
+    check(`${tag}: a spear of its own rig group, point forward (+z), inside the square`, sp.length === SPEAR.length && tip > 15 && tail < -5 && tip * PAWN_UNIT < 0.6 && -tail * PAWN_UNIT < 0.6, `tip ${(tip * PAWN_UNIT).toFixed(2)}, tail ${(tail * PAWN_UNIT).toFixed(2)}`);
+    const shaft = sp.find((p) => p.d >= 19);
+    const skin = vox.parts.filter((p) => p.g === 'body' && p.w === 3.4 && p.h === 3 && Math.abs(p.y - 16.2) < 1e-6);
+    check(`${tag}: two hands close round the shaft`, skin.length === 2 && skin.every((h) => Math.abs(h.x - shaft.x) < 1.2 && h.y <= shaft.y && h.y + h.h >= shaft.y + shaft.h && h.z - h.d / 2 > shaft.z - shaft.d / 2 && h.z + h.d / 2 < shaft.z + shaft.d / 2), `${skin.length} hands`);
+  }
+  check('pawngore: a, b, c; anything else and no flag fall back to a', ['?pawngore=a', '?pawngore=b', '?pawngore=C', '?pawngore=x', '', '?pawngore='].map((q) => pawnVariant(q)).join('') === 'abcaaa');
+}
 console.log(failed ? `\n${failed} check(s) failed` : '\nPixelwelt figures contract passed');
 process.exit(failed ? 1 : 0);
