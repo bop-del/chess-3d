@@ -710,9 +710,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       status.classList.toggle('think', !!st.thinking);
     }
     return {
-      status: statusRender, close, frame, setLearnBar,
-      // CHE-179 (?explain=c): a Menu sheet entry before the Moves card and a chip on the HUD
-      mountEntry(menuEl, chipEl) { sheetBody.insertBefore(menuEl, movesC); hud.append(chipEl); }, resetStatus() { lastKey = ''; },
+      status: statusRender, close, frame, setLearnBar, resetStatus() { lastKey = ''; },
       learn: { body: learnBody, open: openLearn, close, get isOpen() { return isLearnOpen(); } },
       toggleHelp() { if (isOpen() && !helpC.classList.contains('collapsed')) close(); else open(helpC); },
       openCard(id) { const c = id ? cardOf(id) : null; if (id && !c) return false; open(c || undefined); return true; },
@@ -826,5 +824,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     on: (fn) => { hostFns.push(fn); },
   };
 
-  return { sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountDaily, mountEntry: phoneUI ? phoneUI.mountEntry : null, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  return { sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }

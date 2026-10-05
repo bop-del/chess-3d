@@ -361,7 +361,7 @@ Explain mode: walk one of the starter lines on the 3D board.
 - The hint is a flat gold overlay in the gimbal group: the from-square faint, the to-square strong, a straight arrow between them. It is shown only while the board listens for an own move. The switch is stored under `chess3d.hint` in localStorage.
 - Phone: the card in the Menu sheet holds the list; while a line runs a strip under the status line carries the sentence and the buttons, and `body.explaining` moves the camera frame below it (`--xh` is the strip height).
 - `window.__chess.openings` is the test hook: `{ explain, hint, card, strip, tick }`.
-- Entry points (`?explain=a|b|c`, CHE-179, in `src/learn/learn.js`, `explainVariant()` reads the flag, unknown gives `a`): `a` a `.xgo` Explain button inside every playable opening row; `b` a `.xhero` start card at the top of the Openings tab (Italian Game, else the first playable line); `c` a `.xmenu` entry in the Menu sheet before Moves (opens the Learn sheet on Openings) and a `.xchip` under the status line while `lineForMoves()` finds a playable line that starts with the 2 to 8 plies played so far. Variant c needs `game` passed to `mountLearn` and `ui.mountEntry(menuEl, chipEl)` (phone only; a no-op elsewhere). All start through `explain.start(id)`. Tests: the explain block in `test/open-flag.mjs`.
+- Entry point (CHE-179, CHE-221, in `src/learn/learn.js`): a `.xgo` Explain button inside every playable opening row of the Learn Openings tab, starting through `explain.start(id)`. The earlier `?explain=a|b|c` variants (start card, Menu entry with chip) were dropped; the flag is ignored. Tests: the explain block in `test/open-flag.mjs`.
 
 ### `src/puzzles/`
 

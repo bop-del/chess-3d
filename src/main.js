@@ -272,7 +272,7 @@ async function boot() {
     // a finished chapter: after the board finale the puzzle closes and the Learn path opens on the next chapter
     onChapter: () => { puzzles.stop(); puzzleProgress.ack(); learn.openPath(); } });
   mountPuzzlesPanel({ puzzles, ui, progress: puzzleProgress, openPath: () => { if (learn.openPath) learn.openPath(); else { learn.show('puzzles'); ui.learnSheet?.open(); } } });
-  const learn = mountLearn({ ui, game, openings, store, drill, puzzles, puzzleProgress, reward });
+  const learn = mountLearn({ ui, openings, store, drill, puzzles, puzzleProgress, reward });
   mountDailyCard({ daily, ui, game, puzzles, onStart: () => ui.closeSheets() });   // the card is hidden while Explain, Drill or a puzzle runs
   // Badges (src/progress): earned from the puzzle path, the openings store, the daily streak and wins against the computer
   const [{ createBadges, winLevel }, { mountBadgesPanel }, { LINES }] = await Promise.all([import('./progress/badges.js'), import('./progress/badges-panel.js'), import('./openings/lines.js')]);
