@@ -9,7 +9,7 @@
 // Run: node test/pixel-rules.mjs    Exit 0 pass, 1 on any failed check.
 import * as THREE from 'three';
 
-globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({ fillRect() {}, clearRect() {}, drawImage() {}, getImageData: () => ({ data: new Uint8ClampedArray(4) }), putImageData() {} }) }) };
+globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({ fillRect() {}, strokeText() {}, fillText() {}, clearRect() {}, drawImage() {}, getImageData: () => ({ data: new Uint8ClampedArray(4) }), putImageData() {} }) }) };
 const { createPixelWorld } = await import('../src/themes/pixel/world.js');
 const { pixelTextures } = await import('../src/themes/pixel/textures.js');
 const { board } = await import('../src/themes/pixel.js');

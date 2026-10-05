@@ -193,7 +193,7 @@ try {
     const top = new window.__chess.THREE.Box3().setFromObject(w.getObjectByName('island')).max.y;
     return { world: !!w, hidden: board.group.getObjectByName('squares-light').visible === false, moved: !!cloud && cloud.position.x !== x0, water: themes.world.kit.T.water.offset.y !== off0, top: +top.toFixed(2), picks: board.group.children.filter((o) => o.userData.square).length };
   });
-  R.expect('Pixelwelt: world in the gimbal, classic board hidden, clouds drift, water steps, 64 pick squares kept, posts 0.5 high', px.world && px.hidden && px.moved && px.water && px.picks === 64 && px.top === 0.5, JSON.stringify(px));
+  R.expect('Pixelwelt: world in the gimbal, classic board hidden, clouds drift, water steps, 64 pick squares kept, no frame (nothing above the flowers)', px.world && px.hidden && px.moved && px.water && px.picks === 64 && px.top < 0.5, JSON.stringify(px));
   await page.evaluate(async () => { await window.__chess.themes.set('wood', { persist: false }); });
   const gone2 = await page.evaluate(() => ({ world: !!window.__chess.gimbal.getObjectByName('pixel-world'), shown: window.__chess.board.group.getObjectByName('squares-light').visible }));
   R.expect('leaving Pixelwelt removes the world and shows the classic board again', !gone2.world && gone2.shown, JSON.stringify(gone2));

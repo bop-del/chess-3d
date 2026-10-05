@@ -24,10 +24,6 @@ async function gore(ctx) {
   const rnd = seeded(level * 101 + (type.charCodeAt(0) | 0));
   const up = new THREE.Vector3(0, 1, 0);
 
-  // the plank frame steps out of the low camera, as in the Blocks scene
-  const frame = ctx.gimbal?.getObjectByName?.('pixel-world')?.userData.frame;
-  if (frame) { ctx.signal.addEventListener('abort', () => frame(1), { once: true }); ctx.tween({ dur: 0.3, step: (e) => frame(1 - e) }); }
-
   // ---------------------------------------------------------------- voxel materials and blood
   const cube = fx.own(new THREE.BoxGeometry(1, 1, 1));
   const mats = new Map();
@@ -223,7 +219,6 @@ async function gore(ctx) {
     await Promise.all([s.tw(0.4, (k) => { piv.scale.setScalar(Math.max(0.001, 1.2 * (1 - k))); a.d = lerp(-0.95, -s.run0, k); a.yaw = s.yawG * (1 - k); }, inOut)]);
   }
   if (L.puddle) { puddleOut = ctx.time(); await s.tw(0.45, () => {}); }
-  frame?.(1);
 }
 
 const CAM = { p: { dist: 5.6, pitch: 13 }, n: { dist: 6.6, pitch: 13 }, b: { dist: 7.4, pitch: 12 }, r: { dist: 5.2, pitch: 12 }, q: { dist: 6.0, pitch: 12 }, k: { dist: 6.0, pitch: 12 } };

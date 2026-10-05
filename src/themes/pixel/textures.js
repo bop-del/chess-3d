@@ -45,6 +45,25 @@ export function trayPlanks(w, d, track = (t) => t) {
   return track(t);
 }
 
+/** The coordinate labels for the grass (CHE-236): the atlas layout of board.js (8 x 2 cells of 128 px, files then ranks), cream with a dark outline. */
+export function labelAtlas(track = (t) => t) {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 256;
+  const g = c.getContext('2d');
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.font = '700 92px "Times New Roman", Times, "Liberation Serif", serif';
+  const glyphs = ['abcdefgh', '12345678'];
+  for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) {
+    const cx = i * 128 + 64, cy = r * 128 + 68;
+    g.lineWidth = 9; g.strokeStyle = 'rgba(28,20,8,0.95)'; g.strokeText(glyphs[r][i], cx, cy);
+    g.fillStyle = '#fff2c8'; g.fillText(glyphs[r][i], cx, cy);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16;
+  t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
+  return track(t);
+}
+
 export function pixelTextures(track = (t) => t) {
   const T = {};
   T.grassTop = make(1, (g) => { g.fill(0x62a83c, 8); specks(g, 0x77bd48, 26); specks(g, 0x4a8c2e, 22); });

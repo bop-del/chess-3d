@@ -1,7 +1,6 @@
 // The Pixelwelt world: a floating chunk of 1 x 1 x 1 terrain blocks (grass over dirt over stone, a sand beach, a square pond of water
-// blocks), the 8 x 8 board laid into the top layer (light squares sand, dark squares cobblestone, flush with the grass), an oak plank
-// frame with log corner posts, two crates for the captured pieces, an oak tree, a square sun and blocky clouds. Units as everywhere:
-// one square = 1.0, the board top is y = 0, centred at x = z = 0. Everything is meshed quads (mesher.js with the fixed per face shade).
+// blocks), the 8 x 8 board laid into the top layer (light squares sand, dark squares cobblestone, flush with the grass, which reaches straight to them: no frame), two crates for the captured pieces, an oak
+// tree, a square sun and blocky clouds. Units as everywhere: one square = 1.0, the board top is y = 0, centred at x = z = 0. Everything is meshed quads (mesher.js with the fixed per face shade).
 import * as THREE from 'three';
 import { Mesher } from '../blocks/mesher.js';
 import { buildAvoid, approach } from '../blocks/island.js';
@@ -14,9 +13,7 @@ const SLABS = { cx: 5.75, cz: 0.96, w: 1.45, len: 4.9 };   // the tray slab (src
 const BED_DROP = 0.3;                                      // the crate beds sit this much lower than the grass
 const POOL = { x0: 4, x1: 6, z0: -5, z1: -3 };             // the pond, in whole blocks
 const FALL_B = -5.5, FALL_T = 0.3;                         // bottom and thickness of the waterfall sheet
-const FRAME = 0.5;
-export const PIXEL_EDGE = 4 + FRAME;                       // half size of board plus frame
-const FRAME_H = 0.2;
+export const PIXEL_EDGE = 4;                               // half size of the board: the grass reaches the squares (CHE-236, no frame)
 const TREE = { x: -9, z: -9, trunk: 4 };
 const KINDS = {
   grass: { top: 'grassTop', side: 'grassSide', bottom: 'dirt' },
@@ -89,12 +86,6 @@ function buildTerrain(kit) {
   m.box('water', POOL.x0, -1, POOL.z0, POOL.x1 - POOL.x0, 1 - 0.12, POOL.z1 - POOL.z0, { skip: new Set(['px', 'nx', 'pz', 'nz', 'ny']), color: 0xffffff });
   // the waterfall (CHE-222): a sheet of water over the back edge of the pond, down past the island; the pond lip and the sheet meet at its top
   m.box('fall', POOL.x0 + 0.25, FALL_B, POOL.z0 - FALL_T, POOL.x1 - POOL.x0 - 0.5, -0.12 - FALL_B, FALL_T, { skip: new Set(['pz', 'ny']) });
-  // the oak frame: a ring half a block wide around the board, four log posts in the corners
-  const fh = FRAME_H;
-  // the planks stop at the posts: no two boxes share a face (rule, test/pixel-rules.mjs)
-  m.box('planks', -4, 0, -4 - FRAME, 8, fh, FRAME); m.box('planks', -4, 0, 4, 8, fh, FRAME);
-  m.box('planks', -4 - FRAME, 0, -4, FRAME, fh, 8); m.box('planks', 4, 0, -4, FRAME, fh, 8);
-  for (const [px, pz] of [[-4 - FRAME, -4 - FRAME], [4, -4 - FRAME], [-4 - FRAME, 4], [4, 4]]) m.box('logSide', px, 0, pz, FRAME, 0.5, FRAME, { keys: { top: 'logTop', side: 'logSide' } });
   // two crates for the captured pieces: boards two high with corner posts, built around the tray slab (top at y = 0, bottom -0.26)
   for (const sg of [1, -1]) {
     const cx = sg * SLABS.cx, x0 = cx - SLABS.w / 2 - 0.03, x1 = cx + SLABS.w / 2 + 0.03, z0 = SLABS.cz - SLABS.len / 2 - 0.03, z1 = SLABS.cz + SLABS.len / 2 + 0.03, t = 0.13;
@@ -148,17 +139,13 @@ function addClouds(parent, kit) {
   return out;
 }
 
-/** The whole Pixelwelt world: { group, update(dt), settle(), dispose(), avoid, frame }. */
+/** The whole Pixelwelt world: { group, update(dt), settle(), dispose(), avoid }. */
 export function createPixelWorld({ track, view } = {}) {
   const kit = makePixelKit(track);
   const group = new THREE.Group();
   group.name = 'pixel-world';
   const isl = buildTerrain(kit);
   group.add(isl);
-  // the frame and its posts fold down for the capture scenes (k from 1 to 0), as in Blocks
-  const frameMeshes = isl.children.filter((o) => o.material === kit.mats.planks || o.material === kit.mats.logSide || o.material === kit.mats.logTop);
-  const frame = (k) => { for (const o of frameMeshes) { o.scale.y = Math.max(k, 1e-4); o.visible = k > 0.01; } };
-  group.userData.frame = frame;
   const tree = buildTree(kit);
   group.add(tree.group);
   const clouds = addClouds(group, kit);
@@ -179,7 +166,7 @@ export function createPixelWorld({ track, view } = {}) {
   };
   anim(time);
   return {
-    group, kit, avoid: avoid.state, frame,
+    group, kit, avoid: avoid.state,
     update(dt) { time += dt; anim(time); avoid.update(dt); },
     settle() { avoid.update(5); },
     dispose() {

@@ -1,7 +1,7 @@
 // Pixelwelt rendered look checks (S61, CHE-166) in the real page: node test/pixel-look-page.mjs [--port=5354] [--base=<server>] [--shots=<dir>]
 // Statistics and targeted scans only, no golden images. Quality High at device pixel ratio 2 (the setting of the owner's recording).
 //   pond      the pixels over the water do not depend on what is behind it (frame with everything else hidden gives the same pixels)
-//   posts     the lower part of the corner posts does not change when the plank ring is hidden (no z fighting with the planks)
+//   posts     no plank ring and no corner posts (CHE-236), no surfaces at equal depth where the grass meets the board corners
 //   hairline  orbit sweep (yaw 0 to 3 degrees, 0.1 steps, pitch 14, dist 16): no row of green pixels along the bottom edge of the
 //             grass blocks, where a wrapped texture sample draws the green top row of the side texture
 //   tray      the tray floor does not change with the lights off (unlit), and shows planks colours
@@ -68,20 +68,18 @@ try {
   }
   const pn = pond.reduce((s, r) => s + r.n, 0), pm = Math.max(...pond.map((r) => r.max));
   R.expect('pond: the pixels over the water do not depend on what is behind it', pn > 500 && pond.every((r) => r.share < 0.15), `${pn} pixels in ${pond.length} views, largest difference ${pm} (edge pixels only, the rest equal)`, `${pn} pixels, largest difference ${pm}, views ${JSON.stringify(pond)}`);
-  // posts: no two surfaces at the same depth around the four corner posts (where the plank ring used to share faces with them), and the
-  // lower part of the posts does not change when the plank ring is hidden
+  // posts (CHE-236): no frame left, the grass reaches the squares; no two surfaces at the same depth around the four board corners
   const posts = [];
   for (const yaw of [35, 125, 215, 305]) {
     posts.push(await page.evaluate((yaw) => {
       const H = window.__H; H.view(yaw, 28, 9);
-      const log = H.world.island.getObjectByName('logSide'), planks = H.world.island.getObjectByName('planks');
-      const T = window.__chess.THREE, regions = [[-4.25, -4.25], [4.25, -4.25], [-4.25, 4.25], [4.25, 4.25]].map(([x, z]) => { const [sx, sy] = H.screen(window.__chess.gimbal.localToWorld(new T.Vector3(x, 0.1, z))); return [sx - 90, sy - 90, sx + 90, sy + 90]; });
-      const r = H.compare(log, (h) => h.ties.includes(log) && h.point.y < 0.19 && h.point.y > 0.01 && Math.abs(h.face.normal.y) < 0.5, () => { planks.visible = false; }, () => { planks.visible = true; }, 2, regions);
-      return { ...r, ...H.tied(regions, 2) };
+      const T = window.__chess.THREE, regions = [[-4, -4], [4, -4], [-4, 4], [4, 4]].map(([x, z]) => { const [sx, sy] = H.screen(window.__chess.gimbal.localToWorld(new T.Vector3(x, 0, z))); return [sx - 90, sy - 90, sx + 90, sy + 90]; });
+      return H.tied(regions, 2);
     }, yaw));
   }
-  const kn = posts.reduce((s, r) => s + r.n, 0), tied = posts.reduce((s, r) => s + r.tied, 0);
-  R.expect('posts: no two surfaces at the same depth around the corner posts, posts unchanged without the plank ring', kn > 300 && tied === 0 && posts.every((r) => r.share < 0.04), `${kn} pixels scanned in 4 views, none tied`, `${tied} pixels at equal depth, ${JSON.stringify(posts)}`);
+  const noFrame = await page.evaluate(() => { const H = window.__H, w = window.__chess.themes.world; return !H.world.island.getObjectByName('planks') && !w.frame && !w.group.userData.frame; });
+  const tied = posts.reduce((s, r) => s + r.tied, 0);
+  R.expect('posts: no plank ring, no frame fold, no two surfaces at the same depth at the board corners', noFrame && tied === 0, `no frame, ${tied} pixels at equal depth in 4 views`, `noFrame ${noFrame}, ${tied} pixels at equal depth, ${JSON.stringify(posts)}`);
   // hairline
   await page.evaluate(() => {
     const H = window.__H, T = window.__chess.THREE, grass = H.world.island.getObjectByName('grassSide'), pos = grass.geometry.attributes.position, nor = grass.geometry.attributes.normal;
