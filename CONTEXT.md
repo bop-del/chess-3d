@@ -178,6 +178,19 @@ _Avoid_: sidebar, HUD (the HUD is everything drawn over the board, panel include
 One of the three equal destinations of the menu: Play, Learn, Options. On desktop a tab of the panel, on a phone a sheet opened from the thumb bar. The View button opens a small fourth sheet with all views.
 _Avoid_: section, screen, menu page
 
+**Version line**:
+The small line at the bottom of Options that names the version the player runs, for
+example v1.6.0. A preview build adds its commit. It is also shown briefly while the game
+loads. Tapping it opens the News.
+_Avoid_: build number, about, footer
+
+**News** (German Neuigkeiten):
+The window that lists what each version brought, newest first, in a few short points per
+version in German and English, with a link to the full release notes. It opens by itself
+once after an update that adds features (a new first or second number), never on a first
+visit and never for a fix only release.
+_Avoid_: changelog, release notes (the developer text it links to), what's new popup
+
 **Rail**:
 The panel folded to a 60 px strip of icons, so the board gets the screen. Opened by
 the fold button or the H key, remembered per browser.

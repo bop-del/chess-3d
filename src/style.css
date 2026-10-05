@@ -64,6 +64,7 @@ body.intro #hud, body.intro #banner, body.intro #promo, body.intro #toast { opac
   filter: drop-shadow(0 0 12px rgba(232, 184, 80, 0.28));
 }
 .loader-foot { position: absolute; left: 0; right: 0; bottom: max(4.5vh, 22px); margin: 0; text-align: center; padding: 0 20px; }
+.loader-version { margin: 6px 0 0; color: rgba(232, 184, 80, 0.45); font-size: 11px; letter-spacing: 0.1em; }
 .loader-step { margin: 0; color: rgba(232, 184, 80, 0.7); font-size: 12px; letter-spacing: 0.14em; min-height: 1.4em; }
 /* Blocks draws its island under the overlay: the step line (Ready) sits on a calm dark pill instead of on grass */
 #loader.live[data-world="blocks"] .loader-step, #loader.live[data-world="pixel"] .loader-step { display: inline-block; padding: 5px 14px; border-radius: 999px; background: rgba(14, 16, 22, 0.78); color: #f1d28a; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }

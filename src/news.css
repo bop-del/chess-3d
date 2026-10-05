@@ -1,0 +1,21 @@
+/* The version line (bottom of Options) and the News window (CHE-235). */
+.verline { display: block; width: 100%; min-height: 44px; margin: 8px 0 0; padding: 10px 0; appearance: none; border: 0; background: none; color: var(--dim, #8a8f9c); font: inherit; font-size: 12px; letter-spacing: 0.04em; text-align: center; cursor: pointer; }
+.verline:hover { color: var(--text, #e8e8ec); }
+.verline:focus-visible { outline: 2px solid var(--gold, #d8b468); outline-offset: 2px; }
+
+.newsov { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: rgba(5, 6, 9, 0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); pointer-events: auto; }
+.newsov[hidden] { display: none; }
+.newscard { width: min(520px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; border-radius: 16px; background: #12131a; border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); color: var(--text, #e8e8ec); }
+.newscard header { display: flex; align-items: center; justify-content: space-between; padding: 14px 8px 8px 22px; }
+.newscard h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.newsx { appearance: none; border: 0; background: none; color: inherit; width: 44px; height: 44px; font-size: 28px; line-height: 1; cursor: pointer; border-radius: 10px; }
+.newsx:hover { background: rgba(255, 255, 255, 0.08); }
+.newsbody { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 22px 18px; }
+.newsver { padding: 14px 0 6px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.newsver:first-child { border-top: 0; }
+.newsver h3 { margin: 0 0 8px; display: flex; align-items: baseline; gap: 10px; font-size: 16px; color: var(--gold, #d8b468); }
+.newsver h3 small { color: var(--dim, #8a8f9c); font-size: 12px; font-weight: 400; }
+.newsver ul { margin: 0 0 6px; padding-left: 20px; font-size: 14px; line-height: 1.45; }
+.newsver li { margin: 4px 0; }
+.newslink { display: inline-flex; align-items: center; min-height: 44px; color: var(--gold, #d8b468); font-size: 13px; }
+@media (prefers-reduced-motion: no-preference) { .newscard { animation: pop 0.35s cubic-bezier(0.2, 1.2, 0.3, 1); } }

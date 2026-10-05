@@ -9,6 +9,7 @@ import { mountTraysSetting } from './trays-setting.js';
 import { createGameClock } from './clock.js';
 import { initialPreset, mountClock } from './clock-ui.js';
 import { createAdapter } from './adapt.js';
+import { LABEL as VERSION_LABEL } from './version.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 window.__chessBoot = { script: performance.now() };   // start timings for ?diag=1, ms since navigation (download ends here)
@@ -17,6 +18,7 @@ const $ = (id) => document.getElementById(id);
 const stepEl = $('loader-step'), errEl = $('loader-err'), loaderEl = $('loader'), darkEl = $('intro-dark');
 
 translateTree(loaderEl);
+$('loader-version').textContent = VERSION_LABEL;   // the version line of the loading screen (CHE-235)
 document.documentElement.lang = i18n.language;
 let shownProgress = 0;
 let intro = null;              // the start sequence (src/intro.js), null when it is off or failed
@@ -88,7 +90,7 @@ async function boot() {
 
   // camera and views come first: the sequence ends in whatever view the controls hold (the stored or ?view= view, the White
   // view on desktop, the Play view on a phone in portrait), so it reads that pose every frame
-  let game = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null;
+  let game = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null, news = null;
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const pick = (cx, cy) => {
@@ -241,6 +243,7 @@ async function boot() {
   mountTraysSetting({ ui, game, controls, flag: params.get('trays') });   // Captured pieces at the side, below Battle scenes
   const clock = createGameClock({ game, preset: initialPreset(params.get('clock')) });   // the chess clock: off unless chosen (or ?clock=5+0)
   clockUi = mountClock({ ui, game, clock });
+  news = (await import('./news.js')).mountNews({ ui, manual, flag: params.get('news') });   // the version line at the bottom of Options and the News window (CHE-235)
   audio.mountMute(ui);     // the mute switch, right below the Battle scenes setting
   const [{ createMusic }, { mountMusicSettings }] = await Promise.all([import('./music/player.js'), import('./music/settings.js')]);
   const music = createMusic({ audio });    // background piano, starts after the first tap or key
@@ -335,6 +338,7 @@ async function boot() {
 
   window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
   window.__chess.clockUi = clockUi;
+  window.__chess.news = news;
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 
@@ -366,6 +370,7 @@ async function boot() {
   boot.ready = performance.now();
   adapter.arm();   // the start sequence is over: the adapter's warm up starts now
   applyLateParams({ game, ui, stage, controls, learn, review, openings });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
+  news?.autoOpen();   // the News, once after an update with a new first or second number (CHE-235)
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
   window.__chessReady = true;

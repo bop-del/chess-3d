@@ -883,6 +883,13 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     return element;
   }
 
+  // The bottom of Options (the version line, src/news.js): desktop the end of the Settings tab, phone Menu A the end of the Options sheet.
+  function mountFooter(element) {
+    const host = dsk ? hud.querySelector('#tp-settings') : menuA && phoneUI ? phoneUI.optSlots.help.parentNode : null;
+    host?.append(element);
+    return host ? element : null;
+  }
+
   // The daily puzzle card (src/puzzles/daily-card.js): the top of the Play tab on desktop, the top of the Game section on a phone.
   function mountDaily(element) {
     const host = dsk ? hud.querySelector('#tp-play') : hud.querySelector('.card[data-card="game"] .body');
@@ -957,5 +964,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     on: (fn) => { hostFns.push(fn); },
   };
 
-  return { menuA, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  return { menuA, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }
