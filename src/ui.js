@@ -929,7 +929,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
 
   // Menu A: the old names stay valid as aliases (settings, scene, menu, music, clock, moves, daily, badges) next to the new game, view and
   // options. Phone: the sheet that holds it; desktop: the panel tab. A learn value (openings, drill, puzzles) is src/learn's.
-  const A_PLACE = { game: 'play', daily: 'play', moves: 'play', clock: 'play', view: 'view', options: 'options', settings: 'options', scene: 'options', menu: 'options', music: 'options', badges: 'learn' };
+  const A_PLACE = { game: 'play', daily: 'play', moves: 'play', clock: 'play', view: 'view', options: 'options', settings: 'options', scene: 'options', menu: 'options', music: 'options', badges: 'learn', openings: 'learn' };
   const A_TAB = { play: 'play', view: 'settings', options: 'settings', learn: 'learn' };
   function openPanelA(id) {
     if (!Object.hasOwn(A_PLACE, id)) return false;

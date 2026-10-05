@@ -59,9 +59,10 @@ const SIZES = [['desktop', 1280, 720, false], ['phone portrait', 390, 844, true]
 // seeded: one adopted opening, so the Practise tab is not locked
 const SEED = JSON.stringify({ version: 1, ever: true, adopted: ['italian-game'], cards: {} });
 
+let menuOld = true;   // the CASES above run on the old menu; the Menu A units below switch it off
 async function load(page, [, w, h, phone], query, { settle = true } = {}) {
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
-  await page.goto(`${server.base}?quality=low&manual=1&ai=0&intro=0&menu=old${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
+  await page.goto(`${server.base}?quality=low&manual=1&ai=0&intro=0&sound=0${menuOld ? '&menu=old' : ''}${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   const err = await page.evaluate(() => window.__chessError || null);
   if (err) throw new Error('page failed to start: ' + err);
@@ -117,6 +118,28 @@ try {
     }
     seen.errs.push(...watch.errs); seen.foreign.push(...watch.foreign);
     await page.close();
+  }
+  // Menu A (the default): every learn value shows the Learn tab with the requested sub tab, desktop panel unfolded; a phone opens the Learn sheet
+  if (mine()) {
+    menuOld = false;
+    for (const size of [SIZES[0], SIZES[1]]) {
+      const mp = await browser.newPage();
+      await mp.setViewport({ width: size[1], height: size[2], deviceScaleFactor: 1, isMobile: size[3], hasTouch: size[3] });
+      await mp.evaluateOnNewDocument((seed, w, h, phone) => {
+        try { if (!localStorage.getItem('chess3d.train')) localStorage.setItem('chess3d.train', seed); } catch (e) { /* ignore */ }
+        if (phone) for (const [k, v] of [['width', w], ['height', h]]) Object.defineProperty(screen, k, { get: () => v });
+      }, SEED, size[1], size[2], size[3]);
+      for (const [id, want] of CASES.filter(([i]) => ['learn', 'openings', 'mine', 'drill', 'practise', 'puzzles'].includes(i))) {
+        await load(mp, size, `&open=${id}`);
+        const scope = size[3] ? '.psheet.open ' : '#tp-learn ';
+        const s = await shown(mp, scope + '.xtab[aria-selected="true"]');
+        const tab = await mp.evaluate((q) => document.querySelector(q)?.dataset.tab, scope + '.xtab[aria-selected="true"]');
+        const unfolded = size[3] || await mp.evaluate(() => !document.getElementById('hud').classList.contains('rail'));
+        R.expect(`${size[0]} Menu A: open=${id}`, s === 'ok' && tab === want.tab && unfolded, `Learn tab ${want.tab}, panel unfolded`, `${s}, tab ${tab}, unfolded ${unfolded}`);
+      }
+      await mp.close();
+    }
+    menuOld = true;
   }
   // the badge panel: ?open=badges shows the whole grid at both sizes, and a seeded badge gives one toast, once
   for (const size of [SIZES[0], SIZES[1]]) {
