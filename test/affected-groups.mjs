@@ -15,7 +15,7 @@ const g = (files) => { const r = affectedGroups(files); return r.all ? 'ALL' : r
 
 check('docs only: no group', g(['README.md', 'docs/ARCHITECTURE.md', 'bin/lane', 'test/perft.mjs']) === '');
 check('battle code: the battle group only', g(['src/battle/fx.js']) === 'battle');
-check('theme code: the groups that draw themes, blocks characters included', g(['src/themes/blocks/rig.js']) === 'views,themes,textures,blocks chars,pixel chars,pixel look,blocks fixes,cloud mask');
+check('theme code: the groups that draw themes, blocks characters included', g(['src/themes/blocks/rig.js']) === 'views,themes,textures,living,blocks chars,pixel chars,pixel look,blocks fixes,cloud mask');
 check('music code: music', g(['src/music/player.js']) === 'music');
 check('puzzles code: puzzles and the layout fixes', g(['src/puzzles/panel.js']) === 'fixes,puzzles');
 check('several files union their groups, in group order', g(['src/battle/fx.js', 'src/music/score.js']) === 'battle,music');

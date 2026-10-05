@@ -6,6 +6,7 @@ import { mountSwatches } from './themes/swatches.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
 import { mountTraysSetting } from './trays-setting.js';
+import { createLiving } from './living.js';
 import { createGameClock } from './clock.js';
 import { initialPreset, mountClock } from './clock-ui.js';
 import { createAdapter } from './adapt.js';
@@ -90,7 +91,7 @@ async function boot() {
 
   // camera and views come first: the sequence ends in whatever view the controls hold (the stored or ?view= view, the White
   // view on desktop, the Play view on a phone in portrait), so it reads that pose every frame
-  let game = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null, news = null;
+  let living = null, game = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null, news = null;
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const pick = (cx, cy) => {
@@ -234,12 +235,13 @@ async function boot() {
   };
   let t = 0;
   // the frame loop runs the whole game from here on (the modules that follow are optional in it until they exist)
-  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(dt); themes.update(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(dt); themes.update(dt); living?.tick(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   advance(0.001);   // the Play view's first focus and the HUD measure land in the camera now
   intro?.boardGo();
   intro?.setTarget(0.95);
   battle = createDirector({ game, controls, stage, ui, themes, symbols, gore: params.get('gore') });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
+  living = createLiving({ game, themes, views, ui, manual, flags: { living: params.get('living'), sig: params.get('sig') } });   // signature moves of idle pieces (CHE-238)
   mountTraysSetting({ ui, game, controls, flag: params.get('trays') });   // Captured pieces at the side, below Battle scenes
   const clock = createGameClock({ game, preset: initialPreset(params.get('clock')) });   // the chess clock: off unless chosen (or ?clock=5+0)
   clockUi = mountClock({ ui, game, clock });
@@ -336,7 +338,7 @@ async function boot() {
   stage.onQuality((q) => { if (!stepping) adapter.lock('user'); });
   themes.on(() => adapter.hold());   // a theme switch builds textures: its frames are not measured
 
-  window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, clock, train: { store, drill, sweep, learn } };
+  window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, living, clock, train: { store, drill, sweep, learn } };
   window.__chess.clockUi = clockUi;
   window.__chess.news = news;
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise

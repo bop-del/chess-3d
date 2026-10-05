@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { Mesher } from './mesher.js';
 import { buildVox, V } from './vox.js';
+import { moveOf } from './moves.js';
 
 const TYPES = ['p', 'n', 'b', 'r', 'q', 'k'];
 
@@ -72,12 +73,12 @@ let seedCounter = 1;
 const wrapPi = (a) => { const T = Math.PI * 2; a = (a + Math.PI) % T; if (a < 0) a += T; return a - Math.PI; };
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
-function attach(inner, type, unit = V) {
+function attach(inner, type, unit = V, height = 1) {
   const rig = inner.children[0];
   const parts = {};
   for (const g of rig.children) parts[g.name] = { o: g, p: g.position.clone() };
   const seed = seedCounter++ * 1.7;
-  rigs.set(inner, { rig, parts, type, unit, seed, t: seed * 3.1, phi: 0, w: 0, yaw: 0, last: null });
+  rigs.set(inner, { rig, parts, type, unit, height, seed, t: seed * 3.1, phi: 0, w: 0, yaw: 0, last: null, sig: null, spin: 0 });
 }
 
 function animate(s, dt, speed, dist) {
@@ -137,6 +138,73 @@ function animate(s, dt, speed, dist) {
       parts.rider.o.rotation.y = -look * 0.35;
     }
   }
+  if (s.sig) runSignature(s, dt);
+}
+
+// ---------------------------------------------------------------- signature moves (CHE-238)
+// The move (moves.js) is played on top of the idle animation: every frame the parts go back to their base pose first, then the move
+// sets what it needs. A walk (the piece got a move) or the end of the move puts everything back.
+let sparkGeo = null;
+function sparkGeometry() {
+  if (!sparkGeo) {
+    const m = new Mesher();
+    m.box('vox', -0.5, -0.5, -0.5, 1, 1, 1, { color: 0xffe27a, uvUnit: 2 });
+    sparkGeo = m.geometries().get('vox');
+  }
+  return sparkGeo;
+}
+function resetParts(s) {
+  for (const k in s.parts) {
+    const { o, p } = s.parts[k];
+    o.rotation.set(0, 0, 0); o.position.copy(p); o.scale.set(1, 1, 1);
+  }
+  s.rig.position.x = 0; s.rig.position.z = 0;
+  s.spin = 0;
+}
+function endSignature(s) {
+  resetParts(s);
+  s.rig.rotation.x = 0; s.rig.rotation.z = 0;
+  if (s.fx) { s.fx.removeFromParent(); }
+  s.sig = null;
+}
+function runSignature(s, dt) {
+  const g = s.sig;
+  if (s.w > 0.25) { endSignature(s); return; }   // the piece got a move: back to normal at once
+  g.t += dt;
+  const u = clamp01(g.t / g.move.dur);
+  if (u >= 1) { endSignature(s); return; }
+  resetParts(s);
+  const { parts, unit: U, rig } = s;
+  if (!g.k) {
+    g.k = {
+      P: parts, rig, U, H: s.height,
+      has: (n) => !!parts[n],
+      rot(n, x, y, z) { const q = parts[n]; if (q) q.o.rotation.set(x, y, z); },
+      lift(n, dy) { const q = parts[n]; if (q) q.o.position.y = q.p.y + dy; },
+      spin(v) { s.spin = v; },
+      stretch(dy, dxz) { rig.scale.y *= 1 + dy; rig.scale.x *= 1 + dxz; rig.scale.z *= 1 + dxz; },
+      spark(count, cx, cy, cz, radius, t, mode) {
+        if (!s.fx) {
+          s.fx = new THREE.Group(); s.fx.name = 'fx';
+          s.fxMeshes = [];
+          for (let i = 0; i < 8; i++) { const mm = new THREE.Mesh(sparkGeometry(), s.material); s.fx.add(mm); s.fxMeshes.push(mm); }
+        }
+        if (!s.fx.parent) rig.add(s.fx);
+        const on = t >= 0 && t <= 1;
+        s.fxMeshes.forEach((mm, i) => {
+          mm.visible = on && i < count;
+          if (!mm.visible) return;
+          const ph = (t * 1.6 + i / count) % 1, a = (i / count) * Math.PI * 2 + t * (mode === 'orbit' ? 5 : 1.5);
+          const size = Math.round(Math.sin(Math.PI * ph) * 3) / 3 * 0.075 * (s.height / 1.3);
+          const r = radius * (mode === 'orbit' ? 1 : 0.4 + 0.6 * ((i * 0.37) % 1));
+          mm.position.set(cx + Math.cos(a) * r, cy + (mode === 'rise' ? ph * 0.45 : mode === 'fall' ? -ph * cy * 0.7 : Math.sin(a * 2) * 0.06), cz + Math.sin(a) * r);
+          mm.scale.setScalar(Math.max(size, 0.001));
+          mm.rotation.y = a;
+        });
+      },
+    };
+  }
+  g.move.run(g.k, u);
 }
 
 /** Walks all rigs below root (the game's piece group). dt in seconds. */
@@ -162,7 +230,7 @@ function update(dt, root) {
     } else s.last = new THREE.Vector3(p.x, p.y, p.z);
     if (speed === 0 && s.w < 0.3) s.yaw += wrapPi(0 - s.yaw) * Math.min(1, dt * 8);
     animate(s, dt, speed, dist);
-    s.rig.rotation.y = Math.PI + s.yaw;
+    s.rig.rotation.y = Math.PI + s.yaw + s.spin;
   }
 }
 
@@ -183,7 +251,8 @@ export function createPieceStyle({ track } = {}, { id = 'blocks', build = buildV
     make(type, color) {
       const inner = new THREE.Group();
       inner.add(tpl(type, color).rig.clone(true));
-      attach(inner, type, tpl(type, color).unit);
+      attach(inner, type, tpl(type, color).unit, tpl(type, color).height);
+      rigs.get(inner).material = material;
       decorate?.(inner, type, color);
       return inner;
     },
@@ -198,4 +267,14 @@ export function createPieceStyle({ track } = {}, { id = 'blocks', build = buildV
     },
   };
 }
+/** Plays the signature move of the piece whose inner group is `inner`. Returns its duration in seconds, 0 when it cannot play
+ *  (no rig, no such move, one is already running, or the piece is walking). */
+export function playSignature(inner) {
+  const s = rigs.get(inner);
+  const move = s && moveOf(s.type);
+  if (!move || s.sig || s.w > 0.25) return 0;
+  s.sig = { move, t: 0, k: null };
+  return move.dur;
+}
+export const signatureBusy = (inner) => !!rigs.get(inner)?.sig;
 export { TYPES };

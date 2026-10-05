@@ -68,6 +68,7 @@ if (tier === 'fast' || tier === 'all') {
   run('block characters contract (test/blocks-chars.mjs)', 'test/blocks-chars.mjs');
   run('Pixelwelt figures contract (test/pixel-chars.mjs)', 'test/pixel-chars.mjs');
   run('Pixelwelt rules: closed ground, no coplanar faces, clamped textures, one material set (test/pixel-rules.mjs)', 'test/pixel-rules.mjs');
+  run('living pieces: signature moves and Pixelwelt birds (test/living.mjs)', 'test/living.mjs');
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
   run('bin/lane flag parsing (test/lane-args.mjs)', 'test/lane-args.mjs');

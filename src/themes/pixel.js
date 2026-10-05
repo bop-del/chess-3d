@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { createPixelWorld } from './pixel/world.js';
 import { buildPixelVox } from './pixel/figures.js';
+import { withBirds } from './pixel/birds.js';
 import { createPieceStyle } from './blocks/rig.js';
 import { trayPlanks, labelAtlas } from './pixel/textures.js';
 import { SLAB } from '../trays.js';
@@ -20,7 +21,7 @@ export function board({ track } = {}) {
   };
 }
 
-export function world({ track, view }) { return createPixelWorld({ track, view }); }
+export function world({ track, view }) { return withBirds(createPixelWorld({ track, view })); }
 
 // Light variant: ?pixlight=a is the plain daylight Pixelwelt, b the warm evening mood of Blocks done the Pixelwelt way (sky, grade and a
 // warm multiplier on the unlit materials, no real lights). A value in the URL decides, else the default.
