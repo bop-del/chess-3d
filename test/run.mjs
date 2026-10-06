@@ -91,6 +91,7 @@ if (tier === 'fast' || tier === 'all') {
   run('badges: thresholds, wins, storage (test/badges.mjs)', 'test/badges.mjs');
   run('puzzle data is legal and solvable (test/puzzles-data.mjs)', 'test/puzzles-data.mjs');
   run('music data and logic (test/music.mjs)', 'test/music.mjs');
+  run('game sound voices: levels, peak, clicks, DC, rendered offline in Chrome (test/sfx-voices.mjs)', 'test/sfx-voices.mjs');
   run('novice level (test/novice.mjs)', 'test/novice.mjs');
   run('News rules and text (test/news.mjs)', 'test/news.mjs');
   run('chess clock (test/clock.mjs)', 'test/clock.mjs');
