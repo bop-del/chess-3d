@@ -285,7 +285,7 @@ Tests: `test/review-core.mjs` (fast tier: thresholds, accuracy, the engine on sm
 
 ### `src/views/registry.js`
 
-The single list of views the player chooses from. `VIEWS = [{ id, label, kind: 'preset' | 'easy' | 'play', style?, when? }]`: `white`, `black`, `top`, `side`, `iso` (perspective presets), `above` (style V: perspective, pitch 65 degrees, orbit locked with `controls.setOrbitLock`: no tilt or turn by drag, twist or keys, zoom and Flip work, the real 3D pieces; the look point is shifted 0.3 towards Black with `controls.setFocus` so the back rank stays clear of the frame), `play` (phone portrait only, perspective, closer, followed by `src/views/play.js`).
+The single list of views the player chooses from. `VIEWS = [{ id, label, kind: 'preset' | 'easy' | 'play', style?, when? }]`: `white`, `black`, `top`, `side`, `iso` (perspective presets), `above` (style V: perspective, pitch 65 degrees, the orbit stays free (owner, v1.8.0 release test: a view only changes the view), the real 3D pieces; the look point is shifted 0.3 towards Black with `controls.setFocus` so the back rank stays clear of the frame), `play` (phone portrait only, perspective, closer, followed by `src/views/play.js`).
 
     createViews({ controls, stage, game, board, device }) -> { list(), current(), set(id, { instant, remember }), next(), isEasy(), style(), label(), on(fn), update() }
 

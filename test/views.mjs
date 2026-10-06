@@ -97,8 +97,8 @@ try {
       }
     }
   }
-  // From above locks the orbit
-  if (mine()) for (const [id, locked] of [['white', false], ['above', true]]) {
+  // No view locks the orbit (owner, v1.8.0 release test): From above only changes the view
+  if (mine()) for (const [id, locked] of [['white', false], ['above', false]]) {
     await open(page, SIZES[0], `&view=${id}`);
     const c0 = await page.evaluate(() => window.__chess.controls.camera);
     await page.mouse.move(300, 300); await page.mouse.down(); await page.mouse.move(380, 360, { steps: 6 }); await page.mouse.up();

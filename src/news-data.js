@@ -9,12 +9,14 @@ export const NEWS = [
       'Dazu Hintergründe: schwebende Inseln oder eine Burg mit Dorf.',
       'Drei Welten zum Auswählen: Sturmburg, Inselmorgen, Winterdorf.',
       'Lebendige Figuren starten nach 15 Sekunden Ruhe.',
+      'Von oben lässt sich jetzt auch drehen und kippen.',
     ],
     en: [
       'Pixelwelt has new skies: Evening, Night, Sunrise, Storm and Snow.',
       'New backdrops: floating islands or a castle with a village.',
       'Three sets to pick: Sturmburg, Inselmorgen, Winterdorf.',
       'Living pieces start after 15 seconds of quiet.',
+      'From above can now be turned and tilted too.',
     ],
   },
   {
