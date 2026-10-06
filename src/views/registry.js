@@ -15,7 +15,7 @@ export const VIEWS = [
   { id: 'top', label: 'Top down', kind: 'preset' },
   { id: 'side', label: 'Side', kind: 'preset' },
   { id: 'iso', label: 'Isometric', kind: 'preset' },
-  { id: 'above', label: 'From above', kind: 'easy', style: 'V', pitch: 65 * DEG, lock: true, persp: true },
+  { id: 'above', label: 'From above', kind: 'easy', style: 'V', pitch: 65 * DEG, persp: true },
   { id: 'play', label: 'Play', kind: 'play', when: 'phone-portrait', dist: 10.3, pitch: 40 },
 ];
 const BY_ID = Object.assign(Object.create(null), Object.fromEntries(VIEWS.map((v) => [v.id, v])));

@@ -246,7 +246,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   let drag = null;
   let pinch = null;
   let locked = false;
-  let orbitLocked = false;                     // From above: no tilt or turn by drag, twist or keys; zoom and Flip still work
+  let orbitLocked = false;                     // a view with lock: true: no tilt or turn by drag, twist or keys; zoom and Flip still work (no view sets it since v1.8.0)
   const TWIST_DEAD = 6 * DEG;                  // a pure pinch wobbles a few degrees: ignore the twist until it is deliberate
   const pairAngle = () => { const [a, b] = [...pointers.values()]; return Math.atan2(b.y - a.y, b.x - a.x); };
   let lastMoveT = 0;
