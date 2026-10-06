@@ -114,6 +114,13 @@ else {
     (l.moves || []).forEach((m, i) => {
       after.playSan(m.san);
       text(m.why, `move ${i + 1} ${m.san} why`, 160);
+      // CHE-284: "hits/attacks/takes the e4 pawn" must name a square that holds a pawn after this move
+      for (const t of [m.en, m.why?.en, m.threat?.en]) {
+        for (const g of String(t || '').matchAll(/\b(?:hits?|attacks?|takes?|eyes?)\s+(?:your|the|White’s|Black’s)\s+([a-h][1-8])\s+pawn/g)) {
+          const pc = after.board[nameSq(g[1])];
+          check(pc === 'P' || pc === 'p', `${tag}: move ${i + 1} ${m.san} text names a pawn on ${g[1]}, but there is none`);
+        }
+      }
       if (!m.threat) return;
       text(m.threat, `move ${i + 1} ${m.san} threat`, 140);
       check(Array.isArray(m.threat.arrows) && m.threat.arrows.length > 0, `${tag}: move ${i + 1} ${m.san} threat has arrows`);

@@ -1936,8 +1936,8 @@ export const LINES = [
       },
       {
         san: 'Nf6',
-        en: 'Develop a piece with a clear purpose: it hits the e4 pawn and gets ready to castle.',
-        de: 'Entwickle eine Figur mit klarem Ziel: Sie greift den Bauern auf e4 an und bereitet die Rochade vor.',
+        en: 'Develop a piece with a clear purpose: the knight eyes e4 and d5 and gets you ready to castle.',
+        de: 'Entwickle eine Figur mit klarem Ziel: Der Springer schaut auf e4 und d5 und bereitet die Rochade vor.',
         why: {
           en: 'The knight watches d5 and e4, two squares White’s knights would love. It also gets you ready to castle.',
           de: 'Der Springer bewacht d5 und e4, zwei Felder, die die weißen Springer lieben würden. Außerdem bereitet er die Rochade vor.'
