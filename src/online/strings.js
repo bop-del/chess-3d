@@ -1,0 +1,32 @@
+// Online play texts (CHE-271): English is the fallback passed to t(), German registered here (the i18n.js way for modules, addDE).
+import { addDE } from '../i18n.js';
+
+addDE({
+  'online.tab': 'Online',
+  'online.conn.connected': 'Server verbunden', 'online.conn.connecting': 'verbinde...', 'online.conn.unreachable': 'Server nicht erreichbar',
+  'online.details': 'Details', 'online.detailsTitle': 'Verbindung',
+  'online.cause.offline': 'Dieses Gerät hat gerade kein Internet.', 'online.cause.noanswer': 'Der Server antwortet nicht.',
+  'online.cause.server': 'Der Server hat einen Fehler.', 'online.cause.invite': 'Die Einladung gilt nicht mehr.',
+  'online.lastOk': 'Zuletzt verbunden: {time}', 'online.neverOk': 'Noch nicht verbunden',
+  'online.retryIn': 'Nächster Versuch in {s} s', 'online.retrying': 'Versuche gerade...',
+  'online.retry': 'Nochmal versuchen', 'online.copy': 'Details kopieren', 'online.copied': 'Kopiert',
+  'online.lockLine': 'Keine Verbindung, Zug geht gleich wieder',
+  'online.needInvite': 'Online spielen geht nur mit Einladung. Bitte frag nach einem Einladungslink.',
+  'online.codeLabel': 'Code eingeben', 'online.codeGo': 'Anmelden',
+  'online.codeWrong': 'Dieser Code passt nicht.', 'online.codeSlow': 'Zu viele Versuche. Bitte warte ein paar Minuten.', 'online.codeNet': 'Keine Verbindung zum Server.',
+  'online.you': 'Du bist {name}', 'online.players': 'Spieler', 'online.noPlayers': 'Noch niemand sonst ist eingeladen.',
+  'online.challenge': 'Herausfordern', 'online.playing': 'spielt', 'online.online': 'online', 'online.offline': 'nicht da',
+  'online.challengesYou': '{name} fordert dich heraus', 'online.accept': 'Annehmen', 'online.decline': 'Nein danke',
+  'online.waiting': 'Warte auf {name}...', 'online.declined': '{name} hat abgelehnt', 'online.ok': 'OK',
+  'online.gameWith': 'Partie gegen {name}', 'online.youPlay': 'Du spielst {side}', 'online.yourTurn': 'Du bist am Zug', 'online.theirTurn': '{name} ist am Zug',
+  'online.sending': 'Zug wird gesendet...',
+  'online.toBoard': 'Zur Partie', 'online.resign': 'Aufgeben', 'online.resignAsk': 'Partie wirklich aufgeben?', 'online.yes': 'Ja', 'online.cancel': 'Abbrechen',
+  'online.finish': 'Partie beenden', 'online.finishHint': '{name} hat seit 3 Tagen nicht gezogen. Beenden zählt als Sieg für dich.',
+  'online.won': 'Du hast gewonnen', 'online.lost': 'Du hast verloren', 'online.drawn': 'Remis',
+  'online.scoreNow': 'Gegen {name} jetzt {score}', 'online.started': 'Partie gegen {name}. Du spielst {side}.',
+  'online.chat': 'Chat', 'online.chatWith': 'Chat mit {name}', 'online.message': 'Nachricht', 'online.send': 'Senden',
+  'online.monitored': 'Chat wird mitgelesen', 'online.muted': 'Du kannst gerade nicht schreiben.', 'online.noMessages': 'Noch keine Nachrichten.',
+  'online.chatFailed': 'Nachricht nicht gesendet.', 'online.close': 'Schließen',
+  'banner.resign': 'Aufgegeben', 'banner.stale': 'Partie beendet',
+  'reason.resign': 'Aufgegeben', 'reason.stale': '3 Tage kein Zug',
+});

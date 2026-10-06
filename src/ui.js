@@ -5,6 +5,7 @@ import { device } from './device.js';
 import './learn/strings.js';
 import { t, setLanguage, onLanguage, translateTree, sanDisplay, i18n } from './i18n.js';
 import { createDesktop, chipGroup, VIEW_ICONS } from './panel.js';
+import { onlineServer } from './online/store.js';
 import './menu-a.css';
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const g = (t) => GLYPH[t] + '︎';
@@ -27,6 +28,7 @@ const ICON = {
   show: '<path d="M7 4.5v15l12-7.5z"/>',
   end: '<path d="M6 6l12 12M18 6 6 18"/>',
   next: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  online: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/>',
   path: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M6 16c0-7 12-2 12-8"/>',
   good: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2v.1h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
 };
@@ -63,6 +65,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // ?menu=old brings back the old menu for one release. See docs/ARCHITECTURE.md, Menu structure A.
   const menuA = new URLSearchParams(location.search).get('menu') !== 'old';
   document.body.classList.toggle('menu-a', menuA);
+  // Online play (CHE-271): only with ?online=<server url> (remembered for the session) and menu A. Without it nothing here changes.
+  const online = menuA ? onlineServer() : '';
+  let onlineBoard = false;   // the board shows an online game: Back and Good move? are off (src/online/match.js sets it)
   let left = null, right = null, help = null, drawerBtn = null, dsk = null;
   const showBtn = el('button', 'show-btn', 'Show HUD');
   showBtn.dataset.i18n = 'hud.show';
@@ -73,7 +78,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   const hostFns = [];   // told when the desktop panel changes width (folded or unfolded): the review moves its Details box
   const deskFrame = () => controls.setFrame({ ...(deskW ? { right: deskW } : {}), ...(deskBottom ? { bottom: deskBottom } : {}) });
   if (desk) {
-    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => { deskW = w; deskFrame(); hostFns.forEach((fn) => fn()); }, fade: !manual, menuA });
+    dsk = createDesktop({ hud, keyRows: () => keyRows(deskKeys()), onLayout: (w) => { deskW = w; deskFrame(); hostFns.forEach((fn) => fn()); }, fade: !manual, menuA, online: !!online });
     hud.append(showBtn);
   } else {
   // ------------------------------------------------------------ left column
@@ -313,7 +318,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   const startGame = () => { game.newGame(); hideBanner(); phoneUI?.close(); };
   if (menuA && dsk) wireAbandon(dsk.abandon);
   $('#btn-new').addEventListener('click', () => { if (menuA) confirmAbandon(startGame); else { game.newGame(); hideBanner(); } });
-  $('#btn-undo').addEventListener('click', () => { game.undo(); hideBanner(); });
+  $('#btn-undo').addEventListener('click', () => { if (onlineBoard) return; game.undo(); hideBanner(); });
   $('#btn-help').addEventListener('click', toggleHelp);
   const storeLevel = (v) => { try { localStorage.setItem('chess3d.level', v); } catch (e) { /* storage may be blocked */ } };
   // "Good move?" helper (src/goodmove.js, bound from main.js): the desktop button and the phone bulb do the same thing
@@ -321,7 +326,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   const goodBtns = [$('#btn-good')];
   function syncGood() {
     if (!goodMove) return;
-    const think = goodMove.state() === 'thinking', can = goodMove.canAsk();
+    const think = goodMove.state() === 'thinking', can = goodMove.canAsk() && !onlineBoard;   // no helper in an online game
     const key = `${think}|${can}|${goodMove.state()}`;
     if (key === goodKey) return;
     goodKey = key;
@@ -377,7 +382,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   function toggleHelp() { if (phoneUI) phoneUI.toggleHelp(); else if (dsk) dsk.helpApi.toggle(); else help.hidden = !help.hidden; }
   $('#btn-hide')?.addEventListener('click', () => toggleHud(true));
   showBtn.addEventListener('click', () => toggleHud(false));
-  controls.hooks.undo = () => { game.undo(); hideBanner(); };
+  controls.hooks.undo = () => { if (onlineBoard) return; game.undo(); hideBanner(); };
   controls.hooks.newGame = () => { if (menuA) confirmAbandon(startGame); else { game.newGame(); hideBanner(); } };
   controls.hooks.toggleHud = () => toggleHud();
   controls.hooks.toggleHelp = toggleHelp;
@@ -408,8 +413,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     if (st.over) {
       const w = st.over.winner;
       const timeLoss = st.over.reason === 'time' && w;   // a draw on time reads like any draw, with its own reason below
-      main = st.over.reason === 'checkmate' ? t('turn.checkmate', 'Checkmate. {side} wins', { side: sideName(w) }) : timeLoss ? t('turn.timeout', 'Time out. {side} wins', { side: sideName(w) }) : t('turn.draw', 'Draw');
-      sub = st.over.reason === 'checkmate' || timeLoss ? t('turn.gameOver', 'Game over') : st.over.reason === 'time' ? t('reason.timeDraw', 'Time out, draw: the opponent has only a king') : t(`reason.${st.over.reason}`, st.over.reason);
+      const outside = w && (st.over.reason === 'resign' || st.over.reason === 'stale');   // an online game: resigned, or ended after 3 days without a move
+      main = st.over.reason === 'checkmate' ? t('turn.checkmate', 'Checkmate. {side} wins', { side: sideName(w) }) : timeLoss ? t('turn.timeout', 'Time out. {side} wins', { side: sideName(w) }) : outside ? t('banner.wins', '{side} wins', { side: sideName(w) }) : t('turn.draw', 'Draw');
+      sub = outside ? t(`reason.${st.over.reason}`, st.over.reason === 'resign' ? 'Resigned' : 'No move for 3 days') : st.over.reason === 'checkmate' || timeLoss ? t('turn.gameOver', 'Game over') : st.over.reason === 'time' ? t('reason.timeDraw', 'Time out, draw: the opponent has only a king') : t(`reason.${st.over.reason}`, st.over.reason);
     } else if (st.thinking) { sub = t('turn.thinking', 'Computer is thinking'); }
     else if (st.check) sub = t('turn.check', 'Check');
     else if (st.vsComputer) sub = st.turn === st.computerColor ? t('turn.computerMove', 'Computer to move') : t('turn.yourMove', 'Your move');
@@ -450,8 +456,8 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     $('#adv-w').textContent = st.advantage > 0 ? `+${st.advantage}` : '';
     $('#adv-b').textContent = st.advantage < 0 ? `+${-st.advantage}` : '';
 
-    $('#btn-undo').disabled = !st.canUndo;
-    if (menuA && dsk) dsk.undoBtn.hidden = !st.canUndo;   // Back shows from the first move
+    $('#btn-undo').disabled = !st.canUndo || onlineBoard;
+    if (menuA && dsk) dsk.undoBtn.hidden = !st.canUndo || onlineBoard;   // Back shows from the first move (never in an online game)
     if (st.check && !lastCheck && !st.over) toast(t('turn.check', 'Check'));
     lastCheck = st.check;
     if (chkAi.checked !== st.vsComputer) chkAi.checked = st.vsComputer;
@@ -483,9 +489,10 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   game.on('gameover', (st) => {
     const mate = st.reason === 'checkmate';
     const timeLoss = st.reason === 'time' && st.winner;
-    const title = mate ? t('banner.checkmate', 'Checkmate') : timeLoss ? t('banner.time', 'Time out') : t('banner.draw', 'Draw');
+    const outside = st.winner && (st.reason === 'resign' || st.reason === 'stale');   // an online game (CHE-271)
+    const title = mate ? t('banner.checkmate', 'Checkmate') : timeLoss ? t('banner.time', 'Time out') : outside ? t(`banner.${st.reason}`, st.reason === 'resign' ? 'Resigned' : 'Game ended') : t('banner.draw', 'Draw');
     const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
-    const sub = mate || timeLoss ? t('banner.wins', '{side} wins', { side: sideName(st.winner) }) : st.reason === 'time' ? t('reason.timeDraw', 'Time out, draw: the opponent has only a king') : t(`reason.${st.reason}`, cap(st.reason));
+    const sub = mate || timeLoss || outside ? t('banner.wins', '{side} wins', { side: sideName(st.winner) }) : st.reason === 'time' ? t('reason.timeDraw', 'Time out, draw: the opponent has only a king') : t(`reason.${st.reason}`, cap(st.reason));
     banner.innerHTML = `<div class="banner-card"><small>${st.result}</small><h2>${title}</h2><p>${sub}</p>
       <div class="row"><button class="btn primary" id="bn-new">${t('hud.newGame', 'Play')}</button><button class="btn" id="bn-view">${t('banner.review', 'Review board')}</button></div></div>`;
     banner.hidden = false;
@@ -553,7 +560,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     // short word on the button (never wraps), the full name stays as aria-label and title
     // menu A: Back (hidden until the first move), Play (a sheet with the choice), Symbols, View (a sheet), Learn, Options (no Menu)
     const BAR_BUTTONS = menuA
-      ? [['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['undo', 'Back', 'Back', 'tb.undo', 'tb.undo'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'View', 'tb.view', 'tb.view'], ['options', 'Options', 'Options', 'phone.options', 'tb.options']]
+      ? [['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ...(online ? [['online', 'Online', 'Online', 'online.tab', 'online.tab']] : []), ['undo', 'Back', 'Back', 'tb.undo', 'tb.undo'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'View', 'tb.view', 'tb.view'], ['options', 'Options', 'Options', 'phone.options', 'tb.options']]
       : [['undo', 'Undo', 'Undo', 'hud.undo', 'tb.undo'], ['new', 'Play', 'Play', 'hud.newGame', 'tb.new'], ['symbols', 'Symbols', 'Symbols', 'tb.symbols', 'tb.symbols'], ['views', 'View', 'Views', 'phone.views', 'tb.view'], ['learn', 'Learn', 'Learn', 'learn.button', 'tb.learn'], ['menu', 'Menu', 'Menu', 'phone.menu', 'tb.menu']];
     for (const [id, short, full, key, shortKey] of BAR_BUTTONS) {
       const b = el('button', 'tb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg><span data-i18n="${shortKey}">${short}</span>`);
@@ -636,6 +643,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       const view = mkSheet('pview', 'tb.view', 'View', 'View', 'phone.closeMenu', 'Close menu');
       const opts = mkSheet('poptions', 'tb.options', 'Options', 'Options', 'phone.closeMenu', 'Close menu');
       sheetsA = { play, view, options: opts, learn: learnS };
+      if (online) sheetsA.online = mkSheet('ponline', 'online.tab', 'Online', 'Online', 'phone.closeMenu', 'Close menu');   // CHE-271, filled by src/online
       for (const c of [gameC, movesC, viewC]) c.classList.remove('collapsed');
       // Play: [daily card, mounted later] opponent, clock, Start; then the moves. Back and Keys stay in the DOM, hidden (the bar has Back).
       const gb = gameC.querySelector('.body'), ai = gb.querySelector('.row.ai');
@@ -684,7 +692,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     // sheet open and close; swipe down on the header closes it
     const isOpen = () => sheet.classList.contains('open');
     const isLearnOpen = () => learnSheet.classList.contains('open');
-    const sheetBtns = menuA ? [btn.new, btn.views, btn.options, btn.learn] : [btn.menu, btn.learn];
+    const sheetBtns = menuA ? [btn.new, btn.views, btn.options, btn.learn, ...(btn.online ? [btn.online] : [])] : [btn.menu, btn.learn];
     function close() {
       confirmBox.hidden = true; abandonRun = null;
       for (const sh of allSheets) sh.classList.remove('open');
@@ -693,7 +701,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     }
     // menu A: open one of the sheets (play, view, options) from its bar button, or toggle it shut
     function openSheet(name) {
-      const x = sheetsA[name], b = { play: btn.new, view: btn.views, options: btn.options, learn: btn.learn }[name];
+      const x = sheetsA[name], b = { play: btn.new, view: btn.views, options: btn.options, learn: btn.learn, online: btn.online }[name];
       close();
       x.el.classList.add('open'); scrim.classList.add('open'); b.classList.add('on');
       if (name === 'play') movesEl.scrollTop = movesEl.scrollHeight;
@@ -740,7 +748,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     }
 
     // thumb bar
-    btn.undo.addEventListener('click', () => { game.undo(); hideBanner(); });
+    btn.undo.addEventListener('click', () => { if (onlineBoard) return; game.undo(); hideBanner(); });
     // New game: one tap at the start or after the game ended, a small confirm while a game is in progress
     if (!menuA) {
       const startNew = () => { confirmBox.hidden = true; game.newGame(); hideBanner(); close(); };
@@ -761,7 +769,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     btn.symbols.addEventListener('click', () => views.toggleSymbols());
     markSymbols();
     if (menuA) {
-      for (const [name, b] of [['play', btn.new], ['view', btn.views], ['options', btn.options]]) b.addEventListener('click', () => (isSheetOpen(name) ? close() : openSheet(name)));
+      for (const [name, b] of [['play', btn.new], ['view', btn.views], ['options', btn.options], ...(btn.online ? [['online', btn.online]] : [])]) b.addEventListener('click', () => (isSheetOpen(name) ? close() : openSheet(name)));
     } else {
       btn.views.addEventListener('click', () => {
         views.next();
@@ -789,8 +797,8 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       const main = $('#turn-main').textContent;
       const last = st.moves.length ? t('phone.last', 'Last: {move}', { move: sanDisplay(st.moves[st.moves.length - 1]) }) : '';
       const key = `${st.turn}|${main}|${sub}|${last}|${!!st.check}|${!!st.thinking}`;
-      btn.undo.disabled = !st.canUndo;
-      if (menuA) btn.undo.classList.toggle('gone', !st.canUndo);   // the place stays, nothing grey stands there
+      btn.undo.disabled = !st.canUndo || onlineBoard;
+      if (menuA) btn.undo.classList.toggle('gone', !st.canUndo || onlineBoard);   // the place stays, nothing grey stands there
       if (key === lastKey) return;
       lastKey = key;
       status.querySelector('.dot').className = 'dot ' + st.turn;
@@ -809,7 +817,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       },
       openCard(id) { const c = id ? cardOf(id) : null; if (id && !c) return false; open(c || undefined); return true; },
       // menu A
-      openSheet, optSlots, learnBody, playBody: sheetsA?.play.body, sheets: sheetsA,
+      openSheet, optSlots, learnBody, playBody: sheetsA?.play.body, sheets: sheetsA, btn, isSheetOpen,
     };
   }
   if (device.phone) {
@@ -929,8 +937,8 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
 
   // Menu A: the old names stay valid as aliases (settings, scene, menu, music, clock, moves, daily, badges) next to the new game, view and
   // options. Phone: the sheet that holds it; desktop: the panel tab. A learn value (openings, drill, puzzles) is src/learn's.
-  const A_PLACE = { game: 'play', daily: 'play', moves: 'play', clock: 'play', view: 'view', options: 'options', settings: 'options', scene: 'options', menu: 'options', music: 'options', badges: 'learn', openings: 'learn' };
-  const A_TAB = { play: 'play', view: 'settings', options: 'settings', learn: 'learn' };
+  const A_PLACE = { ...(online ? { online: 'online' } : {}), game: 'play', daily: 'play', moves: 'play', clock: 'play', view: 'view', options: 'options', settings: 'options', scene: 'options', menu: 'options', music: 'options', badges: 'learn', openings: 'learn' };
+  const A_TAB = { play: 'play', view: 'settings', options: 'settings', learn: 'learn', online: 'online' };
   function openPanelA(id) {
     if (!Object.hasOwn(A_PLACE, id)) return false;
     const place = A_PLACE[id];
@@ -949,6 +957,21 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     go();
     if (dsk) setTimeout(go, 450);
     return true;
+  }
+
+  // ------------------------------------------------------------ online play (CHE-271): the tab or the sheet, filled by src/online when it loads
+  if (online) {
+    const host = dsk ? hud.querySelector('#online-host') : phoneUI.sheets.online.body;
+    const shown = [];
+    const isVisible = () => (dsk ? dsk.tab === 'online' && !dsk.rail : phoneUI.isSheetOpen('online'));
+    if (dsk) hud.querySelector('#tab-online').addEventListener('click', () => shown.forEach((fn) => fn()));
+    else phoneUI.btn.online.addEventListener('click', () => shown.forEach((fn) => fn()));
+    import('./online/index.js').then((m) => m.mountOnline({
+      server: online, host, hud, game, controls, toast, isVisible, onShown: (fn) => shown.push(fn),
+      setDot: (on) => { if (dsk) dsk.setDot('online', on); else phoneUI.btn.online.classList.toggle('odot', !!on); },
+      closeSheets: () => phoneUI?.close(),
+      setBoard: (on) => { if (onlineBoard === !!on) return; onlineBoard = !!on; document.body.classList.toggle('online-game', onlineBoard); goodKey = ''; render(game.getState()); },
+    })).catch((e) => console.warn('online play failed to load', e));
   }
 
   // Phone only: the Learn sheet { body, open(), close(), isOpen }, null elsewhere. src/learn fills the body.

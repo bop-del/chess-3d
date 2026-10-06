@@ -27,7 +27,8 @@
     "dev": "vite --port 5173",
     "build": "vite build",
     "preview": "vite preview --port 4173",
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs",
+    "server": "node server/index.mjs"
   },
   "dependencies": {
     "three": "0.186.1"

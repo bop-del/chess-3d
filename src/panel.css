@@ -71,7 +71,7 @@
 .cface.out .ct { color: #ff6b5a; font-weight: 800; }
 
 /* tabs */
-.tabs { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--p-line); }
+.tabs { flex: none; display: grid; grid-template-columns: repeat(var(--ntabs, 3), 1fr); gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--p-line); }
 .tab {
   appearance: none; display: flex; gap: 6px; justify-content: center; align-items: center; min-width: 0; padding: 9px 4px; border: 0; border-radius: 9px;
   background: none; color: var(--dim); font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.18s, color 0.18s;
@@ -80,6 +80,7 @@
 .tab svg { width: 16px; height: 16px; flex: none; }
 .tab:hover { color: var(--text); }
 .tab.on { color: var(--p-gold-text); background: var(--p-soft); }
+.tabs[style*="--ntabs: 4"] .tab svg { display: none; }   /* four tabs (Online, CHE-271): the words only, so Optionen fits */
 @container (max-width: 372px) {
   .tab svg { display: none; }
   .tab { font-size: 13px; }

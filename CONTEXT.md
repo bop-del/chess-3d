@@ -225,3 +225,29 @@ _Avoid_: collapsed panel, minimised, drawer
 The small floating bar over the board with the view picker, Flip, Spin, Reset and the
 lock. It fades when nothing moves and wakes on any input.
 _Avoid_: toolbar, camera bar, view buttons
+
+### Online play
+
+**Invite**:
+What lets a person play online: the owner creates it with a name and it comes as a link and an invite code. Having one is the login; there is no account, password or sign up.
+_Avoid_: account, registration, login link
+
+**Invite code**:
+The short code of an invite, like `FELIX-7K3Q`, typed into the Online tab to log in on another device. Gives the same login as the link.
+_Avoid_: password, PIN, token
+
+**Challenge**:
+One player's request to play a game with another; the other accepts or says no thanks. A player in a game cannot challenge or be challenged.
+_Avoid_: invite (that is the login), match request
+
+**Online game**:
+A game between two invited players through the server, one at a time per player, no clock, no takeback. It ends by the rules, by resigning, or after 3 days without a move as a win for the waiting player.
+_Avoid_: match, remote game, multiplayer
+
+**Score**:
+Wins and losses against one opponent from your own side, then the draws when there are some: `3 : 2  ½ 1`. Counted from finished online games, never stored.
+_Avoid_: rating, record, ranking
+
+**Connection**:
+How the game reaches the server: connected (green), connecting (grey, right after a drop or on return to the app), unreachable (red, after 10 s without one). Without a connection an online game's board is locked.
+_Avoid_: online status (that is a player's presence), network

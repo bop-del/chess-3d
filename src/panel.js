@@ -7,7 +7,7 @@ import { t, addDE, onLanguage } from './i18n.js';
 import './panel.css';
 
 addDE({
-  'panel.tab.play': 'Spielen', 'panel.tab.learn': 'Lernen', 'panel.tab.settings': 'Optionen', 'panel.tabs': 'Bereiche',
+  'panel.tab.play': 'Spielen', 'panel.tab.learn': 'Lernen', 'panel.tab.online': 'Online', 'panel.tab.settings': 'Optionen', 'panel.tabs': 'Bereiche',
   'panel.opponent': 'Gegner', 'panel.you': 'Du spielst', 'panel.level': 'Stärke',
   'panel.moves': 'Züge', 'panel.captured': 'Geschlagen',
   'panel.view': 'Ansicht', 'panel.light': 'Licht', 'panel.sound': 'Ton', 'panel.language': 'Sprache', 'panel.quality': 'Qualität',
@@ -41,6 +41,7 @@ export const ICONS = {
   chev: SVG('<path d="m9 6 6 6-6 6"/>'),
   up: SVG('<path d="m6 15 6-6 6 6"/>'),
   close: SVG('<path d="M6 6l12 12M18 6 6 18"/>'),
+  online: SVG('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/>'),
 };
 // one small icon per view id (the views list in src/views/registry.js is the source of the ids)
 export const VIEW_ICONS = {
@@ -118,9 +119,10 @@ export function chipGroup(id, items, { label = '', cls = 'chips' } = {}) {
 const BAR_FADE_MS = 3200;
 
 /** Builds the panel, the rail, the view bar and the help overlay inside `hud`. Returns what ui.js needs to wire. */
-export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fade = true, menuA = false }) {
+export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fade = true, menuA = false, online = false }) {
   // menuA (menu A, CHE-223): the first tab owns the Play button, Back and the clock, the header keeps only the fold button, the last tab is Options
-  const tabsDef = [['play', 'Play', ICONS.play], ['learn', 'Learn', ICONS.learn], ['settings', menuA ? 'Options' : 'Settings', ICONS.gear]];
+  // online (CHE-271, only with ?online=): a fourth tab Online between Learn and Options, filled by src/online
+  const tabsDef = [['play', 'Play', ICONS.play], ['learn', 'Learn', ICONS.learn], ...(online ? [['online', 'Online', ICONS.online]] : []), ['settings', menuA ? 'Options' : 'Settings', ICONS.gear]];
   const headBtns = menuA ? '' : `
         <button class="ib gold" id="btn-new" type="button" title="Play (N)" aria-label="Play" data-i18n-title="hud.newGameTitle" data-i18n-aria="hud.newGame">${ICONS.plus}</button>
         <button class="ib" id="btn-undo" type="button" title="Undo (U)" aria-label="Undo" data-i18n-title="hud.undoTitle" data-i18n-aria="hud.undo">${ICONS.undo}</button>`;
@@ -143,7 +145,7 @@ ${headBtns}
       </div>
       <div class="pclock" id="pclock" hidden></div>
     </header>
-    <nav class="tabs" role="tablist" aria-label="Sections" data-i18n-aria="panel.tabs">
+    <nav class="tabs" role="tablist" aria-label="Sections" data-i18n-aria="panel.tabs" style="--ntabs: ${tabsDef.length}">
       ${tabsDef.map(([id, label, icon]) => `<button class="tab" type="button" role="tab" id="tab-${id}" data-tab="${id}" aria-controls="tp-${id}">${icon}<span data-i18n="panel.tab.${id}">${label}</span></button>`).join('')}
     </nav>
     <div class="pbody">
@@ -166,7 +168,8 @@ ${headBtns}
         </div>
         <div class="foot"><button class="linkbtn" id="btn-help" type="button" title="Keyboard shortcuts (?)" data-i18n="panel.keys" data-i18n-title="hud.keysTitle">Keyboard shortcuts (?)</button></div>
       </section>
-      <section class="tp" id="tp-learn" data-tp="learn" role="tabpanel" aria-labelledby="tab-learn" hidden><div class="lhost" id="learn-host"></div></section>
+      <section class="tp" id="tp-learn" data-tp="learn" role="tabpanel" aria-labelledby="tab-learn" hidden><div class="lhost" id="learn-host"></div></section>${online ? `
+      <section class="tp" id="tp-online" data-tp="online" role="tabpanel" aria-labelledby="tab-online" hidden><div class="ohost" id="online-host"></div></section>` : ''}
       <section class="tp" id="tp-settings" data-tp="settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
         <div class="sec"><h4 data-i18n="panel.view">View</h4><div class="views" id="presets"></div></div>
         <div class="sec" data-slot="themes"></div>
@@ -337,12 +340,15 @@ ${headBtns}
     return card;
   }
 
+  // the dot on a tab (and its rail icon): something waits there (src/online: a challenge, your turn, an unread message)
+  function setDot(id, on) { for (const b of root.querySelectorAll(`.tab[data-tab="${id}"], [data-rtab="${id}"]`)) b.classList.toggle('odot', !!on); }
+
   setTab('play');
   setRail(rail, { persist: false });
   onLanguage(() => { /* strings are translated by translateTree(hud) in ui.js */ });
 
   return {
-    root, bar, help, helpApi, setTab, setRail, layout, mountSettings, mountPanel,
+    root, bar, help, helpApi, setTab, setRail, layout, mountSettings, mountPanel, setDot,
     get tab() { return tab; }, get rail() { return rail; },
     viewsName: $('#views-name', bar), vmenu, wake,
     chips: { chipGroup },

@@ -1,0 +1,95 @@
+/* The Online tab (CHE-271): desktop panel tab and phone sheet share it. Tokens from style.css and panel.css (--text, --dim, --gold,
+   --line). Loaded only with ?online=. */
+.onl { display: flex; flex-direction: column; gap: 12px; font-size: 14px; color: var(--text); }
+.onl h4 { margin: 4px 0 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.onl p { margin: 0; line-height: 1.4; }
+.onl [hidden] { display: none !important; }
+.obtn {
+  appearance: none; min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-strong, rgba(255, 255, 255, 0.16));
+  background: rgba(255, 255, 255, 0.06); color: var(--text); font: inherit; font-size: 13.5px; font-weight: 650; cursor: pointer; touch-action: manipulation; white-space: nowrap;
+}
+.obtn:hover { background: rgba(255, 255, 255, 0.1); }
+.obtn:disabled { opacity: 0.45; cursor: default; }
+.obtn.gold { background: linear-gradient(180deg, #e6c987, #c9a24f); color: #1b1608; border-color: transparent; }
+.obtn.small { min-height: 32px; padding: 0 10px; font-size: 12.5px; }
+.orow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.orow > .obtn { flex: 1 1 auto; }
+
+/* the connection line: a dot and a text, three states */
+.oconn { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--dim); }
+.oconn i { width: 10px; height: 10px; border-radius: 50%; background: #8a8f9c; flex: none; }
+.oconn[data-s="connected"] i { background: #4cc46a; box-shadow: 0 0 0 3px rgba(76, 196, 106, 0.18); }
+.oconn[data-s="connected"] { color: var(--text); }
+.oconn[data-s="unreachable"] i { background: #ff5a4a; box-shadow: 0 0 0 3px rgba(255, 90, 74, 0.2); }
+.oconn[data-s="unreachable"] { color: #ffb2a8; }
+.oconn .obtn { margin-left: auto; }
+.odet { padding: 12px; border-radius: 12px; border: 1px solid rgba(255, 90, 74, 0.35); background: rgba(8, 9, 12, 0.7); display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.odet p { margin: 0; }
+.odet .ocause { font-weight: 650; }
+.odet .olast, .odet .onext { color: var(--dim); }
+.odet .otech { margin: 6px 0 0; padding: 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.35); font: 11px/1.45 ui-monospace, Menlo, monospace; color: var(--dim); white-space: pre-wrap; word-break: break-all; }
+
+/* without an invite */
+.ologin { display: flex; flex-direction: column; gap: 10px; }
+.ocode { display: flex; gap: 8px; align-items: flex-end; }
+.ocode label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dim); }
+.onl input[type="text"] {
+  min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong, rgba(255, 255, 255, 0.16)); background: rgba(0, 0, 0, 0.3);
+  color: var(--text); font: inherit; font-size: 16px; min-width: 0; width: 100%; box-sizing: border-box;
+}
+.ocode input { text-transform: uppercase; letter-spacing: 0.06em; }
+.oerr { color: #ffb2a8; font-size: 13px; }
+
+/* cards: a challenge, the game, the result */
+.ome { color: var(--dim); font-size: 13px; }
+.ochal, .ogame { display: flex; flex-direction: column; gap: 8px; }
+.ochal:empty, .ogame:empty { display: none; }
+.ocard { padding: 12px; border-radius: 12px; border: 1px solid var(--line, rgba(255, 255, 255, 0.09)); background: rgba(8, 9, 12, 0.55); }
+.ocard.mine, .ocard.oresult { border-color: rgba(216, 180, 104, 0.55); }
+.oconfirm { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line, rgba(255, 255, 255, 0.09)); }
+.ohint { margin-top: 8px !important; color: var(--dim); font-size: 13px; }
+
+/* the player list */
+.oplayers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.op { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 4px 4px 4px 0; border-radius: 10px; }
+.op.on { background: rgba(216, 180, 104, 0.1); }
+.oname { appearance: none; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; padding: 0 8px; border: 0; border-radius: 10px; background: none; color: var(--text); font: inherit; font-weight: 650; cursor: pointer; text-align: left; }
+.oname span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pres { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); flex: none; }
+.pres.on { background: #4cc46a; }
+.udot { width: 8px; height: 8px; border-radius: 50%; background: #ff6b5a; flex: none; }
+.oscore { font-variant-numeric: tabular-nums; color: var(--dim); font-size: 13px; white-space: pre; }
+.oplay { color: var(--dim); font-size: 12.5px; font-style: italic; padding: 0 6px; }
+.oempty { color: var(--dim); font-size: 13px; list-style: none; }
+
+/* the chat */
+.ochat { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--line, rgba(255, 255, 255, 0.09)); background: rgba(8, 9, 12, 0.55); }
+.ochat header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.omsgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.omsgs li { align-self: flex-start; max-width: 85%; padding: 6px 10px; border-radius: 12px 12px 12px 4px; background: rgba(255, 255, 255, 0.08); word-break: break-word; }
+.omsgs li.mine { align-self: flex-end; border-radius: 12px 12px 4px 12px; background: rgba(216, 180, 104, 0.2); }
+.omsgs li small { display: block; margin-top: 2px; font-size: 10.5px; color: var(--dim); }
+.omsgs li.oempty { background: none; }
+.osend { display: flex; gap: 8px; }
+.osend input { flex: 1; }
+.omon { color: var(--dim); font-size: 11.5px; }
+
+/* the dot on the tab and the phone button: a challenge to you, your turn, an unread message */
+.tab, .tb[data-act="online"], [data-rtab] { position: relative; }
+.tab.odot::after, .tb.odot::after, [data-rtab].odot::after { content: ''; position: absolute; top: 5px; right: 6px; width: 9px; height: 9px; border-radius: 50%; background: #ff6b5a; box-shadow: 0 0 0 2px rgba(16, 17, 22, 0.9); }
+
+/* the board lock line: no connection during an online game */
+.olock { position: fixed; z-index: 24; top: 64px; left: 50%; transform: translateX(-50%); width: min(440px, calc(100vw - 24px)); pointer-events: auto; }
+body:not(.phone) .olock { left: calc((100vw - var(--panel-w, 0px)) / 2); }
+.olock > p { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(30, 32, 42, 0.95); border: 1px solid rgba(255, 90, 74, 0.45); box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4); font-size: 13.5px; font-weight: 650; color: var(--text); margin: 0; }
+.olock > p i { width: 10px; height: 10px; border-radius: 50%; background: #ff5a4a; flex: none; }
+.olock > p span { flex: 1; }
+.olock .odet { margin-top: 8px; background: rgba(16, 17, 22, 0.96); }
+body.phone .olock { top: calc(var(--st, 8px) + var(--stat, 44px) + 12px); }
+
+/* the score line on the game over card */
+.banner-card .oscore-line { margin: -6px 0 14px; color: var(--p-gold-text, #ecd193); font-size: 15px; font-weight: 650; }
+
+/* phone: 44 px targets */
+body.phone .obtn, body.phone .oname, body.phone .onl input[type="text"] { min-height: 44px; }
+body.phone .obtn.small { min-height: 44px; }
