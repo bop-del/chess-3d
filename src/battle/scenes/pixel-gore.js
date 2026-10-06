@@ -5,7 +5,6 @@
 // Staging, time, skip and cleanup come from the director and ctx.fx, like every scene.
 import * as THREE from 'three';
 import { createStage, lerp, bump } from './kit-a.js';
-import { SPEAR, PAWN_UNIT } from '../../themes/pixel/seta.js';
 
 const outQuad = (k) => 1 - (1 - k) * (1 - k);
 const inQuad = (k) => k * k;
@@ -16,10 +15,10 @@ const LEVELS = [{ hit: 0, ring: 0, puddle: 0, fount: 0 },
   { hit: 9, ring: 0, puddle: 0, fount: 0 },
   { hit: 24, ring: 12, puddle: 12, fount: 1 }];
 
-/** The pawn capture variant from ?pawngore=a|b|c (a run up and thrust, b throw, c double thrust with a wind up); a is the default. */
+/** The pawn capture variant from ?pawngore=a|c (a run up and thrust, c double thrust with a wind up); a is the default. */
 export function pawnVariant(search = globalThis.location?.search || '') {
   const v = (new URLSearchParams(search).get('pawngore') || '').toLowerCase();
-  return v === 'b' || v === 'c' ? v : 'a';
+  return v === 'c' ? v : 'a';
 }
 
 function seeded(seed = 7) { let x = seed; return () => { x = (x * 16807) % 2147483647; return x / 2147483647; }; }
@@ -136,10 +135,10 @@ async function gore(ctx) {
 
   // ---------------------------------------------------------------- the six attackers
   if (type === 'p') {
-    const variant = pawnVariant(), U = PAWN_UNIT;
+    const variant = pawnVariant();
     const jabs = [2, 2, 3][vw],   // a pawn victim gets two jabs like a knight: one jab left a pawn x pawn capture with the weakest gore of all pairings
-      thrusts = { a: jabs, b: 1, c: 2 }[variant], mid = Math.round(L.hit * 0.6);   // the other variants make up the blood of the jabs they skip
-    const spearObj = s.A.group.getObjectByName('spear'), rigObj = s.A.group.getObjectByName('rig'), sz0 = spearObj ? spearObj.position.z : 0;
+      thrusts = { a: jabs, c: 2 }[variant], mid = Math.round(L.hit * 0.6);   // the other variant makes up the blood of the jabs they skip
+    const spearObj = s.A.group.getObjectByName('spear'), sz0 = spearObj ? spearObj.position.z : 0;
     let sl = 0;                                     // how far the spear is slid forward through the hands
     const slide = (d) => { sl = d; if (spearObj) spearObj.position.z = sz0 + d; };
     const hit = new THREE.Vector3(C.x - aim.x * 0.28, hV * 0.45, C.z - aim.z * 0.28);
@@ -174,32 +173,6 @@ async function gore(ctx) {
         } else await thrust();
         await contact(i, jabs);
       }
-    } else if (variant === 'b') {
-      // a throw: stay back, lean away and draw the spear, hurl it (it leaves the hands and flies), it sticks in the victim
-      await stepBack(-1.4);
-      await crouch(0.4, -0.3, 0.9, -0.3);
-      sfx.whoosh?.();
-      const d0 = a.d;
-      await s.tw(0.14, (k) => { a.tip = lerp(-0.3, 0.14, k); slide(lerp(-0.3, 0.1, k)); a.d = lerp(d0, d0 + 0.14, k); a.sy = lerp(0.9, 1.06, k); a.sx = a.sz = 1 / Math.sqrt(a.sy); }, inQuad);
-      if (!s.live()) return;
-      const prop = new THREE.Group();
-      for (const [x, y, z, w, h, d, c] of SPEAR) prop.add(box(w * U, h * U, d * U, c, x * U, (y + h / 2) * U, z * U));
-      ctx.root.updateWorldMatrix(true, true); s.A.group.updateWorldMatrix(true, true);
-      const m0 = new THREE.Matrix4().copy(ctx.root.matrixWorld).invert().multiply(rigObj.matrixWorld), sc = new THREE.Vector3();
-      m0.decompose(prop.position, prop.quaternion, sc);
-      prop.updateMatrixWorld(true);
-      fx.add(prop);
-      if (spearObj) spearObj.visible = false;
-      // it levels out on the way and its point ends at the hit
-      const p0 = prop.position.clone(), q0 = prop.quaternion.clone(), fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(q0);
-      const qEnd = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(fwd.x, 0, fwd.z).normalize());
-      const dv = new THREE.Vector3().subVectors(hit, new THREE.Vector3(0, 17.6 * U, 17.4 * U).applyQuaternion(qEnd)).sub(p0);
-      await s.tw(0.26, (k) => { prop.quaternion.slerpQuaternions(q0, qEnd, k); prop.position.copy(p0).addScaledVector(dv, k); prop.position.y += 0.18 * bump(k); });
-      if (!s.live()) return;
-      sfx.splat?.();
-      for (let e = 0; e < jabs - 1; e++) bleed(hit, { count: mid, dir: aim, spread: 0.9 });
-      s.V.group.attach(prop);                       // it stays in the victim; the director takes it off again with the rest
-      finale(hit, { tipFrom: 0 });
     } else {
       // a double thrust with a wind up: coil back, then two quick jabs one after the other
       await stepBack(-1.2);
@@ -210,9 +183,8 @@ async function gore(ctx) {
       }
     }
     if (!s.live()) return;
-    const sl0 = sl, tip0 = a.tip, sy0 = a.sy, d0 = a.d, spearOff = spearObj && !spearObj.visible;
-    if (spearOff) { spearObj.visible = true; spearObj.scale.setScalar(0.001); }
-    await Promise.all([s.tw(0.5, (k) => { a.d = lerp(d0, -s.run0, k); a.tip = lerp(tip0, 0, k); a.sy = lerp(sy0, 1, k); a.sx = a.sz = 1 / Math.sqrt(a.sy); a.y = 0; a.yaw = s.yawG * (1 - k); slide(lerp(sl0, 0, k)); if (spearOff) spearObj.scale.setScalar(Math.max(0.001, k)); }, inOut), fall]);
+    const sl0 = sl, tip0 = a.tip, sy0 = a.sy, d0 = a.d;
+    await Promise.all([s.tw(0.5, (k) => { a.d = lerp(d0, -s.run0, k); a.tip = lerp(tip0, 0, k); a.sy = lerp(sy0, 1, k); a.sx = a.sz = 1 / Math.sqrt(a.sy); a.y = 0; a.yaw = s.yawG * (1 - k); slide(lerp(sl0, 0, k)); }, inOut), fall]);
   } else if (type === 'n') {
     const piv = hold(sword(), { lift: 0.5 * ah });
     piv.rotation.x = 0.3;

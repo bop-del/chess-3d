@@ -70,7 +70,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
     const skin = vox.parts.filter((p) => p.g === 'body' && p.w === 3.4 && p.h === 3 && Math.abs(p.y - 16.2) < 1e-6);
     check(`${tag}: two hands close round the shaft`, skin.length === 2 && skin.every((h) => Math.abs(h.x - shaft.x) < 1.2 && h.y <= shaft.y && h.y + h.h >= shaft.y + shaft.h && h.z - h.d / 2 > shaft.z - shaft.d / 2 && h.z + h.d / 2 < shaft.z + shaft.d / 2), `${skin.length} hands`);
   }
-  check('pawngore: a, b, c; anything else and no flag fall back to a', ['?pawngore=a', '?pawngore=b', '?pawngore=C', '?pawngore=x', '', '?pawngore='].map((q) => pawnVariant(q)).join('') === 'abcaaa');
+  check('pawngore: a and c; b, anything else and no flag fall back to a', ['?pawngore=a', '?pawngore=b', '?pawngore=C', '?pawngore=x', '', '?pawngore='].map((q) => pawnVariant(q)).join('') === 'aacaaa');
 }
 console.log(failed ? `\n${failed} check(s) failed` : '\nPixelwelt figures contract passed');
 process.exit(failed ? 1 : 0);

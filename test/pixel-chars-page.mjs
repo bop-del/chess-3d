@@ -64,8 +64,8 @@ try {
     R.expect(`capture ${mode} blood ${gore ? 'on' : 'off'}: afterwards the board is clean, no cube is left, the victim is in the tray`, !after.audit.length && !after.busy && after.left === 0 && after.tray === 1, JSON.stringify(after));
   }
 
-  // CHE-219: the pawn variants b (throw) and c (double thrust) through the real director: red appears, the board ends clean, the spear is back in the hands
-  for (const variant of ['b', 'c']) {
+  // CHE-219: the pawn variants a (default), c (double thrust) and b (falls back to a) through the real director: red appears, the board ends clean, the spear is back in the hands
+  for (const variant of ['c', 'b']) {
     await ev(({ m, vr }) => { history.replaceState(null, '', `?pawngore=${vr}`); const c = window.__chess; c.battle.settings.set({ mode: m, gore: true }); c.game.loadFen('8/8/8/3p4/4P3/8/8/4K2k w - - 0 1'); c.step(2); c.game.move('e4', 'd5'); }, { m: 'short', vr: variant });
     let peakRed = 0;
     for (let i = 0; i < 160 && (i < 4 || (await ev(() => window.__chess.game.busy))); i++) { await ev(async () => { await window.__chess.stepAsync(0.1); }); peakRed = Math.max(peakRed, await reds()); }
