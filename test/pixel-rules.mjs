@@ -103,25 +103,25 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
   }
 }
 
-// 5 Light variants (CHE-181): ?pixlight=a is daylight, b the warm evening mood; both keep every mesh flat and unlit, b only tints
-// through the sky, the grade and the material multiplier colour (no lights, no new textures).
+// 5 Light (CHE-181, CHE-239): the sky decides the light; every sky keeps every mesh flat and unlit and tints only through the sky, the
+// grade and the material multiplier colour (no lights, no new textures). The default is the sunrise (the set Inselmorgen).
 {
-  const { light, WARM, PIXLIGHT_DEFAULT } = await import('../src/themes/pixel.js');
-  const hex = (c) => '#' + c.getHexString();
-  for (const v of ['a', 'b']) {
-    globalThis.location = { search: `?pixlight=${v}` };
+  const { light } = await import('../src/themes/pixel.js');
+  const { SKY_IDS, SKIES, DEFAULT_SKY } = await import('../src/themes/pixel/look.js');
+  for (const id of SKY_IDS) {
+    globalThis.location = { search: `?sky=${id}` };
     const L = light(), w = createPixelWorld({}), ms = [];
     w.group.traverse((o) => { if (o.isMesh) ms.push(o); });
     const unlit = ms.every((m) => m.material.isMeshBasicMaterial && (m.material.map || m.material.vertexColors));
-    const sunOk = ms.filter((m) => m.parent?.name === 'sun').every((m) => m.material.color.getHex() === 0xffffff);
-    const tinted = ms.filter((m) => m.parent?.name !== 'sun' && m.material.map).every((m) => m.material.color.getHex() === (v === 'b' ? WARM.world : 0xffffff));
-    check(`variant ${v}: sky, grade and multiplier as specified, every mesh unlit`, unlit && sunOk && tinted && (v === 'b' ? L.bg.bottom === '#ffd6a8' && L.post.tint === '#fff0e0' && L.exposure === 0.88 : L.bg.bottom === '#cfe6ff' && L.post.tint === '#ffffff' && L.exposure === 1.0), `${ms.length} meshes`);
+    const sunOk = ms.filter((m) => m.parent?.name === 'sun').every((m) => m.material.color.getHex() === (SKIES[id].sun ? SKIES[id].sun.color : 0xffffff));
+    const tinted = ms.filter((m) => m.parent?.name !== 'sun' && m.parent?.name !== 'cloud' && m.material.map).every((m) => m.material.color.getHex() === SKIES[id].mul);
+    check(`sky ${id}: light, grade and multiplier as specified, every mesh unlit`, unlit && sunOk && tinted && L.bg.bottom === SKIES[id].light.bg.bottom && L.exposure === SKIES[id].light.exposure, `${ms.length} meshes`);
     w.dispose();
   }
   globalThis.location = { search: '' };
-  check(`variant default is ${PIXLIGHT_DEFAULT} without the flag`, light().bg.bottom === (PIXLIGHT_DEFAULT === 'b' ? '#ffd6a8' : '#cfe6ff'));
-  globalThis.location = { search: '?pixlight=x' };
-  check('a bad pixlight value falls back to the default', light().bg.bottom === (PIXLIGHT_DEFAULT === 'b' ? '#ffd6a8' : '#cfe6ff'));
+  check(`sky default is ${DEFAULT_SKY} without a flag`, light().bg.bottom === SKIES[DEFAULT_SKY].light.bg.bottom);
+  globalThis.location = { search: '?sky=x' };
+  check('a bad sky value falls back to the default', light().bg.bottom === SKIES[DEFAULT_SKY].light.bg.bottom);
   delete globalThis.location;
 }
 

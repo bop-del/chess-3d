@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { Mesher } from '../blocks/mesher.js';
 import { buildAvoid, approach } from '../blocks/island.js';
 import { makePixelKit } from './kit.js';
+import { createSkyLayer } from './sky.js';
 
 const rnd = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
@@ -139,8 +140,8 @@ function addClouds(parent, kit) {
   return out;
 }
 
-/** The whole Pixelwelt world: { group, update(dt), settle(), dispose(), avoid }. */
-export function createPixelWorld({ track, view } = {}) {
+/** The whole Pixelwelt world: { group, update(dt), settle(), dispose(), avoid }. light: fewer weather particles (phone, quality low). */
+export function createPixelWorld({ track, view, light } = {}) {
   const kit = makePixelKit(track);
   const group = new THREE.Group();
   group.name = 'pixel-world';
@@ -156,6 +157,8 @@ export function createPixelWorld({ track, view } = {}) {
   sun.position.set(-12, 17, -34);
   group.add(sun);
   const avoid = buildAvoid(group, tree, clouds, view, PIXEL_EDGE, true);
+  const sky = createSkyLayer({ group, kit, clouds, light });   // CHE-239: sky mood, weather and backdrop
+  group.userData.sky = sky;
   let time = 2.2, tick = -1;
   const anim = (t) => {
     const f = Math.floor(t * 3);   // the water steps like animation frames: a pixel row every few frames
@@ -167,9 +170,10 @@ export function createPixelWorld({ track, view } = {}) {
   anim(time);
   return {
     group, kit, avoid: avoid.state,
-    update(dt) { time += dt; anim(time); avoid.update(dt); },
+    update(dt) { time += dt; anim(time); avoid.update(dt); sky.update(dt); },
     settle() { avoid.update(5); },
     dispose() {
+      sky.dispose();
       group.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
       for (const c of clouds) for (const mt of c.userData.mats) mt.dispose();
       kit.dispose();

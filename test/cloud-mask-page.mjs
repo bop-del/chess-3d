@@ -23,7 +23,7 @@ try {
   const w = await watchPage(page);
   await page.setViewport({ width: 960, height: 540, deviceScaleFactor: 1 });
   for (const theme of ['pixel', 'blocks']) {
-    await page.goto(`${URL0}/?theme=${theme}&quality=low&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.goto(`${URL0}/?theme=${theme}${theme === 'pixel' ? '&sky=evening&backdrop=none' : ''}&quality=low&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step && !!window.__chess.themes.world', { timeout: 120000 });
     const sweep = (fixOn) => page.evaluate((fixOn, COVER) => {
       const C = window.__chess, T = C.THREE, D = Math.PI / 180, world = C.themes.world, cv = document.querySelector('canvas');

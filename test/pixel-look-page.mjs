@@ -11,7 +11,6 @@ import { reporter, launchBrowser, watchPage, startServer, build } from '../tools
 const args = process.argv.slice(2);
 const PORT = Number((args.find((a) => a.startsWith('--port=')) || '--port=5354').slice(7));
 const SHOTS = (args.find((a) => a.startsWith('--shots=')) || '').slice(8);
-const PIXL = (args.find((a) => a.startsWith('--pixlight=')) || '--pixlight=b').slice(11);   // light variant under test (a or b)
 const R = reporter();
 const OUT = '.tmp/pixel-look-dist';
 const BASE = (args.find((a) => a.startsWith('--base=')) || '').slice(7).replace(/\/$/, '');
@@ -23,7 +22,7 @@ try {
   const page = await browser.newPage();
   const w = await watchPage(page);
   await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 2 });
-  await page.goto(`${URL0}/?theme=pixel&pixlight=${PIXL}&quality=high&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(`${URL0}/?theme=pixel&quality=high&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
   // helpers inside the page
   await page.evaluate(() => {

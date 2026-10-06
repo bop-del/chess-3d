@@ -168,6 +168,20 @@ A named level of rendering detail (for example low) trading looks for speed on
 weaker devices.
 _Avoid_: graphics setting, resolution, LOD
 
+### Pixelwelt look
+
+**Sky**:
+The mood of the heaven over the Pixelwelt island: Evening, Night, Sunrise (the default), Storm or Snow. A sky sets the gradient behind the island, the sun or moon and stars, the weather and the colour multiplier of the unlit world. It never changes by itself.
+_Avoid_: weather (that is only the rain and snow part), light variant (the old name of two skies), time of day, Automatic
+
+**Backdrop**:
+What stands far below the island: Islands (the default), Castle (a village with a castle), or None. Independent of the Sky; the island and the board are not changed by it.
+_Avoid_: background (the screen gradient is the sky's), scenery, landscape
+
+**Set**:
+A named pair of one Sky and one Backdrop, Sturmburg (Storm and Castle), Inselmorgen (Sunrise and Islands, the default for new players) or Winterdorf (Snow and Castle). Shown as the Sets row in Options (German label "Welt"); the Sky and Backdrop rows adjust one half.
+_Avoid_: theme (a theme is the whole look: board, pieces, light), preset, scene
+
 ### The interface
 
 **Signature move**:

@@ -8,6 +8,7 @@ import { withBirds } from './pixel/birds.js';
 import { createPieceStyle } from './blocks/rig.js';
 import { trayPlanks, labelAtlas } from './pixel/textures.js';
 import { SLAB } from '../trays.js';
+import { SKIES, look, onLook, skyLight, WARM as WARM_LOOK } from './pixel/look.js';
 
 /** Board spec: classic squares hidden, the labels lie on the grass ring around the board (no frame): cream with a dark outline. */
 export function board({ track } = {}) {
@@ -21,52 +22,25 @@ export function board({ track } = {}) {
   };
 }
 
-export function world({ track, view }) { return withBirds(createPixelWorld({ track, view })); }
+export function world({ track, view, quality }) { return withBirds(createPixelWorld({ track, view, light: quality === 'low' || (typeof document !== 'undefined' && document.body?.classList.contains('phone')) })); }
 
-// Light variant: ?pixlight=a is the plain daylight Pixelwelt, b the warm evening mood of Blocks done the Pixelwelt way (sky, grade and a
-// warm multiplier on the unlit materials, no real lights). A value in the URL decides, else the default.
-export const PIXLIGHT_DEFAULT = 'b';
-export function pixLight() {
-  const v = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pixlight') : null;
-  return v === 'a' || v === 'b' ? v : PIXLIGHT_DEFAULT;
-}
-export const WARM = { world: 0xffe9d2, figure: 0xfff1e2 };   // multiplier colours of variant b (texture pixels stay as drawn)
+export const WARM = WARM_LOOK;   // multiplier colours of the evening (texture pixels stay as drawn)
 
-export function light() {
-  if (pixLight() === 'b') {
-    return {
-      preset: 'Gallery',
-      key: { color: '#ffc78a', intensity: 2.4, dir: [-10, 16, -8] },
-      fill: { color: '#cfe0ff', intensity: 0.8, dir: [10, 8, 9] },
-      rim: { color: '#ffd9b0', intensity: 0.3, dir: [8, 5, -12] },
-      exposure: 0.88, env: 0.5, floor: '#5b86d6',
-      bg: { top: '#5b86d6', bottom: '#ffd6a8', glow: '#ffe2bd', glowAmount: 0.25 },
-      post: { bloom: 0.05, vignette: 0.2, tint: '#fff0e0' },
-      noFloor: true,
-    };
-  }
-  return {
-    preset: 'Gallery',
-    key: { color: '#fff4d6', intensity: 2.4, dir: [-10, 16, -8] },
-    fill: { color: '#cfe0ff', intensity: 0.8, dir: [10, 8, 9] },
-    rim: { color: '#ffffff', intensity: 0.3, dir: [8, 5, -12] },
-    exposure: 1.0, env: 0.5, floor: '#6aa3f0',
-    bg: { top: '#5f9be8', bottom: '#cfe6ff', glow: '#fff3c0', glowAmount: 0.18 },
-    post: { bloom: 0, vignette: 0.08, tint: '#ffffff' },
-    noFloor: true,
-  };
-}
+// The sky (CHE-239) decides the light: ?sky=, ?set= and the Options rows, see pixel/look.js. Default: the set Inselmorgen (sunrise).
+export function light() { return skyLight(look().sky); }
 
 // the blob under each figure: a flat dark square on the board, as a block world draws it (the unlit figures cast no shadow map shadow)
 const SHADOW_W = { p: 0.5, r: 0.8, n: 0.7, b: 0.62, q: 0.78, k: 0.62 };
 export function pieceStyle(ctx) {
+  const figMats = new Set();   // the figure materials: the sky's multiplier colour follows the Sky choice
+  const unsub = onLook((l) => { for (const m of figMats) m.color.setHex(SKIES[l.sky].fig); });
   const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   const mat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const style = createPieceStyle(ctx, {
     id: 'pixel',
     build: buildPixelVox,
     mesher: { shade: true },
-    makeMaterial: (tex) => new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, color: pixLight() === 'b' ? WARM.figure : 0xffffff }),
+    makeMaterial: (tex) => { const m = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, color: SKIES[look().sky].fig }); figMats.add(m); return m; },
     decorate(inner, type) {
       const s = new THREE.Mesh(geo, mat);
       s.name = 'blob';
@@ -77,6 +51,6 @@ export function pieceStyle(ctx) {
     },
   });
   const dispose = style.dispose;
-  style.dispose = () => { dispose(); geo.dispose(); mat.dispose(); };
+  style.dispose = () => { unsub(); figMats.clear(); dispose(); geo.dispose(); mat.dispose(); };
   return style;
 }

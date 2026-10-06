@@ -119,17 +119,17 @@ try {
   await load();
   const sw = await page.evaluate(() => {
     const row = document.querySelector('[data-settings="themes"]');
-    const btns = row ? [...row.querySelectorAll('.swatch')] : [];
+    const btns = row ? [...row.querySelectorAll('.swatch[data-theme]')] : [];
     return { inScene: !!row && !!row.closest('[data-card="scene"], [data-slot="themes"]'), first: !!row && row.parentElement.firstElementChild === row, ids: btns.map((b) => b.dataset.theme).join(), on: btns.filter((b) => b.classList.contains('on')).map((b) => b.dataset.theme).join() };
   });
   R.expect('swatch row in the Scene card, first, six swatches, Classic marked', sw.inScene && sw.first && sw.ids === IDS.join() && sw.on === 'classic', sw.ids, JSON.stringify(sw));
   await page.evaluate(() => document.querySelector('#tab-settings')?.click());
   await page.click('.swatch[data-theme="tournament"]');
   await page.waitForFunction("window.__chess.themes.current() === 'tournament'", { timeout: 20000 });
-  const marked = await page.evaluate(() => [...document.querySelectorAll('[data-settings="themes"] .swatch.on')].map((b) => b.dataset.theme).join());
+  const marked = await page.evaluate(() => [...document.querySelectorAll('[data-settings="themes"] .swatch[data-theme].on')].map((b) => b.dataset.theme).join());
   R.expect('clicking a swatch switches the theme and moves the mark', marked === 'tournament', marked);
   await page.evaluate(() => { document.querySelector('.lang-btn[data-lang="de"]').click(); });
-  const de = await page.evaluate(() => [...document.querySelectorAll('[data-settings="themes"] .swatch')].map((b) => b.title).join());
+  const de = await page.evaluate(() => [...document.querySelectorAll('[data-settings="themes"] .swatch[data-theme]')].map((b) => b.title).join());
   R.expect('swatch names in German', de === 'Klassisch,Turnier,Holz,Metall,Glas,Blöcke,Pixelwelt', de);
   await page.evaluate(() => { document.querySelector('.lang-btn[data-lang="en"]').click(); });
 
@@ -154,7 +154,7 @@ try {
   // phone: the swatches are in the Menu sheet and reachable by tap
   await page.evaluate(() => localStorage.removeItem('chess3d.theme'));
   await load('', { width: 390, height: 844 });
-  const ph = await page.evaluate(() => { const row = document.querySelector('[data-settings="themes"]'); return { inSheet: !!row && !!row.closest('.psheet-body'), n: row ? row.querySelectorAll('.swatch').length : 0 }; });
+  const ph = await page.evaluate(() => { const row = document.querySelector('[data-settings="themes"]'); return { inSheet: !!row && !!row.closest('.psheet-body'), n: row ? row.querySelectorAll('.swatch[data-theme]').length : 0 }; });
   R.expect('phone: swatch row in the Menu sheet', ph.inSheet && ph.n === 7, JSON.stringify(ph));
   await page.tap('.tb[data-act="menu"]');
   await page.waitForSelector('.psheet.open', { timeout: 10000 });
@@ -214,7 +214,7 @@ try {
       const on = await page.waitForFunction((id) => window.__chess.themes.current() === id, { timeout: 60000 }, id).then(() => true, () => false);
       await page.evaluate(() => { window.__chess.step(1); window.__chess.draw(); });
       const after = await sceneLook();
-      const marked = await page.evaluate(() => document.querySelector('[data-settings="themes"] .swatch.on')?.dataset.theme);
+      const marked = await page.evaluate(() => document.querySelector('[data-settings="themes"] .swatch[data-theme].on')?.dataset.theme);
       if (!on || marked !== id || (before === after && (await cur()) !== id)) bad.push(`${id}: current ${await cur()}, mark ${marked}`);
     }
     R.expect(`${label}: every theme button switches the theme, starting on ${start || 'classic'}`, !bad.length, 'all seven', bad.join('; '));
@@ -243,7 +243,7 @@ try {
   await page.click('.swatch[data-theme="pixel"]');
   await page.waitForFunction(() => window.__themeWarned, { timeout: 30000 }).catch(() => null);   // the retry exhausted: the loader warned and gave the mark back
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-  const kept = await page.evaluate(() => ({ cur: window.__chess.themes.current(), mark: document.querySelector('[data-settings="themes"] .swatch.on')?.dataset.theme }));
+  const kept = await page.evaluate(() => ({ cur: window.__chess.themes.current(), mark: document.querySelector('[data-settings="themes"] .swatch[data-theme].on')?.dataset.theme }));
   R.expect('a theme chunk that keeps failing leaves the current theme on, the mark stays on it', kept.cur === 'wood' && kept.mark === 'wood', 'wood, wood', JSON.stringify(kept));
   await block(false);   // let it through again: later switches still work
   await page.click('.swatch[data-theme="pixel"]');
