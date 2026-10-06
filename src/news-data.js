@@ -3,6 +3,23 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.8.0', date: '2026-10-06',
+    de: [
+      'Pixelwelt hat neue Himmel: Abend, Nacht, Sonnenaufgang, Sturm und Schnee.',
+      'Dazu Hintergründe: schwebende Inseln oder eine Burg mit Dorf.',
+      'Drei Welten zum Auswählen: Sturmburg, Inselmorgen, Winterdorf.',
+      'Lebendige Figuren starten nach 15 Sekunden Ruhe.',
+      'Symbole behalten ihre Leserichtung.',
+    ],
+    en: [
+      'Pixelwelt has new skies: Evening, Night, Sunrise, Storm and Snow.',
+      'New backdrops: floating islands or a castle with a village.',
+      'Three sets to pick: Sturmburg, Inselmorgen, Winterdorf.',
+      'Living pieces start after 15 seconds of quiet.',
+      'Symbols keep their reading direction.',
+    ],
+  },
+  {
     version: '1.7.0', date: '2026-10-05',
     de: [
       'Neues Menü: Spielen, Lernen und Optionen sind jetzt drei gleichwertige Orte.',
