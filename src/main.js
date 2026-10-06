@@ -373,6 +373,12 @@ async function boot() {
   }
   boot.ready = performance.now();
   adapter.arm();   // the start sequence is over: the adapter's warm up starts now
+  // test hook: the same code paths as the start flags ?view (and ?symbols, ?preset, ?yaw ...) and ?open, on the running page. An open
+  // value first closes a sheet that a call before it left open, so every call starts from a closed panel.
+  window.__chess.apply = ({ open, view, ...camera } = {}) => {
+    if (view !== undefined || Object.keys(camera).length) applyViewParams({ controls, views }, new URLSearchParams(view === undefined ? camera : { view, ...camera }));
+    if (open !== undefined) { ui.closeSheets(); openFlag(open, { ui, learn, review }); }
+  };
   applyLateParams({ game, ui, stage, controls, learn, review, openings });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
   news?.autoOpen();   // the News, once after an update with a new first or second number (CHE-235)
   loaderEl.classList.add('done');
@@ -398,19 +404,19 @@ function showContextNotice(state) {
 
 // The camera part of the URL flags, applied before the sequence starts (the sequence ends in this view): ?view=, ?preset=, the
 // board gimbal and ?yaw, ?pitch, ?dist.
-function applyViewParams({ controls, views }) {
-  const view = params.get('view');
+function applyViewParams({ controls, views }, q = params) {
+  const view = q.get('view');
   // ?view= is for this load only; without it the remembered choice (or the device default) is applied
   if (!(view && views.set(view, { instant: true, remember: false }))) views.set(views.current(), { instant: true });
-  const sym = params.get('symbols');   // ?symbols=1 or 0 switches the flat symbols for this load only (CHE-227)
+  const sym = q.get('symbols');   // ?symbols=1 or 0 switches the flat symbols for this load only (CHE-227)
   if (sym === '1' || sym === '0') views.setSymbols(sym === '1', { remember: false });
-  const preset = params.get('preset');
+  const preset = q.get('preset');
   if (preset) {
     controls.setPreset(preset);
     for (let i = 0; i < 120; i++) controls.update(0.02); // jump to the end of the transition
   }
   // a URL number that is empty or not finite (?yaw=abc, ?dist=Infinity) is ignored
-  const num = (k) => { const v = params.get(k); return v === null || v.trim() === '' || !Number.isFinite(+v) ? null : +v; };
+  const num = (k) => { const v = q.get(k); return v === null || v.trim() === '' || !Number.isFinite(+v) ? null : +v; };
   for (const a of ['x', 'y', 'z']) {
     const v = num('g' + a);
     if (v !== null) controls.setGimbal(a, v);

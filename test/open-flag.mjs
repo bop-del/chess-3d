@@ -69,6 +69,15 @@ async function load(page, [, w, h, phone], query, { settle = true } = {}) {
   if (settle) await settleUi(page);   // the sheet slide (0.3 s of CSS, real time even with manual=1); an ignored value opens nothing, so it skips the wait (the flag is applied before __chessReady)
 }
 
+// CHE-218: the same page again with another ?open value, through window.__chess.apply (no reload). load() stays for the flags apply does not cover.
+async function reopen(page, id, { settle = true } = {}) {
+  // a fresh load starts unscrolled and has no timer of the call before it left (the desktop panel scrolls its target again after 450 ms)
+  if (!page.viewport().isMobile) await page.evaluate(() => new Promise((r) => setTimeout(r, 460)));
+  await page.evaluate(() => { for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; });
+  await page.evaluate((id) => window.__chess.apply({ open: id }), id);
+  if (settle) await settleUi(page);
+}
+
 // the element exists, has a size, is on screen and no ancestor card is collapsed or sheet closed
 const shown = (page, sel) => page.evaluate((sel) => {
   const e = document.querySelector(sel);
@@ -96,9 +105,10 @@ try {
       if (phone) for (const [k, v] of [['width', w], ['height', h]]) Object.defineProperty(screen, k, { get: () => v });
     }, SEED, size[1], size[2], size[3]);
     const phoneRun = size[3];
+    await load(page, size, '', { settle: false });
     for (const [id, want] of CASES) {
       if (phoneRun && size[0] === 'phone landscape' && ['learn', 'mine', 'drill'].includes(id)) continue;   // same code path as portrait: keep the group short
-      await load(page, size, `&open=${id}`);
+      await reopen(page, id);
       const scope = phoneRun ? '.psheet.open ' : '';   // other panels keep hidden copies of cards and tabs: look only inside the open sheet
       const s = await shown(page, phoneRun ? scope + want.see : (DESKTOP_SEE[id] || want.see));
       const tab = want.tab ? await page.evaluate((q) => document.querySelector(q)?.dataset.tab, scope + '.xtab[aria-selected="true"]') : null;
@@ -111,7 +121,7 @@ try {
       let logs = 0;
       const on = () => { logs++; };
       page.on('console', on);
-      await load(page, size, `&open=${encodeURIComponent(bad)}`, { settle: false });
+      await reopen(page, bad, { settle: false });
       page.off('console', on);
       const open = await page.evaluate(() => !!document.querySelector('.psheet.open'));
       R.expect(`${size[0]}: open=${JSON.stringify(bad)} is ignored`, !open && !watch.errs.length && !watch.warns.length && logs === 0, 'nothing opened, silent', `sheet ${open}, errs ${watch.errs.join('|')}, warns ${watch.warns.join('|')}, console ${logs}`);
@@ -129,8 +139,9 @@ try {
         try { if (!localStorage.getItem('chess3d.train')) localStorage.setItem('chess3d.train', seed); } catch (e) { /* ignore */ }
         if (phone) for (const [k, v] of [['width', w], ['height', h]]) Object.defineProperty(screen, k, { get: () => v });
       }, SEED, size[1], size[2], size[3]);
+      await load(mp, size, '', { settle: false });
       for (const [id, want] of CASES.filter(([i]) => ['learn', 'openings', 'mine', 'drill', 'practise', 'puzzles'].includes(i))) {
-        await load(mp, size, `&open=${id}`);
+        await reopen(mp, id);
         const scope = size[3] ? '.psheet.open ' : '#tp-learn ';
         const s = await shown(mp, scope + '.xtab[aria-selected="true"]');
         const tab = await mp.evaluate((q) => document.querySelector(q)?.dataset.tab, scope + '.xtab[aria-selected="true"]');

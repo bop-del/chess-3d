@@ -50,6 +50,11 @@ async function open(page, size, query = '') {
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   await page.evaluate(() => { window.__chess.step(2); window.__chess.draw(); });
 }
+// CHE-218: another ?view on the same page through window.__chess.apply, the lone pawn position set again (no reload)
+const LONE = '4k3/8/8/8/8/8/4P3/K7 w - - 0 1';
+async function reapply(page, id) {
+  await page.evaluate((id, fen) => { const c = window.__chess; c.game.loadFen(fen); c.apply({ view: id }); c.step(2); c.draw(); }, id, LONE);
+}
 const xy = (page, x, y, z) => page.evaluate((x, y, z) => {
   const { THREE, stage } = window.__chess;
   const v = new THREE.Vector3(x, y, z).project(stage.camera);
@@ -63,9 +68,10 @@ try {
     if (!mine()) continue;
     const tag = `${size.w}x${size.h}`;
     const phonePortrait = !!size.touch && size.h > size.w && Math.min(size.w, size.h) <= 500;
+    await open(page, size, '&fen=4k3/8/8/8/8/8/4P3/K7%20w%20-%20-%200%201');   // a lone pawn: no piece stands in front of it
     for (const id of IDS) {
       const want = phonePortrait || id !== 'play';
-      await open(page, size, `&view=${id}&fen=4k3/8/8/8/8/8/4P3/K7%20w%20-%20-%200%201`);   // a lone pawn: no piece stands in front of it
+      await reapply(page, id);
       const info = await page.evaluate(() => !window.__chess?.views ? { cur: 'none', list: [], err: window.__chessError || 'no __chess.views' } : ({ cur: window.__chess.views.current(), list: window.__chess.views.list().map((v) => v.id), err: window.__chessError || null }));
       if (id === IDS[0]) R.expect(`views list ${tag}`, info.list.includes('play') === phonePortrait && ['above', 'iso'].every((v) => info.list.includes(v)) && !info.list.includes('symbols'), info.list.join(','), info.list.join(','));
       if (!want) { R.expect(`${id} not offered ${tag}`, info.cur !== 'play', `falls back to ${info.cur}`); continue; }
