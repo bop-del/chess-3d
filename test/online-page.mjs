@@ -97,7 +97,7 @@ const moveOn = (page, uci) => ev(page, (u) => { const g = window.__chess.game; g
 const boardMoves = (page) => ev(page, () => window.__chess.game.getState().moves.length);
 const serverMoves = (page) => ev(page, () => window.__chessOnline?.state?.game?.moves.length ?? -1);
 
-let ctxA = null, ctxB = null;
+let ctxA = null, ctxB = null, ctxC = null;
 try {
   // ------------------------------------------------------------ without the flag: nothing changes
   const ctx0 = await browser.createBrowserContext();
@@ -160,12 +160,16 @@ try {
   await click(A, '[data-a=chat][data-n="Mia"]');
   await ev(A, () => { const i = document.querySelector('.osend input'); i.value = 'Hallo Mia, viel Glück!'; document.querySelector('.osend').requestSubmit(); });
   R.expect('the chat says it is monitored', (await ev(A, () => document.querySelector('.omon').textContent)) === 'Chat wird mitgelesen' && await shown(A, '.omon'));
-  R.expect('Mia gets the message: unread dot at the name', await until(B, () => !!document.querySelector('.op .udot')));
-  await click(B, '[data-a=chat][data-n="Felix"]');
+  R.expect('Mia gets the message: the count 1 on the Chat button and on the Online tab', await until(B, () => document.querySelector('.op .ochatbtn .ocnt')?.textContent === '1' && document.querySelector('#tab-online')?.dataset.n === '1'));
+  R.expect('the chat of Felix is closed on her side: a bubble over the board, "💬 Felix: text ›"', await until(B, () => !document.querySelector('.obub').hidden && document.querySelector('.obub-main').textContent === '💬 Felix: Hallo Mia, viel Glück! ›'), await ev(B, () => document.querySelector('.obub-main').textContent));
+  R.expect('the game card has a Chat button with the count too', (await ev(B, () => document.querySelector('.ogamecard .ochatbtn .ocnt')?.textContent)) === '1');
+  R.expect('Felix, whose chat is open and visible, got no bubble for his own message', await ev(A, () => document.querySelector('.obub').hidden));
+  await click(B, '.obub-main');
+  R.expect('a tap on the bubble opens that chat and hides the bubble', await until(B, () => document.querySelector('.obub').hidden && !document.querySelector('.ochat').hidden && /Chat mit Felix/.test(document.querySelector('.owith').textContent) && document.activeElement === document.querySelector('.osend input')));
   R.expect('Mia reads it', await until(B, () => /Hallo Mia/.test(document.querySelector('.omsgs')?.textContent || '')));
-  R.expect('opening the chat clears the unread dot', await until(B, () => !document.querySelector('.op .udot') && !Object.keys(window.__chessOnline.state.unread).length));
+  R.expect('opening the chat clears the count', await until(B, () => !document.querySelector('.op .ocnt') && !document.querySelector('#tab-online').dataset.n && !Object.keys(window.__chessOnline.state.unread).length));
   await ev(B, () => { const i = document.querySelector('.osend input'); i.value = 'Danke, dir auch'; document.querySelector('.osend').requestSubmit(); });
-  R.expect('Felix gets the answer in the open chat', await until(A, () => /Danke, dir auch/.test(document.querySelector('.omsgs')?.textContent || '')));
+  R.expect('Felix gets the answer in the open chat, without a bubble', await until(A, () => /Danke, dir auch/.test(document.querySelector('.omsgs')?.textContent || '')) && await ev(A, () => document.querySelector('.obub').hidden));
   R.expect('the input keeps at most 200 characters', (await ev(A, () => document.querySelector('.osend input').maxLength)) === 200);
 
   // ------------------------------------------------------------ the connection lost mid game and back
@@ -201,6 +205,54 @@ try {
   R.expect('the Online tab shows the result and the score in the list', await until(W, () => /Du hast gewonnen/.test(document.querySelector('.oresult')?.textContent || '') && document.querySelector('.op .oscore')?.textContent === '1 : 0') && await until(Bl, () => /Du hast verloren/.test(document.querySelector('.oresult')?.textContent || '') && document.querySelector('.op .oscore')?.textContent === '0 : 1'));
   R.expect('after the game both can challenge again', await both(() => !!document.querySelector('[data-a=challenge]')), `${lName} lost`);
 
+  // ------------------------------------------------------------ the bubble, the count and the summary (CHE-281)
+  const typeTo = (page, text) => ev(page, (x) => { const i = document.querySelector('.osend input'); i.value = x; document.querySelector('.osend').requestSubmit(); }, text);
+  await click(B, '[data-a=chat-close]');
+  await click(A, '[data-a=chat][data-n="Mia"]');
+  await typeTo(A, 'eins');
+  await until(B, () => document.querySelector('#tab-online')?.dataset.n === '1');
+  await typeTo(A, 'zwei');
+  R.expect('two messages in a row: the bubble shows the newest, the count says 2', await until(B, () => document.querySelector('.obub-main').textContent === '💬 Felix: zwei ›' && document.querySelector('#tab-online').dataset.n === '2'));
+  await click(B, '.obub-x');
+  R.expect('x hides the bubble, the count stays', await ev(B, () => document.querySelector('.obub').hidden && document.querySelector('#tab-online').dataset.n === '2' && document.querySelector('.op .ocnt')?.textContent === '2'));
+  R.expect('a message counts as read only when its chat was visible: still unread on the server', (await ev(B, () => window.__chessOnline.state.unread.Felix)) === 2);
+  // a new message: the bubble goes away by itself after 8 s
+  await typeTo(A, 'drei');
+  const t8 = Date.now();
+  R.expect('the bubble comes back with the next message', await until(B, () => !document.querySelector('.obub').hidden && /drei/.test(document.querySelector('.obub-main').textContent)));
+  R.expect('and goes after 8 s', await until(B, () => document.querySelector('.obub').hidden, null, 12000) && Date.now() - t8 >= 7500 && Date.now() - t8 < 11000, `${Date.now() - t8} ms`);
+  // reload with unread from one sender: the summary
+  const B2 = await open(ctxB, `${BASE_B}/?${Q}&${flag}`);
+  R.expect('reload with unread from one sender: "Felix: drei (+2)", count 3', await until(B2, () => document.querySelector('.obub-main').textContent === '💬 Felix: drei (+2) ›' && document.querySelector('#tab-online').dataset.n === '3'), await ev(B2, () => document.querySelector('.obub-main').textContent));
+  await sleep(8800);
+  R.expect('the summary stays past 8 s', await shown(B2, '.obub'));
+  if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await B2.screenshot({ path: join(SHOTS, 'desktop-summary.png') }); }
+  await click(B2, '.obub-x');
+  R.expect('x on the summary hides it, the count stays', await ev(B2, () => document.querySelector('.obub').hidden && document.querySelector('#tab-online').dataset.n === '3'));
+  await B2.close();
+  const B3 = await open(ctxB, `${BASE_B}/?${Q}&${flag}`);
+  R.expect('the summary returns on the next load while anything is unread', await until(B3, () => !document.querySelector('.obub').hidden && /Felix/.test(document.querySelector('.obub-main').textContent)));
+  await click(B3, '.obub-main');
+  R.expect('tap on the summary of one sender opens that chat, everything read', await until(B3, () => !document.querySelector('.ochat').hidden && /Chat mit Felix/.test(document.querySelector('.owith').textContent) && !document.querySelector('#tab-online').dataset.n && !Object.keys(window.__chessOnline.state.unread).length));
+  // two senders: Lea writes too
+  const lea = runAdmin(['invite', 'Lea'], quiet);
+  ctxC = await browser.createBrowserContext();
+  const C = await open(ctxC, inviteLink({ game: `${BASE}/?${Q}`, server: SERVER, key: lea.key }));
+  await until(C, () => window.__chessOnline?.status === 'connected' && !!window.__chessOnline.state?.players.length);
+  await click(C, '[data-a=chat][data-n="Mia"]');
+  await typeTo(C, 'Hi von Lea');
+  await click(B3, '[data-a=chat-close]');
+  await typeTo(A, 'vier');
+  await until(B3, () => document.querySelector('#tab-online')?.dataset.n === '2');
+  await B3.close();
+  const B4 = await open(ctxB, `${BASE_B}/?${Q}&${flag}`);
+  R.expect('reload with unread from two senders: "2 neue Nachrichten von Felix und Lea"', await until(B4, () => document.querySelector('.obub-main').textContent === '💬 2 neue Nachrichten von Felix und Lea ›'), await ev(B4, () => document.querySelector('.obub-main').textContent));
+  await click(B4, '.obub-main');
+  R.expect('tap on that summary opens the Online tab with the player list, no chat', await until(B4, () => document.querySelector('#tab-online').classList.contains('on') && document.querySelector('.ochat').hidden && document.querySelectorAll('.op .ochatbtn').length === 2 && document.querySelector('.obub').hidden));
+  R.expect('every player row has a Chat button, the name is no button', (await ev(B4, () => [...document.querySelectorAll('.op')].every((r) => r.querySelector('.ochatbtn') && !r.querySelector('.oname').closest('button')))));
+  for (const n of ['Felix', 'Lea']) { await click(B4, `[data-a=chat][data-n="${n}"]`); await until(B4, (x) => !window.__chessOnline.state.unread[x], n); }
+  await B4.close(); await C.close();
+
   // ------------------------------------------------------------ phone: the 7 button bar, the sheet, 44 px targets; screenshots
   const P = await open(ctxA, `${BASE}/?${Q}&${flag}`, PHONE);
   const bar = await ev(P, () => [...document.querySelectorAll('nav.pbar:not(.plbar) .tb')].map((b) => { const r = b.getBoundingClientRect(); return { a: b.dataset.act, w: r.width, h: r.height }; }));
@@ -212,6 +264,91 @@ try {
   const small = await ev(P, () => [...document.querySelectorAll('.ponline button, .ponline input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width && r.height && !e.closest('[hidden]') && (r.width < 43.5 || r.height < 43.5); }).map((e) => `${e.className} ${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`));
   R.expect('phone: tap targets in the Online sheet at least 44 px', !small.length, small.join(', '));
   await P.close();
+
+  // phone: the bubble, the count on the bar button, the Chat button, the half height sheet with the board above it, the keyboard
+  const PH = {};
+  for (const [tag, size] of [['portrait', PHONE], ['narrow', [360, 740, true]], ['landscape', LAND]]) {
+    const M = await open(ctxB, `${BASE_B}/?${Q}&${flag}`, size);
+    await until(M, () => window.__chessOnline?.status === 'connected');
+    // Felix writes: the bubble over the board, the count on the bar button (Mia has read everything above)
+    await click(A, '[data-a=chat][data-n="Mia"]');
+    await typeTo(A, `Phone ${tag}`);
+    R.expect(`phone ${tag}: a bubble over the board and the count on the Online button`, await until(M, () => !document.querySelector('.obub').hidden && /Phone/.test(document.querySelector('.obub-main').textContent) && document.querySelector('.tb[data-act=online]').dataset.n === '1'));
+    const bb = await ev(M, () => { const r = document.querySelector('.obub').getBoundingClientRect(), x = document.querySelector('.obub-x').getBoundingClientRect(), m = document.querySelector('.obub-main').getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, w: innerWidth, xw: x.width, xh: x.height, mh: m.height }; });
+    R.expect(`phone ${tag}: the bubble is inside the screen, its targets 44 px`, bb.l >= 0 && bb.r <= bb.w && bb.xw >= 43.5 && bb.xh >= 43.5 && bb.mh >= 43.5, JSON.stringify(bb));
+    if (args.includes('--shots') && tag !== 'narrow') { mkdirSync(SHOTS, { recursive: true }); await M.screenshot({ path: join(SHOTS, `phone-${tag}-bubble.png`) }); }
+    await click(M, '.obub-main');
+    R.expect(`phone ${tag}: tap opens the chat as a half sheet, the board stays visible above it`, await until(M, () => { const c = document.querySelector('.ochat'); return !c.hidden && c.classList.contains('ochs') && c.parentElement.id === 'hud' && !document.querySelector('.psheet.open'); }));
+    const geo = await ev(M, () => { const r = document.querySelector('.ochat').getBoundingClientRect(); return { top: r.top, h: r.height, vh: innerHeight, bottom: r.bottom, xh: document.querySelector('.ochat-x').getBoundingClientRect().height, sh: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }; });
+    R.expect(`phone ${tag}: the sheet takes at most 60 % of the height`, geo.h <= geo.vh * 0.6 + 1 && geo.top >= geo.vh * 0.38 && geo.xh >= 43.5 && geo.sh <= geo.cw, JSON.stringify(geo));
+    R.expect(`phone ${tag}: opening it counts as reading`, await until(M, () => !document.querySelector('.tb[data-act=online]').dataset.n && !Object.keys(window.__chessOnline.state.unread).length));
+    await sleep(450);
+    await ev(M, () => window.__chessOnline.viewport(280, innerHeight - 280));   // the keyboard, simulated
+    const kb = await ev(M, () => { const r = document.querySelector('.ochat').getBoundingClientRect(); return { bottom: r.bottom, vh: innerHeight, h: r.height }; });
+    R.expect(`phone ${tag}: with the keyboard the sheet sits on top of it`, Math.abs(kb.bottom - (kb.vh - 280)) < 2 && kb.h <= (kb.vh - 280) * 0.65, JSON.stringify(kb));
+    if (args.includes('--shots') && tag !== 'narrow') { await M.screenshot({ path: join(SHOTS, `phone-${tag}-sheet-keyboard.png`) }); }
+    await ev(M, () => window.__chessOnline.viewport(0, innerHeight));
+    if (args.includes('--shots') && tag !== 'narrow') await M.screenshot({ path: join(SHOTS, `phone-${tag}-sheet.png`) });
+    await click(M, '.ochat-x');
+    R.expect(`phone ${tag}: x closes the sheet`, await until(M, () => document.querySelector('.ochat').hidden));
+    // the player rows: no horizontal scroll, the Chat buttons 44 px
+    await click(M, '.tb[data-act=online]');
+    await until(M, () => document.querySelector('.psheet.ponline')?.classList.contains('open'));
+    const rows = await ev(M, () => { const sh = document.querySelector('.psheet-body') && document.querySelector('.ponline .psheet-body'); return { rows: [...document.querySelectorAll('.ponline .op')].map((r) => { const b = r.querySelector('.ochatbtn').getBoundingClientRect(), rr = r.getBoundingClientRect(), n = r.querySelector('.oname').getBoundingClientRect(), sc = r.querySelector('.oscore').getBoundingClientRect(); return { bh: b.height, bw: b.width, out: rr.right > innerWidth + 0.5, sameLine: Math.abs(n.top - sc.top) < 8 }; }), over: sh ? sh.scrollWidth > sh.clientWidth : false }; });
+    R.expect(`phone ${tag}: player rows: Chat button 44 px, name and score on one line, no horizontal scroll`, rows.rows.length >= 2 && rows.rows.every((r) => r.bh >= 43.5 && r.bw >= 43.5 && !r.out && r.sameLine) && !rows.over, JSON.stringify(rows));
+    if (args.includes('--shots')) await M.screenshot({ path: join(SHOTS, `phone-${tag}-rows.png`) });
+    await click(A, '[data-a=chat-close]');
+    await M.close();
+  }
+
+  // ------------------------------------------------------------ the running game (CHE-282): bubble on open, the game line, "has moved", two bubbles
+  await click(A, '[data-a=challenge][data-n="Mia"]');
+  await until(B, () => !!document.querySelector('[data-a=accept]'));
+  await click(B, '[data-a=accept]');
+  R.expect('a second game: both boards attached', await both((x) => window.__chessOnline.state.game?.status === 'active' && window.__chessOnline.match.attached && window.__chessOnline.state.game.moves.length === 0));
+  const colA2 = await ev(A, () => window.__chessOnline.state.game.color);
+  const X = colA2 === 'w' ? A : B, Y = colA2 === 'w' ? B : A;
+  const nX = X === A ? 'Felix' : 'Mia', nY = X === A ? 'Mia' : 'Felix';
+  const gtxt = (page) => ev(page, () => document.querySelector('.obub[data-k=game] .obub-main').textContent);
+  // the opponent moves while Y plays a computer game on the board: a bubble, nothing interrupted, the dot stays
+  await ev(Y, () => { window.__chess.game.newGame(); });
+  R.expect('Y leaves the online game on the board (a local game)', await until(Y, () => !window.__chessOnline.match.attached));
+  await moveOn(X, 'e2e4');
+  R.expect('the opponent moved: bubble "<name> hat gezogen: Du bist am Zug ›"', await until(Y, (n) => !document.querySelector('.obub[data-k=game]').hidden && document.querySelector('.obub[data-k=game] .obub-main').textContent === `♟ ${n} hat gezogen: Du bist am Zug ›`, nX), await gtxt(Y));
+  R.expect('nothing is interrupted: the local board is untouched, the tab dot stays', (await boardMoves(Y)) === 0 && await ev(Y, () => document.querySelector('#tab-online').classList.contains('odot')));
+  await click(Y, '.obub[data-k=game] .obub-main');
+  R.expect('tap on the bubble attaches the game (the move is on the board)', await until(Y, () => window.__chessOnline.match.attached && window.__chess.game.getState().moves.length === 1 && document.querySelector('.obub[data-k=game]').hidden));
+  R.expect('the game line shows while attached', await until(Y, (n) => !document.querySelector('.ogline').hidden && document.querySelector('.ogline').textContent === `Online gegen ${n} · Du bist am Zug`, nX), await ev(Y, () => document.querySelector('.ogline').textContent));
+  // a lesson: the game is not attached, a tap sets the board to play and attaches
+  await ev(X, () => window.__chess.game.setMode('explain'));
+  R.expect('X is in a lesson: the game left the board', await until(X, () => !window.__chessOnline.match.attached && window.__chess.game.mode === 'explain'));
+  R.expect('the game line is gone off the board', await ev(X, () => document.querySelector('.ogline').hidden));
+  await moveOn(Y, 'e7e5');
+  R.expect('in a lesson the opponent moved: bubble', await until(X, (n) => document.querySelector('.obub[data-k=game] .obub-main')?.textContent === `♟ ${n} hat gezogen: Du bist am Zug ›`, nY));
+  await click(X, '.obub[data-k=game] .obub-main');
+  R.expect('tap in a lesson attaches the game (play mode again, both moves)', await until(X, () => window.__chessOnline.match.attached && window.__chess.game.mode === 'play' && window.__chess.game.getState().moves.length === 2));
+  // on open: the game attaches by itself and a bubble says whose move; with a chat message the two stack, game on top
+  await click(X, `[data-a=chat][data-n="${nY}"]`);
+  await typeTo(X, 'Stapel');
+  await until(Y, () => !!window.__chessOnline.state.unread && Object.keys(window.__chessOnline.state.unread).length === 1);
+  const urlOf = (page) => (page === A ? `${BASE}/?${Q}&${flag}` : `${BASE_B}/?${Q}&${flag}`);
+  await Y.close();
+  const Y2 = await open(Y === A ? ctxA : ctxB, urlOf(Y));
+  R.expect('on open: the game is on the board by itself', await until(Y2, () => window.__chessOnline.match?.attached && window.__chess.game.getState().moves.length === 2));
+  R.expect('on open: bubble "Partie gegen <name>: <name> ist am Zug"', await until(Y2, (n) => document.querySelector('.obub[data-k=game] .obub-main')?.textContent === `♟ Partie gegen ${n}: ${n} ist am Zug ›`, nX), await gtxt(Y2));
+  R.expect('two bubbles stacked: game on top, chat summary below', await until(Y2, () => !document.querySelector('.obub[data-k=chat]').hidden) && await ev(Y2, () => { const g = document.querySelector('.obub[data-k=game]').getBoundingClientRect(), c = document.querySelector('.obub[data-k=chat]').getBoundingClientRect(); return g.top < c.top && g.bottom <= c.top + 1; }));
+  R.expect('the game line sits above the bubbles, no overlap', await ev(Y2, () => { const l = document.querySelector('.ogline').getBoundingClientRect(), b = document.querySelector('.obubs').getBoundingClientRect(); return !document.querySelector('.ogline').hidden && l.bottom <= b.top + 1; }));
+  if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await Y2.screenshot({ path: join(SHOTS, 'desktop-two-bubbles.png') }); }
+  await click(Y2, '.obub[data-k=game] .obub-x');
+  R.expect('x on the game bubble leaves the chat bubble', await ev(Y2, () => document.querySelector('.obub[data-k=game]').hidden && !document.querySelector('.obub[data-k=chat]').hidden));
+  await Y2.close();
+  const Y3 = await open(Y === A ? ctxA : ctxB, urlOf(Y) , PHONE);
+  await until(Y3, () => !document.querySelector('.obub[data-k=game]').hidden && !document.querySelector('.obub[data-k=chat]').hidden);
+  R.expect('phone 390: game line, game bubble and chat bubble fit, nothing overlaps, targets 44 px', await ev(Y3, () => { const r = (s) => document.querySelector(s).getBoundingClientRect(), l = r('.ogline'), g = r('.obub[data-k=game]'), c = r('.obub[data-k=chat]'); return l.bottom <= g.top + 1 && g.bottom <= c.top + 1 && g.left >= 0 && g.right <= innerWidth && l.right <= innerWidth && g.height >= 43.5 && c.height >= 43.5; }));
+  if (args.includes('--shots')) await Y3.screenshot({ path: join(SHOTS, 'phone-two-bubbles.png') });
+  await click(Y3, '.obub[data-k=chat] .obub-main');
+  R.expect('tap on the chat bubble opens the chat, the game bubble stays', await until(Y3, () => !document.querySelector('.ochat').hidden && !document.querySelector('.obub[data-k=game]').hidden));
+  await Y3.close();
 
   if (args.includes('--shots')) {
     mkdirSync(SHOTS, { recursive: true });

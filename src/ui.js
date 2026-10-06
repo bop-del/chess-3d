@@ -968,7 +968,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     else phoneUI.btn.online.addEventListener('click', () => shown.forEach((fn) => fn()));
     import('./online/index.js').then((m) => m.mountOnline({
       server: online, host, hud, game, controls, toast, isVisible, onShown: (fn) => shown.push(fn),
-      setDot: (on) => { if (dsk) dsk.setDot('online', on); else phoneUI.btn.online.classList.toggle('odot', !!on); },
+      setDot: (on, n = 0) => { if (dsk) dsk.setDot('online', on, n); else { const b = phoneUI.btn.online; b.classList.toggle('odot', !!on && !n); b.classList.toggle('ocnt', n > 0); if (n > 0) b.dataset.n = n > 99 ? '99+' : String(n); else delete b.dataset.n; } },
+      phone: !dsk,
+      showTab: () => { if (dsk) { dsk.setTab('online'); dsk.setRail(false); } else phoneUI.openSheet('online'); shown.forEach((fn) => fn()); },
       closeSheets: () => phoneUI?.close(),
       setBoard: (on) => { if (onlineBoard === !!on) return; onlineBoard = !!on; document.body.classList.toggle('online-game', onlineBoard); goodKey = ''; render(game.getState()); },
     })).catch((e) => console.warn('online play failed to load', e));

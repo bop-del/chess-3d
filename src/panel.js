@@ -341,14 +341,16 @@ ${headBtns}
   }
 
   // the dot on a tab (and its rail icon): something waits there (src/online: a challenge, your turn, an unread message)
-  function setDot(id, on) { for (const b of root.querySelectorAll(`.tab[data-tab="${id}"], [data-rtab="${id}"]`)) b.classList.toggle('odot', !!on); }
+  function setDot(id, on, n = 0) { for (const b of root.querySelectorAll(`.tab[data-tab="${id}"], [data-rtab="${id}"]`)) markDot(b, on, n); }
+  /** a dot, or the number when something is unread (n > 0): `.odot` or `.ocnt` with data-n */
+  function markDot(b, on, n = 0) { b.classList.toggle('odot', !!on && !n); b.classList.toggle('ocnt', n > 0); if (n > 0) b.dataset.n = n > 99 ? '99+' : String(n); else delete b.dataset.n; }
 
   setTab('play');
   setRail(rail, { persist: false });
   onLanguage(() => { /* strings are translated by translateTree(hud) in ui.js */ });
 
   return {
-    root, bar, help, helpApi, setTab, setRail, layout, mountSettings, mountPanel, setDot,
+    root, bar, help, helpApi, setTab, setRail, layout, mountSettings, mountPanel, setDot, markDot,
     get tab() { return tab; }, get rail() { return rail; },
     viewsName: $('#views-name', bar), vmenu, wake,
     chips: { chipGroup },

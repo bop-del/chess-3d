@@ -26,7 +26,8 @@ addDE({
   'online.scoreNow': 'Gegen {name} jetzt {score}', 'online.started': 'Partie gegen {name}. Du spielst {side}.',
   'online.chat': 'Chat', 'online.chatWith': 'Chat mit {name}', 'online.message': 'Nachricht', 'online.send': 'Senden',
   'online.monitored': 'Chat wird mitgelesen', 'online.muted': 'Du kannst gerade nicht schreiben.', 'online.noMessages': 'Noch keine Nachrichten.',
-  'online.chatFailed': 'Nachricht nicht gesendet.', 'online.close': 'Schließen',
+  'online.chatFailed': 'Nachricht nicht gesendet.', 'online.bubbleMsg': '💬 {name}: {text} ›', 'online.bubbleOne': '💬 {name}: {text}{more} ›',
+  'online.bubbleMany': '💬 {n} neue Nachrichten von {names} ›', 'online.and': 'und', 'online.gameLine': 'Online gegen {name} · {turn}', 'online.gameBubble': '♟ Partie gegen {name}: {turn} ›', 'online.movedBubble': '♟ {name} hat gezogen: {turn} ›', 'online.bubbleHide': 'Ausblenden', 'online.close': 'Schließen',
   'banner.resign': 'Aufgegeben', 'banner.stale': 'Partie beendet',
   'reason.resign': 'Aufgegeben', 'reason.stale': '3 Tage kein Zug',
 });
