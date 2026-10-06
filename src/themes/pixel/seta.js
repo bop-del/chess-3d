@@ -81,8 +81,9 @@ function ribcage(b, x, y, z, w, n, bone = BONE, dark = BLACK) {
 }
 
 // ------------------------------------------------------------------ pawns
-// Every pawn holds a spear in both hands in front of the body, point forward (CHE-219). The spear is its own rig group ('spear', not
-// animated by rig.js) so the capture scene can slide it through the hands or throw it; the arms are part of the still body.
+// A pawn stands in its rest pose (White: arms folded, Black: arms stretched out in front, group 'poseRest') and holds a spear in both hands
+// only in the capture scene (CHE-219, CHE-273). The spear pose is two more rig groups, hidden at rest: 'poseSpear' (arms and hands) and
+// 'spear' (not animated by rig.js, so the scene can slide it through the hands or throw it). pixel-gore.js swaps the poses with setPawnPose.
 const WOOD = 0x8a5a30, STEEL = 0xd5dbe3, STEEL2 = 0x9aa3b0;
 export const PAWN_UNIT = 0.0312;
 /** The spear as [x, y bottom, z, w, h, d, color] in voxels, long axis +z (the front), shaft from z -9 to 10, head to 17.4. */
@@ -90,8 +91,13 @@ export const SPEAR = [
   [0, 17, 0.5, 1.6, 1.6, 19, WOOD], [0, 16.8, -9.3, 1.9, 2, 0.6, STEEL2],
   [0, 16.7, 10.7, 2.2, 2.2, 1.4, GOLD], [0, 16.8, 13.4, 1.8, 2, 4, STEEL], [0, 17.2, 16.4, 0.9, 1.2, 2, STEEL],
 ];
+/** Shows the spear pose (arms round the spear, the spear) or the rest pose on a pawn's rig; no-op on any other piece. */
+export function setPawnPose(rig, spear) {
+  const set = (n, on) => { const o = rig?.getObjectByName(n); if (o) o.visible = on; };
+  set('poseRest', !spear); set('poseSpear', spear); set('spear', spear);
+}
 function holdSpear(b, C, sleeve) {
-  b.g = 'body';
+  b.g = 'poseSpear';
   for (const s of [-1, 1]) b.add(s * 5.6, 17, 0.4, 3, 7, 3, sleeve);                                    // upper arms at the sides
   b.add(-3.4, 16.3, 2.95, 4.2, 2.8, 3.9, sleeve); b.add(3.1, 16.3, 4.75, 2.6, 2.8, 7.5, sleeve);        // forearms: the rear one across, the front one forward
   b.add(0, 16.2, 3.5, 3.4, 3, 3, C.skin); b.add(0.8, 16.2, 8.2, 3.4, 3, 3.2, C.skin);                   // the two hands round the shaft
@@ -99,6 +105,8 @@ function holdSpear(b, C, sleeve) {
   for (const p of SPEAR) b.add(...p);
   b.g = 'body';
 }
+/** A rig group that shows at rest and is hidden in the capture scene. */
+const rest = (b) => { b.g = 'poseRest'; };
 function pawnW(C0) {
   const C = { ...C0, robe: shade(C0.robe, 1.15), robeD: shade(C0.robe, 1.0) };                          // a lighter robe, so the team gap survives greyscale
   const b = new Vox(0.0312);
@@ -106,6 +114,7 @@ function pawnW(C0) {
   b.g = 'body';
   b.add(0, 12, 0, 8, 12, 4, C.robe);
   b.add(0, 12, 0, 8.4, 5, 4.4, C.robeD); b.add(0, 15, 0, 8.4, 1.2, 4.4, C.main);                        // a robe with a blue sash
+  rest(b); b.add(0, 18, 3.4, 9.4, 4, 3.4, C.robe); b.add(0, 18, 3.4, 9.6, 1, 3.5, C.robeD);              // arms folded in front
   holdSpear(b, C, C.robe);
   head(b, 24, C.skin);
   b.add(0, 25, 5, 2, 4, 2, C.skinD);                                                                    // a long nose
@@ -120,6 +129,7 @@ function pawnB(C) {
   b.g = 'body';
   b.add(0, 12, 0, 8, 12, 4, rag);
   b.add(0, 12, 2.1, 6, 3, 0.3, C.skinD); b.add(-2, 19, 2.1, 3, 5, 0.3, C.dark);                        // torn cloth showing skin
+  rest(b); for (const s of [-1, 1]) { b.add(s * 6, 20, 5, 4, 4, 12, rag); b.add(s * 6, 20, 11.2, 4.2, 4, 2, C.skin); }   // arms stretched out in front
   holdSpear(b, C, rag);
   head(b, 24, C.skin);
   paint(b, 24, FACE.grim, facePal(C, { r: EMBER, b: C.robeD }));

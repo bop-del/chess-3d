@@ -5,6 +5,7 @@
 // Staging, time, skip and cleanup come from the director and ctx.fx, like every scene.
 import * as THREE from 'three';
 import { createStage, lerp, bump } from './kit-a.js';
+import { setPawnPose } from '../../themes/pixel/seta.js';
 
 const outQuad = (k) => 1 - (1 - k) * (1 - k);
 const inQuad = (k) => k * k;
@@ -138,6 +139,8 @@ async function gore(ctx) {
     const variant = pawnVariant();
     const jabs = [2, 2, 3][vw],   // a pawn victim gets two jabs like a knight: one jab left a pawn x pawn capture with the weakest gore of all pairings
       thrusts = { a: jabs, c: 2 }[variant], mid = Math.round(L.hit * 0.6);   // the other variant makes up the blood of the jabs they skip
+    const rigObj = s.A.group.getObjectByName('rig');
+    setPawnPose(rigObj, true);                      // the spear pose shows from the run up on; run() puts the rest pose back
     const spearObj = s.A.group.getObjectByName('spear'), sz0 = spearObj ? spearObj.position.z : 0;
     let sl = 0;                                     // how far the spear is slid forward through the hands
     const slide = (d) => { sl = d; if (spearObj) spearObj.position.z = sz0 + d; };
@@ -264,6 +267,6 @@ export default {
   async run(ctx) {
     const g = ctx.attackerObj.group, clear = () => { delete g.userData.noTurn; };
     if (ctx.attacker === 'p') { g.userData.noTurn = true; ctx.signal.addEventListener('abort', clear, { once: true }); }
-    try { return await gore(ctx); } finally { clear(); }
+    try { return await gore(ctx); } finally { clear(); if (ctx.attacker === 'p') setPawnPose(g.getObjectByName('rig'), false); }
   },
 };

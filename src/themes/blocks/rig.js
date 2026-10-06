@@ -47,6 +47,7 @@ export function buildTemplate(color, type, material, build = buildVox, mesherOpt
     mesh.castShadow = true; mesh.receiveShadow = true;
     const g = new THREE.Group();
     g.name = tag;
+    if (tag === 'poseSpear' || tag === 'spear') g.visible = false;      // the Pixelwelt pawn's spear pose: only in the capture scene (CHE-273)
     g.position.set(px * U, py * U, pz * U);
     g.add(mesh);
     rig.add(g);

@@ -57,7 +57,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
   const mean = (color, type) => { let a = 0, s = 0; for (const p of buildPixelVox(color, type).parts) { const ar = p.w * p.h + p.w * p.d + p.h * p.d; a += ar; s += ar * grey(p.color); } return s / a; };
   for (const [type, name] of Object.entries(TYPES)) { const gap = mean('w', type) - mean('b', type); check(`${name}: White is lighter than Black in greyscale`, gap >= (type === 'p' ? 40 : 25), `gap ${gap.toFixed(0)}`); }
 }
-// CHE-219: both pawns hold the spear in both hands in front of the body, point forward; ?pawngore picks the capture variant
+// CHE-219, CHE-273: both pawns stand in a rest pose (White arms folded, Black arms stretched out) and hold the spear in both hands only in the
+// capture scene: the spear pose is its own hidden rig groups, point forward; ?pawngore picks the capture variant
 {
   const { pawnVariant } = await import('../src/battle/scenes/pixel-gore.js');
   const { SPEAR, PAWN_UNIT } = await import('../src/themes/pixel/seta.js');
@@ -67,7 +68,15 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
     const tip = Math.max(...sp.map((p) => p.z + p.d / 2)), tail = Math.min(...sp.map((p) => p.z - p.d / 2));
     check(`${tag}: a spear of its own rig group, point forward (+z), inside the square`, sp.length === SPEAR.length && tip > 15 && tail < -5 && tip * PAWN_UNIT < 0.6 && -tail * PAWN_UNIT < 0.6, `tip ${(tip * PAWN_UNIT).toFixed(2)}, tail ${(tail * PAWN_UNIT).toFixed(2)}`);
     const shaft = sp.find((p) => p.d >= 19);
-    const skin = vox.parts.filter((p) => p.g === 'body' && p.w === 3.4 && p.h === 3 && Math.abs(p.y - 16.2) < 1e-6);
+    const skin = vox.parts.filter((p) => p.g === 'poseSpear' && p.w === 3.4 && p.h === 3 && Math.abs(p.y - 16.2) < 1e-6);
+    const rest = vox.parts.filter((p) => p.g === 'poseRest');
+    check(`${tag}: a rest pose of its own (${color === 'w' ? 'arms folded across the front' : 'arms stretched out in front'})`, color === 'w' ? rest.length === 2 && rest.some((p) => p.w > 9 && p.z > 3) : rest.length === 4 && rest.filter((p) => p.d === 12).length === 2);
+    const { rig } = buildTemplate(color, 'p', mat, buildPixelVox, { shade: true }), vis = (n) => rig.getObjectByName(n).visible;
+    check(`${tag}: at rest the rest pose shows, the spear pose and the spear are hidden`, vis('poseRest') && !vis('poseSpear') && !vis('spear'));
+    const { setPawnPose } = await import('../src/themes/pixel/seta.js');
+    setPawnPose(rig, true); const during = !vis('poseRest') && vis('poseSpear') && vis('spear');
+    setPawnPose(rig, false);
+    check(`${tag}: setPawnPose swaps to the spear pose and back`, during && vis('poseRest') && !vis('poseSpear') && !vis('spear'));
     check(`${tag}: two hands close round the shaft`, skin.length === 2 && skin.every((h) => Math.abs(h.x - shaft.x) < 1.2 && h.y <= shaft.y && h.y + h.h >= shaft.y + shaft.h && h.z - h.d / 2 > shaft.z - shaft.d / 2 && h.z + h.d / 2 < shaft.z + shaft.d / 2), `${skin.length} hands`);
   }
   check('pawngore: a and c; b, anything else and no flag fall back to a', ['?pawngore=a', '?pawngore=b', '?pawngore=C', '?pawngore=x', '', '?pawngore='].map((q) => pawnVariant(q)).join('') === 'aacaaa');
