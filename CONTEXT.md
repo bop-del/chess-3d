@@ -160,7 +160,7 @@ piece is drawn as a flat chess diagram symbol, as in chess books, lying on its
 square, on a plain board with flat square colours from the current theme. The
 view and the camera stay where they are. No battle scenes (in Pixelwelt the
 captured symbol fades out). The symbols are drawn as paths in code, not text
-characters. They keep one reading direction, upright for the side of the board at the bottom (the colour played, Flip, the White or Black view): orbiting, tilting and zooming never turn them, a flip turns them once with the board.
+characters. They turn with the camera, so they always read upright for the viewer.
 _Avoid_: symbol view, glyph view, icon view, 2D mode
 
 **Quality tier**:

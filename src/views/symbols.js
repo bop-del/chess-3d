@@ -163,22 +163,16 @@ export function createSymbols({ gimbal, game, stage, controls = null, themes = n
     return r;
   };
 
-  // The reading direction comes from the side at the bottom of the board (controls.side: the played colour, Flip, the White or
-  // Black view), never from the camera: orbit, tilt and zoom leave it alone. A change of side turns the symbols once by half a
-  // turn, together with the board (the flip glide takes 0.9 s).
-  const TURN = 0.9;
-  let turn = null;   // { t, from, to }
-  const sideYaw = () => (controls?.side === 'b' ? Math.PI : 0);
-  const setYaw = (a) => { yaw = a; for (const h of holders) { if (!h.parent) holders.delete(h); else h.rotation.y = yaw; } };
-  function orient(dt = 0, snap = false) {
-    const to = sideYaw();
-    if (snap) { turn = null; if (yaw !== to) setYaw(to); return; }
-    if (!turn && Math.abs(yaw - to) > 1e-6) turn = { t: 0, from: yaw, to: yaw + Math.PI };   // always the same way round
-    if (!turn) return;
-    turn.t += dt;
-    const k = Math.min(1, turn.t / TURN), e = k * k * (3 - 2 * k);
-    setYaw(turn.from + (turn.to - turn.from) * e);
-    if (k >= 1) { turn = null; yaw = to; setYaw(to); }
+  // The symbols turn with the camera so they always read upright for the viewer (owner, v1.8.0 release test: CHE-245's fixed
+  // reading direction from the bottom side was taken back).
+  const upLocal = new THREE.Vector3(), q = new THREE.Quaternion();
+  function orient() {
+    upLocal.set(0, 1, 0).applyQuaternion(stage.camera.quaternion).applyQuaternion(q.copy(gimbal.quaternion).invert());
+    if (upLocal.x * upLocal.x + upLocal.z * upLocal.z < 1e-4) return;
+    const a = Math.atan2(-upLocal.x, -upLocal.z);
+    if (Math.abs(a - yaw) < 1e-3) return;
+    yaw = a;
+    for (const h of holders) { if (!h.parent) holders.delete(h); else h.rotation.y = yaw; }
   }
 
   // The GTAO pass draws the whole scene with an override material, which would turn the transparent planes into opaque quads in
@@ -240,14 +234,14 @@ export function createSymbols({ gimbal, game, stage, controls = null, themes = n
       if (on) { flatten(); stage.scene.onBeforeRender = beforeRender; }
       else { unflatten(); if (stage.scene.onBeforeRender === beforeRender) stage.scene.onBeforeRender = () => {}; }
       eachPiece(apply);
-      if (on) orient(0, true); else release();
+      if (on) orient(); else release();
     },
     fadeOut,
     sync(dt = 0) {
       if (!on) return;
       eachPiece(apply);
       if (fades.length) stepFades(dt);
-      orient(dt);
+      orient();
     },
     get visible() { return on; },
     dispose() {
