@@ -102,6 +102,44 @@ try {
   R.expect('phone: all three rows are in the Options sheet with Pixelwelt', s.rows[0]?.n === 3 && s.rows[1]?.n === 5 && s.rows[2]?.n === 3 && s.rows.every((x) => !x.hidden), JSON.stringify(s.rows));
   R.expect('no console error or warning (phone)', !w.errs.length && !w.warns.length, 'none', [...w.errs, ...w.warns].slice(0, 3).join(' | '));
   await page.close();
+
+  // the option rows (CHE-265): German headings, no cut off label, 44 px tap targets, the selected mark, in each ?tiles= style at 1280 and 390 px
+  const rowCheck = async (tag, query, vp, ua, lang) => {
+    const pg = await browser.newPage();
+    const ww = await watchPage(pg);
+    if (ua) await pg.setUserAgent(ua);
+    await pg.setViewport(vp);
+    await pg.evaluateOnNewDocument((l) => { try { localStorage.setItem('chess3d.lang', l); localStorage.removeItem('chess3d.pixsky'); localStorage.removeItem('chess3d.pixbackdrop'); } catch (e) { /* storage blocked */ } }, lang);
+    await pg.goto(`${URL0}/?theme=pixel&open=settings&${query}&quality=low&manual=1&ai=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await pg.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+    await pg.evaluate(() => { const C = window.__chess; C.step(0.5); C.draw(); });
+    const r = await pg.evaluate(async () => {
+      const rows = [...document.querySelectorAll('.field.themes')].filter((x) => x.querySelector('.swatches') && !x.hidden);
+      const heads = rows.map((x) => x.querySelector(':scope > span').textContent.trim());
+      const tiles = rows.flatMap((x) => [...x.querySelectorAll('.swatch')]);
+      const cut = tiles.filter((b) => { const l = b.querySelector('b'); return l.scrollWidth > l.clientWidth; }).map((b) => `${b.dataset.value || b.dataset.theme}: ${b.querySelector('b').textContent}`);
+      const small = tiles.filter((b) => { const q = b.getBoundingClientRect(); return q.height < 44 || q.width < 44; }).map((b) => `${b.dataset.value || b.dataset.theme} ${Math.round(b.getBoundingClientRect().width)}x${Math.round(b.getBoundingClientRect().height)}`);
+      const on = rows.map((x) => x.querySelectorAll('.swatch.on').length);
+      const dressed = tiles.map((b) => { const i = b.querySelector('i'); return i.querySelector('canvas') ? 'b' : i.querySelector('svg') ? 'c' : /url\(/.test(i.style.backgroundImage) ? 'a' : ''; });
+      const urls = [...new Set(tiles.map((b) => b.querySelector('i').style.backgroundImage.match(/url\("?([^")]+)"?\)/)?.[1]).filter(Boolean))];
+      const bad = []; for (const u of urls) { const res = await fetch(u); if (!res.ok) bad.push(u); }
+      const sheet = tiles.length ? tiles[0].closest('.swatches').getBoundingClientRect() : null;
+      return { heads, n: tiles.length, cut, small, on, dressed: [...new Set(dressed)].join(''), bad, urls: urls.length, scrollX: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+    });
+    const want = lang === 'de' ? ['Thema', 'Welt', 'Himmel', 'Hintergrund'] : ['Theme', 'World', 'Sky', 'Backdrop'];
+    const style = (/tiles=(\w)/.exec(query) || [])[1] || '';
+    R.expect(`${tag}: headings ${want.join(', ')}`, JSON.stringify(r.heads) === JSON.stringify(want), JSON.stringify(r.heads));
+    R.expect(`${tag}: ${r.n} tiles, no label cut off (scrollWidth <= clientWidth)`, r.n === 6 + 3 + 5 + 3 && !r.cut.length, `${r.n} tiles`, r.cut.join(' | ') || `${r.n} tiles`);
+    R.expect(`${tag}: tap targets at least 44 px, one selected mark per row`, !r.small.length && r.on.every((n) => n === 1) && r.on.length === 4, 'ok', JSON.stringify({ small: r.small, on: r.on }));
+    R.expect(`${tag}: ${style ? 'style ' + style + ' pictures' : 'the dots'}${style === 'a' ? ' load' : ''}`, r.dressed === style && !r.bad.length && (style !== 'a' || r.urls === 17), r.dressed || 'dots', JSON.stringify({ dressed: r.dressed, bad: r.bad, urls: r.urls }));
+    R.expect(`${tag}: no console error or warning`, !ww.errs.length && !ww.warns.length, 'none', [...ww.errs, ...ww.warns].slice(0, 3).join(' | '));
+    await pg.close();
+  };
+  for (const q of ['', 'tiles=a', 'tiles=b', 'tiles=c']) {
+    await rowCheck(`rows de desktop ${q || 'default'}`, q, { width: 1280, height: 720 }, null, 'de');
+    await rowCheck(`rows de phone ${q || 'default'}`, `${q}&touch=1`, { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, UA, 'de');
+  }
+  await rowCheck('rows en desktop tiles=c', 'tiles=c', { width: 1280, height: 720 }, null, 'en');
   process.exitCode = R.summary().nf ? 1 : 0;
 } finally {
   await browser.close();

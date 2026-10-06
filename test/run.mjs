@@ -75,6 +75,7 @@ if (tier === 'fast' || tier === 'all') {
   run('Pixelwelt rules: closed ground, no coplanar faces, clamped textures, one material set (test/pixel-rules.mjs)', 'test/pixel-rules.mjs');
   run('Pixelwelt skies, backdrops, sets: choice, build and dispose, weather (test/pixel-sky.mjs)', 'test/pixel-sky.mjs');
   run('living pieces: signature moves and Pixelwelt birds (test/living.mjs)', 'test/living.mjs');
+  run('option tiles: pictures, icons, flag (test/tiles.mjs)', 'test/tiles.mjs');
   run('text lint (test/lint.mjs)', 'test/lint.mjs');
   run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
   run('bin/lane flag parsing (test/lane-args.mjs)', 'test/lane-args.mjs');

@@ -2,7 +2,8 @@
 // (desktop Scene card and phone Menu, through ui.mountSettings). One pick per row, remembered per browser (look.js). A Set sets both
 // the sky and the backdrop; the Sky and Backdrop rows then adjust one axis. A pick sets the light of the stage here; the world and the
 // figures follow through onLook.
-import { t, onLanguage, addDE } from '../../i18n.js';
+import { t, onLanguage, addDE, translateTree } from '../../i18n.js';
+import { dressTile, dressBox } from '../tiles.js';
 import { SKIES, SKY_IDS, BACKDROPS, BACKDROP_IDS, SETS, choice, currentSetId, setChoice, onLook, look, skyLight } from './look.js';
 
 addDE({ 'pixsky.label': 'Himmel', 'pixsky.group': 'Himmel wählen', 'pixset.label': 'Welt', 'pixset.group': 'Welt wählen', 'pixback.label': 'Hintergrund', 'pixback.group': 'Hintergrund wählen' });
@@ -18,6 +19,7 @@ export function mountLookSetting({ themes, ui, stage }) {
     row.dataset.pixlook = kind;
     row.innerHTML = `<span data-i18n="pix${kind}.label">${label}</span><div class="swatches" role="radiogroup" data-i18n-aria="pix${kind}.group" aria-label="${label}"></div>`;
     const box = row.querySelector('.swatches'), buttons = new Map();
+    dressBox(box);
     for (const id of ids) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'swatch'; b.dataset.value = id; b.setAttribute('role', 'radio');
@@ -25,9 +27,10 @@ export function mountLookSetting({ themes, ui, stage }) {
       b.style.setProperty('--sw-a', a); b.style.setProperty('--sw-b', c);
       b.innerHTML = '<i></i><b></b>';
       b.addEventListener('click', () => setChoice(pick(id)));
+      dressTile(b, kind, id, kind === 'set' ? { sky: setOf(id).sky, backdrop: setOf(id).backdrop } : [a, c]);
       box.append(b); buttons.set(id, b);
     }
-    const names = () => { for (const [id, b] of buttons) { const n = t(`pix${kind}.${id}`, en(id)); b.title = n; b.setAttribute('aria-label', n); b.querySelector('b').textContent = n; } };
+    const names = () => { translateTree(row); for (const [id, b] of buttons) { const n = t(`pix${kind}.${id}`, en(id)); b.title = n; b.setAttribute('aria-label', n); b.querySelector('b').textContent = n; } };
     const mark = () => { const v = current(); for (const [id, b] of buttons) { b.classList.toggle('on', id === v); b.setAttribute('aria-checked', id === v ? 'true' : 'false'); } };
     rows.push({ row, names, mark });
     return row;
