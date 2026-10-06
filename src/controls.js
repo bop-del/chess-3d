@@ -190,15 +190,18 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   function setPreset(name) {
     if (!Object.hasOwn(PRESETS, name)) return;
     const p = PRESETS[name];
+    if (name === 'White view') side = 'w'; else if (name === 'Black view') side = 'b';
     spin = false;
     animateTo({ ...p });
   }
+  let side = 'w';                              // the side of the board at the bottom: set by Flip and the White or Black view, never by orbiting (the Symbols read from it)
   function levelBoard() { animateTo({ yaw: cam.yaw, pitch: cam.pitch, dist: cam.dist }, 0.7); }
   function reset() {
     spin = false;
     animateTo({ ...HOME });
   }
   function flip() {
+    side = side === 'w' ? 'b' : 'w';
     // turn the view to the other side of the board, keep pitch and zoom
     const target_ = Math.round(cam.yaw / Math.PI) * Math.PI + Math.PI;
     animateTo({ yaw: target_, pitch: cam.pitch, dist: cam.dist, gx: gim.x, gy: gim.y, gz: gim.z }, 0.9);
@@ -216,7 +219,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   function setEdgeToEdge(v) { edgeToEdge = !!v; apply(); }
   function setTrays(v) { v = !!v; if (v === traysOn) return; traysOn = v; apply(); }
   function setOrbitLock(v) { orbitLocked = !!v; if (orbitLocked) { vel.yaw = vel.pitch = 0; spin = false; } notify(); }
-  function setCamera(v) { tw = null; Object.assign(cam, v); apply(); }
+  function setCamera(v) { tw = null; Object.assign(cam, v); if (v.yaw != null) side = Math.cos(v.yaw) < 0 ? 'b' : 'w'; apply(); }
 
   // Glide to a pose: opts.pitch / yaw / dist (0.6 s unless opts.dur), the rest of the pose stays. The orbit keeps working afterwards.
   function glideTo(opts = {}) {
@@ -468,6 +471,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     cinematic, restore,
     glideTo, setFocus, setOrbitLock, setEdgeToEdge, setTrays,
     update, apply, setPreset, reset, levelBoard, flip, topDown, toggleSpin, setGimbal, nudgeZoom, setCamera, onResize, setFrame, setLocked, retarget,
+    get side() { return side; },
     get trays() { return traysOn; },
     get locked() { return locked; },
     get frame() { return { ...frame }; },
