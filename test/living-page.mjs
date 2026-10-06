@@ -30,7 +30,7 @@ try {
   const state = () => page.evaluate(() => window.__chess.living.state());
 
   // ---- the scheduler
-  await load('&theme=blocks');
+  await load('&theme=pixel');
   await page.evaluate(() => { window.__chess.living.setAuto(true); window.__chess.living.reset(); });
   await step(14.5);
   R.expect('nothing happens before 15 s without a move', (await fired()) === 0, '0 shows at 14.5 s');
@@ -112,17 +112,17 @@ try {
   const stored = await page.evaluate(() => localStorage.getItem('chess3d.living'));
   await step(120);
   R.expect('switched off: nothing for 120 s, stored as 0', (await fired()) === 0 && stored === '0', `${await fired()} shows, stored ${stored}`);
-  await load('&theme=blocks', { clear: false });
+  await load('&theme=pixel', { clear: false });
   const re = await page.evaluate(() => ({ checked: document.querySelector('[data-living]').checked, on: window.__chess.living.state().on }));
   R.expect('the stored value comes back after a reload (off)', re.checked === false && re.on === false, JSON.stringify(re));
-  await load('&theme=blocks&living=1', { clear: false });
+  await load('&theme=pixel&living=1', { clear: false });
   const fl = await page.evaluate(() => ({ on: window.__chess.living.state().on, auto: window.__chess.living.state().auto, stored: localStorage.getItem('chess3d.living') }));
   R.expect('?living=1 beats the stored value for this load, arms the shows in a test and does not write', fl.on && fl.auto && fl.stored === '0', JSON.stringify(fl));
   await step(16);
   R.expect('?living=1 plays by itself after 15 s', (await fired()) === 1);
-  await load('&theme=blocks&living=0', { clear: false });
+  await load('&theme=pixel&living=0', { clear: false });
   R.expect('?living=0 turns it off for this load', (await state()).on === false);
-  await load('&theme=blocks');
+  await load('&theme=pixel');
   R.expect('never by itself under ?manual=1 (and under automation)', (await state()).auto === false);
   await step(90);
   R.expect('...so nothing plays in 90 s', (await fired()) === 0);

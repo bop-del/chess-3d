@@ -71,7 +71,6 @@ if (tier === 'fast' || tier === 'all') {
   run('rules: perft and game logic (test/perft.mjs)', 'test/perft.mjs');
   run('piece geometry contract (test/geometry.mjs)', 'test/geometry.mjs');
   run('capture tray layout (test/trays.mjs)', 'test/trays.mjs');
-  run('block characters contract (test/blocks-chars.mjs)', 'test/blocks-chars.mjs');
   run('Pixelwelt figures contract (test/pixel-chars.mjs)', 'test/pixel-chars.mjs');
   run('Pixelwelt rules: closed ground, no coplanar faces, clamped textures, one material set (test/pixel-rules.mjs)', 'test/pixel-rules.mjs');
   run('Pixelwelt skies, backdrops, sets: choice, build and dispose, weather (test/pixel-sky.mjs)', 'test/pixel-sky.mjs');

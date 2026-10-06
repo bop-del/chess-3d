@@ -185,8 +185,13 @@ _Avoid_: theme (a theme is the whole look: board, pieces, light), preset, scene
 ### The interface
 
 **Signature move**:
-The short show a piece puts on by itself when nobody moves (a pawn looks around, a knight rears, a queen waves). Only in the themes with figures that have parts (Blocks and Pixelwelt), one piece at a time, a few seconds long, switched by "Living pieces". Not a chess move and not a capture scene.
+The short show a piece puts on by itself when nobody moves (a pawn looks around, a knight rears, a queen waves). Only in the themes with figures that have parts (Pixelwelt, and the hidden theme Blocks), one piece at a time, a few seconds long, switched by "Living pieces". Not a chess move and not a capture scene.
 _Avoid_: animation (too wide), idle animation (that one runs all the time), emote, taunt
+
+**Hidden theme**:
+A theme that stays in the game but is not offered in any theme picker; only its link opens it, and opening it that
+way is not remembered. Blocks is the hidden theme since Pixelwelt took over its look.
+_Avoid_: removed theme, deprecated theme, secret theme
 
 **Panel**:
 The one column on the right of a desktop or tablet screen that holds everything the

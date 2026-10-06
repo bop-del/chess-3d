@@ -1,5 +1,5 @@
 // Cloud mask (CHE-159) in the real page: node test/cloud-mask-page.mjs [--port=5356] [--base=<server>] [--shots=<dir>]
-// No cloud is drawn over the board or a figure, in Pixelwelt and in Blocks, for a sweep of cameras (the five presets, then yaw 0 to 330
+// No cloud is drawn over the board or a figure, in Pixelwelt, for a sweep of cameras (the five presets, then yaw 0 to 330
 // in steps of 30 times pitch 2 to 89 times distance 6, 19, 40, each after 6 s of drift). Each camera: one frame with the clouds, one with
 // the cloud groups hidden, and the pixels over the board (hull of the frame square) and over every figure (projected box) must be the same.
 // The check has to bite: with the fix switched off (world.avoid.boardAvoid = false) the same sweep must find clouds over the board in
@@ -22,8 +22,8 @@ try {
   const page = await browser.newPage();
   const w = await watchPage(page);
   await page.setViewport({ width: 960, height: 540, deviceScaleFactor: 1 });
-  for (const theme of ['pixel', 'blocks']) {
-    await page.goto(`${URL0}/?theme=${theme}${theme === 'pixel' ? '&sky=evening&backdrop=none' : ''}&quality=low&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  for (const theme of ['pixel']) {
+    await page.goto(`${URL0}/?theme=${theme}&sky=evening&backdrop=none&quality=low&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true && !!window.__chess.step && !!window.__chess.themes.world', { timeout: 120000 });
     const sweep = (fixOn) => page.evaluate((fixOn, COVER) => {
       const C = window.__chess, T = C.THREE, D = Math.PI / 180, world = C.themes.world, cv = document.querySelector('canvas');

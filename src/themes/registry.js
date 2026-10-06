@@ -18,7 +18,7 @@ export const THEMES = [
   { id: 'wood', label: { en: 'Wood', de: 'Holz' }, swatch: ['#efc687', '#6a2b1c'] },
   { id: 'metal', label: { en: 'Metal', de: 'Metall' }, swatch: ['#d9a640', '#9aa1ac'] },
   { id: 'glass', label: { en: 'Glass', de: 'Glas' }, swatch: ['#9fd0ff', '#3a4250'] },
-  { id: 'blocks', label: { en: 'Blocks', de: 'Blöcke' }, swatch: ['#62b43a', '#4b515e'] },
+  { id: 'blocks', label: { en: 'Blocks', de: 'Blöcke' }, swatch: ['#62b43a', '#4b515e'], hidden: true },
   { id: 'pixel', label: { en: 'Pixel world', de: 'Pixelwelt' }, swatch: ['#e3d49a', '#7a7a7a'] },
 ];
 const LOADERS = {
@@ -35,8 +35,14 @@ addDE({ 'theme.label': 'Thema', 'theme.group': 'Thema wählen' });
 for (const th of THEMES) addDE({ [`theme.${th.id}`]: th.label.de });
 
 export const isTheme = (id) => THEMES.some((th) => th.id === id);
+// Hidden themes (Blocks) stay in the game but no picker lists them: only their ?theme= link opens them, and that is never stored.
+// A Blocks pick stored before it was hidden becomes Pixelwelt, and the store is rewritten.
 export function storedTheme() {
-  try { const id = localStorage.getItem(STORE); return isTheme(id) ? id : 'classic'; } catch (e) { return 'classic'; }
+  try {
+    let id = localStorage.getItem(STORE);
+    if (id === 'blocks') { id = 'pixel'; localStorage.setItem(STORE, id); }
+    return isTheme(id) ? id : 'classic';
+  } catch (e) { return 'classic'; }
 }
 
 // game may be null at first (the start sequence turns the theme on before the game exists): attachGame(game) follows.
@@ -130,7 +136,8 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
   stage.onQuality?.(() => { if (current !== 'classic') { const id = current; current = ''; chain = chain.then(() => run(id, false)).catch(() => {}); } });
 
   return {
-    list: () => THEMES,
+    /** the themes the pickers offer: hidden themes (Blocks) are left out, set() still takes them */
+    list: () => THEMES.filter((th) => !th.hidden),
     current: () => current,
     /** set(id, { persist = true }): resolves when the theme is on. persist false: this load only (the ?theme= flag). */
     set(id, { persist = true } = {}) {

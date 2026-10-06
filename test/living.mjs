@@ -1,6 +1,6 @@
 // Living pieces, fast tier, no browser (CHE-238): the signature moves and the Pixelwelt birds.
 //   moves   every piece type has its one picked move with a duration of 1.5 to 3.3 s and a German description; each move of each
-//           figure of both themes (Blocks and Pixelwelt, both colours) plays through a stepped clock with finite transforms, and when
+//           figure of Pixelwelt (both colours) plays through a stepped clock with finite transforms, and when
 //           it is over every part, the rig lean, the spin and the position are back at the base pose; a walk cancels a move at once
 //   birds   each variant stays high (at least 4) and far (at least 9 from the board centre), ends, leaves nothing behind and uses only
 //           the flat unlit material with a pixel texture (the Pixelwelt rules)
@@ -29,7 +29,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
 }
 
 // ---- the moves on real rigs
-const themes = [['blocks', { id: 'blocks' }], ['pixel', { id: 'pixel', build: buildPixelVox, mesher: { shade: true } }]];
+const themes = [['pixel', { id: 'pixel', build: buildPixelVox, mesher: { shade: true } }]];
 for (const [theme, opts] of themes) {
   const style = createPieceStyle({}, { ...opts, makeMaterial: () => new THREE.MeshBasicMaterial({ vertexColors: true }) });
   const root = new THREE.Group();

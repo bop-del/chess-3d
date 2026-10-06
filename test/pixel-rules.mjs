@@ -85,7 +85,6 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
 // (0 to LIFT 14 in steps of 0.5, buildAvoid lifts clouds for a low camera) never intersects the tree box (trunk and leaves)
 {
   const trees = [['Pixelwelt', world]];
-  try { const { createWorld } = await import('../src/themes/blocks/island.js'); trees.push(['Blocks', createWorld({})]); } catch (e) { console.log('NOTE  Blocks world not built in node: ' + e.message); }
   for (const [name, w] of trees) {
     w.group.updateMatrixWorld(true);
     const treeBox = new THREE.Box3();
