@@ -11,11 +11,12 @@
 // Shared Chrome (CHE-171, off by default): --shared-chrome (or CHESS_SHARED_CHROME=1) starts ONE headless Chrome for the whole run, holding one slot, and every group gets a BrowserContext of it instead of its own Chrome
 // (launchBrowser() in tools/_lib.mjs connects through CHESS_SHARED_WS). A group asking for other args, GL or executable falls back to its own Chrome and logs why. --own-chrome (or CHESS_SHARED_CHROME=0) forces the old path.
 // Options: --port=<lane preview port, 5303 in the main checkout> --dev --dev-port=<lane dev port, 5302> --skip-build --write-budgets --shots --skip-fixes, plus --only=<group,group> to run just those groups, --jobs=<n> to set the number of processes at once (default: the free Chrome slots at start, at least 2, so waiting groups do not hit the 15 minute lock timeout).
+// Retry: a group whose Chrome died (Target closed, frame got detached, protocol error from a closed target) runs once more, logged to .tmp/chrome-waits.jsonl as kind retry; a second death or any real check FAIL is final (chromeCrashReason in tools/_lib.mjs).
 // A group that still finds no slot is reported as SKIPPED (slot starvation), not as a failure: run it alone with node test/smoke.mjs --group=<name>.
 import { spawn, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, launchSharedHost, disposeSharedContext, sharedChromeOn, startServer, claimPort } from '../tools/_lib.mjs';
+import { ROOT, appendWaitLog, chromeCrashReason, build, buildHash, freeSlots, laneName, lanePorts, launchBrowser, launchSharedHost, disposeSharedContext, sharedChromeOn, startServer, claimPort } from '../tools/_lib.mjs';
 import { affectedGroups, changedFiles } from '../tools/affected-groups.mjs';
 import { getResult, groupKey, groupTimings, longestFirst, putResult } from '../tools/result-cache.mjs';
 import { GROUPS as ALL_GROUPS, SMOKE, family } from './smoke-group-list.mjs';
@@ -61,7 +62,8 @@ for (const g of selected) {
 }
 const JOBS = Math.max(1, Number(opt('jobs', Math.max(2, freeSlots()))));
 
-let server = null, host = null;
+let server = null, host = null, rehost = null;
+const hostAlive = (h) => { try { return typeof h.connected === 'boolean' ? h.connected : h.isConnected(); } catch (e) { return false; } };
 const fail = (m) => { console.log('FAIL  ' + m); console.log('SMOKE FAILED'); process.exit(1); };
 try {
   if (!todo.length) console.log('PASS  every selected group is cached or not affected: no build, no server, no Chrome');
@@ -86,7 +88,7 @@ const base = server ? server.base : '';
 const pass = ['--skip-build', `--base=${base}`, ...args.filter((a) => /^--(write-budgets|shots|tabs=)/.test(a) || a === '--skip-fixes')];
 const totals = { np: server ? 2 : 1, nw: 0, nf: 0 }, skipped = [];   // the build and the server rows printed above (or the one cached row)
 for (const { g: [name], hit } of cached) { totals.np += hit.pass; totals.nw += (hit.warns || []).length; console.log(`--- group ${name} CACHED (passed ${hit.pass} checks in ${hit.secs}s at ${hit.t.slice(0, 16).replace('T', ' ')}, same build and scripts)`); for (const w of hit.warns || []) console.log(w); }
-const runGroup = ({ g: [name, script, extra], key }) => new Promise((resolve) => {
+const runGroup = ({ g: [name, script, extra], key }, attempt = 1) => new Promise((resolve) => {
   const tg = Date.now();
   const c = spawn(process.execPath, [script, ...(script === SMOKE ? pass : [`--base=${base}`]), ...extra], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   const contexts = new Set(); c.on('message', (m) => { if (m && m.sharedContext) contexts.add(m.sharedContext); });   // shared Chrome: the browser contexts this child opened
@@ -120,6 +122,16 @@ const runGroup = ({ g: [name, script, extra], key }) => new Promise((resolve) =>
       skipped.push(name);
       console.log(`--- group ${name} SKIPPED, no headless Chrome slot (${((Date.now() - tg) / 1000).toFixed(1)}s): run ${script === SMOKE ? `node test/smoke.mjs --group=${extra[0].slice(8)}${extra[1] ? ' ' + extra[1] : ''}` : `node ${script}`} --skip-build --base=${base}`);
       return resolve();
+    }
+    const why = killedQuiet ? null : chromeCrashReason(out, code);   // the Chrome died under the group: once more, a second death is a real FAIL; a real check FAIL is never retried
+    if (why && attempt === 1) {
+      console.log(`--- group ${name} RETRY (${((Date.now() - tg) / 1000).toFixed(1)}s): Chrome died (${why}), running it once more\n${out.trimEnd().split('\n').slice(-6).map((l) => '      ' + l).join('\n')}`);
+      appendWaitLog({ kind: 'retry', group: name, reason: why });
+      if (host && !hostAlive(host)) {   // the shared Chrome itself died: every group in it crashed, so the retry needs a fresh one (one launch for all the groups that retry)
+        rehost ||= (async () => { try { await host.close(); } catch (e) { /* dead already */ } host = await launchSharedHost({ w: 1280, h: 720 }); console.log('      shared headless Chrome died, started a new one'); })().finally(() => { rehost = null; });
+        try { await rehost; } catch (e) { out += '\nFAIL  shared Chrome could not be restarted for the retry  ' + String(e.message).slice(0, 200); totals.nf++; console.log(`--- group ${name} (${((Date.now() - tg) / 1000).toFixed(1)}s)\n${out.trimEnd()}`); return resolve(); }
+      }
+      return resolve(runGroup({ g: [name, script, extra], key }, 2));
     }
     const rows = (s) => (out.match(new RegExp(`^${s}  `, 'gm')) || []).length;   // count the result rows, battle.mjs prints no summary line
     const nf = rows('FAIL'), nw = rows('WARN');

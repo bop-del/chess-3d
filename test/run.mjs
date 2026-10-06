@@ -3,13 +3,14 @@
 //   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on the lane's own port (5303 in the main checkout), only the groups the diff against main affects inside a lane (--all forces every group), cached passes print CACHED, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes, themes
 //          --shared-chrome (or CHESS_SHARED_CHROME=1): one Chrome for the whole smoke run, a BrowserContext per group (the default since CHE-186); --own-chrome (or =0) the old path, one Chrome per group (tools/README.md)
 //   phone  phone sizes and real touch, the scripts at the same time (install in 2 parts), each cached by build, scripts and GL backend (CACHED, --no-cache reruns): tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
+//   one smoke or phone run at a time on the machine (CHE-257): a lock file in ~/.cache/chess-3d, a second run prints one queued line and waits, the wait is logged to .tmp/chrome-waits.jsonl (kind run). A --shots run does not wait: it runs with --jobs=2 (at most 2 groups at once) next to the other run
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes, --affected, --all, --no-cache
 // Exit codes: 0 all pass, 1 a check failed, 2 usage error, 3 nothing failed but a smoke group was skipped (no Chrome slot).
 import { spawn, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildHash } from '../tools/_lib.mjs';
+import { acquireRunLock, buildHash } from '../tools/_lib.mjs';
 import { getResult, groupKey, putResult } from '../tools/result-cache.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,6 +18,11 @@ const [tier = 'fast', ...rest] = process.argv.slice(2);
 if (!['fast', 'smoke', 'phone', 'all'].includes(tier)) { console.error('usage: node test/run.mjs [fast|smoke|phone|all] [smoke options]'); process.exit(2); }
 
 const results = [];
+let runLock = null;
+if (tier === 'smoke' || tier === 'phone' || tier === 'all') {
+  if (rest.includes('--shots')) { if (!rest.some((a) => a.startsWith('--jobs='))) rest.push('--jobs=2'); console.log('      --shots run: no machine wide wait, at most 2 groups at once (--jobs=2)'); }
+  else if (tier !== 'all') runLock = await acquireRunLock({ kind: tier });
+}
 const run = (name, script, args = [], { show = false } = {}) => {
   const t = Date.now();
   const r = spawnSync(process.execPath, [script, ...args], { cwd: ROOT, encoding: 'utf8', stdio: show ? 'inherit' : ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
@@ -76,6 +82,7 @@ if (tier === 'fast' || tier === 'all') {
   run('bin/lane agent identity prepend (test/lane-identity.mjs)', 'test/lane-identity.mjs');
   run('bin/lane kickoff verify and resend (test/kickoff.mjs)', 'test/kickoff.mjs');
   run('affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs');
+  run('run lock and group retry classifier (test/run-lock.mjs)', 'test/run-lock.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
   run('goal screens: target position, marks, goal sentences (test/goal.mjs)', 'test/goal.mjs');
   run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
@@ -92,6 +99,7 @@ if (tier === 'fast' || tier === 'all') {
   run('training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs');
 }
 if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((r) => r.ok))) {
+  if (!runLock && !rest.includes('--shots')) runLock = await acquireRunLock({ kind: 'smoke' });   // tier all: only after the fast tier passed, so a red fast tier never queues
   console.log('--- smoke tier (headless Chrome)');
   run('smoke (test/smoke-groups.mjs)', 'test/smoke-groups.mjs', rest, { show: true });
 } else if (tier === 'all') console.log('--- smoke tier skipped because the fast tier failed');
@@ -102,6 +110,7 @@ if (tier === 'phone') {
   await runParallel([['phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', shared], ['real touch (test/touch.mjs)', 'test/touch.mjs', shared], ['install reminder and manifest 1/2 (test/install.mjs)', 'test/install.mjs', [...shared, '--part=0/2']], ['install reminder and manifest 2/2 (test/install.mjs)', 'test/install.mjs', [...shared, '--part=1/2']]], { cache: !rest.includes('--no-cache') });
 }
 
+runLock?.release();
 const bad = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length} steps, ${bad} failed, ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 if (!bad && tier === 'all') console.log('Next: run the release check separately (fresh npm ci, slow): node tools/release-check.mjs');

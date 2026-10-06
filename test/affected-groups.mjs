@@ -33,10 +33,10 @@ check('every group name in the table is a real group', MAP.flatMap(([, gs]) => g
 check('every group script exists', GROUPS.every(([, s]) => existsSync(new URL('../' + s, import.meta.url))));
 
 // Chrome slots, decision 3: with Metal load 1 under 8 gives 4, under 16 gives 3, else 2. Without Metal unchanged (under 6: 4, under 12: 3, else 2).
-check('metal: load 0 and 11.9 give 4 slots', slotsFor(0, true) === 4 && slotsFor(11.9, true) === 4);
-check('metal: load 12 and 23.9 give 3 slots', slotsFor(12, true) === 3 && slotsFor(23.9, true) === 3);
-check('metal: load 24 and above give 2 slots', slotsFor(24, true) === 2 && slotsFor(60, true) === 2);
-check('software: 4 under load 6, 3 under 12, else 2', slotsFor(5.9, false) === 4 && slotsFor(6, false) === 3 && slotsFor(11.9, false) === 3 && slotsFor(12, false) === 2);
+check('metal: load 0 and 7.9 give 4 slots', slotsFor(0, true) === 4 && slotsFor(7.9, true) === 4);
+check('metal: load 8 and 15.9 give 3 slots', slotsFor(8, true) === 3 && slotsFor(15.9, true) === 3);
+check('metal: load 16 and above give 2 slots', slotsFor(16, true) === 2 && slotsFor(60, true) === 2);
+check('software: 4 under load 4, 3 under 8, else 2', slotsFor(3.9, false) === 4 && slotsFor(4, false) === 3 && slotsFor(7.9, false) === 3 && slotsFor(8, false) === 2);
 
 // Lane ports: stable hash of the worktree directory name, preview 5400 to 5498, dev 5500 to 5598, main checkout keeps 5303 and 5302.
 const a = lanePorts('/x/.herdr/worktrees/chess-3d/s16-smoke-affected-ports', true), b = lanePorts('/y/.herdr/worktrees/chess-3d/s16-smoke-affected-ports', true);

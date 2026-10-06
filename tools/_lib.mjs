@@ -3,7 +3,7 @@
 //   reporter()               PASS / FAIL / WARN rows printed as they come, plus summary(): { rows, nf, nw }
 //   launchBrowser(opts)      chrome-headless-shell (the default when installed and the same version as Chrome, see headlessShell(); full Chrome for the release check, { full: true } or CHESS_BROWSER=chrome; CHESS_BROWSER=<path> overrides) through puppeteer-core with software GL (swiftshader) by default, so it runs anywhere;
 //                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check's extra software pass does).
-//                            Waits for a machine wide slot first: two always, three under load 12, four under load 6 (with metal: four under 12, three under 24).
+//                            Waits for a machine wide slot first: two always, three under load 8, four under load 4 (with metal: four under 8, three under 16).
 //                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
 //                            Shared mode (smoke tier, the default; --own-chrome or CHESS_SHARED_CHROME=0 opts out): a group connects to the one Chrome of the runner (CHESS_SHARED_WS) and gets a BrowserContext, no slot of its own, see launchSharedHost().
 //   pageRenderer(page)       the WebGL renderer the page itself draws with (the app's own context, UNMASKED_RENDERER), logged by the smoke, phone and release tiers as proof of the GPU
@@ -50,7 +50,7 @@ export function chromePath() {
 }
 
 // Headless Chromes at a time on this machine, across lanes and agents, adaptive by load: two slots always, a third
-// while the 1 minute load is under 12, a fourth under 6. With CHESS_GL=metal (the GPU does the drawing): four under load 12, three under 24, else two. Each slot is a lock directory in the temp folder holding its
+// while the 1 minute load is under 8, a fourth under 4. With CHESS_GL=metal (the GPU does the drawing): four under load 8, three under 16, else two. Each slot is a lock directory in the temp folder holding its
 // owner's pid (slot 0 keeps the original lock name, so older checkouts still count). A lock whose pid is gone is stale
 // and taken over. Released when the browser closes or the process exits.
 const SLOTS = ['', '.1', '.2', '.3'].map((x) => join(tmpdir(), 'chess-3d-chrome.lock' + x));
@@ -59,8 +59,8 @@ export const defaultGl = () => {
   return want === 'metal' ? 'metal' : 'swiftshader';
 };
 const metalOn = () => defaultGl() === 'metal';
-/** Slots for a 1 minute load. With Metal (the GPU does the drawing): under 12 gives 4, under 24 gives 3, else 2. Without: under 6 gives 4, under 12 gives 3, else 2. */
-export const slotsFor = (load, metal) => metal ? (load < 12 ? 4 : load < 24 ? 3 : 2) : (load < 6 ? 4 : load < 12 ? 3 : 2);
+/** Slots for a 1 minute load. With Metal (the GPU does the drawing): under 8 gives 4, under 16 gives 3, else 2. Without: under 4 gives 4, under 8 gives 3, else 2. */
+export const slotsFor = (load, metal) => metal ? (load < 8 ? 4 : load < 16 ? 3 : 2) : (load < 4 ? 4 : load < 8 ? 3 : 2);
 const allowedSlots = () => slotsFor(loadavg()[0], metalOn());
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 /** Slots free right now at this load (at least 0). Used by test/smoke-groups.mjs to size its parallelism. */
@@ -81,6 +81,46 @@ async function acquireLock(maxWaitMs = 15 * 60 * 1000) {
     if (!said) { console.log(`      waiting for a headless Chrome slot (${allowedSlots()} allowed at this load)`); said = true; }
     await sleep(1000);
   }
+}
+
+/** Append one line to .tmp/chrome-waits.jsonl (kind: run for a queued smoke or phone run, retry for a group run twice). Never throws. */
+export const appendWaitLog = (entry) => { try { mkdirSync(join(ROOT, '.tmp'), { recursive: true }); appendFileSync(join(ROOT, '.tmp', 'chrome-waits.jsonl'), JSON.stringify({ t: new Date().toISOString(), ...entry }) + '\n'); } catch (e) { /* ignore */ } };
+
+/** Machine wide lock around a whole smoke or phone run (CHE-257): one run at a time, not one Chrome at a time. The lock is a file in ~/.cache/chess-3d
+ *  holding the owner's pid, start time and kind, created exclusively. A file whose pid is gone is stale and taken over. A second run waits, prints one
+ *  queued line and logs its wait to .tmp/chrome-waits.jsonl as kind run. Returns { release(), waited } ; release is also called on process exit. */
+export const RUN_LOCK_DIR = join(homedir(), '.cache', 'chess-3d');
+export async function acquireRunLock({ kind = 'smoke', dir = RUN_LOCK_DIR, maxWaitMs = 60 * 60 * 1000, pollMs = 1000, pid = process.pid, isAlive = alive, say = console.log, log = appendWaitLog } = {}) {
+  const file = join(dir, 'run.lock'), mine = JSON.stringify({ pid, start: new Date().toISOString(), kind });
+  mkdirSync(dir, { recursive: true });
+  const t0 = Date.now(); let said = false;
+  const release = () => { try { if (JSON.parse(readFileSync(file, 'utf8')).pid === pid) rmSync(file, { force: true }); } catch (e) { /* gone or not ours */ } };
+  for (;;) {
+    try { writeFileSync(file, mine, { flag: 'wx' }); break; } catch (e) { if (e.code !== 'EEXIST') throw e; }
+    let raw = '', owner = null; try { raw = readFileSync(file, 'utf8'); owner = JSON.parse(raw); } catch (e) { /* being written, or unreadable */ }
+    if (owner && owner.pid && !isAlive(owner.pid)) { try { if (readFileSync(file, 'utf8') === raw) rmSync(file, { force: true }); } catch (e) { /* taken over by another waiter */ } continue; }
+    if (!owner && raw && Date.now() - statSync(file).mtimeMs > 10000) { rmSync(file, { force: true }); continue; }   // garbage that stayed
+    if (Date.now() - t0 > maxWaitMs) throw new Error(`another ${owner?.kind || 'test'} run held the machine for over ${maxWaitMs / 60000} min`);
+    if (!said) { said = true; say(`      queued: a ${owner?.kind || 'test'} run (pid ${owner?.pid}, since ${(owner?.start || '').slice(11, 19)}) is running, waiting for it to finish`); }
+    await sleep(pollMs);
+  }
+  const waited = (Date.now() - t0) / 1000;
+  if (said) log({ kind: 'run', run: kind, script: process.argv[1] ? process.argv[1].split('/').slice(-2).join('/') : '', waitSecs: Math.round(waited * 10) / 10 });
+  process.on('exit', release);
+  return { release: () => { release(); process.removeListener('exit', release); }, waited };
+}
+
+/** Why a finished smoke group should be run once more, or null. True only for a Chrome that died under the group ("Target closed", "frame got detached",
+ *  a protocol error from a closed target or session), never for a real check FAIL: any FAIL row that does not itself name a crash means the group judged
+ *  something, so it is final. Exit 0 never retries. */
+const CHROME_DIED = /Target closed|frame got detached|Navigating frame was detached|Session closed|Protocol error[^\n]*(closed|detached|destroyed)|Browser has disconnected|Connection closed/i;
+export function chromeCrashReason(out, code) {
+  if (code === 0) return null;
+  const text = String(out), m = CHROME_DIED.exec(text);
+  if (!m) return null;
+  const fails = text.split('\n').filter((l) => /^FAIL  /.test(l) && !/^FAIL  group .* ended with exit/.test(l));
+  if (fails.some((l) => !CHROME_DIED.test(l))) return null;
+  return m[0].slice(0, 80);
 }
 
 const GL_ARGS = {
