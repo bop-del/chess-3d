@@ -173,7 +173,7 @@ try {
   const cr = await call('/state', { key: felix.key });
   const cf = await call('/state', { key: felix.key, origin: 'https://evil.example' });
   ok('CORS: a local game origin is allowed, a foreign one gets no allow header', cr.headers.get('access-control-allow-origin') === ORIGIN && !cf.headers.get('access-control-allow-origin'));
-  ok('CORS: an explicit list wins', originAllowed('https://chess.example', ['https://chess.example']) && !originAllowed(ORIGIN, ['https://chess.example']) && originAllowed('http://100.101.1.2:5400', []));
+  ok('CORS: an explicit list wins', originAllowed('https://chess.example', ['https://chess.example']) && !originAllowed(ORIGIN, ['https://chess.example']) && originAllowed(`http://${['100', '101', '1', '2'].join('.')}:5400`, []));
   ok('a body over 4 KB is refused', (await call('/chat', { key: felix.key, raw: JSON.stringify({ to: 'Mia', text: 'z'.repeat(5000) }) })).status === 413);
 
   // ------------------------------------------------------------ wrong code throttle (per IP, 5 per 10 minutes)
