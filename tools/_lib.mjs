@@ -4,7 +4,7 @@
 //   launchBrowser(opts)      chrome-headless-shell (the default when installed and the same version as Chrome, see headlessShell(); full Chrome for the release check, { full: true } or CHESS_BROWSER=chrome; CHESS_BROWSER=<path> overrides) through puppeteer-core with software GL (swiftshader) by default, so it runs anywhere;
 //                            the GPU (ANGLE Metal) is the default on Apple Silicon, CHESS_GL=swiftshader opts out, and it logs the WebGL renderer once per launch ({ gl: 'swiftshader' } pins it, as the release check's extra software pass does).
 //                            Waits for a machine wide slot first: two always, three under load 8, four under load 4 (with metal: four under 8, three under 16).
-//                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl.
+//                            Every launch appends its slot wait to .tmp/chrome-waits.jsonl, and registers its Chrome in ~/.cache/chess-3d/chromes/ (registerChrome, reapChromes: CHE-270).
 //                            Shared mode (smoke tier, the default; --own-chrome or CHESS_SHARED_CHROME=0 opts out): a group connects to the one Chrome of the runner (CHESS_SHARED_WS) and gets a BrowserContext, no slot of its own, see launchSharedHost().
 //   pageRenderer(page)       the WebGL renderer the page itself draws with (the app's own context, UNMASKED_RENDERER), logged by the smoke, phone and release tiers as proof of the GPU
 //   proveGpu(page, R)        prints pageRenderer once, a WARN when the GPU was asked for and the page reports software
@@ -123,6 +123,44 @@ export function chromeCrashReason(out, code) {
   return m[0].slice(0, 80);
 }
 
+/** Registry of the Chromes launchOwn() started (CHE-270): one JSON file per Chrome in ~/.cache/chess-3d/chromes/<chrome pid>.json with the Chrome pid, its profile dir, the owner pid (the node process) and the start time.
+ *  Removed when the browser closes. reapChromes() ends entries whose owner is gone; it never touches a Chrome that is not in the registry. */
+export const CHROMES_DIR = join(RUN_LOCK_DIR, 'chromes');
+export function registerChrome({ pid, profile = '', owner = process.pid, dir = CHROMES_DIR } = {}) {
+  try { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, `${pid}.json`), JSON.stringify({ pid, profile, owner, start: new Date().toISOString() })); } catch (e) { /* the registry is a safety net, never a reason to fail a launch */ }
+}
+export function unregisterChrome(pid, dir = CHROMES_DIR) { try { rmSync(join(dir, `${pid}.json`), { force: true }); } catch (e) { /* ignore */ } }
+/** The process table as a Map pid -> { ppid, command } from ps. */
+export function psTable() {
+  const table = new Map();
+  try { for (const line of execFileSync('/bin/ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\n')) { const m = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line); if (m) table.set(Number(m[1]), { ppid: Number(m[2]), command: m[3] }); } } catch (e) { /* no ps */ }
+  return table;
+}
+/** Puppeteer Chromes (profile dir puppeteer_dev_chrome_profile) whose parent is launchd (ppid 1): the leftovers of a node process that died. Main processes only, not the --type= helpers. */
+export const orphanChromes = (table = psTable()) => [...table].filter(([, p]) => p.ppid === 1 && p.command.includes('puppeteer_dev_chrome_profile') && !/--type=/.test(p.command)).map(([pid, p]) => ({ pid, command: p.command }));
+/** End registry entries whose owner pid is gone: SIGTERM, SIGKILL after killAfterMs, only while the pid's command line still holds the entry's profile dir (a reused pid is left alone, its entry is dropped).
+ *  An entry whose Chrome is gone is dropped silently. Each reap is logged to .tmp/chrome-waits.jsonl as kind reap. Returns the reaped entries. All process access is injectable for the tests. */
+export async function reapChromes({ dir = CHROMES_DIR, table = psTable, isAlive = alive, kill = (pid, sig) => process.kill(pid, sig), wait = sleep, killAfterMs = 10000, log = appendWaitLog } = {}) {
+  const reaped = [];
+  let files = []; try { files = readdirSync(dir).filter((f) => f.endsWith('.json')); } catch (e) { return reaped; }
+  for (const f of files) {
+    let e; try { e = JSON.parse(readFileSync(join(dir, f), 'utf8')); } catch (err) { continue; }   // being written
+    if (!e || !e.pid || !e.profile) { rmSync(join(dir, f), { force: true }); continue; }
+    if (e.owner && isAlive(e.owner)) continue;
+    const holds = () => String(table().get(e.pid)?.command || '').includes(e.profile);
+    if (!isAlive(e.pid) || !holds()) { rmSync(join(dir, f), { force: true }); continue; }
+    let how = 'SIGTERM';
+    try { kill(e.pid, 'SIGTERM'); } catch (err) { /* gone */ }
+    await wait(killAfterMs);
+    if (isAlive(e.pid) && holds()) { how = 'SIGKILL'; try { kill(e.pid, 'SIGKILL'); } catch (err) { /* gone */ } }
+    if (e.profile.startsWith(tmpdir()) && basename(e.profile).startsWith('puppeteer_dev_chrome_profile')) { try { rmSync(e.profile, { recursive: true, force: true }); } catch (err) { /* ignore */ } }
+    rmSync(join(dir, f), { force: true });
+    log({ kind: 'reap', pid: e.pid, owner: e.owner, profile: e.profile, since: e.start, how });
+    reaped.push(e);
+  }
+  return reaped;
+}
+
 const GL_ARGS = {
   swiftshader: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--use-gl=angle', '--ignore-gpu-blocklist'],
   metal: ['--enable-gpu', '--use-angle=metal', '--use-gl=angle', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],   // swiftshader stays allowed as a fallback, the renderer log shows which one won
@@ -218,6 +256,8 @@ async function launchOwn({ w = 1280, h = 720, args = [], gl = defaultGl(), execu
     });
     if (gl === 'metal') await logRenderer(browser);
   } catch (e) { releaseLock(lock); throw e; }
+  const chromePid = browser.process()?.pid;
+  if (chromePid) registerChrome({ pid: chromePid, profile: (browser.process().spawnargs.find((a) => a.startsWith('--user-data-dir=')) || '').slice(16) });
   const close = browser.close.bind(browser);
   // Chrome sometimes needs minutes to quit after a busy GPU run (seen: a group that printed its last line at 45 s and ended at 371 s). After 8 s the browser process this call started is killed by its own PID and its temp profile removed.
   browser.close = async () => {
@@ -231,12 +271,12 @@ async function launchOwn({ w = 1280, h = 720, args = [], gl = defaultGl(), execu
         if (dir && dir.startsWith(tmpdir())) { await sleep(300); try { rmSync(dir, { recursive: true, force: true }); } catch (e) { /* ignore */ } }
       }
     } finally {
-      clearTimeout(timer); releaseLock(lock);
+      clearTimeout(timer); releaseLock(lock); if (chromePid) unregisterChrome(chromePid);
       // Chrome's crashpad handler outlives it (parent 1) and holds the inherited stdio pipes, so node saw no EOF on them and the script process stayed alive for minutes after its last row. Destroy our ends.
       if (proc) { for (const st of [proc.stdin, proc.stdout, proc.stderr]) { try { st?.destroy(); } catch (e) { /* ignore */ } } try { proc.unref(); } catch (e) { /* ignore */ } }
     }
   };
-  browser.on('disconnected', () => releaseLock(lock));
+  browser.on('disconnected', () => { releaseLock(lock); if (chromePid) unregisterChrome(chromePid); });
   return browser;
 }
 

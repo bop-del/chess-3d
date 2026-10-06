@@ -83,6 +83,7 @@ if (tier === 'fast' || tier === 'all') {
   run('bin/lane kickoff verify and resend (test/kickoff.mjs)', 'test/kickoff.mjs');
   run('affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs');
   run('run lock and group retry classifier (test/run-lock.mjs)', 'test/run-lock.mjs');
+  run('chrome registry and reaper (test/reap-chromes.mjs)', 'test/reap-chromes.mjs');
   run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
   run('goal screens: target position, marks, goal sentences (test/goal.mjs)', 'test/goal.mjs');
   run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
