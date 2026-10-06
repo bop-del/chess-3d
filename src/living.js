@@ -1,6 +1,6 @@
 // Living pieces (CHE-238): in Blocks and Pixelwelt a piece plays a signature move (themes/blocks/moves.js) when nobody moves.
-// After IDLE_FIRST seconds without a player move or tap one random piece of either colour (never the selected one) plays it, then
-// the next one GAPS[0] seconds later and every GAPS[1] seconds after that, never two at once. A move or tap starts the wait again. Paused during a move, a capture scene and with
+// After IDLE_FIRST seconds without a move or a piece pick one random piece of either colour (never the selected one) plays it, then
+// the next one GAPS[0] seconds later and every GAPS[1] seconds after that, never two at once. Only a move or a piece pick starts the wait again. Paused during a move, a capture scene and with
 // Symbols on. Never automatic with ?manual=1 or under automation (navigator.webdriver) unless ?living=1; ?living=0 turns it off for
 // this load. The Options switch "Living pieces" is stored per browser like the other settings.
 // ?sig=<piece>[.<square>] plays one move at once (test hook: sig=knight, sig=pawn.e2). In the Pixelwelt the birds (themes/pixel/birds.js)
@@ -12,7 +12,7 @@ import { living } from './living-state.js';
 
 addDE({ 'living.label': 'Figuren-Leben' });
 
-export const IDLE_FIRST = 30, GAPS = [20, 10];   // owner 2026-10-06: first show after 30 s, the next 20 s later, then every 10 s
+export const IDLE_FIRST = 15, GAPS = [10, 10];   // owner 2026-10-06: first show after 15 s, the next 10 s later, then every 10 s
 const KEY = 'chess3d.living';
 const readStored = () => { try { return localStorage.getItem(KEY) !== '0'; } catch (e) { return true; } };
 const writeStored = (on) => { try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) { /* storage blocked */ } };
@@ -78,10 +78,7 @@ export function createLiving({ game, themes, views, ui, flags = {}, manual = fal
   }
 
   game.onMove(reset);
-  if (typeof window !== 'undefined') {
-    window.addEventListener('pointerdown', reset, { capture: true, passive: true });
-    window.addEventListener('keydown', reset, { capture: true, passive: true });
-  }
+  game.onSelect?.(reset);   // only a move or a piece pick starts the wait again: camera drags, menu taps and keys do not
 
   // the Options switch, mounted like the trays one
   const row = document.createElement('label');

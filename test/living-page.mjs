@@ -1,6 +1,6 @@
 // Living pieces in the real page (CHE-238): node test/living-page.mjs [--port=5249] [--base=<server>] [--skip-build]
-// The scheduler in a stepped clock (?manual=1, living.setAuto(true) arms it, the test never waits for real time): nothing before 30 s,
-// one piece at 30 s, the next one 20 s later, then every 10 s, never two at once, never the selected piece, a move or tap starts the wait again;
+// The scheduler in a stepped clock (?manual=1, living.setAuto(true) arms it, the test never waits for real time): nothing before 15 s,
+// one piece at 15 s, the next one 10 s later, then every 10 s, never two at once, never the selected piece, only a move or a piece pick starts the wait again (a camera drag or a menu tap does not);
 // paused with Symbols on, in a theme without rigs and while a move runs; never with the switch off (also after a reload: the stored
 // value), never by itself under ?manual=1. ?sig=<piece> plays a move at once, ?birds=<a|b|c> a bird flight. The switch is in the Options of the
 // desktop HUD and of the phone menu (both menus), on by default, ?living=0|1 beats the stored value without writing it.
@@ -32,17 +32,17 @@ try {
   // ---- the scheduler
   await load('&theme=blocks');
   await page.evaluate(() => { window.__chess.living.setAuto(true); window.__chess.living.reset(); });
-  await step(29.5);
-  R.expect('nothing happens before 30 s without a move', (await fired()) === 0, '0 shows at 29.5 s');
+  await step(14.5);
+  R.expect('nothing happens before 15 s without a move', (await fired()) === 0, '0 shows at 14.5 s');
   await step(1);
   let n = await fired();
-  R.expect('one piece plays its move after 30 s', n === 1, `${n} show`);
+  R.expect('one piece plays its move after 15 s', n === 1, `${n} show`);
   const first = await page.evaluate(() => window.__chess.living.log[0]);
   R.expect('the show names a real piece of the position and the picked move', !!first && 'prnbqk'.includes(first.type), JSON.stringify(first));
-  await step(19);
-  R.expect('the next one waits 20 s', (await fired()) === 1, 'still 1 at +19 s');
+  await step(9);
+  R.expect('the next one waits 10 s', (await fired()) === 1, 'still 1 at +9 s');
   await step(1.5);
-  R.expect('the next one follows after 20 s', (await fired()) === 2, `${await fired()} shows at +20.5 s`);
+  R.expect('the next one follows after 10 s', (await fired()) === 2, `${await fired()} shows at +10.5 s`);
   await step(9);
   R.expect('the third waits 10 s', (await fired()) === 2, 'still 2 at +9 s');
   await step(1.5);
@@ -67,20 +67,30 @@ try {
 
   // ---- a move resets the wait
   await page.evaluate(() => { window.__chess.living.log.length = 0; window.__chess.living.reset(); });
-  await step(25);
+  await step(10);
   await page.evaluate(() => { window.__chess.game.move('e2', 'e4'); });
   await step(1.5);
   await page.evaluate(() => window.__chess.game.finishAnimations());
-  await step(28);
-  R.expect('a move starts the 30 s wait again', (await fired()) === 0, `${await fired()} shows 28 s after the move`);
-  await step(4);
-  R.expect('and the wait runs out 30 s after it', (await fired()) === 1);
-  // a tap
+  await step(13);
+  R.expect('a move starts the 15 s wait again', (await fired()) === 0, `${await fired()} shows 13 s after the move`);
+  await step(3);
+  R.expect('and the wait runs out 15 s after it', (await fired()) === 1);
+  // a camera drag and a tap on empty space do not reset
+  await page.evaluate(() => { window.__chess.game.finishAnimations(); window.__chess.living.log.length = 0; window.__chess.living.reset(); });
+  await step(10);
+  await page.mouse.move(40, 40); await page.mouse.down(); await page.mouse.move(120, 90, { steps: 4 }); await page.mouse.up();
+  await page.mouse.click(40, 40); await page.keyboard.press('Shift');
+  await step(6);
+  R.expect('a camera drag, a tap and a key do not reset the wait', (await fired()) === 1, `${await fired()} shows`);
+  // a piece pick does
   await page.evaluate(() => { window.__chess.living.log.length = 0; window.__chess.living.reset(); });
-  await step(25);
-  await page.mouse.move(40, 40); await page.mouse.down(); await page.mouse.up();
-  await step(28);
-  R.expect('a tap starts the wait again', (await fired()) === 0);
+  await step(10);
+  await page.evaluate(() => { const g = window.__chess.game; g.clickSquare(g.nameSq('d7')); });
+  await step(13);
+  R.expect('a piece pick starts the wait again', (await fired()) === 0, `${await fired()} shows 13 s after the pick`);
+  await step(3);
+  R.expect('and the wait runs out 15 s after it', (await fired()) === 1);
+  await page.evaluate(() => { const g = window.__chess.game; g.clickSquare(g.nameSq('d7')); });   // deselect
 
   // ---- pauses
   await page.evaluate(() => { window.__chess.living.log.length = 0; window.__chess.living.reset(); window.__chess.views.setSymbols(true, { remember: false }); });
@@ -91,7 +101,7 @@ try {
   await step(90);
   R.expect('nothing in a theme without rigs (Classic)', (await fired()) === 0, `${await fired()} shows in 90 s`);
   await page.evaluate(() => window.__chess.themes.set('pixel'));
-  await step(65);
+  await step(40);
   R.expect('Pixelwelt takes part', (await fired()) >= 1);
 
   // ---- the switch
@@ -108,8 +118,8 @@ try {
   await load('&theme=blocks&living=1', { clear: false });
   const fl = await page.evaluate(() => ({ on: window.__chess.living.state().on, auto: window.__chess.living.state().auto, stored: localStorage.getItem('chess3d.living') }));
   R.expect('?living=1 beats the stored value for this load, arms the shows in a test and does not write', fl.on && fl.auto && fl.stored === '0', JSON.stringify(fl));
-  await step(31);
-  R.expect('?living=1 plays by itself after 30 s', (await fired()) === 1);
+  await step(16);
+  R.expect('?living=1 plays by itself after 15 s', (await fired()) === 1);
   await load('&theme=blocks&living=0', { clear: false });
   R.expect('?living=0 turns it off for this load', (await state()).on === false);
   await load('&theme=blocks');

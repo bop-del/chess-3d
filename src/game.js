@@ -558,9 +558,9 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
         doMove({ from: selected, to: sq });
         return;
       }
-      if (own && sq !== selected) selected = sq;
+      if (own && sq !== selected) { selected = sq; emit('select', selected); }
       else selected = -1;
-    } else if (own) selected = sq;
+    } else if (own) { selected = sq; emit('select', selected); }
     refreshHighlights();
     changed();
   }
@@ -787,6 +787,7 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
     setMoveGuard(fn) { moveGuard = typeof fn === 'function' ? fn : null; },
     get mode() { return mode; },
     onMove(fn) { (listeners.move = listeners.move || []).push(fn); },
+    onSelect(fn) { (listeners.select = listeners.select || []).push(fn); },
     onCapture(fn) { captureHooks.push(fn); },
     get captureHooks() { return captureHooks; },
     // Play a move given as SAN (opening lines, tests). Returns the move record or null when it is not legal here.
