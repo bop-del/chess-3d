@@ -89,3 +89,18 @@ should replace the weaker mode rather than sit next to it.
 **Texts as PGN comments** (`1. e4 {takes the centre}`). Standard PGN, and the
 parser already skips comments. Rejected: two languages do not fit one comment, and
 the line becomes unreadable.
+
+## Addendum (CHE-269, 2026-10-06): plans, aims, traps, and why and threat per move
+
+The owner moved the scope line a second time, by decision: every line now also explains its plans. Per line the intro
+gets fixed sections (what it is about, what White wants, what Black wants, typical plans, one or two traps), and per move
+the sentence stays and gains a short "why" and, where the move threatens something concrete, a "threat" that is also
+drawn as a red arrow on the board.
+
+The format is new optional fields in `src/openings/lines.js`, not a new file: `aims`, `plans`, `traps` per line, `why`
+and `threat` (with `arrows` as from and to squares) per move. Existing texts are unchanged. Depth does not move: the
+same moves, more said about them.
+
+Sourcing gives way to a test for the checkable part: every threat arrow must be a move the side that just moved could
+make in that position, and every trap sequence must be legal on `src/rules.js`. Whether a sentence works for a child
+stays the owner's judgement on review, as above.

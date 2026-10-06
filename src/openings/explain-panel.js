@@ -9,10 +9,17 @@ import { device } from '../device.js';
 import { createExplain } from './explain.js';
 import { createLineView } from './lineview.js';
 import '../learn/strings.js';
-import { createHint, createMarks } from './arrow.js';
+import { createHint, createMarks, createThreats } from './arrow.js';
+import { nameSq } from '../rules.js';
 import './explain.css';
 
 const { t, onLanguage, i18n } = I18N;
+
+// CHE-269: the intro sections of a goal screen and the why and threat of a move card.
+I18N.addDE({
+  'lines.about': 'Worum es geht', 'lines.aimsW': 'Was Weiß will', 'lines.aimsB': 'Was Schwarz will',
+  'lines.plans': 'Typische Pläne', 'lines.traps': 'Fallen', 'lines.why': 'Warum?', 'lines.whyHead': 'Warum', 'lines.threat': 'Droht',
+});
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -40,6 +47,7 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
     const facesBlack = Math.cos(controls.camera.yaw) < 0;
     if ((side === 'b') !== facesBlack) controls.flip();
   };
+  const threats = createThreats({ gimbal });
   const explain = createExplain({ game, hint, marks, pause, onSide });
 
   // `idle` is the element src/learn fills with the tabs (Openings, Mine, Practise). Desktop: it sits in this card while no line
@@ -71,6 +79,33 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
   const sideLabel = (l) => t(l.side === 'w' ? 'explain.forWhite' : 'explain.forBlack', l.side === 'w' ? 'You play White' : 'You play Black');
 
   // ------------------------------------------------------------ the descriptor
+  // The goal screen's intro in fixed sections: what it is about, what each side wants, typical plans, traps. A section without
+  // text is left out, so a player's own line shows only what it has.
+  function introSections(L) {
+    const out = [];
+    if (L.intro) out.push({ head: t('lines.about', 'What it is about'), text: pick(L.intro) });
+    if (L.aims?.w) out.push({ head: t('lines.aimsW', 'What White wants'), text: pick(L.aims.w) });
+    if (L.aims?.b) out.push({ head: t('lines.aimsB', 'What Black wants'), text: pick(L.aims.b) });
+    if (L.plans?.length) out.push({ head: t('lines.plans', 'Typical plans'), items: L.plans.map(pick) });
+    if (L.traps?.length) out.push({ head: t('lines.traps', 'Traps'), items: L.traps.map(pick) });
+    return out;
+  }
+  function moveCard(L, ply) {
+    const m = L.moves[ply];
+    return {
+      title: show(m.san), text: pick(m), kind: 'move', key: `${L.id}:${ply}`,
+      why: m.why ? pick(m.why) : '', threat: m.threat ? pick(m.threat) : '',
+      whyLabel: t('lines.why', 'Why?'), whyHead: t('lines.whyHead', 'Why'), threatHead: t('lines.threat', 'Threat'),
+    };
+  }
+  // The threat arrows stand while a move card shows and go with it.
+  function syncThreats(s) {
+    const m = s.line && s.card && !s.card.ending ? s.line.moves[s.card.ply] : null;
+    const arrows = m?.threat?.arrows || [];
+    if (arrows.length) threats.show(arrows.map((a) => ({ from: nameSq(a.slice(0, 2)), to: nameSq(a.slice(2, 4)) })));
+    else threats.hide();
+  }
+
   function describe(s) {
     const L = s.line;
     const base = { title: pick(L.name), side: sideLabel(L), close: { label: t('explain.all', 'All openings'), run: () => explain.stop() } };
@@ -79,7 +114,7 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
     if (s.phase === 'preview') {
       return {
         ...base, action: goalText(L),
-        card: { title: `${base.title}, ${base.side}`, text: t('lines.legend', 'Gold squares: where the pieces that move end up. Tap Go to start from the beginning.'), kind: 'goal' },
+        card: { title: `${base.title}, ${base.side}`, text: t('lines.legend', 'Gold squares: where the pieces that move end up. Tap Go to start from the beginning.'), kind: 'goal', sections: introSections(L) },
         buttons: [{ id: 'go', icon: 'show', label: t('lines.go', 'Go'), aria: t('lines.go', 'Go'), primary: true, run: () => explain.go() }, end],
       };
     }
@@ -87,7 +122,7 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
       const ending = s.card && s.card.ending ? pick(L.ending) : '';
       return {
         ...base, action: t('lines.done', 'Line complete.'),
-        card: s.card ? (s.card.ending ? { title: t('lines.done', 'Line complete.'), text: ending, kind: 'ending' } : { title: show(L.moves[s.card.ply].san), text: pick(L.moves[s.card.ply]), kind: 'move' }) : null,
+        card: s.card ? (s.card.ending ? { title: t('lines.done', 'Line complete.'), text: ending, kind: 'ending' } : moveCard(L, s.card.ply)) : null,
         buttons: [again(true), end],
         extra: store ? adoptControl(s) : null,
       };
@@ -101,7 +136,7 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
     else action = t('lines.opponent', 'The opponent replies.');
     return {
       ...base, action, actionKind: kind,
-      card: s.card ? { title: show(L.moves[s.card.ply].san), text: pick(L.moves[s.card.ply]), kind: 'move' } : null,
+      card: s.card ? moveCard(L, s.card.ply) : null,
       buttons: [
         { id: 'next', icon: 'next', label: nextLabel, aria: nextLabel, primary: waiting, disabled: !waiting, run: () => explain.weiter() },
         { id: 'hint', icon: 'good', label: t('lines.hint', 'Hint'), aria: t(s.hint ? 'explain.hintOff' : 'explain.hintOn', s.hint ? 'Hide the hint' : 'Show the hint'), on: s.hint, pressed: s.hint, run: () => explain.setHint(!s.hint) },
@@ -120,6 +155,7 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
       root.replaceChildren(live ? view.desktop(desc) : idle);
     }
     document.body.classList.toggle('explaining', live);
+    syncThreats(s);
     view.show(desc);
   }
   explain.on(render);
@@ -127,5 +163,5 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
   onLanguage(render);
   render();
 
-  return { explain, hint, marks, card, view, idle, onSide, tick: (dt) => explain.tick(dt) };
+  return { explain, hint, marks, threats, card, view, idle, onSide, tick: (dt) => explain.tick(dt) };
 }

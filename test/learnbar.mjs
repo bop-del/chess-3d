@@ -42,7 +42,7 @@ export async function runLearnBarChecks({ browser, baseUrl, log = () => {}, part
         primary: [...document.querySelectorAll('.plbar .tb.primary')].map((b) => b.dataset.act),
         sizes: [...document.querySelectorAll('.plbar .tb')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }),
         textCut: text ? text.scrollHeight > text.clientHeight + 1 : null, cardInView: card ? card.getBoundingClientRect().bottom <= H : null,
-        cardBtns: card ? card.querySelectorAll('button:not(.xadopt)').length : null, cardBottom: card ? card.getBoundingClientRect().bottom : null,
+        cardBtns: card ? card.querySelectorAll('button:not(.xadopt):not(.xwhybtn)').length : null, whyBtns: card ? card.querySelectorAll('.xwhybtn').length : null, cardBottom: card ? card.getBoundingClientRect().bottom : null,
         cardTop: card ? card.getBoundingClientRect().top : null, topText: top ? top.textContent : null, topCut: top ? top.scrollHeight > top.clientHeight + 1 : null, topBottom: top ? top.getBoundingClientRect().bottom : null,
         view: c.views.current(),
       };
@@ -75,7 +75,8 @@ export async function runLearnBarChecks({ browser, baseUrl, log = () => {}, part
       await page.evaluate(() => { const g = window.__chess.game; g.clickSquare(g.nameSq('e2')); g.clickSquare(g.nameSq('e4')); });
       await step(1.5); await settle(); await shot('explain-after');
       const b = await geometry();
-      ok('explain: after the move the card shows its text, whole, and Next is the gold button', b.textCut === false && b.cardBtns === 0 && b.primary.join() === 'next', JSON.stringify([b.textCut, b.cardBtns, b.primary]));
+      // CHE-269: the one button the card holds is the Warum? toggle (owner decision), every other button lives in the bar
+      ok('explain: after the move the card shows its text, whole, and Next is the gold button', b.textCut === false && b.cardBtns === 0 && b.whyBtns === 1 && b.primary.join() === 'next', JSON.stringify([b.textCut, b.cardBtns, b.whyBtns, b.primary]));
       ok('explain: with the card up the board is still inside the free frame', inside(b), fmt(b));
       ok('explain: the board does not jump when the card appears', Math.abs((b.box.b - b.box.t) - (a.box.b - a.box.t)) < 2 && Math.abs(b.box.t - a.box.t) < 2, `${JSON.stringify(a.box)} -> ${JSON.stringify(b.box)}`);
       await step(4);

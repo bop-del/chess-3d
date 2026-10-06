@@ -161,3 +161,54 @@ export function createMarks({ gimbal }) {
     dispose() { gimbal.remove(group); live.delete(applyStyle); square.dispose(); ring.dispose(); ownMat.dispose(); quietMat.dispose(); ringMat.dispose(); },
   };
 }
+
+// The threat arrows of a move card (CHE-269): what the move just played threatens, one straight arrow per threat, in a warm red
+// so they never read as the gold move hint. Named `threat-arrows`, not `move-hint`, so the hint tests and the Play view's follow
+// camera leave them alone. `show([{ from, to }])` with engine squares replaces what is drawn, `hide()` clears it.
+const THREAT = 0xe0533d;
+export function createThreats({ gimbal }) {
+  const group = new THREE.Group();
+  group.name = 'threat-arrows';
+  group.visible = false;
+  gimbal.add(group);
+  const mat = new THREE.MeshBasicMaterial({
+    color: THREAT, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  const ringMat = mat.clone();
+  ringMat.opacity = 0.9;
+  const ring = new THREE.RingGeometry(0.34, 0.42, 28).rotateX(-Math.PI / 2);
+  let drawn = '';
+  function clear() {
+    for (const c of group.children) if (c.geometry !== ring) c.geometry.dispose();
+    group.clear();
+  }
+  return {
+    group,
+    show(list) {
+      const key = (list || []).map((a) => `${a.from}-${a.to}`).join();
+      if (key === drawn) { group.visible = group.children.length > 0; return; }
+      drawn = key;
+      clear();
+      for (const { from, to } of list || []) {
+        const dx = sqX(to) - sqX(from), dz = sqZ(to) - sqZ(from);
+        const dist = Math.hypot(dx, dz);
+        const startGap = 0.3, endGap = 0.08;
+        const len = Math.max(0.3, dist - startGap - endGap);
+        const m = new THREE.Mesh(new THREE.ShapeGeometry(arrowShape(len, 0.08, 0.26, 0.34)).rotateX(Math.PI / 2), mat);
+        const ux = dx / dist, uz = dz / dist;
+        m.position.set(sqX(from) + ux * startGap, LIFT * 3, sqZ(from) + uz * startGap);
+        m.rotation.set(0, -Math.atan2(uz, ux), 0);
+        m.renderOrder = 13;
+        const r = new THREE.Mesh(ring, ringMat);
+        r.position.set(sqX(to), LIFT * 3, sqZ(to)); r.renderOrder = 13;
+        group.add(m, r);
+      }
+      group.visible = group.children.length > 0;
+    },
+    hide() { group.visible = false; },
+    get visible() { return group.visible; },
+    get count() { return group.visible ? group.children.filter((c) => c.geometry !== ring).length : 0; },
+    dispose() { clear(); gimbal.remove(group); ring.dispose(); mat.dispose(); ringMat.dispose(); },
+  };
+}

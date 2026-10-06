@@ -34,7 +34,7 @@ body:not(.phone) .xtext { max-height: 30vh; overflow-y: auto; }
 .xaction[data-kind="refused"] { color: #ffb3a9; }
 .xcardbox { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); }
 /* one fixed height on the desktop too, whatever the text length (the longest text of a line fits; longer would scroll) */
-body:not(.phone) .xcardbox { height: 18em; overflow-y: auto; box-sizing: border-box; }
+body:not(.phone) .xcardbox { height: clamp(18em, 46vh, 28em); overflow-y: auto; box-sizing: border-box; }   /* CHE-269: room for why and threat */
 .xcardbox[data-kind="goal"] { border-color: rgba(216, 180, 104, 0.45); }
 .xcardbox[data-kind="refused"] .xcardhead { color: #ffb3a9; }
 .xcardempty { background: transparent; border-style: dashed; }
@@ -75,3 +75,16 @@ body.phone.lines .btn, body.phone .xline { min-height: 44px; }
 body.phone .plbar .tb[data-act="next"] span { white-space: normal; text-align: center; line-height: 1.05; font-size: 11px; }
 body.phone .plbar .tb[data-act="next"] { flex: 1.35 1 0; gap: 1px; }
 body.phone .plbar .tb[data-act="next"] svg { width: 20px; height: 20px; }
+
+/* CHE-269: the move card's why and threat, the phone's Warum? toggle, and the intro sections of a goal screen. */
+.xcardrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.xwhy { display: flex; flex-direction: column; gap: 4px; }
+.xwhy[hidden] { display: none; }
+.xwhy b, .xsechead { color: var(--gold); font-weight: 650; }
+.xthreat b { color: #ff9b85; }
+.xwhybtn { flex: none; padding: 4px 12px; font-size: 13px; }
+body.phone .xwhybtn { min-height: 44px; min-width: 84px; }
+.xsec { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.xsechead { font-size: 13px; }
+.xseclist { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.45; }
+.xseclist li + li { margin-top: 3px; }

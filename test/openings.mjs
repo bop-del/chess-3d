@@ -1,7 +1,7 @@
 // Opening lines: SAN parsing, the PGN parser, and every shipped line legal on src/rules.js.
 // Run: node test/openings.mjs    Exit 0 when every check holds, 1 otherwise.
 import { existsSync } from 'node:fs';
-import { Chess, START_FEN } from '../src/rules.js';
+import { Chess, START_FEN, nameSq } from '../src/rules.js';
 import { parse, mainLine } from '../src/openings/pgn.js';
 
 let bad = 0;
@@ -89,6 +89,43 @@ else {
       check(m.san === san, `${tag}: move ${i + 1} ${san} is written as ${m.san}`);
     });
     for (const m of l.moves || []) for (const lang of ['en', 'de']) if (m[lang] !== undefined) check(typeof m[lang] === 'string' && m[lang].length > 0, `${tag}: ${m.san} has ${lang} text`);
+    // CHE-269: aims, plans, traps per line; why on every move, threat where the move threatens something concrete
+    const text = (pair, what, max) => {
+      for (const lang of ['en', 'de']) {
+        const s = pair && pair[lang];
+        if (typeof s !== 'string' || !s.trim()) { fail(`${tag}: ${what} has no ${lang} text`); continue; }
+        if (/\u2014|--/.test(s)) fail(`${tag}: ${what} ${lang} has an em dash or a double hyphen`);
+        if (max && s.length > max) fail(`${tag}: ${what} ${lang} is ${s.length} characters, at most ${max}`);
+      }
+    };
+    text(l.aims?.w, 'aims.w', 200); text(l.aims?.b, 'aims.b', 200);
+    check(Array.isArray(l.plans) && l.plans.length > 0, `${tag}: has plans`);
+    (l.plans || []).forEach((p, i) => text(p, `plan ${i + 1}`, 200));
+    check(Array.isArray(l.traps) && l.traps.length >= 1 && l.traps.length <= 2, `${tag}: one or two traps`);
+    (l.traps || []).forEach((tr, i) => {
+      text(tr, `trap ${i + 1}`, 220);
+      if (tr.moves === undefined) return;
+      let tree;
+      try { tree = parse(tr.moves); } catch (err) { return fail(`${tag}: trap ${i + 1} moves are not legal: ${err.message}`); }
+      check(mainLine(tree).length > 0, `${tag}: trap ${i + 1} has moves`);
+    });
+    // the threat arrows: a pseudo legal move for the side that just moved, in the position after its move
+    const after = new Chess();
+    (l.moves || []).forEach((m, i) => {
+      after.playSan(m.san);
+      text(m.why, `move ${i + 1} ${m.san} why`, 160);
+      if (!m.threat) return;
+      text(m.threat, `move ${i + 1} ${m.san} threat`, 140);
+      check(Array.isArray(m.threat.arrows) && m.threat.arrows.length > 0, `${tag}: move ${i + 1} ${m.san} threat has arrows`);
+      const f = after.fen().split(' ');
+      f[1] = f[1] === 'w' ? 'b' : 'w'; f[3] = '-';
+      const mover = new Chess(f.join(' '));
+      const pseudo = new Set(mover.pseudoMoves().map((x) => `${x.from}-${x.to}`));
+      for (const a of m.threat.arrows || []) {
+        const ok = /^[a-h][1-8][a-h][1-8]$/.test(a) && pseudo.has(`${nameSq(a.slice(0, 2))}-${nameSq(a.slice(2, 4))}`);
+        check(ok, `${tag}: move ${i + 1} ${m.san} threat arrow ${a} is not a move of the side that just moved`);
+      }
+    });
   }
   console.log(`ok   ${(lines || []).length} lines checked`);
 }
