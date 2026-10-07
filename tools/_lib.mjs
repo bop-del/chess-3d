@@ -206,6 +206,11 @@ const versionOf = (exe) => { try { return (execFileSync(exe, ['--version'], { en
 let shellChoice;   // decided once per process: { path, version } or { warn }
 
 /** The chrome-headless-shell in the Puppeteer cache that matches the installed Chrome. { path } when it does, else { warn } with the one line to print (the caller then uses full Chrome). */
+/** The Chrome major version of a full version string ('141.0.7390.54' gives '141'); '' when it has none. */
+export const majorOf = (v) => (String(v || '').match(/^(\d+)\./) || [])[1] || '';
+/** True when two full Chrome versions share the major version: the shell and Chrome of one major render the same, the patch level does not matter. */
+export const sameMajor = (a, b) => !!majorOf(a) && majorOf(a) === majorOf(b);
+
 export function headlessShell() {
   if (shellChoice) return shellChoice;
   const chrome = chromePath();
@@ -220,7 +225,7 @@ export function headlessShell() {
   } catch (e) { /* no cache folder */ }
   if (!found) return (shellChoice = { warn: `chrome-headless-shell not installed, using full Chrome. Install it: ${install}` });
   const shellVersion = (found.dir.match(/\d+\.\d+\.\d+\.\d+/) || [])[0] || versionOf(found.exe);
-  if (chromeVersion && shellVersion !== chromeVersion) return (shellChoice = { warn: `chrome-headless-shell ${shellVersion} differs from Chrome ${chromeVersion}, using full Chrome. Update it: ${install}` });
+  if (chromeVersion && !sameMajor(shellVersion, chromeVersion)) return (shellChoice = { warn: `chrome-headless-shell ${shellVersion} has another major version than Chrome ${chromeVersion}, using full Chrome. Update it: ${install}` });
   return (shellChoice = { path: found.exe, version: shellVersion });
 }
 

@@ -26,9 +26,11 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 
 ## Fast tier
 
+`node test/run.mjs` runs the scripts below in a pool of 4 (`POOL` in test/run.mjs). Scripts that bind ports, start Chrome or touch shared files (the run lock, the Chrome registry, temp lane folders) form a serial chain in one worker (the `true` flag in the `FAST` list). Output is buffered per script and printed in list order, with the same `PASS`, `FAIL` and `INCOMPLETE` lines as before (`bin/land-lane` parses them). chrome-headless-shell is used when its major version equals the Chrome major version (`headlessShell()` in tools/_lib.mjs); otherwise one WARN prints both full versions and the install hint, and full Chrome runs. Changes under `server/` run no smoke group, except `server/index.mjs` and `server/live.mjs`, which also run the `online` page group (tools/affected-groups.mjs).
+
 - `test/perft.mjs`: perft counts for five reference positions, SAN, check, mate, stalemate, repetition, en passant, promotion, castling. Exits 1 on any mismatch.
 - `test/geometry.mjs`: builds all six pieces in both colors with the real materials, headless. Height within 8 percent of the contract (pawn 0.90, rook 1.00, knight 1.20, bishop 1.35, queen 1.60, king 1.85), footprint 0.5 to 0.85, centered within 0.06, sitting on y = 0, 20k to 90k triangles, finite positions and normals, shadow flags on every mesh.
-- `test/affected-groups.mjs`: the path to smoke group table, the Chrome slot rule, lane ports, the port refusal and the result cache keys.
+- `test/affected-groups.mjs`: the path to smoke group table (including the `server/` rule), the Chrome major version compare, the Chrome slot rule, lane ports, the port refusal and the result cache keys.
 - `test/audit-plan.mjs`: the audit planner's rules (docs only needs no browser tier, the stylesheet needs smoke, visual and device checks, and so on).
 - `test/openings.mjs`: every opening line is legal on the rules engine. `test/puzzle-progress.mjs`, `test/puzzle-controller.mjs`, `test/puzzles-data.mjs`: the puzzle store, the controller and the shipped data. `test/novice.mjs`: the Novice level rules (injected random). `test/train.mjs`: ladder, store and planner of the training core.
 - `test/lint.mjs`: no em dashes, no spaced double hyphen punctuation and no local absolute paths in text files (tracked, plus untracked files that are not ignored).

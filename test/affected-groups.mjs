@@ -3,7 +3,7 @@
 import { affectedGroups, MAP } from '../tools/affected-groups.mjs';
 import { FAMILIES, GROUPS } from './smoke-group-list.mjs';
 import { groupKey, groupFiles, longestFirst } from '../tools/result-cache.mjs';
-import { slotsFor, lanePorts, startServer, claimPort, portAnswers, safeDecode } from '../tools/_lib.mjs';
+import { slotsFor, majorOf, sameMajor, lanePorts, startServer, claimPort, portAnswers, safeDecode } from '../tools/_lib.mjs';
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -31,6 +31,16 @@ check('a group script change runs its group', g(['test/battle.mjs']) === 'battle
 check('the learn bar helper runs the groups that load it', g(['test/learnbar.mjs']) === 'learn,explain');
 check('every group name in the table is a real group', MAP.flatMap(([, gs]) => gs || []).every((n) => FAMILIES.includes(n)));
 check('every group script exists', GROUPS.every(([, s]) => existsSync(new URL('../' + s, import.meta.url))));
+
+check('server code: the fast tier only, no smoke group', g(['server/stats.mjs']) === '' && g(['server/db.mjs', 'server/admin.mjs', 'server/health.mjs', 'server/README.md', 'server/Dockerfile']) === '');
+check('server/index.mjs and server/live.mjs run the online page group', g(['server/index.mjs']) === 'online' && g(['server/live.mjs']) === 'online' && g(['server/live.mjs', 'server/stats.mjs']) === 'online');
+check('server change next to a core path still runs everything', g(['server/index.mjs', 'src/rules.js']) === 'ALL');
+
+// headlessShell compares the major version only
+check('majorOf reads the first number', majorOf('141.0.7390.54') === '141' && majorOf('') === '' && majorOf('abc') === '' && majorOf(undefined) === '');
+check('same major, other patch level: the shell is used', sameMajor('141.0.7390.54', '141.0.7390.122') && sameMajor('141.0.7390.54', '141.0.1.1'));
+check('another major: no match', !sameMajor('141.0.7390.54', '142.0.7444.1') && !sameMajor('99.0.1.1', '9.0.1.1'));
+check('an unreadable version never matches', !sameMajor('', '') && !sameMajor('', '141.0.1.1') && !sameMajor('141.0.1.1', ''));
 
 // Chrome slots, decision 3: with Metal load 1 under 8 gives 4, under 16 gives 3, else 2. Without Metal unchanged (under 6: 4, under 12: 3, else 2).
 check('metal: load 0 and 7.9 give 4 slots', slotsFor(0, true) === 4 && slotsFor(7.9, true) === 4);

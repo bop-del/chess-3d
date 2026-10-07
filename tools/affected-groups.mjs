@@ -41,6 +41,9 @@ export const MAP = [
   [/^src\/adapt\.js$/, ['adapt']],
   [/^src\/(intro|install-hint)\.js$/, ['intro', 'fixes']],
   [/^src\/dev\//, ['core']],
+  // server/ is no page code: the fast tier (test/online-*.mjs) covers it. Only the two files the online page talks to also run the online page group.
+  [/^server\/(index|live)\.mjs$/, ['online']],
+  [/^server\//, []],
   // test scripts: the group that runs the script
   [/^test\/(battle)\.mjs$/, ['battle']],
   [/^test\/music-page\.mjs$/, ['music']],

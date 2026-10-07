@@ -66,44 +66,84 @@ const runParallel = (steps, { cache = true } = {}) => {
 };
 
 const t0 = Date.now();
+// Fast tier scripts: [name, script, serial]. A serial script binds ports, starts Chrome or touches shared files (the run lock, the Chrome registry, temp lane folders): those run one after the other in one worker, the rest spread over the pool.
+const FAST = [
+  ['rules: perft and game logic (test/perft.mjs)', 'test/perft.mjs'],
+  ['piece geometry contract (test/geometry.mjs)', 'test/geometry.mjs'],
+  ['capture tray layout (test/trays.mjs)', 'test/trays.mjs'],
+  ['Pixelwelt figures contract (test/pixel-chars.mjs)', 'test/pixel-chars.mjs'],
+  ['Pixelwelt rules: closed ground, no coplanar faces, clamped textures, one material set (test/pixel-rules.mjs)', 'test/pixel-rules.mjs'],
+  ['Pixelwelt skies, backdrops, sets: choice, build and dispose, weather (test/pixel-sky.mjs)', 'test/pixel-sky.mjs'],
+  ['living pieces: signature moves and Pixelwelt birds (test/living.mjs)', 'test/living.mjs'],
+  ['option tiles: pictures, icons, flag (test/tiles.mjs)', 'test/tiles.mjs'],
+  ['text lint (test/lint.mjs)', 'test/lint.mjs'],
+  ['audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs'],
+  ['bin/lane flag parsing (test/lane-args.mjs)', 'test/lane-args.mjs', true],
+  ['bin/lane agent identity prepend (test/lane-identity.mjs)', 'test/lane-identity.mjs', true],
+  ['bin/lane kickoff verify and resend (test/kickoff.mjs)', 'test/kickoff.mjs', true],
+  ['affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs', true],
+  ['run lock and group retry classifier (test/run-lock.mjs)', 'test/run-lock.mjs', true],
+  ['chrome registry and reaper (test/reap-chromes.mjs)', 'test/reap-chromes.mjs', true],
+  ['opening lines are legal (test/openings.mjs)', 'test/openings.mjs'],
+  ['goal screens: target position, marks, goal sentences (test/goal.mjs)', 'test/goal.mjs'],
+  ['puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs'],
+  ['puzzle controller (test/puzzle-controller.mjs)', 'test/puzzle-controller.mjs'],
+  ['daily puzzle and streak (test/daily.mjs)', 'test/daily.mjs'],
+  ['badges: thresholds, wins, storage (test/badges.mjs)', 'test/badges.mjs'],
+  ['puzzle data is legal and solvable (test/puzzles-data.mjs)', 'test/puzzles-data.mjs'],
+  ['music data and logic (test/music.mjs)', 'test/music.mjs'],
+  ['game sound voices: levels, peak, clicks, DC, rendered offline in Chrome (test/sfx-voices.mjs)', 'test/sfx-voices.mjs', true],
+  ['novice level (test/novice.mjs)', 'test/novice.mjs'],
+  ['News rules and text (test/news.mjs)', 'test/news.mjs'],
+  ['chess clock (test/clock.mjs)', 'test/clock.mjs'],
+  ['adaptive quality governor (test/adapt.mjs)', 'test/adapt.mjs'],
+  ['TAA stillness detector (test/still.mjs)', 'test/still.mjs'],
+  ['game review core: classification, accuracy, engine (test/review-core.mjs)', 'test/review-core.mjs'],
+  ['training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs'],
+  ['online play server: invite, login, challenge, moves, chat, admin (test/online-server.mjs)', 'test/online-server.mjs', true],
+  ['online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs'],
+  ['own stats: events, limits, roll up, cleanup, /stats auth, sender (test/online-stats.mjs)', 'test/online-stats.mjs', true],
+  ['server history: samples, maxima, retention, gaps, markers, /stats Server section (test/online-health.mjs)', 'test/online-health.mjs', true],
+];
+const POOL = 4;
+
+/** Runs the fast tier scripts in a pool of POOL workers. Output is buffered per script and printed in list order; the PASS, FAIL and INCOMPLETE lines are the same as the old serial run (bin/land-lane parses them). */
+const runFast = async (list) => {
+  const slots = list.map(() => null);
+  const exec = (name, script) => new Promise((done) => {
+    const t = Date.now();
+    const c = spawn(process.execPath, [script], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    let text = ''; c.stdout.on('data', (d) => { text += d; }); c.stderr.on('data', (d) => { text += d; });
+    c.on('error', () => { text += 'Error: cannot start ' + script; });
+    c.on('close', (status) => done({ name, text, status, secs: (Date.now() - t) / 1000 }));
+  });
+  let next = 0;   // flush in list order as soon as the next row is ready
+  const flush = () => {
+    for (; next < slots.length && slots[next]; next++) {
+      const { name, text, status, secs } = slots[next], ok = status === 0;
+      results.push({ name, ok, secs, status });
+      console.log(`${ok ? 'PASS' : status === 3 ? 'INCOMPLETE' : 'FAIL'}  ${name}  ${secs.toFixed(1)}s`);
+      if (!ok) {
+        const lines = text.trim().split('\n'), bad = lines.filter((l) => /^FAIL|FAILED|Error/.test(l));
+        console.log((bad.length ? bad : lines.slice(-12)).slice(0, 25).map((l) => '      ' + l).join('\n'));
+      }
+    }
+  };
+  const jobs = list.map(([name, script, serial], i) => ({ name, script, serial, i }));
+  const queue = [...jobs.filter((j) => !j.serial), { chain: jobs.filter((j) => j.serial) }].filter((j) => !j.chain || j.chain.length);
+  queue.sort((a, b) => (b.chain ? 1 : 0) - (a.chain ? 1 : 0));   // the serial chain starts first: it is the longest
+  const worker = async () => {
+    for (let j; (j = queue.shift());) {
+      for (const x of j.chain || [j]) { slots[x.i] = await exec(x.name, x.script); flush(); }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(POOL, queue.length) }, worker));
+  flush();
+};
+
 if (tier === 'fast' || tier === 'all') {
   console.log('--- fast tier (no browser)');
-  run('rules: perft and game logic (test/perft.mjs)', 'test/perft.mjs');
-  run('piece geometry contract (test/geometry.mjs)', 'test/geometry.mjs');
-  run('capture tray layout (test/trays.mjs)', 'test/trays.mjs');
-  run('Pixelwelt figures contract (test/pixel-chars.mjs)', 'test/pixel-chars.mjs');
-  run('Pixelwelt rules: closed ground, no coplanar faces, clamped textures, one material set (test/pixel-rules.mjs)', 'test/pixel-rules.mjs');
-  run('Pixelwelt skies, backdrops, sets: choice, build and dispose, weather (test/pixel-sky.mjs)', 'test/pixel-sky.mjs');
-  run('living pieces: signature moves and Pixelwelt birds (test/living.mjs)', 'test/living.mjs');
-  run('option tiles: pictures, icons, flag (test/tiles.mjs)', 'test/tiles.mjs');
-  run('text lint (test/lint.mjs)', 'test/lint.mjs');
-  run('audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs');
-  run('bin/lane flag parsing (test/lane-args.mjs)', 'test/lane-args.mjs');
-  run('bin/lane agent identity prepend (test/lane-identity.mjs)', 'test/lane-identity.mjs');
-  run('bin/lane kickoff verify and resend (test/kickoff.mjs)', 'test/kickoff.mjs');
-  run('affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs');
-  run('run lock and group retry classifier (test/run-lock.mjs)', 'test/run-lock.mjs');
-  run('chrome registry and reaper (test/reap-chromes.mjs)', 'test/reap-chromes.mjs');
-  run('opening lines are legal (test/openings.mjs)', 'test/openings.mjs');
-  run('goal screens: target position, marks, goal sentences (test/goal.mjs)', 'test/goal.mjs');
-  run('puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs');
-  run('puzzle controller (test/puzzle-controller.mjs)', 'test/puzzle-controller.mjs');
-  run('daily puzzle and streak (test/daily.mjs)', 'test/daily.mjs');
-  run('badges: thresholds, wins, storage (test/badges.mjs)', 'test/badges.mjs');
-  run('puzzle data is legal and solvable (test/puzzles-data.mjs)', 'test/puzzles-data.mjs');
-  run('music data and logic (test/music.mjs)', 'test/music.mjs');
-  run('game sound voices: levels, peak, clicks, DC, rendered offline in Chrome (test/sfx-voices.mjs)', 'test/sfx-voices.mjs');
-  run('novice level (test/novice.mjs)', 'test/novice.mjs');
-  run('News rules and text (test/news.mjs)', 'test/news.mjs');
-  run('chess clock (test/clock.mjs)', 'test/clock.mjs');
-  run('adaptive quality governor (test/adapt.mjs)', 'test/adapt.mjs');
-  run('TAA stillness detector (test/still.mjs)', 'test/still.mjs');
-  run('game review core: classification, accuracy, engine (test/review-core.mjs)', 'test/review-core.mjs');
-  run('training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs');
-  run('online play server: invite, login, challenge, moves, chat, admin (test/online-server.mjs)', 'test/online-server.mjs');
-  run('online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs');
-  run('own stats: events, limits, roll up, cleanup, /stats auth, sender (test/online-stats.mjs)', 'test/online-stats.mjs');
-  run('server history: samples, maxima, retention, gaps, markers, /stats Server section (test/online-health.mjs)', 'test/online-health.mjs');
+  await runFast(FAST);
 }
 if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((r) => r.ok))) {
   if (!runLock && !rest.includes('--shots')) runLock = await acquireRunLock({ kind: 'smoke' });   // tier all: only after the fast tier passed, so a red fast tier never queues
