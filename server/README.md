@@ -82,4 +82,8 @@ user, the database under `/data`, `LABEL service="chess-online"`, listening on `
 stream sends `Cache-Control: no-cache` and `X-Accel-Buffering: no` and a heartbeat every 20 s, so it passes kamal-proxy. The Kamal
 config is written with the owner in the VPS step.
 
-Tests: `test/online-server.mjs` and `test/online-stats.mjs` (fast tier) and `test/online-page.mjs` (smoke group `online`).
+## Server history (CHE-306)
+
+Every 5 minutes (and once 10 s after start) the server writes one row into `server_health`: the chess server group (maxima over the interval of Present players, Live streams and running games, event loop delay in ms, RSS; requests, 4xx and 5xx; uptime; server start time) and the machine group (load 1/5/15, free and total memory, free and total disk of the volume the database lives on, database size incl. WAL). Maxima are kept between samples (`health.touch()` on every presence, stream and game change), so a visit shorter than 5 minutes still shows. Counts only: no player id, no IP. Rows older than 90 days go in the daily maintain step. `/stats` starts with a "Server" section: live values (red: disk over 85 percent used, free memory under 10 percent, event loop delay over 200 ms), then charts for 24 hours and 7 days as inline SVG (no script). A new server start time is a vertical marker, a missing slot is a gap. Code: `server/health.mjs`. Test: `test/online-health.mjs`.
+
+Tests: `test/online-server.mjs`, `test/online-stats.mjs`, `test/online-health.mjs` (fast tier) and `test/online-page.mjs` (smoke group `online`).

@@ -44,3 +44,4 @@ and nothing that can be linked to a person.
 - The stats cover only the online players, so they say little about the public page.
 - The raw table is capped by time, not by size; the per key daily cap bounds a runaway client.
 - A later switch to PostHog replaces `src/online/stats.js` and `server/stats.mjs`; the event kinds are the contract.
+- Server health (CHE-306) is kept the same way: one count-only row per 5 minutes in `server_health` for 90 days, shown on /stats, no player id and no IP.

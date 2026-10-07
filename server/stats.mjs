@@ -127,9 +127,18 @@ export function createStats(db, { now = () => Date.now() } = {}) {
 // ------------------------------------------------------------ dashboard
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const PAGE = (title, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(title)}</title><style>
-body{font:15px/1.45 system-ui,sans-serif;margin:0;padding:16px;background:#14161c;color:#e6e8ee;max-width:900px}
-h1{font-size:20px}h2{font-size:16px;margin:24px 0 6px;color:#9fb4ff}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:4px 8px;border-bottom:1px solid #2a2e3a}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#8a90a2}input,button{font:inherit;padding:8px}
+:root{color-scheme:dark light;--bg:#14161c;--fg:#e6e8ee;--h2:#9fb4ff;--line:#2a2e3a;--mut:#8a90a2;--card:#1b1e27;--c1:#7aa2ff;--c2:#6fd39a;--c3:#f0b45a;--c4:#e6d36a;--c5:#ff6b6b;--bad:#ff4d4d}
+@media (prefers-color-scheme:light){:root{--bg:#f6f7fa;--fg:#1b1e27;--h2:#2f4fbf;--line:#d5d9e3;--mut:#5d6477;--card:#fff;--c1:#2f5fe0;--c2:#1f9a5a;--c3:#c27a12;--c4:#a08a00;--c5:#d12b2b;--bad:#d12b2b}}
+body{font:15px/1.45 system-ui,sans-serif;margin:0;padding:16px;background:var(--bg);color:var(--fg);max-width:900px}
+h1{font-size:20px}h2{font-size:16px;margin:24px 0 6px;color:var(--h2)}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}.muted{color:var(--mut)}input,button{font:inherit;padding:8px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}.stat{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+.stat span{display:block;font-size:12px;color:var(--mut)}.stat b{font-variant-numeric:tabular-nums}.stat.bad{border-color:var(--bad)}.stat.bad b{color:var(--bad)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:10px}figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px}
+figcaption{font-size:13px;color:var(--mut);margin:0 0 2px 4px}.chart{width:100%;height:auto;display:block}.chart .tx{font-size:10px;fill:var(--mut)}.chart .ax{stroke:var(--line);stroke-width:1}
+.chart .ln{fill:none;stroke-width:1.5}.chart .c1{stroke:var(--c1);fill:var(--c1)}.chart .c2{stroke:var(--c2);fill:var(--c2)}.chart .c3{stroke:var(--c3);fill:var(--c3)}.chart .c4{stroke:var(--c4);fill:var(--c4)}.chart .c5{stroke:var(--c5);fill:var(--c5)}
+.chart .ln.c1,.chart .ln.c2,.chart .ln.c3,.chart .ln.c4,.chart .ln.c5{fill:none}.chart text.c1,.chart text.c2,.chart text.c3,.chart text.c4,.chart text.c5{stroke:none}
+.chart .lim{stroke:var(--bad);stroke-width:1;stroke-dasharray:4 3}.chart .mk{stroke:var(--mut);stroke-width:1;stroke-dasharray:2 2}.chart .bad{fill:var(--bad);stroke:none}
 </style></head><body>${body}</body></html>`;
 
 export const loginPage = (bad) => PAGE('Stats', `<h1>Stats</h1>${bad ? '<p>Wrong secret.</p>' : ''}<form method="post" action="/stats"><input type="password" name="secret" autocomplete="off" autofocus> <button>Open</button></form>`);
@@ -137,7 +146,7 @@ export const loginPage = (bad) => PAGE('Stats', `<h1>Stats</h1>${bad ? '<p>Wrong
 const table = (head, rowsHtml) => rowsHtml.length ? `<table><tr>${head.map((h, i) => `<th${i ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr>${rowsHtml.join('')}</table>` : '<p class="muted">Nothing yet.</p>';
 const tr = (cells) => `<tr>${cells.map((c, i) => `<td${i ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}</tr>`;
 
-export function dashboardPage(r7, r30) {
+export function dashboardPage(r7, r30, serverHtml = '') {
   const block = (r) => `<h2>Last ${r.days} days</h2>
 <p>Sessions: <b>${r.sessions.n}</b>, average length ${r.sessions.avgSeconds} s</p>
 ${table(['Day', 'Sessions'], r.sessions.perDay.map(([d, n]) => tr([d, n])))}
@@ -146,7 +155,7 @@ ${table(['Day', 'Sessions'], r.sessions.perDay.map(([d, n]) => tr([d, n])))}
 <h3>Errors by place</h3>${table(['Where', 'Errors'], r.errorsByWhere.slice(0, 15).map((f) => tr([f.key, f.n])))}
 <h3>Performance tiers</h3>${table(['Tier', 'Sessions', 'Avg load ms'], r.perf.map((p) => tr([p.tier, p.n, p.avgLoadMs])))}`;
   const recent = r30.recentErrors.length ? `<h2>Latest errors</h2>${table(['When (UTC)', 'Where', 'Device', 'Message'], r30.recentErrors.map((e) => `<tr><td>${esc(new Date(e.at).toISOString().slice(0, 16).replace('T', ' '))}</td><td>${esc(e.where)}</td><td>${esc(e.device)}</td><td>${esc(e.message)}</td></tr>`))}` : '';
-  return PAGE('Stats', `<h1>chess-3d stats</h1><p class="muted">Logged in online players only. Raw events ${RAW_DAYS} days, daily sums forever.</p>${block(r7)}${block(r30)}${recent}`);
+  return PAGE('Stats', `<h1>chess-3d stats</h1><p class="muted">Logged in online players only. Raw events ${RAW_DAYS} days, daily sums forever.</p>${serverHtml}${block(r7)}${block(r30)}${recent}`);
 }
 
 /** constant time compare of the secret (both sides hashed, so the length does not leak) */

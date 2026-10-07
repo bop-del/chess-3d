@@ -9,6 +9,7 @@ import { existsSync } from 'node:fs';
 import { Chess, nameSq } from '../src/rules.js';
 import { openDb, sha256, normCode, adminOps, newKey } from './db.mjs';
 import { createLive } from './live.mjs';
+import { createHealth, serverSection, systemProbe, SAMPLE_MS } from './health.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
 export const STALE_MS = 3 * 24 * 3600 * 1000;   // a game with no move for 3 days: the waiting player may end it as a win
@@ -27,12 +28,18 @@ export function originAllowed(origin, list) {
   } catch (e) { return false; }
 }
 
-export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, trustProxy = false, adminSecret = '', log = () => {}, random = Math.random } = {}) {
+export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', log = () => {}, random = Math.random } = {}) {
   const admin = adminOps(db, now);
   const stats = createStats(db, { now });
-  stats.maintain();   // CHE-291: roll up and clean on start, then once a day
-  const statsTimer = setInterval(() => { try { stats.maintain(); } catch (e) { console.error(e); } }, 24 * 3600 * 1000);
+  const health = createHealth(db, { now, probe: probe || systemProbe({ dbFile: dbFile || ':memory:' }), gauges: {
+    present: () => live.ids().length, streams: () => live.streamCount(), games: () => q("SELECT COUNT(*) AS n FROM games WHERE status = 'active'").get().n,
+  } });   // CHE-306: the server history; the gauges read live, which is created below
+  stats.maintain(); health.prune();   // CHE-291: roll up and clean on start, then once a day
+  const statsTimer = setInterval(() => { try { stats.maintain(); health.prune(); } catch (e) { console.error(e); } }, 24 * 3600 * 1000);
   statsTimer.unref();
+  const sampleSafe = () => { try { health.sample(); } catch (e) { console.error(e); } };
+  const sampleTimer = setInterval(sampleSafe, sampleMs), firstTimer = setTimeout(sampleSafe, firstSampleMs);   // CHE-306: one row per 5 minutes, one soon after start
+  sampleTimer.unref(); firstTimer.unref();
   const q = (sql) => db.prepare(sql);
   const playerById = (id) => q('SELECT * FROM players WHERE id = ?').get(id);
   const playerByName = (name) => q('SELECT * FROM players WHERE name = ?').get(String(name));
@@ -121,7 +128,8 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   // ------------------------------------------------------------ live
   const live = createLive({
     heartbeatMs,
-    onPresence: () => broadcast(),
+    onPresence: () => { health.touch(); broadcast(); },
+    onStream: () => health.touch(),
     onBeat: () => { for (const id of live.ids()) { const p = playerById(id); if (!p || p.revoked) live.drop(id); } },
   });
   function broadcast() { for (const id of live.ids()) { const s = stateFor(id); if (s) live.send(id, 'state', s); else live.drop(id); } }
@@ -267,7 +275,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         if (!given && req.method === 'POST') given = String((await readBody(req, 1024, (t) => Object.fromEntries(new URLSearchParams(t)))).secret || '');
         if (!given) { status = 401; return html(401, loginPage(false)); }
         if (!secretOk(given, adminSecret)) { loginFailed(ip); status = 401; return html(401, loginPage(true)); }
-        return html(200, dashboardPage(stats.report(7), stats.report(30)));
+        return html(200, dashboardPage(stats.report(7), stats.report(30), serverSection(health, { now: now() })));
       }
       const auth = String(req.headers.authorization || '');
       const me = authKey(auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
@@ -299,11 +307,13 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         db.exec('COMMIT');
       } catch (e) { db.exec('ROLLBACK'); throw e; }
       send(req, res, 200, out);
+      health.touch();
       broadcast();
     } catch (e) {
       if (e instanceof Fail) { status = e.status; if (!res.headersSent) send(req, res, e.status, { error: e.code }); }
       else { status = 500; console.error(e); if (!res.headersSent) send(req, res, 500, { error: 'server' }); }
     } finally {
+      health.request(status);
       log(`${req.method} ${path} ${status}`);   // never the Authorization header, never a body
     }
   }
@@ -311,9 +321,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   const server = createServer((req, res) => { handle(req, res); });
   server.keepAliveTimeout = 65000;
   return {
-    server, db, admin, live, stats, stateFor, broadcast,
+    server, db, admin, live, stats, health, stateFor, broadcast,
     listen: (port, host) => new Promise((ok) => server.listen(port, host, () => ok(server.address().port))),
-    close: () => new Promise((ok) => { clearInterval(statsTimer); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
+    close: () => new Promise((ok) => { clearInterval(statsTimer); clearInterval(sampleTimer); clearTimeout(firstTimer); health.stop(); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
   };
 }
 
@@ -333,7 +343,7 @@ export function loadEnv() {
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const env = loadEnv();
-  const app = createOnlineServer({ db: openDb(env.db), origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
+  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
   const port = await app.listen(env.port, env.host);
   console.log(`online server on http://${env.host}:${port} (db ${env.db})`);
   const stop = () => { app.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 2000).unref(); };

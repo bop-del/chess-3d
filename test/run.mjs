@@ -103,6 +103,7 @@ if (tier === 'fast' || tier === 'all') {
   run('online play server: invite, login, challenge, moves, chat, admin (test/online-server.mjs)', 'test/online-server.mjs');
   run('online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs');
   run('own stats: events, limits, roll up, cleanup, /stats auth, sender (test/online-stats.mjs)', 'test/online-stats.mjs');
+  run('server history: samples, maxima, retention, gaps, markers, /stats Server section (test/online-health.mjs)', 'test/online-health.mjs');
 }
 if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((r) => r.ok))) {
   if (!runLock && !rest.includes('--shots')) runLock = await acquireRunLock({ kind: 'smoke' });   // tier all: only after the fast tier passed, so a red fast tier never queues

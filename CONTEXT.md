@@ -252,6 +252,14 @@ _Avoid_: rating, record, ranking
 How the game reaches the server: connected (green), connecting (grey, right after a drop or on return to the app), unreachable (red, after 10 s without one). Without a connection an online game's board is locked.
 _Avoid_: online status (that is a player's presence), network
 
+**Live stream**:
+One open line from one device or tab of a logged in player to the server, through which the server pushes changes. A player can have several at once (phone and laptop).
+_Avoid_: connection (that is the status the player sees), socket, session
+
+**Present**:
+A player with at least one open live stream. Closing the last one makes the player absent.
+_Avoid_: online (overloaded), connected, active
+
 ### Bubble
 A tappable note over the board with an x, for a new chat message, the summary of unread messages after a load, or the running online game. Two at most: game on top, chat below. Hiding one never marks a message read.
 _Avoid_: notification, toast (a toast is the short grey line without a tap)

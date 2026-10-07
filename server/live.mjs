@@ -2,7 +2,7 @@
 // stream of theirs is open. Every event is `state` with the same shape as GET /state; a comment line every 20 s keeps proxies
 // (kamal-proxy, nginx) from closing an idle stream. The transport lives here and in src/online/api.js only, so a later switch to
 // WebSocket touches these two files.
-export function createLive({ heartbeatMs = 20000, onPresence = () => {}, onBeat = () => {} } = {}) {
+export function createLive({ heartbeatMs = 20000, onPresence = () => {}, onBeat = () => {}, onStream = () => {} } = {}) {
   const streams = new Map();   // player id -> Set of responses
   const timer = setInterval(() => {
     for (const set of streams.values()) for (const res of set) { try { res.write(': hb\n\n'); } catch (e) { /* closed */ } }
@@ -33,15 +33,19 @@ export function createLive({ heartbeatMs = 20000, onPresence = () => {}, onBeat 
       const done = () => {
         const set = streams.get(id);
         if (!set || !set.delete(res)) return;
+        onStream(false);
         if (!set.size) { streams.delete(id); onPresence(id, false); }
       };
       req.on('close', done);
       res.on('close', done);
       if (!was) onPresence(id, true);
+      onStream(true);
     },
     send(id, event, data) { for (const res of streams.get(id) || []) write(res, event, data); },
     online: (id) => (streams.get(id)?.size || 0) > 0,
     ids: () => [...streams.keys()],
+    /** open live streams over all players (a Present player can have several) */
+    streamCount() { let n = 0; for (const set of streams.values()) n += set.size; return n; },
     /** end every stream of a player (revoked, deleted) */
     drop(id) { for (const res of streams.get(id) || []) { try { res.end(); } catch (e) { /* gone */ } } streams.delete(id); },
     close() { clearInterval(timer); for (const id of [...streams.keys()]) this.drop(id); },
