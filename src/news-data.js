@@ -5,7 +5,7 @@ export const NEWS = [
   {
     version: '1.9.1', date: '2026-10-07',
     de: [
-      'Der Online-Reiter sieht besser aus: Spielerkarten, ein schwebender Chat und eine klare Wartezeile.',
+      'Der Online-Reiter sieht schöner aus: Spielerkarten, ein schwebender Chat und eine klare Wartezeile.',
       'Symbole bleiben am Brett ausgerichtet und drehen sich nicht mehr zu dir.',
       'Das rechte Fenster am Computer lässt sich wieder nach oben scrollen.',
       'Glattere Kanten und ein weicher Nebel in der Ferne, Pixelwelt ohne kleine Fehler.',
