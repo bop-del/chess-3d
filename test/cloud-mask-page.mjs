@@ -12,7 +12,7 @@ const PORT = Number((args.find((a) => a.startsWith('--port=')) || '--port=5356')
 const SHOTS = (args.find((a) => a.startsWith('--shots=')) || '').slice(8);
 const BASE = (args.find((a) => a.startsWith('--base=')) || '').slice(7).replace(/\/$/, '');
 const R = reporter();
-const COVER = 64;   // a cloud over a pixel changes it by 200 or more; below that is the post process glow of the bright cloud (bloom), not a cloud over the board
+const COVER = 64;   // (CHE-300: the low tier now runs FXAA, which blends one or two edge pixels toward a cloud next to the board: more than 2 pixels over in one camera is a cloud over the board)   // a cloud over a pixel changes it by 200 or more; below that is the post process glow of the bright cloud (bloom), not a cloud over the board
 const OUT = '.tmp/cloud-mask-dist';
 if (!BASE && !args.includes('--skip-build')) build(OUT);
 const server = BASE ? { stop() {} } : await startServer({ mode: 'preview', port: PORT, outDir: OUT });
@@ -58,7 +58,7 @@ try {
           if (Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > COVER) { over++; maxd = Math.max(maxd, Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])); dx0 = Math.min(dx0, x); dx1 = Math.max(dx1, x); dy0 = Math.min(dy0, y); dy1 = Math.max(dy1, y); }
         }
         cameras++; pixels += n; noise += noisy;
-        if (over > 0) { badCams.push([yaw, pitch, dist, over, [dx0, dy0, dx1, dy1].join(',') + ' max' + maxd, clouds.filter((c) => c.visible).map((c) => +c.userData.fade.toFixed(2)).join('/')]); worst = Math.max(worst, over); }
+        if (over > 2) { badCams.push([yaw, pitch, dist, over, [dx0, dy0, dx1, dy1].join(',') + ' max' + maxd, clouds.filter((c) => c.visible).map((c) => +c.userData.fade.toFixed(2)).join('/')]); worst = Math.max(worst, over); }
         if (clouds.some((c) => c.visible && c.userData.fade > 0.5)) skyCams++;
       }
       return { cameras, pixels, worst, noise, bad: badCams.length, first: badCams.slice(0, 4), skyCams };

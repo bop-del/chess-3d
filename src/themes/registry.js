@@ -4,7 +4,7 @@
 //   pieces(ctx) -> { white: { body, accent }, black: { body, accent }, dark } property specs, or null for the classic pieces
 //   world(ctx)  -> { group, update(dt), dispose() } an optional scene of its own (the Blocks island), added to the gimbal
 //   pieceStyle(ctx) -> a piece style for pieceSet.setStyle (block characters), or absent
-//   light(ctx)  -> { preset, key, fill, rim, exposure, env, floor, bg, post } (see stage.setThemeLight), or null
+//   light(ctx)  -> { preset, key, fill, rim, exposure, tone ('neutral', default ACES), env, floor, bg, post } (see stage.setThemeLight), or null
 // ctx = { THREE, quality, base, track(texture) }. Every texture a theme builds goes through track(): it is disposed when the theme
 // is left, so ten switches leave no textures behind. Classic is today's look: no module, nothing built.
 import * as THREE from 'three';

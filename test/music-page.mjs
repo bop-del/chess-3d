@@ -102,6 +102,7 @@ try {
   // every piece of set b rendered offline with the real piano: a small static server for the music modules, no game page
   const srv = createServer((q, r) => {
     const u = q.url.split('?')[0];
+    if (u === '/favicon.ico') { r.statusCode = 204; return r.end(); }   // Chrome asks for it on a bare page: not a missing asset
     if (u === '/') { r.setHeader('content-type', 'text/html'); return r.end('<!doctype html><title>music render</title>'); }
     try { const b = readFileSync(join(ROOT, u.replace(/\.\./g, ''))); r.setHeader('content-type', extname(u) === '.js' ? 'text/javascript' : 'text/plain'); r.end(b); } catch (e) { r.statusCode = 404; r.end('not found'); }
   });

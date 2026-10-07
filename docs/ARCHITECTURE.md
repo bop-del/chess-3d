@@ -94,16 +94,18 @@ Per frame: `controls.update(dt)`, `game.update(dt)`, `board.update(dt, t)`, `ui.
       quality, lightingPreset, composer, contextLost   // read only
     }
 
-- Tone mapping: ACES filmic, sRGB output. A procedural studio environment (softbox panels on a dome) is built with PMREM and assigned to `scene.environment`.
+- Tone mapping (CHE-300): ACES filmic by default, sRGB output. A theme light spec may carry `tone: 'neutral'` (Neutral tone mapping, more saturated and truer to the textures; Tournament uses it with exposure 0.84): `setThemeLight` switches `renderer.toneMapping`, `OutputPass` follows by itself. Distance fog: `scene.fog` (Fog, colour synced to the backdrop in `applyState`), near and far are set per frame relative to the camera distance (`d + 1.5`, `d + 34`), so the board stays clear on a phone where the camera sits further back; it fades the far world, Pixelwelt included (the unlit materials take fog). The backdrop glow is stronger than the preset values (`paintBackdrop`: glow colour x1.9, amount x1.7, at least 1.6), for every theme. A procedural studio environment (softbox panels on a dome) is built with PMREM and assigned to `scene.environment`.
 - Shadows use `PCFShadowMap` (the soft variant is deprecated in r186). `shadowMap.autoUpdate` is off: the stage updates the shadow map once per frame so the shadow, reflection and ambient occlusion passes share it.
 - A lighting preset is plain data: key, fill and rim light colour, intensity and direction, the environment panels, the backdrop gradient, exposure, bloom, vignette, tint, shadow opacity and floor colour. Add an entry to `PRESET_DEFS` to add a preset.
 - Quality tiers (`QUALITY` in the same file):
 
 | Tier | Shadow map | Pixel ratio cap | Post chain |
 |---|---|---|---|
-| high | 4096 | 2 | 4x MSAA, ambient occlusion (GTAO), bloom, SMAA, floor reflection |
-| medium | 2048 | 1.5 | bloom, SMAA, weaker floor reflection |
-| low | 1024 | 1 | none, plain render |
+| high | 4096 | 2 | 4x MSAA, ambient occlusion (GTAO), bloom, TAA still and SMAA moving, floor reflection |
+| medium | 2048 | 1.5 | bloom, TAA still and SMAA moving, weaker floor reflection |
+| low | 1024 | 1 | render, output, grade, FXAA (no bloom, no AO, no reflection) |
+
+TAA (CHE-300): `TAARenderPass` replaces the plain render pass on high and medium, 2 jittered samples per frame. `src/still.js` `createStillness(scene, camera)` hashes the camera, every object transform and visibility, material look and instanced data each frame (no allocation): while the hash equals the last frame the pass accumulates (`accumulate = true`, SMAA off), the first changed frame goes back to a plain render with SMAA on, so moving pieces leave no ghosts. Lights, theme, tone, size and quality changes bump an extra key (`stillExtra`) that also restarts it. Under `?manual=1` each `draw()` is a frame: a still picture converges after about 16 draws. Test: `test/still.mjs` (fast tier).
 
 - Context loss (every device): the stage listens for `webglcontextlost` on the canvas and calls `preventDefault`, which allows a restore. While the context is lost `render()` draws nothing. On `webglcontextrestored` it rebuilds what the dead context owned (shadow map, reflection target, post chain, environment map) and goes on. `onContext(state)` is called with `'lost'`, `'stalled'` (nothing came back within 4 s), `'ok'` or `'failed'` (the rebuild threw); `src/main.js` shows the `#notice` element, a tap to reload message, for `stalled` and `failed`. Tests force it with the `WEBGL_lose_context` extension.
 - The final pass is a small grade shader: vignette, tint, a gentle contrast curve and a dither against banding.

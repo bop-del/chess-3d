@@ -97,6 +97,7 @@ if (tier === 'fast' || tier === 'all') {
   run('News rules and text (test/news.mjs)', 'test/news.mjs');
   run('chess clock (test/clock.mjs)', 'test/clock.mjs');
   run('adaptive quality governor (test/adapt.mjs)', 'test/adapt.mjs');
+  run('TAA stillness detector (test/still.mjs)', 'test/still.mjs');
   run('game review core: classification, accuracy, engine (test/review-core.mjs)', 'test/review-core.mjs');
   run('training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs');
   run('online play server: invite, login, challenge, moves, chat, admin (test/online-server.mjs)', 'test/online-server.mjs');

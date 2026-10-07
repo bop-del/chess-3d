@@ -147,7 +147,7 @@ async function boot() {
       intro.setTarget(introTarget(shownProgress));
     } catch (e) { intro = null; introFailed(e); }
   }
-  const compile = () => { try { stage.renderer.compileAsync(stage.scene, stage.camera).catch(() => {}); } catch (e) { /* compiled on first draw instead */ } };
+  const compile = () => { try { stage.compile().catch(() => {}); } catch (e) { /* compiled on first draw instead */ } };
 
   // render loop: starts now, so the king turns while the rest loads. The full per frame update replaces `advance` once it exists.
   const boot = window.__chessBoot;

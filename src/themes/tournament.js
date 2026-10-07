@@ -20,7 +20,7 @@ export function light() {
     preset: 'Gallery',
     key: { color: '#fff4e2', intensity: 2.8, dir: [-5, 14, 8] },
     fill: { color: '#f0f4ff', intensity: 1.2, dir: [10, 8, 7] },
-    exposure: 1.05, floor: '#1d1a16',
+    exposure: 0.84, tone: 'neutral', floor: '#1d1a16',
     bg: { top: '#34322d', bottom: '#14130f', glow: '#615c50', glowAmount: 0.6 },
     post: { bloom: 0.05, vignette: 0.3 },
   };

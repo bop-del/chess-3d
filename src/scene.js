@@ -7,6 +7,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { FXAAPass } from 'three/addons/postprocessing/FXAAPass.js';
+import { TAARenderPass } from 'three/addons/postprocessing/TAARenderPass.js';
+import { createStillness } from './still.js';
 
 const FLOOR_Y = -1.2;
 const LIGHT_DIST = 22;
@@ -15,21 +18,23 @@ const TRANSITION_SECONDS = 0.9;
 
 // ---------------------------------------------------------------------------
 // Quality tiers. Each tier really changes cost: shadow map, pixel ratio, post chain, reflection.
+// Anti aliasing (CHE-300): high and medium accumulate jittered frames (TAA) while the picture stands still and use SMAA while it moves;
+// low runs the cheapest chain (render, output, grade, FXAA).
 // ---------------------------------------------------------------------------
 const QUALITY = {
   high: {
     shadowSize: 4096, shadowRadius: 3.2, bias: -0.00022, normalBias: 0.022,
-    pixelRatioCap: 2, post: true, msaa: 4, gtao: true, bloom: true, smaa: true,
+    pixelRatioCap: 2, post: true, msaa: 4, gtao: true, bloom: true, smaa: true, taa: true, fxaa: false,
     reflection: 0.5, pmrem: 256
   },
   medium: {
     shadowSize: 2048, shadowRadius: 2.0, bias: -0.00035, normalBias: 0.03,
-    pixelRatioCap: 1.5, post: true, msaa: 0, gtao: false, bloom: true, smaa: true,
+    pixelRatioCap: 1.5, post: true, msaa: 0, gtao: false, bloom: true, smaa: true, taa: true, fxaa: false,
     reflection: 0.3, pmrem: 256
   },
   low: {
     shadowSize: 1024, shadowRadius: 1.4, bias: -0.0006, normalBias: 0.05,
-    pixelRatioCap: 1, post: false, msaa: 0, gtao: false, bloom: false, smaa: false,
+    pixelRatioCap: 1, post: true, msaa: 0, gtao: false, bloom: false, smaa: false, taa: false, fxaa: true,
     reflection: 0, pmrem: 128
   }
 };
@@ -268,7 +273,7 @@ export function createStage(canvas, opts = {}) {
     canvas, antialias: true, powerPreference: 'high-performance', alpha: false, stencil: false
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;   // a theme may ask for Neutral (light spec tone), see setThemeLight
   renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoftShadowMap is deprecated since r186 and aliases this
@@ -286,6 +291,8 @@ export function createStage(canvas, opts = {}) {
   renderer.setSize(width, height);
 
   const scene = new THREE.Scene();
+  // distance fog (CHE-300): the far side of the board and the world beyond it sink into the backdrop colour (synced in applyState)
+  scene.fog = new THREE.Fog(0x08090c, 13, 46);
   const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 200);
   camera.position.set(0, 9, 11);
   camera.lookAt(0, 0, 0);
@@ -310,6 +317,7 @@ export function createStage(canvas, opts = {}) {
   bgTexture.minFilter = THREE.LinearFilter;
   bgTexture.generateMipmaps = false;
   scene.background = bgTexture;
+  const _glow = new THREE.Color();
   function paintBackdrop(s) {
     const W = bgCanvas.width, H = bgCanvas.height;
     const g = bgCtx.createLinearGradient(0, 0, 0, H);
@@ -318,8 +326,9 @@ export function createStage(canvas, opts = {}) {
     bgCtx.fillStyle = g;
     bgCtx.fillRect(0, 0, W, H);
     const cx = W * 0.5, cy = H * 0.56;
-    const a = Math.min(1, 0.55 * s.bg.glowAmount);
-    const css = s.bg.glow.getStyle(); // rgb(r,g,b)
+    // the glow behind the board is stronger than the preset values (CHE-300): the colour x1.9, the amount x1.7 and at least 1.6
+    const a = Math.min(1, 0.55 * Math.max(1.6, s.bg.glowAmount * 1.7));
+    const css = _glow.copy(s.bg.glow).multiplyScalar(1.9).getStyle(); // rgb(r,g,b)
     const rgb = css.slice(css.indexOf('(') + 1, css.indexOf(')'));
     const rg2 = bgCtx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.62);
     rg2.addColorStop(0, `rgba(${rgb},${a})`);
@@ -521,12 +530,14 @@ export function createStage(canvas, opts = {}) {
 
   // ---- post-processing ----
   let composer = null;
-  let gtaoPass = null, bloomPass = null, gradePass = null, smaaPass = null;
+  let gtaoPass = null, bloomPass = null, gradePass = null, smaaPass = null, taaPass = null, fxaaPass = null;
+  const stillness = createStillness(scene, camera);
+  let stillExtra = 0;   // bumped by lights, theme, quality and size changes: they restart the TAA accumulation
   function buildPipeline() {
     if (composer) {
       composer.renderTarget1.dispose(); composer.renderTarget2.dispose();
-      [gtaoPass, bloomPass, smaaPass].forEach((p) => p && p.dispose && p.dispose());
-      composer = gtaoPass = bloomPass = gradePass = smaaPass = null;
+      [gtaoPass, bloomPass, smaaPass, taaPass].forEach((p) => p && p.dispose && p.dispose());
+      composer = gtaoPass = bloomPass = gradePass = smaaPass = taaPass = fxaaPass = null;
     }
     if (!cfg.post) return;
     let rt;
@@ -538,7 +549,8 @@ export function createStage(canvas, opts = {}) {
     composer = new EffectComposer(renderer, rt);
     composer.setPixelRatio(pixelRatio);
     composer.setSize(width, height);
-    composer.addPass(new RenderPass(scene, camera));
+    if (cfg.taa) { taaPass = new TAARenderPass(scene, camera); taaPass.sampleLevel = 1; taaPass.accumulate = false; composer.addPass(taaPass); }
+    else composer.addPass(new RenderPass(scene, camera));
     if (cfg.gtao) {
       gtaoPass = new GTAOPass(scene, camera, width * pixelRatio, height * pixelRatio);
       gtaoPass.output = GTAOPass.OUTPUT.Default;
@@ -567,6 +579,8 @@ export function createStage(canvas, opts = {}) {
       composer.addPass(smaaPass);
       smaaPass.setSize(width * pixelRatio, height * pixelRatio);
     }
+    if (cfg.fxaa) { fxaaPass = new FXAAPass(); composer.addPass(fxaaPass); fxaaPass.setSize(width * pixelRatio, height * pixelRatio); }
+    stillness.reset();
     syncPostUniforms();
   }
   function syncPostUniforms() {
@@ -591,7 +605,7 @@ export function createStage(canvas, opts = {}) {
     rim.position.copy(_v); rim.color.copy(cur.rim.color); rim.intensity = cur.rim.intensity * dim;
     scene.environmentIntensity = cur.env.intensity * dim;
   }
-  function setDim(k) { dim = k; applyLights(); }
+  function setDim(k) { dim = k; applyLights(); stillExtra++; }
   function applyState() {
     applyLights();
     renderer.toneMappingExposure = cur.exposure;
@@ -600,6 +614,8 @@ export function createStage(canvas, opts = {}) {
     shadowMat.opacity = cur.shadowOpacity * floorVisibility;
     syncPostUniforms();
     paintBackdrop(cur);
+    if (scene.fog) scene.fog.color.copy(cur.bg.bottom).lerp(cur.bg.glow, 0.25);
+    stillExtra++;
   }
 
   applyState();
@@ -658,7 +674,16 @@ export function createStage(canvas, opts = {}) {
     }
     return s;
   }
+  function setTone(tone) {
+    const t = tone === 'neutral' ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
+    if (renderer.toneMapping === t) return;
+    renderer.toneMapping = t;
+    // the scene is drawn into float targets and OutputPass tone maps (it follows renderer.toneMapping by itself)
+    if (!composer) scene.traverse((o) => { for (const m of [].concat(o.material || [])) m.needsUpdate = true; });
+    stillExtra++;
+  }
   function setThemeLight(spec) {
+    setTone(spec && spec.tone);
     startTransition(spec ? themeState(spec) : presetStates[currentName]);
   }
   const qualityListeners = [];
@@ -666,6 +691,7 @@ export function createStage(canvas, opts = {}) {
   function setFloorVisibility(t) {
     floorWanted = Math.min(1, Math.max(0, t));
     floorVisibility = floorHidden ? 0 : floorWanted;
+    stillExtra++;
     applyFloorVisibility();
     floorUniforms.reflStrength.value = cfg.reflection > 0 ? cur.reflection * floorVisibility : 0;
   }
@@ -704,7 +730,9 @@ export function createStage(canvas, opts = {}) {
       composer.setSize(width, height);
       if (gtaoPass) gtaoPass.setSize(width * pixelRatio, height * pixelRatio);
       if (smaaPass) smaaPass.setSize(width * pixelRatio, height * pixelRatio);
+      if (fxaaPass) fxaaPass.setSize(width * pixelRatio, height * pixelRatio);
     }
+    stillExtra++;
     setupReflectionTarget();
     syncPostUniforms();
   }
@@ -727,7 +755,7 @@ export function createStage(canvas, opts = {}) {
   canvas.addEventListener('webglcontextrestored', () => {
     clearTimeout(lostTimer);
     try {
-      envTarget = null; reflTarget = null; composer = gtaoPass = bloomPass = gradePass = smaaPass = null; // owned by the dead context
+      envTarget = null; reflTarget = null; composer = gtaoPass = bloomPass = gradePass = smaaPass = taaPass = fxaaPass = null; // owned by the dead context
       applyShadowQuality();
       setupReflectionTarget();
       buildPipeline();
@@ -749,13 +777,31 @@ export function createStage(canvas, opts = {}) {
     renderer.shadowMap.needsUpdate = true;
     if (reflTarget && floorVisibility > 0.02) renderReflection();
     if (gradePass) gradePass.uniforms.time.value = time;
+    if (scene.fog) {   // relative to the camera (it sits further back on a phone): the board itself stays clear, only the far world fades
+      const d = camera.position.length();
+      scene.fog.near = d + 1.5; scene.fog.far = d + 34;
+    }
+    if (taaPass) {
+      // accumulate only while the whole picture stands still, SMAA while it moves (no ghosts behind moving pieces)
+      const still = stillness.check(stillExtra) && transT >= 1;
+      taaPass.accumulate = still;
+      if (smaaPass) smaaPass.enabled = !still;
+    }
     if (composer) composer.render(dt);
     else renderer.render(scene, camera);
   }
 
+  // pre compile the programs the frames will use: the scene is drawn into the composer target, whose output settings (no tone
+  // mapping, float colour) make other programs than the screen would, so compile against that target (not twice, CHE-300)
+  function compile() {
+    const prev = renderer.getRenderTarget();
+    if (composer) renderer.setRenderTarget(composer.renderTarget1);
+    try { return renderer.compileAsync(scene, camera); } finally { renderer.setRenderTarget(prev); }
+  }
+
   function dispose() {
     if (composer) { composer.renderTarget1.dispose(); composer.renderTarget2.dispose(); }
-    [gtaoPass, bloomPass, smaaPass].forEach((p) => p && p.dispose && p.dispose());
+    [gtaoPass, bloomPass, smaaPass, taaPass].forEach((p) => p && p.dispose && p.dispose());
     if (reflTarget) reflTarget.dispose();
     if (envTarget) envTarget.dispose();
     pmrem.dispose();
@@ -772,7 +818,7 @@ export function createStage(canvas, opts = {}) {
     get camera() { return camera; },
     lights: { key, fill, rim },
     lightingPresets,
-    setLightingPreset, setThemeLight, setFloorHidden, setDim, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, dispose,
+    setLightingPreset, setThemeLight, setFloorHidden, setDim, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, compile, dispose,
     // extras (beyond the contract, harmless)
     get quality() { return quality; },
     get lightingPreset() { return currentName; },
