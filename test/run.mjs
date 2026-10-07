@@ -80,6 +80,7 @@ const FAST = [
   ['text lint (test/lint.mjs)', 'test/lint.mjs'],
   ['audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs'],
   ['bin/lane flag parsing (test/lane-args.mjs)', 'test/lane-args.mjs', true],
+  ['bin/lane preland arguments, merge, tiers, stamp (test/lane-preland.mjs)', 'test/lane-preland.mjs', true],
   ['bin/lane agent identity prepend (test/lane-identity.mjs)', 'test/lane-identity.mjs', true],
   ['bin/lane kickoff verify and resend (test/kickoff.mjs)', 'test/kickoff.mjs', true],
   ['affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs', true],

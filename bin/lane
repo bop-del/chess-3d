@@ -22,6 +22,11 @@
 //                                       builder or engineer, from the brief's `Mode:` line (builder when missing; tools/lane-identity.mjs, CHE-104).
 //                                       CHE-241: the kickoff is verified (tools/kickoff.mjs): the agent must turn working within 60 s, else the prompt is
 //                                       resent, 3 times at most, then a RED line and exit 1. The text is kept in <lane>/.tmp/<name>/kickoff.txt.
+//   bin/lane preland [<branch>] [--all] [--no-cache]   (CHE-311) the builder's last step before it reports: merge main into the lane (and private
+//                                       main into its private worktree), fast tier, the lane's affected smoke groups (--all: every group), on the merged
+//                                       tree; writes .tmp/preland.json, which the Stop hook checks before it accepts `ready to land`. Land then
+//                                       finds the same tree green and its groups CACHED. Prints `preland green: ...` | `red: <step>` | `conflict: <files>`
+//                                       | `dirty: ...` (exit 0, 1, 3, 1). Run it inside the lane, with the lane committed.
 //   bin/lane list                       open lanes of this repo
 //   bin/lane land <branch> [-m <msg>]   land a green lane with no agent (the private bin/land-lane): lock, merge main, fast tier, the
 //                                       lane's affected smoke groups, release-next add, then close below; prints `landed <sha>`,
@@ -45,9 +50,10 @@ import { fileURLToPath } from 'node:url';
 import { parseLaneFlags } from '../tools/lane-args.mjs';
 import { agentPrompt } from '../tools/lane-identity.mjs';
 import { sendKickoff } from '../tools/kickoff.mjs';
+import { parsePrelandArgs, prelandRun } from '../tools/lane-preland.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const USAGE = 'usage: bin/lane open <che-n-words | branch --key CHE-n> [--key CHE-n]... [--private] [--agent <name> <brief> [--model <m>]] | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
+const USAGE = 'usage: bin/lane open <che-n-words | branch --key CHE-n> [--key CHE-n]... [--private] [--agent <name> <brief> [--model <m>]] | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane preland [<branch>] [--all] [--no-cache] | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
 const LEAD = 'chess-3d-lead';   // the lead session\'s Herdr agent name
 const die = (msg, code = 1) => { console.error(msg); process.exit(code); };
 // the main clone, also when this script runs from inside a lane. Every git command below runs there.
@@ -290,6 +296,26 @@ function closeLocked(branch, message, noLinear) {
   console.log('Servers the lane started are not stopped here: stop them by PID. Pushing needs the owner\'s go.');
 }
 
+// CHE-311: the builder's last step. Runs in the lane's own worktree (the lane of the current directory, or <branch>'s).
+function preland(args) {
+  let o; try { o = parsePrelandArgs(args); } catch (e) { die(USAGE, 2); }
+  const here = (() => { try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: process.cwd(), encoding: 'utf8' }).trim(); } catch (e) { return null; } })();
+  const lane = o.branch ? lanes().find((w) => w.branch === o.branch) : lanes().find((w) => w.path === here);
+  if (!lane) die(o.branch ? `no open lane ${o.branch}: bin/lane list` : 'preland runs inside a lane worktree (or name the lane: bin/lane preland <branch>)', 2);
+  const priv = privatePathOf(lane.branch);
+  const sh = (cmd, a, { cwd, shell = false } = {}) => { const r = spawnSync(cmd, a, { cwd, encoding: 'utf8', shell, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }); return { status: r.status ?? 1, out: `${r.stdout || ''}${r.stderr || ''}` }; };
+  const io = { sh, fast: process.env.PRELAND_FAST_CMD || 'node test/run.mjs', smoke: process.env.PRELAND_SMOKE_CMD || 'node test/run.mjs smoke', now: () => Date.now(),
+    privateDir: priv, privateMerge: priv ? () => {
+      const w = privateLane('wip', lane.branch); if (w.status !== 0) return { ok: false, out: `private wip failed: ${(w.stderr || w.stdout).trim()}` };
+      const m = privateLane('merge-main', lane.branch); const o = m.stdout.trim();
+      return m.status === 0 ? { ok: true, moved: o === 'moved' } : { ok: false, files: o.replace(/^conflict:\s*/, '').split(/,\s*/).filter(Boolean), out: (m.stderr || o) };
+    } : null,
+    privateTests: priv ? (process.env.PRELAND_PRIVATE_CMD || 'for f in test-*.mjs; do node "$f" >/dev/null || { echo "$f failed"; exit 1; }; done') : null };
+  const r = prelandRun({ dir: lane.path, branch: lane.branch, io, all: o.all, noCache: o.noCache });
+  console.log(r.line); if (r.detail) console.log(r.detail);
+  process.exit(r.ok ? 0 : r.kind === 'conflict' ? 3 : 1);
+}
+
 // landing by script (S49): hands over to the private bin/land-lane, which ends in `bin/lane close` itself
 function land(branch, message) {
   const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'land-lane');
@@ -305,6 +331,7 @@ try {
   if (cmd === 'open') { const o = flags(rest, { key: true, priv: true, agent: true }); if (o.pos.length !== 1) die(USAGE, 2); open(o.pos[0], o.key, !!o.priv, o.agent, o.model); }
   else if (cmd === 'agent' && (rest.length === 3 || (rest.length === 5 && rest[3] === '--model'))) agent(rest[0], rest[1], rest[2], rest[4]);
   else if (cmd === 'list' && !rest.length) list();
+  else if (cmd === 'preland') preland(rest);
   else if (cmd === 'land' && (rest.length === 1 || (rest.length === 3 && rest[1] === '-m'))) land(rest[0], rest[2]);
   else if (cmd === 'close') { const o = flags(rest, { m: true, noLinear: true }); if (o.pos.length !== 1) die(USAGE, 2); close(o.pos[0], o.m, !!o.noLinear); }
   else die(USAGE, 2);
