@@ -2,6 +2,50 @@
 
 A short tour of how Chess 3D is put together. Plain ES modules on top of three.js 0.186, bundled by Vite. The game loads no asset files while it runs (the PNGs in `public/` are for the Home Screen and link previews): geometry comes from code, textures from canvas, the lighting environment from a generated studio map.
 
+## Section index
+
+Read only the section for the module you change. Sections are listed in file order.
+
+- [Coordinates](#coordinates)
+- [Layout](#layout)
+- [Boot order](#boot-order-srcmainjs)
+- [Modules and APIs](#modules-and-apis)
+  - [src/scene.js](#srcscenejs)
+  - [Themes: src/themes/](#themes-srcthemes)
+  - [src/device.js](#srcdevicejs)
+  - [src/textures.js, src/materials.js](#srctexturesjs-srcmaterialsjs)
+  - [src/board.js](#srcboardjs)
+  - [src/pieces/setA.js, src/pieces/setB.js, src/pieceset.js](#srcpiecessetajs-srcpiecessetbjs-srcpiecesetjs)
+  - [src/rules.js](#srcrulesjs)
+  - [src/ai.js](#srcaijs)
+  - [src/goodmove.js](#srcgoodmovejs)
+  - [src/review/](#srcreview-game-review)
+  - [src/game.js](#srcgamejs)
+  - [Projection and focus](#projection-and-focus-srcscenejs-srccontrolsjs)
+  - [src/controls.js](#srccontrolsjs)
+  - [src/views/registry.js](#srcviewsregistryjs)
+  - [src/views/symbols.js](#srcviewssymbolsjs)
+  - [src/views/play.js](#srcviewsplayjs)
+  - [src/ui.js](#srcuijs)
+  - [Battle scenes: src/battle/director.js, settings.js, the capture hook in game.js, controls.cinematic](#battle-scenes-srcbattledirectorjs-settingsjs-the-capture-hook-in-gamejs-controlscinematic)
+  - [Music: src/music/](#music-srcmusic)
+  - [src/openings/explain.js, explain-panel.js, lineview.js, goal.js, arrow.js](#srcopeningsexplainjs-explain-paneljs-lineviewjs-goaljs-arrowjs)
+  - [src/puzzles/](#srcpuzzles)
+  - [src/learn/, src/train/](#srclearn-srctrain-learn-adopt-mine-drill)
+  - [src/clock.js, src/clock-ui.js](#srcclockjs-srcclock-uijs-chess-clock)
+  - [src/adapt.js](#srcadaptjs-adaptive-quality)
+  - [src/news.js, news-rules.js, news-data.js, version.js](#srcnewsjs-news-rulesjs-news-datajs-versionjs-version-line-and-news-che-235)
+  - [src/install-hint.js](#srcinstall-hintjs)
+  - [src/dev/diag.js](#srcdevdiagjs)
+  - [Assets in public/](#assets-in-public)
+  - [Menu structure A](#menu-structure-a-default-menuold-for-the-old-menu-che-223-che-226)
+  - [src/living.js, themes/blocks/moves.js, themes/pixel/birds.js](#srclivingjs-themesblocksmovesjs-themespixelbirdsjs-living-pieces-che-238)
+  - [Online play: server/, src/online/](#online-play-server-srconline-che-271-adr-0009)
+- [Test tiers and the smoke runner](#test-tiers-and-the-smoke-runner)
+- [Test hooks](#test-hooks)
+- [Conventions](#conventions)
+- [The open flag](#the-open-flag)
+
 ## Coordinates
 
 - One board square = 1.0 unit. Y is up. The board top surface is at y = 0, centred at x = z = 0.
