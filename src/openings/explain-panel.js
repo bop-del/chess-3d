@@ -11,6 +11,7 @@ import { createLineView } from './lineview.js';
 import '../learn/strings.js';
 import { createHint, createMarks, createThreats } from './arrow.js';
 import { nameSq } from '../rules.js';
+import { chooseIntroStyle, introModel, introNode } from './intro.js';
 import './explain.css';
 
 const { t, onLanguage, i18n } = I18N;
@@ -19,6 +20,9 @@ const { t, onLanguage, i18n } = I18N;
 I18N.addDE({
   'lines.about': 'Worum es geht', 'lines.aimsW': 'Was Weiß will', 'lines.aimsB': 'Was Schwarz will',
   'lines.plans': 'Typische Pläne', 'lines.traps': 'Fallen', 'lines.why': 'Warum?', 'lines.whyHead': 'Warum', 'lines.threat': 'Droht',
+  // CHE-288: the three intro layouts (src/openings/intro.js)
+  'lines.more': 'Mehr', 'lines.less': 'Weniger', 'lines.tabAim': 'Ziel', 'lines.tabPlan': 'Plan', 'lines.tabTrap': 'Falle',
+  'lines.whiteS': 'Weiß', 'lines.blackS': 'Schwarz',
 });
 
 const el = (tag, cls, text) => {
@@ -79,17 +83,16 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
   const sideLabel = (l) => t(l.side === 'w' ? 'explain.forWhite' : 'explain.forBlack', l.side === 'w' ? 'You play White' : 'You play Black');
 
   // ------------------------------------------------------------ the descriptor
-  // The goal screen's intro in fixed sections: what it is about, what each side wants, typical plans, traps. A section without
-  // text is left out, so a player's own line shows only what it has.
-  function introSections(L) {
-    const out = [];
-    if (L.intro) out.push({ head: t('lines.about', 'What it is about'), text: pick(L.intro) });
-    if (L.aims?.w) out.push({ head: t('lines.aimsW', 'What White wants'), text: pick(L.aims.w) });
-    if (L.aims?.b) out.push({ head: t('lines.aimsB', 'What Black wants'), text: pick(L.aims.b) });
-    if (L.plans?.length) out.push({ head: t('lines.plans', 'Typical plans'), items: L.plans.map(pick) });
-    if (L.traps?.length) out.push({ head: t('lines.traps', 'Traps'), items: L.traps.map(pick) });
-    return out;
+  // The goal screen's intro (CHE-288): one of three layouts, `?introstyle=a|b|c` (src/openings/intro.js). The open toggle or tab
+  // stays while the card re-renders and starts fresh for the next line. A line without any intro text has no intro.
+  const introStyle = chooseIntroStyle(location.search);
+  let introState = { id: null };
+  function introCard(L) {
+    if (introState.id !== L.id) introState = { id: L.id };
+    const model = introModel(L, introStyle, { t, pick, legend: legend() });
+    return model ? introNode(model, introState) : null;
   }
+  const legend = () => t('lines.legend', 'Gold squares: where the pieces that move end up. Tap Go to start from the beginning.');
   function moveCard(L, ply) {
     const m = L.moves[ply];
     return {
@@ -112,9 +115,10 @@ export function mountExplain({ game, controls, ui, gimbal, pause = 900, store = 
     const end = { id: 'end', icon: 'end', label: t('lines.end', 'End'), aria: t('explain.all', 'All openings'), run: () => explain.stop() };
     const again = (primary) => ({ id: 'again', icon: 'undo', label: t('lines.again', 'Again'), aria: t('lines.again', 'Again'), primary, run: () => explain.restart() });
     if (s.phase === 'preview') {
+      const introEl = introCard(L);   // variant a folds the legend into its More box, but only when there is an intro to fold it into
       return {
         ...base, action: goalText(L),
-        card: { title: `${base.title}, ${base.side}`, text: t('lines.legend', 'Gold squares: where the pieces that move end up. Tap Go to start from the beginning.'), kind: 'goal', sections: introSections(L) },
+        card: { title: `${base.title}, ${base.side}`, text: introEl ? (introStyle === 'a' ? '' : legend()) : legend(), kind: 'goal', node: introEl },
         buttons: [{ id: 'go', icon: 'show', label: t('lines.go', 'Go'), aria: t('lines.go', 'Go'), primary: true, run: () => explain.go() }, end],
       };
     }

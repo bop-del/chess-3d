@@ -10,7 +10,8 @@
     { "flag": "review", "item": "CHE-155", "status": "open", "question": "keep both game review guidance variants, or drop a (b, the summary first, is the default)" },
     { "flag": "menu", "item": "CHE-223", "status": "open", "question": "remove ?menu=old once Menu A has shipped for one release" },
     { "flag": "rqueen", "status": "open", "question": "pick the Blocks red queen look a, b or c (a is the default; the Blocks theme is hidden)" },
-    { "flag": "musicset", "status": "open", "question": "pick the background music set a or b (a is the default)" }
+    { "flag": "musicset", "status": "open", "question": "pick the background music set a or b (a is the default)" },
+    { "flag": "introstyle", "item": "CHE-288", "status": "open", "question": "pick the Learn intro layout a, b or c (a is the default)" }
   ],
   "normal": [
     "adapt", "ai", "backdrop", "birds", "clock", "daily", "diag", "fen", "gore", "help", "hud", "intro", "light", "line",

@@ -137,5 +137,50 @@ else {
   console.log(`ok   ${(lines || []).length} lines checked`);
 }
 
+// --- CHE-288: the three intro layouts of a goal screen: every section text of a line is reachable, a missing section leaves no
+// empty part, the labels exist in both languages and no layout adds a dash as punctuation.
+{
+  const intro = await import('../src/openings/intro.js');
+  const mod = await import('../src/openings/lines.js');
+  const lines = mod.OPENINGS || mod.LINES || mod.default;
+  const DASH = new RegExp(`${String.fromCharCode(0x2014)}| ${'-'.repeat(2)} |${'-'.repeat(2)}`);
+  const noDe = [];
+  // the German labels are the ones registered in explain-panel.js (addDE), read from its source
+  const panel = (await import('node:fs')).readFileSync(new URL('../src/openings/explain-panel.js', import.meta.url), 'utf8');
+  const de = {};
+  for (const k of ['lines.more', 'lines.less', 'lines.tabAim', 'lines.tabPlan', 'lines.tabTrap', 'lines.whiteS', 'lines.blackS']) de[k] = (panel.match(new RegExp(`'${k.replace('.', '\\.')}': '([^']+)'`)) || [])[1];
+  check(intro.chooseIntroStyle('?introstyle=b') === 'b' && intro.chooseIntroStyle('?introstyle=c') === 'c' && intro.chooseIntroStyle('?introstyle=a') === 'a', 'introstyle a, b and c are picked');
+  check(intro.chooseIntroStyle('') === intro.DEFAULT_INTRO_STYLE && intro.chooseIntroStyle('?introstyle=z') === intro.DEFAULT_INTRO_STYLE && intro.chooseIntroStyle('?intro=b') === intro.DEFAULT_INTRO_STYLE, 'no, an unknown or the start sequence flag gives the default style');
+  check(intro.firstSentence('One. Two.') === 'One.' && intro.firstSentence('Only one') === 'Only one', 'firstSentence cuts at the first full stop');
+  const bare = { id: 'x', intro: { en: 'Just this.', de: 'Nur das.' } };
+  const noPlans = { ...lines.find((l) => l.id === 'italian-game'), plans: undefined };
+  const noTraps = { ...lines.find((l) => l.id === 'italian-game'), traps: [] };
+  for (const lang of ['en', 'de']) {
+    const tx = { t: (k, d) => (lang === 'de' && de[k]) || d, pick: (p) => (p ? p[lang] || p.en || '' : ''), legend: 'Gold squares.' };
+    for (const style of intro.INTRO_STYLES) {
+      for (const L of [...lines, noPlans, noTraps, bare]) {
+        const tag = `intro ${style} ${lang} ${L.id}`;
+        const sections = intro.introSections(L, tx);
+        const m = intro.introModel(L, style, tx);
+        const got = new Set(intro.reachableTexts(m));
+        const want = sections.flatMap((x) => (x.items || [x.text]));
+        for (const w of want) check(got.has(w), `${tag}: a section text is not reachable: ${w.slice(0, 40)}`);
+        check(want.every((w) => w && w.trim()) && [...got].every((g) => g && g.trim()), `${tag}: an empty text row`);
+        if (m?.style === 'b') check(m.tabs.length > 0 && m.tabs.every((x) => x.rows.length && x.label), `${tag}: an empty tab`);
+        if (m?.style === 'c') check(m.steps.length === want.length, `${tag}: steps do not match the texts`);
+        if (L === noPlans && m?.style === 'b') check(!m.tabs.some((x) => x.id === 'plan'), `${tag}: a Plan tab without plans`);
+        if (L === noTraps && m?.style === 'b') check(!m.tabs.some((x) => x.id === 'trap'), `${tag}: a Trap tab without traps`);
+        if (L === noTraps && m?.style === 'c') check(!m.steps.some((x) => x.kind === 'trap'), `${tag}: a trap step without traps`);
+        if (m?.style === 'a') check(m.lead.length > 0 && m.lead.every((x) => (x.text || x.aims.length)), `${tag}: an empty lead`);
+        check(!DASH.test(JSON.stringify(m)), `${tag}: a dash as punctuation`);
+      }
+    }
+    if (lang === 'de') for (const k of Object.keys(de)) if (!de[k] || de[k] === k) noDe.push(k);
+  }
+  check(!noDe.length, `intro labels without German: ${noDe}`);
+  check(intro.introModel({ id: 'e' }, 'a', { t: (k, d) => d, pick: () => '' }) === null, 'a line without any intro text has no intro');
+  console.log('ok   intro layouts a, b, c');
+}
+
 if (bad) { console.log(`\n${bad} check(s) failed`); process.exit(1); }
 console.log('ok   openings');

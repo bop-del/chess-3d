@@ -1,6 +1,6 @@
 // The look of a running line, shared by Explain and Drill (CHE-129). One descriptor in, two layouts out:
 //
-//   desc = { action, title, side, card: { text, kind, title?, key?, sections?, why?, threat?, whyLabel?, whyHead?, threatHead? } | null, buttons: [{ id, label, icon, aria, primary, disabled, on,
+//   desc = { action, title, side, card: { text, kind, title?, key?, node?, sections?, why?, threat?, whyLabel?, whyHead?, threatHead? } | null, buttons: [{ id, label, icon, aria, primary, disabled, on,
 //            pressed, run }], close: { label, run } | null, extra: Node | null }
 //
 // Top: `action` says only what to do now ("Play e4"). Bottom: only buttons. Between the moves: the text card, which holds the
@@ -68,6 +68,7 @@ export function createLineView({ ui, owner }) {
     }
     if (c.text) box.append(el('p', 'xcardtext', c.text));
     if (extra) box.append(extra);
+    if (c.node) box.append(c.node);   // CHE-288: the intro of a goal screen, built by intro.js
     for (const sec of c.sections || []) {
       const s = el('div', 'xsec');
       s.append(el('b', 'xsechead', sec.head));
