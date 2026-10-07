@@ -3,6 +3,19 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.10.1', date: '2026-10-08',
+    de: [
+      'Online spielen ist jetzt für alle Eingeladenen gleich auf der Seite da.',
+      'Die Kacheln in den Optionen sehen ausgewählt viel ruhiger aus: ein goldener Rahmen ums Bild.',
+      'Symbole: Schwarz und Weiß schauen wieder gleich herum.',
+    ],
+    en: [
+      'Online play is now right there on the site for everyone invited.',
+      'Selected option tiles look much calmer: one gold ring around the picture.',
+      'Symbols: Black and White face the same way again.',
+    ],
+  },
+  {
     version: '1.10.0', date: '2026-10-08',
     de: [
       'Lernen: Jede Eröffnung beginnt mit einem kurzen, übersichtlichen Einstieg.',
