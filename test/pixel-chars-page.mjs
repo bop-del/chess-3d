@@ -64,17 +64,6 @@ try {
     R.expect(`capture ${mode} blood ${gore ? 'on' : 'off'}: afterwards the board is clean, no cube is left, the victim is in the tray`, !after.audit.length && !after.busy && after.left === 0 && after.tray === 1, JSON.stringify(after));
   }
 
-  // CHE-219: the pawn variants a (default), c (double thrust) and b (falls back to a) through the real director: red appears, the board ends clean, the pawn is back in its rest pose
-  for (const variant of ['c', 'b']) {
-    await ev(({ m, vr }) => { history.replaceState(null, '', `?pawngore=${vr}`); const c = window.__chess; c.battle.settings.set({ mode: m, gore: true }); c.game.loadFen('8/8/8/3p4/4P3/8/8/4K2k w - - 0 1'); c.step(2); c.game.move('e4', 'd5'); }, { m: 'short', vr: variant });
-    let peakRed = 0, armed = false;
-    const armedNow = () => ev(() => { const w = window.__chess.game.root.children.find((o) => o.userData.piece && o.name === 'wp' && o.userData.noTurn); return !!w && w.getObjectByName('spear').visible && w.getObjectByName('poseSpear').visible && !w.getObjectByName('poseRest').visible; });
-    for (let i = 0; i < 160 && (i < 4 || (await ev(() => window.__chess.game.busy))); i++) { await ev(async () => { await window.__chess.stepAsync(0.1); }); peakRed = Math.max(peakRed, await reds()); armed = armed || await armedNow(); }
-    R.expect(`pawngore ${variant}: during the capture the pawn shows the spear pose and the spear`, armed);
-    await ev(async () => { await window.__chess.stepAsync(3); });
-    const end = await ev(() => { const g = window.__chess.game; const w = g.root.children.find((o) => o.userData.piece && o.name === 'wp' && o.position.x < -0.4 && o.position.x > -0.6); const sp = w?.getObjectByName('spear'), ps = w?.getObjectByName('poseSpear'), pr = w?.getObjectByName('poseRest'); return { audit: g.audit(), busy: g.busy, tray: g.getState().captured.b.length, spear: !!sp && !sp.visible && sp.scale.x === 1 && !ps.visible && pr.visible && sp.parent?.name === 'rig', noTurn: !!w?.userData.noTurn }; });
-    R.expect(`pawngore ${variant}: the capture plays with blood, ends clean, the pawn is back in its rest pose`, peakRed > 0 && !end.audit.length && !end.busy && end.tray === 1 && end.spear && !end.noTurn, JSON.stringify({ peakRed, ...end }));
-  }
   await ev(() => history.replaceState(null, '', '?'));
 
   await ev(() => window.__chess.battle.settings.set({ mode: 'on', gore: true }));

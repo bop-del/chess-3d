@@ -58,9 +58,8 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
   for (const [type, name] of Object.entries(TYPES)) { const gap = mean('w', type) - mean('b', type); check(`${name}: White is lighter than Black in greyscale`, gap >= (type === 'p' ? 40 : 25), `gap ${gap.toFixed(0)}`); }
 }
 // CHE-219, CHE-273: both pawns stand in a rest pose (White arms folded, Black arms stretched out) and hold the spear in both hands only in the
-// capture scene: the spear pose is its own hidden rig groups, point forward; ?pawngore picks the capture variant
+// capture scene: the spear pose is its own hidden rig groups, point forward
 {
-  const { pawnVariant } = await import('../src/battle/scenes/pixel-gore.js');
   const { SPEAR, PAWN_UNIT } = await import('../src/themes/pixel/seta.js');
   for (const color of ['w', 'b']) {
     const tag = color === 'w' ? 'white pawn' : 'black pawn';
@@ -79,7 +78,6 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
     check(`${tag}: setPawnPose swaps to the spear pose and back`, during && vis('poseRest') && !vis('poseSpear') && !vis('spear'));
     check(`${tag}: two hands close round the shaft`, skin.length === 2 && skin.every((h) => Math.abs(h.x - shaft.x) < 1.2 && h.y <= shaft.y && h.y + h.h >= shaft.y + shaft.h && h.z - h.d / 2 > shaft.z - shaft.d / 2 && h.z + h.d / 2 < shaft.z + shaft.d / 2), `${skin.length} hands`);
   }
-  check('pawngore: a and c; b, anything else and no flag fall back to a', ['?pawngore=a', '?pawngore=b', '?pawngore=C', '?pawngore=x', '', '?pawngore='].map((q) => pawnVariant(q)).join('') === 'aacaaa');
 }
 console.log(failed ? `\n${failed} check(s) failed` : '\nPixelwelt figures contract passed');
 process.exit(failed ? 1 : 0);

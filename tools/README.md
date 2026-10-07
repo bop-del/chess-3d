@@ -33,6 +33,7 @@ Four tiers (fast, smoke, phone, release), from instant to thorough. `npm test` r
 - `test/affected-groups.mjs`: the path to smoke group table (including the `server/` rule), the Chrome major version compare, the Chrome slot rule, lane ports, the port refusal and the result cache keys.
 - `test/audit-plan.mjs`: the audit planner's rules (docs only needs no browser tier, the stylesheet needs smoke, visual and device checks, and so on).
 - `test/openings.mjs`: every opening line is legal on the rules engine. `test/puzzle-progress.mjs`, `test/puzzle-controller.mjs`, `test/puzzles-data.mjs`: the puzzle store, the controller and the shipped data. `test/novice.mjs`: the Novice level rules (injected random). `test/train.mjs`: ladder, store and planner of the training core.
+- `test/flags.mjs` (CHE-315): the preview flag registry `docs/preview-flags.json`. An open flag has an item or a question and is still read in src; a picked flag has a pickRef and no reader in src. `node tools/check-flags.mjs` (the land check, scanner in `tools/flag-scan.mjs`) fails when src reads a URL parameter name the registry does not list.
 - `test/lint.mjs`: no em dashes, no spaced double hyphen punctuation and no local absolute paths in text files (tracked, plus untracked files that are not ignored).
 
 ## Smoke tier

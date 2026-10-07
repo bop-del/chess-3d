@@ -76,6 +76,7 @@ const FAST = [
   ['Pixelwelt skies, backdrops, sets: choice, build and dispose, weather (test/pixel-sky.mjs)', 'test/pixel-sky.mjs'],
   ['living pieces: signature moves and Pixelwelt birds (test/living.mjs)', 'test/living.mjs'],
   ['option tiles: a picture per choice, no orphans (test/tiles.mjs)', 'test/tiles.mjs'],
+  ['preview flag registry (test/flags.mjs)', 'test/flags.mjs'],
   ['text lint (test/lint.mjs)', 'test/lint.mjs'],
   ['audit planner rules (test/audit-plan.mjs)', 'test/audit-plan.mjs'],
   ['bin/lane flag parsing (test/lane-args.mjs)', 'test/lane-args.mjs', true],

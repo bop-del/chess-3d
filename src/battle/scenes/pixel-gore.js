@@ -16,12 +16,6 @@ const LEVELS = [{ hit: 0, ring: 0, puddle: 0, fount: 0 },
   { hit: 9, ring: 0, puddle: 0, fount: 0 },
   { hit: 24, ring: 12, puddle: 12, fount: 1 }];
 
-/** The pawn capture variant from ?pawngore=a|c (a run up and thrust, c double thrust with a wind up); a is the default. */
-export function pawnVariant(search = globalThis.location?.search || '') {
-  const v = (new URLSearchParams(search).get('pawngore') || '').toLowerCase();
-  return v === 'c' ? v : 'a';
-}
-
 function seeded(seed = 7) { let x = seed; return () => { x = (x * 16807) % 2147483647; return x / 2147483647; }; }
 
 async function gore(ctx) {
@@ -136,9 +130,8 @@ async function gore(ctx) {
 
   // ---------------------------------------------------------------- the six attackers
   if (type === 'p') {
-    const variant = pawnVariant();
     const jabs = [2, 2, 3][vw],   // a pawn victim gets two jabs like a knight: one jab left a pawn x pawn capture with the weakest gore of all pairings
-      thrusts = { a: jabs, c: 2 }[variant], mid = Math.round(L.hit * 0.6);   // the other variant makes up the blood of the jabs they skip
+      mid = Math.round(L.hit * 0.6);
     const rigObj = s.A.group.getObjectByName('rig');
     setPawnPose(rigObj, true);                      // the spear pose shows from the run up on; run() puts the rest pose back
     const spearObj = s.A.group.getObjectByName('spear'), sz0 = spearObj ? spearObj.position.z : 0;
@@ -158,32 +151,21 @@ async function gore(ctx) {
         await s.tw(pull, (k) => { a.d = lerp(d0, -1.05, k); slide(lerp(s0, -0.2, k)); a.sy = lerp(y0, 1, k); a.tip = lerp(t0, 0, k); }, inOut);
         await hurt;
       } else {
-        for (let e = 0; e < Math.max(0, jabs - thrusts); e++) bleed(hit, { count: mid, dir: aim, spread: 0.9 });
         finale(hit, { tipFrom: lean });
       }
     };
     const thrust = (dur = 0.12) => { const d0 = a.d, s0 = sl, t0 = a.tip, y0 = a.sy; sfx.whoosh?.(); return s.tw(dur, (k) => { a.d = lerp(d0, -0.83, k); slide(lerp(s0, 0.12, k)); a.sy = lerp(y0, 1.14, k); a.tip = lerp(t0, 0.08, k); }, outQuad); };
     const crouch = (dur, tip, sy, back) => s.tw(dur, (k) => { a.tip = lerp(0, tip, k); a.sy = lerp(1, sy, k); a.sx = a.sz = 1 / Math.sqrt(a.sy); slide(lerp(0, back, k)); }, inOut);
-    if (variant === 'a') {
-      // a run up and thrust: step far back, crouch with the spear drawn, sprint in and drive it home; further jabs from where it stands
-      await stepBack(-1.55);
-      await crouch(0.25, -0.1, 0.88, -0.2);
-      for (let i = 0; i < jabs && s.live(); i++) {
-        if (i === 0) {
-          sfx.whoosh?.();
-          const d0 = a.d;
-          await s.tw(0.36, (k) => { a.d = lerp(d0, -0.88, k); a.y = 0.06 * bump(k); slide(lerp(-0.2, 0.12, k)); a.sy = lerp(0.88, 1.12, k); a.sx = a.sz = 1 / Math.sqrt(a.sy); a.tip = lerp(-0.1, 0.1, k); }, inQuad);
-        } else await thrust();
-        await contact(i, jabs);
-      }
-    } else {
-      // a double thrust with a wind up: coil back, then two quick jabs one after the other
-      await stepBack(-1.2);
-      await crouch(0.5, -0.35, 0.8, -0.35);
-      for (let i = 0; i < 2 && s.live(); i++) {
-        await thrust(0.1);
-        await contact(i, 2, 0.14);
-      }
+    // a run up and thrust: step far back, crouch with the spear drawn, sprint in and drive it home; further jabs from where it stands
+    await stepBack(-1.55);
+    await crouch(0.25, -0.1, 0.88, -0.2);
+    for (let i = 0; i < jabs && s.live(); i++) {
+      if (i === 0) {
+        sfx.whoosh?.();
+        const d0 = a.d;
+        await s.tw(0.36, (k) => { a.d = lerp(d0, -0.88, k); a.y = 0.06 * bump(k); slide(lerp(-0.2, 0.12, k)); a.sy = lerp(0.88, 1.12, k); a.sx = a.sz = 1 / Math.sqrt(a.sy); a.tip = lerp(-0.1, 0.1, k); }, inQuad);
+      } else await thrust();
+      await contact(i, jabs);
     }
     if (!s.live()) return;
     const sl0 = sl, tip0 = a.tip, sy0 = a.sy, d0 = a.d;
