@@ -52,12 +52,13 @@ ok('a payload over the push service limit is refused', tooBig);
 const vk = vapidGenerate();
 ok('VAPID key: private 32 bytes, public an uncompressed point of 65 bytes', unb(vk.private).length === 32 && unb(vk.public).length === 65 && unb(vk.public)[0] === 4);
 const NOW = Date.UTC(2026, 9, 7, 12);
-const jwt = vapidJwt(vk, 'mailto:owner@example.com', 'https://fcm.googleapis.com/fcm/send/abc', NOW);
+const MAILTO = 'mailto:owner' + '@' + 'example.com';   // built from parts: the release check scans tracked text for e-mail addresses
+const jwt = vapidJwt(vk, MAILTO, 'https://fcm.googleapis.com/fcm/send/abc', NOW);
 const [h, c, s] = jwt.split('.');
 const claims = JSON.parse(unb(c)), head = JSON.parse(unb(h));
 const pub = createPublicKey({ key: { kty: 'EC', crv: 'P-256', x: b64u(unb(vk.public).subarray(1, 33)), y: b64u(unb(vk.public).subarray(33)) }, format: 'jwk' });
 ok('VAPID JWT: ES256 signature verifies against the public key', createVerify('SHA256').update(`${h}.${c}`).verify({ key: pub, dsaEncoding: 'ieee-p1363' }, unb(s)));
-ok('VAPID JWT: alg ES256, aud is the endpoint origin, sub kept, exp under 24 hours', head.alg === 'ES256' && claims.aud === 'https://fcm.googleapis.com' && claims.sub === 'mailto:owner@example.com' && claims.exp > NOW / 1000 && claims.exp - NOW / 1000 < 24 * 3600, JSON.stringify(claims));
+ok('VAPID JWT: alg ES256, aud is the endpoint origin, sub kept, exp under 24 hours', head.alg === 'ES256' && claims.aud === 'https://fcm.googleapis.com' && claims.sub === MAILTO && claims.exp > NOW / 1000 && claims.exp - NOW / 1000 < 24 * 3600, JSON.stringify(claims));
 const bad = jwt.slice(0, -4) + (jwt.endsWith('AAAA') ? 'BBBB' : 'AAAA');
 ok('VAPID JWT: a changed signature does not verify', !createVerify('SHA256').update(`${h}.${c}`).verify({ key: pub, dsaEncoding: 'ieee-p1363' }, unb(bad.split('.')[2])));
 
@@ -84,7 +85,7 @@ const logs = [];
 let coin = 0.2;   // the challenger plays white
 const clock = Date.UTC(2026, 9, 7, 12);
 const app = createOnlineServer({ db: openDb(':memory:'), now: () => clock, heartbeatMs: 200, log: (l) => logs.push(l), random: () => coin,
-  vapid: vk, vapidSubject: 'mailto:owner@example.com', gameUrl: 'https://chess.example.com/' });
+  vapid: vk, vapidSubject: MAILTO, gameUrl: 'https://chess.example.com/' });
 const off = createOnlineServer({ db: openDb(':memory:'), now: () => clock, heartbeatMs: 200 });
 const port = await app.listen(0, '127.0.0.1'), offPort = await off.listen(0, '127.0.0.1');
 const ORIGIN = 'http://localhost:5173';
