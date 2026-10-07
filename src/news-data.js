@@ -3,6 +3,23 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.10.0', date: '2026-10-08',
+    de: [
+      'Lernen: Jede Eröffnung beginnt mit einem kurzen, übersichtlichen Einstieg.',
+      'Der Online-Reiter zeigt deine Zahlen und die Karte eines Spielers mit Bilanz und Serien.',
+      'Auf dem Handy kommen Mitteilungen, wenn jemand dich herausfordert oder dir schreibt.',
+      'Symbole: Die schwarzen Symbole schauen jetzt zur schwarzen Seite.',
+      'Das Spiel hat eine eigene Adresse: chess3d.borisdiebold.com.',
+    ],
+    en: [
+      'Learn: every opening starts with a short, tidy intro.',
+      'The Online tab shows your numbers and a player card with record and streaks.',
+      'On a phone you get a notification when someone challenges you or writes to you.',
+      'Symbols: Black\'s symbols now face the black side.',
+      'The game has its own address: chess3d.borisdiebold.com.',
+    ],
+  },
+  {
     version: '1.9.1', date: '2026-10-07',
     de: [
       'Der Online-Reiter sieht schöner aus: Spielerkarten, ein schwebender Chat und eine klare Wartezeile.',

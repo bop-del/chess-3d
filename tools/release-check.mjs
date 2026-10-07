@@ -130,12 +130,13 @@ try {
     const biggest = dist.map((f) => [f, statSync(f).size]).sort((a, b) => b[1] - a[1])[0];
     pass('dist size', `${(total / 1024).toFixed(0)} kB in ${dist.length} files, largest ${biggest[0].split('/').pop()} ${(biggest[1] / 1024).toFixed(0)} kB`);
     const user = userInfo().username;
+    const PUBLIC_HOSTS = /\b(?:chess3d|chess)\.borisdiebold\.com\b/g;   // the game's own public hosts (ADR 0012); the login name anywhere else still fails
     const leaks = [];
     const LOCAL = new RegExp('/Us' + 'ers/|/ho' + 'me/[a-z]|[A-Z]:\\\\Us' + 'ers\\\\');
     for (const f of dist.filter((x) => /\.(js|css|html|json|svg|map|txt)$/.test(x))) {
       const t = readFileSync(f, 'utf8');
       if (LOCAL.test(t)) leaks.push(`${f.split('/').pop()} (local path)`);
-      if (user && user.length > 3 && t.includes(user)) leaks.push(`${f.split('/').pop()} (user name)`);
+      if (user && user.length > 3 && t.replace(PUBLIC_HOSTS, '').includes(user)) leaks.push(`${f.split('/').pop()} (user name)`);
       if (/(ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY)/.test(t)) leaks.push(`${f.split('/').pop()} (key like string)`);
     }
     leaks.length ? fail('dist has no local paths, user names or keys', leaks.slice(0, 5).join(', ')) : pass('dist has no local paths, user names or keys');
