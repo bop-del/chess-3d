@@ -9,11 +9,12 @@ import { existsSync } from 'node:fs';
 import { Chess, nameSq } from '../src/rules.js';
 import { openDb, sha256, normCode, adminOps, newKey } from './db.mjs';
 import { createLive } from './live.mjs';
+import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
 export const STALE_MS = 3 * 24 * 3600 * 1000;   // a game with no move for 3 days: the waiting player may end it as a win
 export const CHAT_MAX = 200;
 const BODY_MAX = 4096;
-const LIMITS = { move: [60, 60e3], chat: [10, 60e3], other: [30, 60e3], login: [5, 10 * 60e3] };   // [count, window ms]
+const LIMITS = { move: [60, 60e3], chat: [10, 60e3], other: [30, 60e3], login: [5, 10 * 60e3], events: [10, 60e3] };   // [count, window ms]
 
 /** Is this browser origin allowed? A list from ONLINE_ORIGINS, else the local preview origins (localhost, 127.0.0.1, the Tailscale range). */
 export function originAllowed(origin, list) {
@@ -26,8 +27,12 @@ export function originAllowed(origin, list) {
   } catch (e) { return false; }
 }
 
-export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, trustProxy = false, log = () => {}, random = Math.random } = {}) {
+export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, trustProxy = false, adminSecret = '', log = () => {}, random = Math.random } = {}) {
   const admin = adminOps(db, now);
+  const stats = createStats(db, { now });
+  stats.maintain();   // CHE-291: roll up and clean on start, then once a day
+  const statsTimer = setInterval(() => { try { stats.maintain(); } catch (e) { console.error(e); } }, 24 * 3600 * 1000);
+  statsTimer.unref();
   const q = (sql) => db.prepare(sql);
   const playerById = (id) => q('SELECT * FROM players WHERE id = ?').get(id);
   const playerByName = (name) => q('SELECT * FROM players WHERE name = ?').get(String(name));
@@ -161,6 +166,12 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       q("UPDATE challenges SET status = 'cancelled', answered = ? WHERE status = 'open' AND (from_id IN (?, ?) OR to_id IN (?, ?))").run(now(), me.id, c.from_id, me.id, c.from_id);
       return { game: Number(r.lastInsertRowid) };
     },
+    'challenge/cancel'(me, { id }) {   // the challenger withdraws an open challenge (only their own; none open is fine, so a retry is harmless)
+      const r = id == null
+        ? q("UPDATE challenges SET status = 'cancelled', answered = ? WHERE from_id = ? AND status = 'open'").run(now(), me.id)
+        : q("UPDATE challenges SET status = 'cancelled', answered = ? WHERE id = ? AND from_id = ? AND status = 'open'").run(now(), Number(id), me.id);
+      return { cancelled: Number(r.changes) };
+    },
     move(me, { game, uci }) {
       const g = myGame(me, game);
       if (typeof uci !== 'string' || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(uci)) fail(400, 'illegal');
@@ -220,10 +231,10 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     res.writeHead(status, { ...h, 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(body));
   }
-  const readBody = (req) => new Promise((ok, bad) => {
+  const readBody = (req, max = BODY_MAX, parse = JSON.parse) => new Promise((ok, bad) => {
     let size = 0; const parts = [];
-    req.on('data', (d) => { size += d.length; if (size > 16 * BODY_MAX) req.destroy(); else if (size <= BODY_MAX) parts.push(d); });   // drained up to 64 KB so the 413 reaches the client
-    req.on('end', () => { if (size > BODY_MAX) return bad(new Fail(413, 'too-large')); try { const s = Buffer.concat(parts).toString('utf8'); ok(s ? JSON.parse(s) : {}); } catch (e) { bad(new Fail(400, 'bad-json')); } });
+    req.on('data', (d) => { size += d.length; if (size > 16 * max) req.destroy(); else if (size <= max) parts.push(d); });   // drained up to 16 times the cap so the 413 reaches the client
+    req.on('end', () => { if (size > max) return bad(new Fail(413, 'too-large')); try { const s = Buffer.concat(parts).toString('utf8'); ok(s ? parse(s) : {}); } catch (e) { bad(new Fail(400, 'bad-json')); } });
     req.on('error', bad);
   });
   const ipOf = (req) => (trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
@@ -245,11 +256,30 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         q('INSERT INTO keys (key_hash, player_id, created) VALUES (?, ?, ?)').run(sha256(key), p.id, now());
         return send(req, res, 200, { key, name: p.name });
       }
+      if (path === '/stats') {   // CHE-291: the dashboard, only with the admin secret (header, or a form post; never in a URL or a log)
+        if (!adminSecret) { status = 404; return send(req, res, 404); }
+        if (req.method !== 'GET' && req.method !== 'POST') { status = 405; return send(req, res, 405); }
+        const ip = ipOf(req);
+        if (loginBlocked(ip)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+        const html = (code, body) => { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'", 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' }); res.end(body); };
+        const h = String(req.headers.authorization || '');
+        let given = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
+        if (!given && req.method === 'POST') given = String((await readBody(req, 1024, (t) => Object.fromEntries(new URLSearchParams(t)))).secret || '');
+        if (!given) { status = 401; return html(401, loginPage(false)); }
+        if (!secretOk(given, adminSecret)) { loginFailed(ip); status = 401; return html(401, loginPage(true)); }
+        return html(200, dashboardPage(stats.report(7), stats.report(30)));
+      }
       const auth = String(req.headers.authorization || '');
       const me = authKey(auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
       const known = ['/state', '/events', ...Object.keys(ACTIONS).map((a) => '/' + a)];
       if (!known.includes(path)) { status = 404; return send(req, res, 404); }
       if (!me) { status = 401; return send(req, res, 401); }   // an unknown key gets 401 and nothing else
+      if (req.method === 'POST' && path === '/events') {   // CHE-291: usage events of a logged in player
+        if (limited('events', me.id)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+        const out = stats.ingest(me.id, await readBody(req, EVENTS_BODY_MAX));
+        if (out.error) { status = out.status; return send(req, res, out.status, { error: out.error }); }
+        status = 202; return send(req, res, 202, { ok: true, n: out.n });
+      }
       if (req.method === 'GET' && path === '/state') return send(req, res, 200, stateFor(me.id));
       if (req.method === 'GET' && path === '/events') { live.open(req, res, me.id, stateFor(me.id), cors(req)); return; }
       if (req.method !== 'POST') { status = 405; return send(req, res, 405); }
@@ -281,9 +311,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   const server = createServer((req, res) => { handle(req, res); });
   server.keepAliveTimeout = 65000;
   return {
-    server, db, admin, live, stateFor, broadcast,
+    server, db, admin, live, stats, stateFor, broadcast,
     listen: (port, host) => new Promise((ok) => server.listen(port, host, () => ok(server.address().port))),
-    close: () => new Promise((ok) => { live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
+    close: () => new Promise((ok) => { clearInterval(statsTimer); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
   };
 }
 
@@ -298,11 +328,12 @@ export function loadEnv() {
     db: process.env.ONLINE_DB || resolve(ROOT, '.tmp/online/online.db'),
     origins: (process.env.ONLINE_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
     trustProxy: process.env.ONLINE_TRUST_PROXY === '1',
+    adminSecret: process.env.ONLINE_ADMIN_SECRET || '',
   };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const env = loadEnv();
-  const app = createOnlineServer({ db: openDb(env.db), origins: env.origins, trustProxy: env.trustProxy, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
+  const app = createOnlineServer({ db: openDb(env.db), origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
   const port = await app.listen(env.port, env.host);
   console.log(`online server on http://${env.host}:${port} (db ${env.db})`);
   const stop = () => { app.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 2000).unref(); };

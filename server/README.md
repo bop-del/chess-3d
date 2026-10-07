@@ -25,6 +25,7 @@ Invite players (the command prints the link and the code):
 | `ONLINE_DB` | `.tmp/online/online.db` | The SQLite file (the image: `/data/online.db`) |
 | `ONLINE_ORIGINS` | the local preview origins | Comma separated list of game origins allowed by CORS, for example `https://bop-del.github.io`. Without it: `http://localhost:*`, `http://127.0.0.1:*`, the Tailscale address range (CGNAT, carrier grade NAT block) and `*.ts.net` |
 | `ONLINE_TRUST_PROXY` | off | `1` takes the client IP from `X-Forwarded-For` (behind kamal-proxy), for the wrong code throttle |
+| `ONLINE_ADMIN_SECRET` | none | The secret for the `/stats` dashboard. Without it `/stats` answers 404 (the page does not exist). Keep it in the `ONLINE_ENV` file, never in the repo |
 | `ONLINE_GAME_URL` | `http://localhost:5173/` | The game page the invite link points to (admin only) |
 | `ONLINE_PUBLIC_URL` | `http://localhost:<port>` | This server as the browser reaches it, put into the link as `?online=` (admin only) |
 | `ONLINE_ENV` | none | A `KEY=VALUE` file outside the repo with the variables above |
@@ -56,6 +57,7 @@ JSON, `Authorization: Bearer <key>` except `/up` and `/login-code`. An unknown k
 | `GET /state` | | `{ me, now, players, challenges: { in, out }, game, chats, unread }` |
 | `GET /events` | | the live stream: event `state` (the same shape) on every change, `: hb` every 20 s |
 | `POST /challenge` | `{ to }` | `{ id }` |
+| `POST /challenge/cancel` | `{ id?, cid }` | `{ cancelled }`: the challenger withdraws their open challenge (id optional); only their own; none open gives `cancelled: 0` |
 | `POST /challenge/answer` | `{ id, accept }` | `{ game }` or `{ declined }` |
 | `POST /move` | `{ game, uci, cid }` | `{ ply, san, over }`; an illegal move is 400 `illegal` |
 | `POST /resign` | `{ game }` | `{ over: 'resign' }` |
@@ -63,8 +65,15 @@ JSON, `Authorization: Bearer <key>` except `/up` and `/login-code`. An unknown k
 | `POST /chat` | `{ to, text, cid }` | at most 200 characters |
 | `POST /chat/read` | `{ with }` | marks that conversation read |
 
+| `POST /events` | `{ events: [{ kind, device, ... }] }` | `202 { ok, n }`. Usage events (CHE-291, ADR 0010), only with a player key. Kinds: `error` { message, where }, `feature` { name }, `perf` { tier: high, mid, low; loadMs }, `session` { length }; `device` { ua, touch, w, h, gpu }. One bad event refuses the batch (400) |
+| `GET /stats`, `POST /stats` | secret | The stats dashboard (HTML), only with `ONLINE_ADMIN_SECRET`: `Authorization: Bearer <secret>` or the form on the page (a POST body, never a URL). 401 without it, 404 when no secret is set |
+
 `cid` is a client id: a retried POST with the same id is applied once. Limits per key: 60 moves, 10 messages and 30 other actions a
-minute; a body over 4 KB is refused.
+minute; a body over 4 KB is refused. `POST /events`: 20 events and 16 KB per request, 10 requests a minute and 2000 events a day per key. Wrong `/stats` secrets are throttled like wrong codes (5 per IP in 10 minutes).
+
+## Own stats (CHE-291)
+
+Usage events of logged in players only, no player id and no IP stored. Raw events are kept 90 days (table `events`), a daily sum per day, kind, name and device class forever (table `stats_daily`). The roll up and the clean up run in the server: once on start and then every 24 hours. Open the dashboard with `curl -H "Authorization: Bearer $ONLINE_ADMIN_SECRET" <server>/stats` or in a browser at `/stats` (the page asks for the secret). Last 7 and 30 days: sessions, top features, errors by device and place, performance tiers, the latest errors. No migration step: the tables are created on start (`CREATE TABLE IF NOT EXISTS`).
 
 ## Deploy (VPS)
 
@@ -73,4 +82,4 @@ user, the database under `/data`, `LABEL service="chess-online"`, listening on `
 stream sends `Cache-Control: no-cache` and `X-Accel-Buffering: no` and a heartbeat every 20 s, so it passes kamal-proxy. The Kamal
 config is written with the owner in the VPS step.
 
-Tests: `test/online-server.mjs` (fast tier) and `test/online-page.mjs` (smoke group `online`).
+Tests: `test/online-server.mjs` and `test/online-stats.mjs` (fast tier) and `test/online-page.mjs` (smoke group `online`).

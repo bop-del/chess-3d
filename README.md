@@ -251,6 +251,7 @@ Two invited players play one game against each other through a small server of o
 - **Chat**: one conversation per opponent, opened with the Chat button on the player row and on the running game, at most 200 characters per message, with an unread count; "Chat wird mitgelesen" under the field.
 - **Connection**: a line at the top of the tab, green "Server verbunden", grey "verbinde..." after a drop, red "Server nicht erreichbar" after 10 s with a Details box (cause, last connected, next try, Nochmal versuchen, Details kopieren). During a game without a connection the board is locked with a line over it; no move is lost or sent twice.
 - A dot on the tab (and the phone button) for a challenge to you or your move, and a count for unread messages. A new message of a closed chat, unread messages after a load and the running game also show as a tappable bubble over the board with an x (game on top, chat below; hiding one never marks a message read).
+- **Own stats** (ADR 0010): logged in online players send errors, feature use, performance and session length to our own server (no third party, no player id, no IP; raw 90 days, daily sums forever). The owner reads them at `/stats` on the server with `ONLINE_ADMIN_SECRET`. Players get no notice.
 
     npm run server                      # the server on port 5502, database in .tmp/online/
 
@@ -267,7 +268,7 @@ The build uses relative asset paths (`base: './'`), so `dist/` can be hosted fro
 
 Tests come in four tiers:
 
-    node test/run.mjs            # fast, no browser: rules perft, piece geometry contract, Pixelwelt rules, Pixelwelt skies, signature moves and birds, text lint, audit planner rules, openings, puzzles (progress, controller, data), novice level, training core, the online play server (this is npm test)
+    node test/run.mjs            # fast, no browser: rules perft, piece geometry contract, Pixelwelt rules, Pixelwelt skies, signature moves and birds, text lint, audit planner rules, openings, puzzles (progress, controller, data), novice level, training core, the online play server and its own stats (this is npm test)
     node test/run.mjs smoke      # smoke, about 2 minutes on a quiet machine for all groups: build, serve, drive the real page in headless Chrome, then the battle scenes (test/battle.mjs). In a lane worktree only the groups the diff against main affects run (--all for every group, --no-cache to ignore cached passes). The long groups run in parts (open 1/3 to 3/3, views 1/2 and 2/2, fixes 1/2 and 2/2); --only=open runs all parts of a group
     node test/run.mjs phone      # phone, several minutes: phone sizes, tap target audit, real multi touch, the Add to Home Screen reminder. Each of the three scripts is cached by build, scripts and GL backend: a pass for the same build prints CACHED (--no-cache reruns, and takes the screenshots again)
     node tools/release-check.mjs # release: fresh build, page load (GPU, plus a software pass that only warns), hostile URLs, docs and repo hygiene

@@ -10,6 +10,7 @@ import { loginFor, writeLogin } from './store.js';
 import { createApi, loginWithCode } from './api.js';
 import { createMatch } from './match.js';
 import { detailsText } from './details.js';
+import { startStats } from './stats.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SEEN = 'chess3d.onlineSeen';
@@ -393,6 +394,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   let lastIn = new Set(), lastGameId = 0;
   function start(l) {
     login = l; writeLogin(l);
+    startStats({ server, key: l.key });   // CHE-291: our own stats, logged in players only
     api?.stop(); match?.stop();
     api = createApi({
       server, key: l.key, version: VERSION,
