@@ -8,7 +8,7 @@ import { monitorEventLoopDelay } from 'node:perf_hooks';
 
 export const SAMPLE_MS = 5 * 60 * 1000;
 export const KEEP_DAYS = 90;
-export const LIMITS = { diskUsed: 0.85, memFree: 0.10, loopMs: 200 };   // over these a value turns red
+export const LIMITS = { diskUsed: 0.85, memFree: 0.10, loopMs: 200, errorRate: 0.05, windowMs: 15 * 60 * 1000, minSamples: 3, minRequests: 20 };   // over these a value turns red; errorRate, disk and the window also drive /health (CHE-307)
 const DAY_MS = 24 * 3600 * 1000;
 
 /** The real machine and process readings. Tests pass their own probe. */
@@ -80,6 +80,24 @@ export function createHealth(db, { now = () => Date.now(), probe, gauges = {} } 
       loop_ms: probe.loopMax(), rss: m.rss, load: m.load, memFree: m.memFree, memTotal: m.memTotal, diskFree: m.diskFree, diskTotal: m.diskTotal, dbBytes: m.dbBytes };
   }
   return { touch, request, sample, prune, history, current, stop: () => probe.stop?.() };
+}
+
+/** CHE-307: the verdict behind GET /health, from the rows of server_health only (pure; memory and event loop are display only).
+ *  Fewer than minSamples rows in the window (fresh start) is ok. Reasons are fixed short strings, no counts of players. */
+export function healthVerdict(db, { now = Date.now(), limits = LIMITS } = {}) {
+  const reasons = [];
+  let rows;
+  try {
+    db.prepare('SELECT 1').get();
+    rows = db.prepare('SELECT req, r5xx, disk_free, disk_total FROM server_health WHERE at >= ? AND at <= ? ORDER BY at').all(now - limits.windowMs, now);
+  } catch (e) { return { ok: false, reasons: ['db unreachable'] }; }
+  if (rows.length >= limits.minSamples) {
+    const req = rows.reduce((a, r) => a + r.req, 0), bad = rows.reduce((a, r) => a + r.r5xx, 0);
+    if (req >= limits.minRequests && bad / req > limits.errorRate) reasons.push(`error rate ${Math.round(100 * bad / req)}% over ${Math.round(limits.windowMs / 60000)} min`);
+    const used = rows.map((r) => (r.disk_total ? 1 - r.disk_free / r.disk_total : null));
+    if (used.every((u) => u != null && u > limits.diskUsed)) reasons.push(`disk ${Math.round(100 * Math.min(...used))}% used`);
+  }
+  return { ok: reasons.length === 0, reasons };
 }
 
 // ------------------------------------------------------------ the page section: inline SVG, no script

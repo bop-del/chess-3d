@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import { Chess, nameSq } from '../src/rules.js';
 import { openDb, sha256, normCode, adminOps, newKey, newCode } from './db.mjs';
 import { createLive } from './live.mjs';
-import { createHealth, serverSection, systemProbe, SAMPLE_MS } from './health.mjs';
+import { createHealth, healthVerdict, serverSection, systemProbe, SAMPLE_MS } from './health.mjs';
 import { createPush, overLine, vapidLoad } from './push.mjs';
 import { statsFor } from './playerstats.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
@@ -282,10 +282,17 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
 
   async function handle(req, res) {
     const path = new URL(req.url, 'http://x').pathname;
-    let status = 200;
+    let status = 200, counted = true;
     try {
       if (req.method === 'OPTIONS') { status = 204; return send(req, res, 204); }
       if (req.method === 'GET' && path === '/up') { status = 200; res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }); return res.end('ok'); }
+      if ((req.method === 'GET' || req.method === 'HEAD') && path === '/health') {   // CHE-307: for an external monitor, public, derived from server_health
+        counted = false;
+        const v = healthVerdict(db, { now: now() });
+        status = v.ok ? 200 : 503;
+        res.writeHead(status, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+        return res.end(req.method === 'HEAD' ? undefined : v.ok ? 'ok' : v.reasons.join(', '));
+      }
       if (req.method === 'POST' && path === '/login-code') {
         const ip = ipOf(req);
         if (loginBlocked(ip)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
@@ -371,7 +378,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       if (e instanceof Fail) { status = e.status; if (!res.headersSent) send(req, res, e.status, { error: e.code }); }
       else { status = 500; console.error(e); if (!res.headersSent) send(req, res, 500, { error: 'server' }); }
     } finally {
-      health.request(status);
+      if (counted) health.request(status);
       log(`${req.method} ${path} ${status}`);   // never the Authorization header, never a body
     }
   }

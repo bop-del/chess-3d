@@ -2,7 +2,7 @@
 // retention, gaps and restart markers in the chart, and the /stats "Server" section with an empty table and with data.
 import { createOnlineServer } from '../server/index.mjs';
 import { openDb } from '../server/db.mjs';
-import { createHealth, chartSvg, serverSection, SAMPLE_MS, KEEP_DAYS } from '../server/health.mjs';
+import { createHealth, healthVerdict, LIMITS, chartSvg, serverSection, SAMPLE_MS, KEEP_DAYS } from '../server/health.mjs';
 
 let failed = 0;
 const ok = (name, pass, detail = '') => { if (!pass) failed++; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${pass ? '' : '  ' + detail}`); };
@@ -65,6 +65,36 @@ try {
   const loopDef = { title: 'l', lines: [['ms', (r) => r.loop_max_ms, 'c1']], limit: 200, over: (v) => v > 200 };
   ok('a value over the limit is a red mark, under it none', /class="bad"/.test(chartSvg(loopDef, [slot(0, { loop_max_ms: 250 })], base - 3600e3, base)) && !/class="bad"/.test(chartSvg(loopDef, [slot(0)], base - 3600e3, base)));
   ok('an empty window says so', /No samples yet/.test(chartSvg(present, [], base - 3600e3, base)));
+
+  // ------------------------------------------------------------ the /health verdict (CHE-307)
+  const vdb = openDb(':memory:');
+  const put = (db2, at, over = {}) => { const r = mkRow(at, over); db2.prepare('INSERT OR REPLACE INTO server_health (at, started, uptime_s, present_max, streams_max, games_max, loop_max_ms, rss_max, req, r4xx, r5xx, load1, load5, load15, mem_free, mem_total, disk_free, disk_total, db_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(r.at, r.started, r.uptime_s, r.present_max, r.streams_max, r.games_max, r.loop_max_ms, r.rss_max, r.req, r.r4xx, r.r5xx, r.load1, r.load5, r.load15, r.mem_free, r.mem_total, r.disk_free, r.disk_total, r.db_bytes); };
+  const fill = (db2, n, over, fn) => { db2.exec('DELETE FROM server_health'); for (let i = 0; i < n; i++) put(db2, base - (n - 1 - i) * SAMPLE_MS, { ...over, ...(fn ? fn(i) : {}) }); };
+  const verdict = (db2 = vdb) => healthVerdict(db2, { now: base });
+  ok('health: ok with no samples', JSON.stringify(verdict()) === '{"ok":true,"reasons":[]}');
+  fill(vdb, 4, { req: 30 });
+  ok('health: ok with healthy samples', verdict().ok);
+  fill(vdb, 4, { req: 100, r5xx: 6 });
+  ok('health: 503 reason on 15 min of 6% errors', JSON.stringify(verdict()) === '{"ok":false,"reasons":["error rate 6% over 15 min"]}', JSON.stringify(verdict()));
+  fill(vdb, 4, { req: 100 }, (i) => (i === 3 ? { r5xx: 15 } : {}));
+  ok('health: ok on one bad sample (15 of 400 is 3.75%)', verdict().ok);
+  fill(vdb, 4, { req: 4, r5xx: 4 });
+  ok('health: ok when the window has fewer than 20 requests (idle server)', verdict().ok);
+  fill(vdb, 2, { req: 100, r5xx: 50 });
+  ok('health: ok with fewer than 3 samples (fresh start)', verdict().ok);
+  fill(vdb, 4, { disk_free: 14 * GB });
+  ok('health: 503 on disk 86% for 15 min', JSON.stringify(verdict()) === '{"ok":false,"reasons":["disk 86% used"]}', JSON.stringify(verdict()));
+  fill(vdb, 4, { disk_free: 14 * GB }, (i) => (i === 3 ? { disk_free: 50 * GB } : {}));
+  ok('health: ok when disk is high but the latest sample is low', verdict().ok);
+  fill(vdb, 4, { disk_free: 50 * GB }, (i) => (i === 0 ? { disk_free: 5 * GB } : {}));
+  ok('health: ok when disk was high only in the older part of the window', verdict().ok);
+  fill(vdb, 6, { disk_free: 14 * GB, req: 100, r5xx: 6 });
+  ok('health: both reasons together, samples older than the window do not count', JSON.stringify(verdict().reasons) === '["error rate 6% over 15 min","disk 86% used"]');
+  fill(vdb, 6, { req: 100, r5xx: 6 }, (i) => (i < 2 ? { r5xx: 0 } : {}));
+  ok('health: only the last 15 minutes count (4 of 6 samples)', !verdict().ok);
+  const broken = { prepare() { throw new Error('database is locked'); } };
+  ok('health: 503 when the db throws', JSON.stringify(healthVerdict(broken, { now: base })) === '{"ok":false,"reasons":["db unreachable"]}');
+  ok('health: the limits are the shared contract', LIMITS.errorRate === 0.05 && LIMITS.windowMs === 900000 && LIMITS.minSamples === 3 && LIMITS.minRequests === 20 && LIMITS.diskUsed === 0.85);
 
   // ------------------------------------------------------------ the page: empty table, then data, red values
   const SECRET = 'health-secret-1234';

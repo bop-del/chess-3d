@@ -53,6 +53,34 @@ try {
   const up = await call('/up', { origin: '' });
   ok('GET /up answers 200 without auth', up.status === 200 && up.text === 'ok');
 
+  // ------------------------------------------------------------ GET /health (CHE-307)
+  const ins = (at, req, r5xx, diskFree) => app.db.prepare('INSERT OR REPLACE INTO server_health (at, started, uptime_s, present_max, streams_max, games_max, loop_max_ms, rss_max, req, r4xx, r5xx, load1, load5, load15, mem_free, mem_total, disk_free, disk_total, db_bytes) VALUES (?, 0, 0, 0, 0, 0, 0, 0, ?, 0, ?, 0, 0, 0, 1, 1, ?, 100, 0)').run(at, req, r5xx, diskFree);
+  app.db.exec('DELETE FROM server_health');
+  const h1 = await call('/health', { origin: '' });
+  ok('GET /health: 200 ok, no auth, text/plain, no-store', h1.status === 200 && h1.text === 'ok' && /^text\/plain/.test(h1.headers.get('content-type')) && h1.headers.get('cache-control') === 'no-store');
+  const hh = await call('/health', { method: 'HEAD', origin: '' });
+  ok('HEAD /health: same status, no body', hh.status === 200 && hh.text === '');
+  app.db.exec('DELETE FROM server_health');
+  for (let i = 0; i < 4; i++) ins(clock - (3 - i) * 300000, 100, 12, 90);
+  const h2 = await call('/health', { origin: '' });
+  ok('GET /health: 503 with one short reason on 12% errors', h2.status === 503 && h2.text === 'error rate 12% over 15 min', h2.text);
+  ok('HEAD /health: 503 without body', (await call('/health', { method: 'HEAD', origin: '' })).status === 503);
+  app.db.exec('DELETE FROM server_health');
+  for (let i = 0; i < 4; i++) ins(clock - (3 - i) * 300000, 10, 0, 9);
+  const h3 = await call('/health', { origin: '' });
+  ok('GET /health: 503 disk 91% used', h3.status === 503 && h3.text === 'disk 91% used', h3.text);
+  ok('the 503 body holds no key, code, name or path', ![felix.key, felix.code, 'Felix', '/data'].some((x) => h3.text.includes(x)) && !h3.text.includes('\n'));
+  ok('/up stays 200 while /health is 503', (await call('/up', { origin: '' })).status === 200);
+  app.db.exec('DELETE FROM server_health');
+  const cnt = () => { app.health.sample(); return app.db.prepare('SELECT req FROM server_health ORDER BY at DESC LIMIT 1').get().req; };
+  cnt();
+  for (let i = 0; i < 3; i++) await call('/health', { origin: '' });
+  clock += 1;
+  ok('three /health calls leave the request counter at 0', cnt() === 0);
+  for (let i = 0; i < 6; i++) await call('/health', { origin: '' });
+  ok('/health is not throttled like wrong codes', (await call('/health', { origin: '' })).status === 200);
+  app.db.exec('DELETE FROM server_health');
+
   const lc = await call('/login-code', { body: { code: ` ${mia.code.toLowerCase().replace('-', ' - ')} ` } });
   ok('code login: a typed code (lower case, spaces) gives a key for the same player', lc.status === 200 && lc.json.name === 'Mia' && lc.json.key && lc.json.key !== mia.key);
   const miaKey2 = lc.json.key;

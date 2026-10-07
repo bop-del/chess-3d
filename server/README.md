@@ -57,6 +57,7 @@ JSON, `Authorization: Bearer <key>` except `/up` and `/login-code`. An unknown k
 | Request | Body | Answer |
 |---|---|---|
 | `GET /up` | | `ok` (health check, no auth) |
+| `GET /health`, `HEAD /health` | | `ok` (200) or a one line reason (503), for an external monitor, no auth (see Health check for a monitor) |
 | `POST /login-code` | `{ code }` | `{ key, name }` (a new device key for that player) |
 | `GET /state` | | `{ me, now, players, challenges: { in, out }, game, chats, unread }` |
 | `GET /events` | | the live stream: event `state` (the same shape) on every change, `: hb` every 20 s |
@@ -98,5 +99,9 @@ config is written with the owner in the VPS step.
 ## Server history (CHE-306)
 
 Every 5 minutes (and once 10 s after start) the server writes one row into `server_health`: the chess server group (maxima over the interval of Present players, Live streams and running games, event loop delay in ms, RSS; requests, 4xx and 5xx; uptime; server start time) and the machine group (load 1/5/15, free and total memory, free and total disk of the volume the database lives on, database size incl. WAL). Maxima are kept between samples (`health.touch()` on every presence, stream and game change), so a visit shorter than 5 minutes still shows. Counts only: no player id, no IP. Rows older than 90 days go in the daily maintain step. `/stats` starts with a "Server" section: live values (red: disk over 85 percent used, free memory under 10 percent, event loop delay over 200 ms), then charts for 24 hours and 7 days as inline SVG (no script). A new server start time is a vertical marker, a missing slot is a gap. Code: `server/health.mjs`. Test: `test/online-health.mjs`.
+
+### Health check for a monitor (CHE-307)
+
+`GET /health` (public, no secret, `Cache-Control: no-store`, text/plain; `HEAD` gives the same status without a body) answers `200 ok` or `503` with one short reason, derived from the `server_health` rows of the last 15 minutes so a single bad sample does not alarm. Reasons: `error rate N% over 15 min` (5xx over 5 percent of the requests, at least 3 samples and 20 requests in the window, so an idle server never alarms), `disk N% used` (over 85 percent in every sample of the window), `db unreachable` (`SELECT 1` throws). Fewer than 3 samples (fresh start) is ok. Memory and event loop delay are display only. The body holds no player, name, count or path. `/health` is not counted in the request counters (a monitor cannot move the error rate) and not throttled. `/up` stays the Kamal health check and does not depend on `/health`. Code: `healthVerdict()` in `server/health.mjs`; limits in `LIMITS`. The monitor setup (UptimeRobot) is in the private deploy notes.
 
 Tests: `test/online-server.mjs`, `test/online-stats.mjs`, `test/online-health.mjs` (fast tier) and `test/online-page.mjs` (smoke group `online`).
