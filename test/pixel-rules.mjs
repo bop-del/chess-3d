@@ -16,8 +16,24 @@ const { board } = await import('../src/themes/pixel.js');
 const { coplanarOverlaps } = await import('../src/themes/blocks/mesher.js');
 
 let failed = 0;
-const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`); if (!ok) failed++; };
+const checkAll = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`); if (!ok) failed++; };
 
+const check = checkAll;
+const ISLANDS = [null, 'a', 'b', 'c', 'd', 'e'];   // CHE-106: today's island and the five variants behind ?island=; rules 1 to 5 run for each
+// 3 wrap modes
+{
+  const ALLOW_REPEAT = ['water', 'fall', 'planks', 'cloud', 'sun', 'lava', 'lavafall'];
+  const T = pixelTextures();
+  const wrong = Object.entries(T).filter(([k, t]) => {
+    const want = ALLOW_REPEAT.includes(k) ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+    return t.wrapS !== want || t.wrapT !== want;
+  }).map(([k]) => k);
+  check('Pixelwelt textures: Repeat only on the allow list, everything else clamps', wrong.length === 0, `${Object.keys(T).length} textures${wrong.length ? ', wrong: ' + wrong.join(', ') : ''}`);
+}
+
+for (const isl of ISLANDS) {
+globalThis.location = { search: isl ? `?island=${isl}` : '' };
+const tag = isl ? `island ${isl}: ` : '', check = (name, ok, detail) => checkAll(tag + name, ok, detail);
 const world = createPixelWorld({});
 world.group.updateMatrixWorld(true);
 const meshes = [];
@@ -58,17 +74,6 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
   check('finder: shared top plane clashes, stacked boxes do not', coplanarOverlaps([A, B]).length === 1 && coplanarOverlaps([A, C]).length === 0);
 }
 
-// 3 wrap modes
-{
-  const ALLOW_REPEAT = ['water', 'fall', 'planks', 'cloud', 'sun'];
-  const T = pixelTextures();
-  const wrong = Object.entries(T).filter(([k, t]) => {
-    const want = ALLOW_REPEAT.includes(k) ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
-    return t.wrapS !== want || t.wrapT !== want;
-  }).map(([k]) => k);
-  check('Pixelwelt textures: Repeat only on the allow list, everything else clamps', wrong.length === 0, `${Object.keys(T).length} textures${wrong.length ? ', wrong: ' + wrong.join(', ') : ''}`);
-}
-
 // 4 one material set
 {
   const bad = meshes.filter((m) => !(m.material.isMeshBasicMaterial && (m.material.map || m.material.vertexColors))).map((m) => `${m.parent?.name}/${m.name}`);
@@ -98,9 +103,13 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
         if (b.intersectsBox(treeBox)) { hits.push(`cloud ${i} (z ${pz}) at x ${x} lift ${lift}`); return; }
       }
     });
-    check(`${name}: no cloud passes through the tree (${clouds.length} clouds, drift span and lift range swept)`, !treeBox.isEmpty() && clouds.length === 7 && hits.length === 0, hits.join('; '));
+    const noTrees = isl === 'c' || isl === 'e';   // the village and the volcano have no tree
+    check(`${name}: no cloud passes through the tree (${clouds.length} clouds, drift span and lift range swept)`, (noTrees ? treeBox.isEmpty() : !treeBox.isEmpty()) && clouds.length === 7 && hits.length === 0, hits.join('; '));
   }
 }
+world.dispose();
+}
+globalThis.location = { search: '' };
 
 // 5 Light (CHE-181, CHE-239): the sky decides the light; every sky keeps every mesh flat and unlit and tints only through the sky, the
 // grade and the material multiplier colour (no lights, no new textures). The default is the sunrise (the set Inselmorgen).

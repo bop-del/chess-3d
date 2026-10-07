@@ -8,7 +8,7 @@ const clamp = (v) => Math.max(0, Math.min(255, v));
 
 // Wrap modes (S61): a texture whose faces are one tile clamps, so the sample at a block edge can never wrap to the opposite row (the
 // green hairline). Repeat is an explicit opt in for textures that tile on purpose; test/pixel-rules.mjs holds the allow list.
-export const REPEATING = ['water', 'fall', 'planks', 'cloud', 'sun'];
+export const REPEATING = ['water', 'fall', 'planks', 'cloud', 'sun', 'lava', 'lavafall'];
 function make(seed, draw, size = 16, repeat = false) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   const x = c.getContext('2d'), r = rng(seed);
@@ -109,6 +109,16 @@ export function pixelTextures(track = (t) => t) {
   T.fall = make(12, (g) => { g.fill(0x3a6bd8, 8); for (let i = 0; i < 9; i++) { const px = Math.floor(g.r() * 16), py = Math.floor(g.r() * 12); for (let k = 0; k < 2 + Math.floor(g.r() * 4); k++) g.P(px, (py + k) % 16, 0xdce9ff, 4); } specks(g, 0x2a55b8, 14); }, 16, true);
   T.cloud = make(12, (g) => { g.fill(0xffffff, 4); }, 8, true);
   T.sun = make(13, (g) => { g.fill(0xffe27a, 6); for (let i = 0; i < 8; i++) { g.P(i * 2, 0, 0xfff3b8); g.P(0, i * 2, 0xfff3b8); } }, 8, true);
+  // CHE-106 island variants: gravel paths, tilled soil (furrows run along z on a top face), ore, basalt and the lava of the volcano island
+  T.gravel = make(14, (g) => { g.fill(0x9a948a, 7); specks(g, 0xb4aea2, 30); specks(g, 0x7d776d, 26); specks(g, 0xcfc9bd, 8, 3); });
+  T.soil = make(15, (g) => { g.fill(0x6e4a2c, 6); for (let px = 0; px < 16; px += 4) for (let py = 0; py < 16; py++) { g.P(px, py, 0x4a2f1a, 3); g.P(px + 1, py, 0x5a3a22, 3); } specks(g, 0x86603f, 14); });
+  T.ore = make(16, (g) => {
+    g.fill(0x808285, 6); specks(g, 0x6a6c70, 24); specks(g, 0x95979b, 16);
+    for (const [hex, n] of [[0xf2c744, 3], [0x5fd8e6, 2]]) for (let i = 0; i < n; i++) { const px = 1 + Math.floor(g.r() * 12), py = 1 + Math.floor(g.r() * 12); g.P(px, py, hex, 6); g.P(px + 1, py, hex, 6); g.P(px, py + 1, hex, 6); g.P(px + 1, py + 1, 0xfff3b8, 4); }
+  });
+  T.basalt = make(17, (g) => { g.fill(0x59555f, 5); specks(g, 0x46424d, 26); specks(g, 0x6e6a78, 20); specks(g, 0xe0662a, 1, 10); });
+  T.lava = make(18, (g) => { g.fill(0xe8641c, 8); for (let i = 0; i < 12; i++) { const px = Math.floor(g.r() * 13), py = Math.floor(g.r() * 16); for (let k = 0; k < 3; k++) g.P(px + k, py, 0xffb028, 4); } specks(g, 0xffe066, 8); specks(g, 0xb23a10, 14); }, 16, true);
+  T.lavafall = make(19, (g) => { g.fill(0xf07a1c, 8); for (let i = 0; i < 9; i++) { const px = Math.floor(g.r() * 16), py = Math.floor(g.r() * 12); for (let k = 0; k < 2 + Math.floor(g.r() * 4); k++) g.P(px, (py + k) % 16, 0xffe066, 4); } specks(g, 0xc9440f, 14); }, 16, true);
   for (const k in T) track(T[k]);
   return T;
 }

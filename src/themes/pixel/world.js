@@ -6,6 +6,7 @@ import { Mesher } from '../blocks/mesher.js';
 import { buildAvoid, approach } from '../blocks/island.js';
 import { makePixelKit } from './kit.js';
 import { createSkyLayer } from './sky.js';
+import { ISLANDS, islandFlag } from './islands.js';
 
 const rnd = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
@@ -54,6 +55,19 @@ function noise2(seed) {
   };
 }
 
+// two crates for the captured pieces: boards two high with corner posts, built around the tray slab (top at y = 0, bottom -0.26)
+function addCrates(m) {
+  for (const sg of [1, -1]) {
+    const cx = sg * SLABS.cx, x0 = cx - SLABS.w / 2 - 0.03, x1 = cx + SLABS.w / 2 + 0.03, z0 = SLABS.cz - SLABS.len / 2 - 0.03, z1 = SLABS.cz + SLABS.len / 2 + 0.03, t = 0.13;
+    for (const [yb, yt] of [[-0.3, -0.01], [0, 0.29]]) {
+      const h = yt - yb;
+      m.box('crate', x0, yb, z0, x1 - x0, h, t); m.box('crate', x0, yb, z1 - t, x1 - x0, h, t);
+      m.box('crate', x0, yb, z0 + t, t, h, z1 - z0 - 2 * t); m.box('crate', x1 - t, yb, z0 + t, t, h, z1 - z0 - 2 * t);
+    }
+    for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) m.box('crate', px - 0.04 + (px === x1 ? -0.14 : 0), -0.3, pz - 0.04 + (pz === z1 ? -0.14 : 0), 0.2, 0.62, 0.2);
+  }
+}
+
 function buildTerrain(kit) {
   const R = rnd(31), m = new Mesher({ shade: true }), grid = new Map(), NZ = noise2(9);
   const K = (ix, iy, iz) => ((ix + 256) * 512 + (iy + 256)) * 512 + (iz + 256);
@@ -87,16 +101,7 @@ function buildTerrain(kit) {
   m.box('water', POOL.x0, -1, POOL.z0, POOL.x1 - POOL.x0, 1 - 0.12, POOL.z1 - POOL.z0, { skip: new Set(['px', 'nx', 'pz', 'nz', 'ny']), color: 0xffffff });
   // the waterfall (CHE-222): a sheet of water over the back edge of the pond, down past the island; the pond lip and the sheet meet at its top
   m.box('fall', POOL.x0 + 0.25, FALL_B, POOL.z0 - FALL_T, POOL.x1 - POOL.x0 - 0.5, -0.12 - FALL_B, FALL_T, { skip: new Set(['pz', 'ny']) });
-  // two crates for the captured pieces: boards two high with corner posts, built around the tray slab (top at y = 0, bottom -0.26)
-  for (const sg of [1, -1]) {
-    const cx = sg * SLABS.cx, x0 = cx - SLABS.w / 2 - 0.03, x1 = cx + SLABS.w / 2 + 0.03, z0 = SLABS.cz - SLABS.len / 2 - 0.03, z1 = SLABS.cz + SLABS.len / 2 + 0.03, t = 0.13;
-    for (const [yb, yt] of [[-0.3, -0.01], [0, 0.29]]) {
-      const h = yt - yb;
-      m.box('crate', x0, yb, z0, x1 - x0, h, t); m.box('crate', x0, yb, z1 - t, x1 - x0, h, t);
-      m.box('crate', x0, yb, z0 + t, t, h, z1 - z0 - 2 * t); m.box('crate', x1 - t, yb, z0 + t, t, h, z1 - z0 - 2 * t);
-    }
-    for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) m.box('crate', px - 0.04 + (px === x1 ? -0.14 : 0), -0.3, pz - 0.04 + (pz === z1 ? -0.14 : 0), 0.2, 0.62, 0.2);
-  }
+  addCrates(m);
   // a few flowers (single colour blocks on a green stalk) and a boulder on the grass
   const flowers = [[-3.2, 4.75, 0xe0364f], [2.4, 4.8, 0xf2d13a], [0.2, -4.85, 0xffffff], [-2.5, -4.8, 0xe0364f], [3.6, 4.75, 0xf2d13a], [5.4, 4.4, 0xe0364f], [-5.4, 4.2, 0xf2d13a], [-6.2, -2.3, 0xe0364f], [-1.0, 4.8, 0xffffff]];
   for (const [fx, fz, c] of flowers) if (onGrass.has(`${Math.floor(fx)},${Math.floor(fz)}`)) {
@@ -140,14 +145,20 @@ function addClouds(parent, kit) {
   return out;
 }
 
+// what the island variants (islands.js) share with this file
+const ISLAND_CTX = { Mesher, rnd, noise2, toGroup, DIRS, KINDS, BED_DROP, SLABS, inTray, inBoard, addCrates };
+
 /** The whole Pixelwelt world: { group, update(dt), settle(), dispose(), avoid }. light: fewer weather particles (phone, quality low). */
 export function createPixelWorld({ track, view, light } = {}) {
   const kit = makePixelKit(track);
   const group = new THREE.Group();
   group.name = 'pixel-world';
-  const isl = buildTerrain(kit);
-  group.add(isl);
-  const tree = buildTree(kit);
+  // CHE-106: ?island=a|b|c|d|e swaps the island body, its decoration and the trees; no flag or another value is today's island
+  const id = islandFlag(), pick = id && ISLANDS[id];
+  const v = pick ? pick(ISLAND_CTX, kit, { light: !!light }) : null;
+  group.add(v ? v.island : buildTerrain(kit));
+  if (v) for (const x of v.extras) group.add(x);
+  const tree = v ? v.tree || { group: new THREE.Group(), cells: [], feet: [] } : buildTree(kit);
   group.add(tree.group);
   const clouds = addClouds(group, kit);
   // the sun: one flat square, far behind the board
@@ -162,20 +173,23 @@ export function createPixelWorld({ track, view, light } = {}) {
   let time = 2.2, tick = -1;
   // CHE-299 treefade: the camera inside or within 1.5 of the oak's box shrinks the whole tree softly (0.35 s ease), so no green fills the screen.
   const treeBox = new THREE.Box3(), camPos = new THREE.Vector3();
-  let treeK = 1;
+  const feet = tree.feet || [tree.group], treeKs = feet.map(() => 1);   // an island variant can have several trees, each one fades on its own
   const treeFade = (dt) => {
     const c = view?.()?.camera;
     if (!c) return;
-    tree.group.visible = true; tree.group.scale.setScalar(1);
-    treeBox.setFromObject(tree.group).expandByScalar(1.5);
-    treeK = approach(treeK, treeBox.containsPoint(c.getWorldPosition(camPos)) ? 0 : 1, dt / 0.35);
-    tree.group.scale.setScalar(Math.max(treeK, 0.0001)); tree.group.visible = treeK > 0.02;
+    feet.forEach((g, i) => {
+      g.visible = true; g.scale.setScalar(1);
+      treeBox.setFromObject(g).expandByScalar(1.5);
+      treeKs[i] = approach(treeKs[i], treeBox.containsPoint(c.getWorldPosition(camPos)) ? 0 : 1, dt / 0.35);
+      g.scale.setScalar(Math.max(treeKs[i], 0.0001)); g.visible = treeKs[i] > 0.02;
+    });
   };
   const anim = (t) => {
     const f = Math.floor(t * 3);   // the water steps like animation frames: a pixel row every few frames
     // the pond drifts toward its back edge (-z, where the fall is: a top face's v grows toward -z, so the offset counts down) and the
     // fall runs down (a side face's v grows with y, so the offset counts up)
     if (f !== tick) { tick = f; kit.T.water.offset.y = ((16 - f % 16) % 16) / 16; kit.T.fall.offset.y = (f % 16) / 16; }
+    v?.update?.(t);
     for (const c of clouds) { const span = 70, x = c.userData.x0 + t * c.userData.speed; c.position.x = ((x + 35) % span + span) % span - 35; }
   };
   anim(time);

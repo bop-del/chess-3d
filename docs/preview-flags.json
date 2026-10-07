@@ -8,6 +8,7 @@
     { "flag": "pawngore", "item": "CHE-219", "status": "picked", "pickRef": "owner 2026-10-06, variant a (run up and thrust) is the only choreography; the flag and variant c were removed in CHE-315" },
     { "flag": "tiles", "item": "CHE-287", "status": "picked", "pickRef": "owner 2026-10-06 (CHE-265 grill): style A, rendered images; the flag was removed in CHE-287" },
     { "flag": "review", "item": "CHE-155", "status": "open", "question": "keep both game review guidance variants, or drop a (b, the summary first, is the default)" },
+    { "flag": "island", "item": "CHE-106", "status": "open", "question": "pick the Pixelwelt island a (meadow), b (beach), c (village), d (floating islands) or e (volcano); no flag keeps today's island" },
     { "flag": "menu", "item": "CHE-223", "status": "open", "question": "remove ?menu=old once Menu A has shipped for one release" },
     { "flag": "rqueen", "status": "open", "question": "pick the Blocks red queen look a, b or c (a is the default; the Blocks theme is hidden)" },
     { "flag": "musicset", "status": "open", "question": "pick the background music set a or b (a is the default)" },

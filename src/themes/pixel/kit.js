@@ -9,7 +9,7 @@ export function makePixelKit(track = (t) => t) {
   const mul = SKIES[look().sky].mul;   // the sky's multiplier colour on the unlit materials (the sun keeps its own colour; sky.js changes it later)
   const bas = (map, extra = {}) => new THREE.MeshBasicMaterial({ map, vertexColors: true, ...(map !== T.sun ? { color: mul } : {}), ...extra });
   const mats = {};
-  for (const k of ['grassTop', 'grassSide', 'dirt', 'stone', 'cobble', 'sand', 'planks', 'logSide', 'logTop', 'sun']) mats[k] = bas(T[k]);
+  for (const k of ['grassTop', 'grassSide', 'dirt', 'stone', 'cobble', 'sand', 'planks', 'logSide', 'logTop', 'sun', 'gravel', 'soil', 'ore', 'basalt', 'lava', 'lavafall']) mats[k] = bas(T[k]);
   mats.crate = bas(T.planks);
   mats.leaves = bas(T.leaves, { alphaTest: 0.5 });
   mats.water = bas(T.water);   // opaque: a see through pond shows the open sky through the unclosed side (S61, rule: translucent only over closed ground)

@@ -24,8 +24,8 @@ try {
   await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 2 });
   await page.goto(`${URL0}/?theme=pixel&quality=high&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
-  // helpers inside the page
-  await page.evaluate(() => {
+  // helpers inside the page (a function, so the island variants below can set it up again after each load)
+  const SETUP = () => {
     const C = window.__chess, T = C.THREE, D = Math.PI / 180;
     C.step(3); for (let i = 0; i < 30; i++) C.stage.render(0.2);
     const cv = document.querySelector('canvas'), off = document.createElement('canvas'), ox = off.getContext('2d', { willReadFrequently: true });
@@ -54,7 +54,8 @@ try {
     H.hideAllBut = (keep) => { const was = meshes.map((m) => m.visible); meshes.forEach((m) => { if (!keep(m)) m.visible = false; }); return () => meshes.forEach((m, i) => { m.visible = was[i]; }); };
     H.world = { island, meshes };
     window.__H = H;
-  });
+  };
+  await page.evaluate(SETUP);
   // pond
   const pond = [];
   for (const [yaw, pitch, dist] of [[180, 35, 19], [150, 25, 19], [215, 45, 17], [200, 30, 22]]) {
@@ -80,8 +81,10 @@ try {
   const tied = posts.reduce((s, r) => s + r.tied, 0);
   R.expect('posts: no plank ring, no frame fold, no two surfaces at the same depth at the board corners', noFrame && tied === 0, `no frame, ${tied} pixels at equal depth in 4 views`, `noFrame ${noFrame}, ${tied} pixels at equal depth, ${JSON.stringify(posts)}`);
   // hairline
-  await page.evaluate(() => {
-    const H = window.__H, T = window.__chess.THREE, grass = H.world.island.getObjectByName('grassSide'), pos = grass.geometry.attributes.position, nor = grass.geometry.attributes.normal;
+  const SETUP_HAIR = () => {
+    const H = window.__H, T = window.__chess.THREE, grass = H.world.island.getObjectByName('grassSide');
+    if (!grass) { H.edges = []; return; }   // an island variant without grass block sides (CHE-106)
+    const pos = grass.geometry.attributes.position, nor = grass.geometry.attributes.normal;
     const edges = [];
     for (let q = 0; q + 3 < pos.count; q += 4) if (nor.getZ(q) > 0.9) edges.push([grass.localToWorld(new T.Vector3().fromBufferAttribute(pos, q)), grass.localToWorld(new T.Vector3().fromBufferAttribute(pos, q + 1))]);
     H.edges = edges;
@@ -106,7 +109,8 @@ try {
       }
       return [yaw, samples, +worst.toFixed(2)];
     };
-  });
+  };
+  await page.evaluate(SETUP_HAIR);
   const frames = [];
   for (let i = 0; i <= 30; i++) frames.push(await page.evaluate((y) => window.__H.hairFrame(y), +(i * 0.1).toFixed(1)));
   const seen = frames.reduce((s, f) => s + f[1], 0), bad = frames.filter((f) => f[2] > 0);
@@ -152,6 +156,27 @@ try {
     return { mesh: true, top: +b.max.y.toFixed(2), bottom: +b.min.y.toFixed(2), zBack: +b.min.z.toFixed(2), down: (T.fall.offset.y - f0 + 1) % 1 > 0 && (T.fall.offset.y - f0 + 1) % 1 < 0.5, pond: (w0 - T.water.offset.y + 1) % 1 > 0 && (w0 - T.water.offset.y + 1) % 1 < 0.5 };
   });
   R.expect('waterfall: a sheet over the back edge of the pond, running down, the pond drifting toward it', fall.mesh && fall.bottom < -4 && fall.top > -0.5 && fall.down && fall.pond, JSON.stringify(fall));
+  // CHE-106: the five island variants behind ?island=a..e. Each one loads and renders (canvas not blank, the island group is there and
+  // is not today's, no page error) and, where it has grass block sides, shows no green hairline row while orbiting a little.
+  for (const id of ['a', 'b', 'c', 'd', 'e']) {
+    await page.goto(`${URL0}/?theme=pixel&island=${id}&quality=high&manual=1&ai=0&hud=0&intro=0&view=white`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+    await page.evaluate(() => { const C = window.__chess; C.step(3); for (let i = 0; i < 30; i++) C.stage.render(0.2); });
+    await page.evaluate(SETUP); await page.evaluate(SETUP_HAIR);
+    const r = await page.evaluate(() => {
+      const H = window.__H, img = H.snap(), seen = new Set(); let nonSky = 0;
+      for (let i = 0; i < img.length; i += 4 * 97) seen.add((img[i] >> 4) << 8 | (img[i + 1] >> 4) << 4 | img[i + 2] >> 4);
+      const world = window.__chess.themes.world, isl = world.group.getObjectByName('island');
+      return { colors: seen.size, island: !!isl, boxes: isl?.userData.boxes.length || 0, edges: H.edges.length };
+    });
+    R.expect(`island ${id}: loads and renders (canvas not blank, island group built)`, r.colors > 60 && r.island && r.boxes > 300, `${r.colors} colours, ${r.boxes} island boxes`);
+    if (r.edges) {
+      const fr = [];
+      for (let i = 0; i <= 6; i++) fr.push(await page.evaluate((y) => window.__H.hairFrame(y), +(i * 0.1).toFixed(1)));
+      const bad = fr.filter((f) => f[2] > 0);
+      R.expect(`island ${id}: no green row along the bottom of the grass blocks while orbiting`, bad.length === 0, `${fr.reduce((a, f) => a + f[1], 0)} samples in ${fr.length} frames`, JSON.stringify(bad));
+    }
+  }
   if (SHOTS) {
     mkdirSync(SHOTS, { recursive: true });
     for (const [name, v] of [['pond', [180, 35, 14]], ['posts', [35, 28, 7]], ['tray', [0, 55, 13]]]) {

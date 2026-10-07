@@ -8,7 +8,7 @@ import { SKIES, look as currentLook, onLook } from './look.js';
 import { buildBackdrop, meshesOf } from './backdrops.js';
 
 const rnd = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-const TEXTURED = ['grassTop', 'grassSide', 'dirt', 'stone', 'cobble', 'sand', 'planks', 'logSide', 'logTop', 'crate', 'leaves', 'water', 'fall'];
+const TEXTURED = ['grassTop', 'grassSide', 'dirt', 'stone', 'cobble', 'sand', 'planks', 'logSide', 'logTop', 'crate', 'leaves', 'water', 'fall', 'gravel', 'soil', 'ore', 'basalt', 'lava', 'lavafall'];
 const AREA = { x: 15, z: 13, top: 16, bottom: -3 };   // where the weather falls: a box around the island
 const SUN_HOME = [-12, 17, -34];
 
