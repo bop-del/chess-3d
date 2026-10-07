@@ -1,6 +1,6 @@
 # Architecture
 
-A short tour of how Chess 3D is put together. Plain ES modules on top of three.js 0.186, bundled by Vite. The game loads no asset files while it runs (the PNGs in `public/` are for the Home Screen and link previews): geometry comes from code, textures from canvas, the lighting environment from a generated studio map.
+A short tour of how Chess 3D is put together. Plain ES modules on top of three.js 0.186, bundled by Vite. The game loads no asset files while it runs (the PNGs in `public/` are for the Home Screen and link previews, and the 17 webp pictures in `public/tiles/` are the Options tiles, ADR 0011): geometry comes from code, textures from canvas, the lighting environment from a generated studio map.
 
 ## Section index
 
@@ -572,3 +572,7 @@ Only with `?online=<server url>` (and menu A). `src/online/store.js` is the one 
 ## The `open` flag
 
 `?open=<id>` shows one panel or tab when the game is ready. `applyLateParams` in `src/main.js` calls `openFlag(id, { ui, learn })`, so it runs after the start sequence. Values `learn`, `openings`, `mine`, `drill`, `practise` and `puzzles` go to `learn.open(tab)` (`src/learn/learn.js`: selects the tab, then opens the Learn sheet on a phone or unfolds the Learn card on desktop; `drill` maps to the Practise tab, which falls back to Openings while no opening was added). `settings`, `scene`, `music`, `clock`, `moves`, `daily` and `badges` go to `ui.openPanel(id)` (`src/ui.js`: on a phone the Menu sheet with that card open, on desktop the card unfolded, then scrolled into view; `music` scrolls to `.music-settings`). Lookups use `Object.hasOwn`, an unknown value does nothing and logs nothing. `online` opens the Online tab or sheet when `?online=` is set. Test: `test/open-flag.mjs` (smoke group `open`).
+
+## Options tiles (CHE-265, CHE-287)
+
+The Theme, World, Sky and Backdrop rows of Options show a small picture of each real choice (Light keeps its own tiles). `src/themes/tiles.js` has `dressTile(button, kind, id)`, which sets the picture of `public/tiles/<kind>-<id>.webp` (kinds `theme`, `set`, `sky`, `back`) as the background of the tile's `<i>`, and `dressBox(box)`, which marks the row so the tile rules in `style.css` apply. `src/themes/swatches.js` (Theme) and `src/themes/pixel/look-setting.js` (World, Sky, Backdrop) call them. The 17 files are made by `node tools/tile-renders.mjs` from the real game (headless Chrome through `launchBrowser()`), never edited by hand; run it again after a look change or a new theme, sky or backdrop id. `test/tiles.mjs` (fast tier) fails with that command when an id has no file or a file has no id. ADR 0011 records the exception to "no asset files".

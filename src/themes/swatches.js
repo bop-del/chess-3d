@@ -18,7 +18,7 @@ export function mountSwatches({ themes, ui }) {
     b.style.setProperty('--sw-a', th.swatch[0]);
     b.style.setProperty('--sw-b', th.swatch[1]);
     b.innerHTML = '<i></i><b></b>';
-    dressTile(b, 'theme', th.id, th.swatch);
+    dressTile(b, 'theme', th.id);
     b.addEventListener('click', () => themes.set(th.id));
     box.append(b);
     buttons.set(th.id, b);

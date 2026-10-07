@@ -27,7 +27,7 @@ export function mountLookSetting({ themes, ui, stage }) {
       b.style.setProperty('--sw-a', a); b.style.setProperty('--sw-b', c);
       b.innerHTML = '<i></i><b></b>';
       b.addEventListener('click', () => setChoice(pick(id)));
-      dressTile(b, kind, id, kind === 'set' ? { sky: setOf(id).sky, backdrop: setOf(id).backdrop } : [a, c]);
+      dressTile(b, kind, id);
       box.append(b); buttons.set(id, b);
     }
     const names = () => { translateTree(row); for (const [id, b] of buttons) { const n = t(`pix${kind}.${id}`, en(id)); b.title = n; b.setAttribute('aria-label', n); b.querySelector('b').textContent = n; } };

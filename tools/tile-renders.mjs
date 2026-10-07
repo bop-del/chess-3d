@@ -1,9 +1,9 @@
-// Renders the Option tile pictures of style A (?tiles=a, CHE-265) from the real game into public/tiles/.
+// Renders the Option tile pictures of the Options tiles (CHE-265, CHE-287) from the real game into public/tiles/.
 // Usage: node tools/tile-renders.mjs [--only=theme,set,sky,back] [--out=public/tiles] [--size=132] [--quality=62] [--port=5362]
 // One small webp per theme, Pixelwelt set, sky and backdrop id (tile-<kind>-<id>.webp as <kind>-<id>.webp), 132 px square (3x of a 44 px tile, fine for 2x),
 // about 4 KB each. The page is the real build, manual mode (?manual=1), music and sound off, GPU where there is one, through launchBrowser()
-// (tools/_lib.mjs). The camera and which parts of the scene show are set here through window.__chess; test/tiles.mjs (fast tier) fails when a file is missing.
-// These files are the only exception to "no asset files" besides the app icons (public/tiles/ only).
+// (tools/_lib.mjs). The camera and which parts of the scene show are set here through window.__chess; test/tiles.mjs (fast tier) fails when a file is missing or orphaned.
+// These files are the one exception to "no asset files" besides the app icons (public/tiles/ only, docs/adr/0011).
 // Exit codes: 0 done, 1 a render failed, 2 usage or setup error.
 import { mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
