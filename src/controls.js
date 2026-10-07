@@ -335,7 +335,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // --------------------------------------------------------------- keyboard
-  const inField = (e) => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '');
+  const inField = (e) => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '') || !!e.target?.isContentEditable;
   const hooks = {};
   function onKeyDown(e) {
     if (e.metaKey || e.ctrlKey || e.altKey || inField(e) || cine) return;

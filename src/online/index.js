@@ -503,6 +503,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     const er = $c('.oerr');
     const cid = `m${Date.now().toString(36)}-${++chatN}`;
     input.value = '';
+    input.focus({ preventScroll: true });   // the tap on Send took the focus: back in the field, inside the gesture, so the keyboard stays up
     for (let i = 0; i < 3; i++) {
       try { await api.post('/chat', { to, text, cid }); er.hidden = true; er.dataset.kind = ''; return; }
       catch (err) { if (!err.net) break; await new Promise((r) => setTimeout(r, 1500)); }
@@ -511,7 +512,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     er.hidden = false; er.dataset.kind = 'send'; er.textContent = t('online.chatFailed', 'Message not sent.');
   });
   root.addEventListener('keydown', (e) => e.stopPropagation());
-  ch.addEventListener('keydown', (e) => e.stopPropagation());   // typing a code or a message never reaches the board's keys
+  ch.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape' && e.target.matches?.('.osend input')) e.target.blur(); });   // typing a code or a message never reaches the board's keys
 
   // ------------------------------------------------------------ start with a login
   let lastIn = new Set(), lastGameId = 0;

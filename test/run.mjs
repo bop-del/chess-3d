@@ -2,7 +2,7 @@
 //   fast   no browser, seconds: rules (perft and game logic), piece geometry contract, text lint, audit planner rules, novice level
 //   smoke  parallel groups (test/smoke-groups.mjs): vite build, preview on the lane's own port (5303 in the main checkout), only the groups the diff against main affects inside a lane (--all forces every group), cached passes print CACHED, one headless Chrome per group, scripted game, gimbal, budgets, pixel checks, fix checks, explain, drill, learn, battle scenes, themes
 //          --shared-chrome (or CHESS_SHARED_CHROME=1): one Chrome for the whole smoke run, a BrowserContext per group (the default since CHE-186); --own-chrome (or =0) the old path, one Chrome per group (tools/README.md)
-//   phone  phone sizes and real touch, the scripts at the same time (install in 2 parts), each cached by build, scripts and GL backend (CACHED, --no-cache reruns): tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/install.mjs (Add to Home Screen reminder)
+//   phone  phone sizes and real touch, the scripts at the same time (install in 2 parts), each cached by build, scripts and GL backend (CACHED, --no-cache reruns): tools/phoneshots.mjs (shots, contact sheets, tap target audit), test/touch.mjs, test/chat-focus.mjs, test/install.mjs (Add to Home Screen reminder)
 //   one smoke or phone run at a time on the machine (CHE-257): a lock file in ~/.cache/chess-3d, a second run prints one queued line and waits, the wait is logged to .tmp/chrome-waits.jsonl (kind run). A --shots run does not wait: it runs with --jobs=2 (at most 2 groups at once) next to the other run
 //   all    fast, then smoke. The release check is separate and slow (fresh npm ci): node tools/release-check.mjs
 // Extra options after the tier are passed to the smoke run, for example: node test/run.mjs smoke --skip-build --skip-fixes, --affected, --all, --no-cache
@@ -158,7 +158,7 @@ if (tier === 'phone') {
   console.log('--- phone tier (headless Chrome, phone sizes, real touch)');
   // the scripts do not share state: one Chrome slot, port and dist folder each, so they run at the same time (the slot lock keeps it to what the machine allows)
   const shared = rest.filter((a) => !a.startsWith('--port=') && a !== '--no-cache');   // one port for several servers would clash: each script claims its own
-  await runParallel([['phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', shared], ['real touch (test/touch.mjs)', 'test/touch.mjs', shared], ['install reminder and manifest 1/2 (test/install.mjs)', 'test/install.mjs', [...shared, '--part=0/2']], ['install reminder and manifest 2/2 (test/install.mjs)', 'test/install.mjs', [...shared, '--part=1/2']]], { cache: !rest.includes('--no-cache') });
+  await runParallel([['phone screenshots and tap target audit (tools/phoneshots.mjs)', 'tools/phoneshots.mjs', shared], ['real touch (test/touch.mjs)', 'test/touch.mjs', shared], ['chat focus and no board input through the chat (test/chat-focus.mjs)', 'test/chat-focus.mjs', shared], ['install reminder and manifest 1/2 (test/install.mjs)', 'test/install.mjs', [...shared, '--part=0/2']], ['install reminder and manifest 2/2 (test/install.mjs)', 'test/install.mjs', [...shared, '--part=1/2']]], { cache: !rest.includes('--no-cache') });
 }
 
 runLock?.release();
