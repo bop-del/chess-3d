@@ -11,7 +11,8 @@ import { createApi, loginWithCode } from './api.js';
 import { createMatch } from './match.js';
 import { detailsText } from './details.js';
 import { secondAction, scoreOf, chatStep, statView } from './cards.js';
-import { previewOn, previewScene, createPreviewApi } from './preview.js';
+import { previewOn, previewScene, createPreviewApi, previewPushEnv } from './preview.js';
+import { createPush } from './push.js';
 import { startStats } from './stats.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -26,6 +27,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const preview = previewOn(), scene = previewScene();   // test aid: ?onlinepv=list|wait|chat|min|stats|card runs the tab on fake players, no server
   let login = loginFor(server) || (preview ? { server, key: 'preview', name: 'Boris' } : null);
   let chatMin = false;
+  let push = null;
   let api = null, match = null, state = null, status = 'connecting', receivedAt = 0;
   let chatWith = null, chatShown = false, bub = null, bubTimer = 0, bubDone = false, gbub = null, gTimer = 0, confirmResign = false, detailsOpen = false, lockDetails = false, codeErr = '';
   const seen = seenGet();   // { game: last finished game id acknowledged, out: last declined challenge id acknowledged }
@@ -41,7 +43,9 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       <p class="oerr" hidden></p>
     </div>
     <div class="omain" hidden>
-      <p class="ome"></p>
+      <div class="omehead"><p class="ome"></p><button class="obell" type="button" data-a="bell" hidden></button></div>
+      <div class="opushcard ocard" hidden><p data-i18n="online.pushAsk">Shall I tell you when it is your turn?</p><div class="orow"><button class="obtn gold" type="button" data-a="push-yes" data-i18n="online.pushYes">Yes please</button><button class="obtn" type="button" data-a="push-no" data-i18n="online.pushNo">No thanks</button></div></div>
+      <p class="opushnote oerr" hidden></p>
       <button class="ostat own" type="button" data-a="stats" hidden></button>
       <section class="opd" hidden></section>
       <div class="ochal"></div>
@@ -367,7 +371,22 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const vv = window.visualViewport;
   const fitKeyboard = () => { if (vv) viewport(Math.max(0, window.innerHeight - vv.height - vv.offsetTop), vv.height); };
   if (phone) { viewport(0, window.innerHeight); vv?.addEventListener('resize', fitKeyboard); vv?.addEventListener('scroll', fitKeyboard); }
-  function render() { renderConn(); renderMain(); renderDot(); renderBub(); renderGame(); }
+  // CHE-272: the permission card (after the first online action, once) and the bell (on, off, blocked, or "add to Home Screen first")
+  const BELL = { on: ['online.bellOn', 'Notifications on'], off: ['online.bellOff', 'Notifications off'], denied: ['online.bellDenied', 'Notifications are blocked in the browser'], install: ['online.bellInstall', 'Add to Home Screen to get notifications'] };
+  let pushNote = '';
+  function renderPush() {
+    const st = push ? push.state() : 'unsupported', bell = $('.obell');
+    bell.hidden = !push || st === 'unsupported';
+    if (!bell.hidden) {
+      const [k, d] = BELL[st];
+      bell.dataset.s = st; bell.setAttribute('aria-label', t(k, d)); bell.title = t(k, d); bell.setAttribute('aria-pressed', st === 'on' ? 'true' : 'false');
+      bell.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Z"/><path d="M10 20a2 2 0 0 0 4 0"/>${st === 'on' ? '' : '<path d="M4 4l16 16"/>'}</svg>`;
+    }
+    $('.opushcard').hidden = !push || !push.wantCard();
+    const n = $('.opushnote'); n.hidden = !pushNote; n.textContent = pushNote;
+  }
+  async function pushDo(p) { pushNote = ''; await p; pushNote = push.error === 'off-server' ? t('online.pushServerOff', 'The server is not sending notifications right now.') : push.error ? t('online.pushFailed', 'That did not work.') : ''; renderPush(); }
+  function render() { renderConn(); renderMain(); renderDot(); renderBub(); renderGame(); renderPush(); }
 
   // the result line on the game over card: "Against Felix now 4 : 2"
   function scoreOnBanner() {
@@ -400,8 +419,11 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (a === 'details') { detailsOpen = !detailsOpen; renderDetails(); return; }
     if (a === 'retry') { api?.retry(); renderDetails(); return; }
     if (a === 'copy') { copyDetails(b); return; }
-    if (a === 'challenge') { await act('/challenge', { to: n }); return; }
-    if (a === 'accept') { if (await act('/challenge/answer', { id, accept: true })) closeSheets(); return; }
+    if (a === 'challenge') { if (await act('/challenge', { to: n })) push?.acted(); return; }
+    if (a === 'bell') { if (push?.state() === 'install') { pushNote = t('online.bellInstall', 'Add to Home Screen to get notifications'); renderPush(); } else if (push?.state() !== 'denied') pushDo(push.toggle()); else { pushNote = t('online.bellDenied', 'Notifications are blocked in the browser'); renderPush(); } return; }
+    if (a === 'push-yes') { pushDo(push.answer(true)); return; }
+    if (a === 'push-no') { push.answer(false); return; }
+    if (a === 'accept') { if (await act('/challenge/answer', { id, accept: true })) { closeSheets(); push?.acted(); } return; }
     if (a === 'decline') { await act('/challenge/answer', { id, accept: false }); return; }
     if (a === 'seen-out') { seen.out = id; seenSet(seen); render(); return; }
     if (a === 'seen-game') { seen.game = id; seenSet(seen); render(); return; }
@@ -493,10 +515,17 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
 
   // ------------------------------------------------------------ start with a login
   let lastIn = new Set(), lastGameId = 0;
+  let withParam = new URLSearchParams(location.search).get('with') || '';   // a tapped notification: ?open=online&with=<name> opens that chat
+  const memStorage = () => { const m = {}; return { getItem: (k) => m[k] ?? null, setItem: (k, v) => { m[k] = String(v); } }; };
   function start(l) {
     login = l; if (!preview) writeLogin(l);
     if (!preview) startStats({ server, key: l.key });   // CHE-291: our own stats, logged in players only
     api?.stop(); match?.stop();
+    if (!push) {
+      push = createPush({ server, getKey: () => login.key, onChange: renderPush, ...(preview ? { env: previewPushEnv(scene), storage: memStorage(), call: async (path) => (path === '/push/key' ? { key: 'BPreviewKeyPreviewKeyPreviewKey' } : { ok: true }) } : {}) });
+      if (preview && scene === 'pushcard') push.acted();
+      push.refresh();
+    }
     const mkApi = preview ? (o) => createPreviewApi({ scene, ...o }) : createApi;
     api = mkApi({
       server, key: l.key, version: VERSION,
@@ -517,9 +546,10 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
         else if (mine && prevG && prevG.id === mine.id && mine.moves.length > prevG.moves.length && mine.turn === mine.color && !match.attached) showGameBub({ kind: 'moved' });
         if (g && g.status === 'active' && g.id !== lastGameId) {
           if (lastGameId || !first) { toast(t('online.started', 'Game against {name}. You play {side}.', { name: g.opponent, side: sideName(g.color) }), 'info', 3200); closeSheets(); }
-          lastGameId = g.id;
+          lastGameId = g.id; push?.acted();
         }
         scoreOnBanner();
+        if (first && withParam && s.players.some((p) => p.name === withParam)) { openChat(withParam); withParam = ''; }
         render();
       },
     });
@@ -540,7 +570,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const hook = {
     get state() { return state; }, get status() { return status; }, get match() { return match; }, get api() { return api; },
     get login() { return login ? { server: login.server, name: login.name } : null },
-    render, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; },
+    get push() { return push; }, render, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; },
   };
   window.__chessOnline = hook;
   return hook;

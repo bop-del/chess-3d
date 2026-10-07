@@ -376,6 +376,20 @@ try {
   if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await D2.screenshot({ path: join(SHOTS, 'phone-pill.png') }); }
   await D2.close();
 
+  // ------------------------------------------------------------ CHE-272 push card and bell on the fake PushManager (no permission prompt, no server)
+  const P1 = await open(ctxA, `${BASE}/?${PVQ}pushcard&open=online`, PHONE);
+  await settleUi(P1);
+  R.expect('push: the card "Soll ich dir Bescheid sagen" shows, the bell is off', await until(P1, () => !document.querySelector('.opushcard').hidden && /Bescheid sagen/.test(document.querySelector('.opushcard').textContent) && document.querySelector('.obell')?.dataset.s === 'off'));
+  R.expect('push: card buttons and bell are at least 44 px', await ev(P1, () => [...document.querySelectorAll('.opushcard .obtn'), document.querySelector('.obell')].every((b) => { const r = b.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
+  if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await P1.screenshot({ path: join(SHOTS, 'phone-pushcard.png') }); }
+  await click(P1, '[data-a=push-yes]');
+  R.expect('push: Ja subscribes through the fake PushManager, the card goes, the bell is on', await until(P1, () => document.querySelector('.opushcard').hidden && document.querySelector('.obell')?.dataset.s === 'on' && window.__chessOnline.push.state() === 'on'));
+  await click(P1, '[data-a=bell]');
+  R.expect('push: the bell switches pushes off', await until(P1, () => document.querySelector('.obell')?.dataset.s === 'off' && window.__chessOnline.push.state() === 'off'));
+  await P1.close();
+  const P2 = await open(ctxA, `${BASE}/?${PVQ}bell&open=online`, WIDE);
+  R.expect('push: the bell scene starts on, no card', await until(P2, () => document.querySelector('.obell')?.dataset.s === 'on' && document.querySelector('.opushcard').hidden));
+  await P2.close();
   // ------------------------------------------------------------ CHE-290 player card on the fake fixture (?onlinepv=stats|card)
   const overflowFree = (page) => ev(page, () => { const w = document.documentElement.clientWidth; return document.documentElement.scrollWidth <= w + 1 && [...document.querySelectorAll('.ostat, .opd')].filter((e) => e.getClientRects().length).every((e) => { const r = e.getBoundingClientRect(); return r.left >= -0.5 && r.right <= w + 0.5 && e.scrollWidth <= e.clientWidth + 1; }); });
   for (const [tag, size] of [['phone 360', [360, 740, true]], ['phone 390', PHONE], ['desktop', DESK]]) {

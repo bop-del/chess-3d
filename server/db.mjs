@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS actions (player_id INTEGER NOT NULL, cid TEXT NOT NUL
 CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, device TEXT NOT NULL, value INTEGER, data TEXT);
 CREATE TABLE IF NOT EXISTS stats_daily (day TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, device TEXT NOT NULL, n INTEGER NOT NULL, v INTEGER NOT NULL, PRIMARY KEY (day, kind, name, device));
 CREATE TABLE IF NOT EXISTS server_health (at INTEGER PRIMARY KEY, started INTEGER NOT NULL, uptime_s INTEGER NOT NULL, present_max INTEGER NOT NULL, streams_max INTEGER NOT NULL, games_max INTEGER NOT NULL, loop_max_ms REAL NOT NULL, rss_max INTEGER NOT NULL, req INTEGER NOT NULL, r4xx INTEGER NOT NULL, r5xx INTEGER NOT NULL, load1 REAL NOT NULL, load5 REAL NOT NULL, load15 REAL NOT NULL, mem_free INTEGER NOT NULL, mem_total INTEGER NOT NULL, disk_free INTEGER, disk_total INTEGER, db_bytes INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS push_subs (player INTEGER NOT NULL, endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS push_subs_player ON push_subs (player);
 CREATE INDEX IF NOT EXISTS events_day ON events (day);
 CREATE INDEX IF NOT EXISTS games_white ON games (white_id);
 CREATE INDEX IF NOT EXISTS games_black ON games (black_id);
@@ -50,6 +52,7 @@ export function adminOps(db, now = () => Date.now()) {
   function issue(p) {
     const key = newKey(), code = newCode(p.name);
     db.prepare('DELETE FROM keys WHERE player_id = ?').run(p.id);
+    db.prepare('DELETE FROM push_subs WHERE player = ?').run(p.id);   // CHE-272: a fresh invite ends the old devices, so their pushes too
     db.prepare('INSERT INTO keys (key_hash, player_id, created) VALUES (?, ?, ?)').run(sha256(key), p.id, now());
     db.prepare('UPDATE players SET code_hash = ?, revoked = 0 WHERE id = ?').run(sha256(code), p.id);
     return { name: p.name, key, code };
@@ -69,6 +72,7 @@ export function adminOps(db, now = () => Date.now()) {
       const p = byName(name); if (!p) throw new Error(`no player ${name}`);
       db.prepare('UPDATE players SET revoked = 1, code_hash = NULL WHERE id = ?').run(p.id);
       db.prepare('DELETE FROM keys WHERE player_id = ?').run(p.id);
+      db.prepare('DELETE FROM push_subs WHERE player = ?').run(p.id);   // CHE-272
       return p.name;
     },
     delete(name) {
@@ -80,6 +84,7 @@ export function adminOps(db, now = () => Date.now()) {
       db.prepare('DELETE FROM messages WHERE from_id = ? OR to_id = ?').run(p.id, p.id);
       db.prepare('DELETE FROM actions WHERE player_id = ?').run(p.id);
       db.prepare('DELETE FROM keys WHERE player_id = ?').run(p.id);
+      db.prepare('DELETE FROM push_subs WHERE player = ?').run(p.id);
       db.prepare('DELETE FROM players WHERE id = ?').run(p.id);
       return p.name;
     },

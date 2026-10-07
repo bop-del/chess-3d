@@ -28,6 +28,9 @@ Invite players (the command prints the link and the code):
 | `ONLINE_ADMIN_SECRET` | none | The secret for the `/stats` dashboard. Without it `/stats` answers 404 (the page does not exist). Keep it in the `ONLINE_ENV` file, never in the repo |
 | `ONLINE_GAME_URL` | `http://localhost:5173/` | The game page the invite link points to (admin only) |
 | `ONLINE_PUBLIC_URL` | `http://localhost:<port>` | This server as the browser reaches it, put into the link as `?online=` (admin only) |
+| `ONLINE_VAPID_FILE` | none | CHE-272: the web push key file (JSON, mode 600, made once by `node server/admin.mjs push-keys`). Without it push is off and `/push/*` answers 404. A secret like `ONLINE_ADMIN_SECRET`: back it up, losing it invalidates every subscription |
+| `ONLINE_VAPID_SUBJECT` | none | `mailto:` (or `https:`) contact sent to the push services; push stays off without it |
+| `ONLINE_GAME_URL` | `http://localhost:5173/` | (also read by the server) the page a tap on a push opens, for example `https://chess.example.com/` |
 | `ONLINE_ENV` | none | A `KEY=VALUE` file outside the repo with the variables above |
 
 Nothing secret lives in the repo: keys and codes are stored only as sha256 hashes; paths and the public origin come from the env.
@@ -41,6 +44,7 @@ Nothing secret lives in the repo: keys and codes are stored only as sha256 hashe
     node server/admin.mjs chat <name>           # print all of that player's conversations
     node server/admin.mjs mute <name>           # cannot write chat messages (unmute <name> undoes it)
     node server/admin.mjs list                  # the players
+    ONLINE_VAPID_FILE=/path/vapid.json node server/admin.mjs push-keys   # the push key pair, once (refuses to overwrite)
 
 The link is `<game>?online=<server>&open=online#online=<key>`: the key travels in the fragment, which the browser never sends to a
 server; the game stores it and strips it from the address bar at once. The code gives the same login on another device (the iPhone
@@ -67,10 +71,18 @@ JSON, `Authorization: Bearer <key>` except `/up` and `/login-code`. An unknown k
 
 | `GET /player/<name>` | | The numbers of that player (CHE-290), derived from the finished games: `{ name, own, games, wins, losses, draws, streak: { current: { type, n }, best: { wins, losses, draws } }, perOpponent: [{ name, games, wins, losses, draws }], details: { avgMoves, avgMinutes, longestGameMoves, shortestWinMoves, openings: [{ eco, name, n }] }, headToHead }`. `headToHead` is from the asking player's side (`wins` are the asker's) and `null` on the own card. Running games do not count; a resign is a loss, a stale finish a win. Unknown, revoked or deleted name: 404 |
 | `POST /events` | `{ events: [{ kind, device, ... }] }` | `202 { ok, n }`. Usage events (CHE-291, ADR 0010), only with a player key. Kinds: `error` { message, where }, `feature` { name }, `perf` { tier: high, mid, low; loadMs }, `session` { length }; `device` { ua, touch, w, h, gpu }. One bad event refuses the batch (400) |
+| `POST /my-code` | `{}` | `{ ok, code }` (CHE-272): a fresh login code for the calling player (Bearer key). The old code stops working, keys stay valid. 5 per 10 minutes, the code is never logged |
+| `GET /push/key` | | `{ key }` the VAPID public key (base64url). CHE-272. 404 for all three push routes when push is off |
+| `POST /push/subscribe` | `{ endpoint, keys: { p256dh, auth } }` | `{ ok }` (the browser's `PushSubscription.toJSON()`; one row per endpoint, at most 10 per player; an endpoint must be https) |
+| `POST /push/unsubscribe` | `{ endpoint }` | `{ ok }` |
 | `GET /stats`, `POST /stats` | secret | The stats dashboard (HTML), only with `ONLINE_ADMIN_SECRET`: `Authorization: Bearer <secret>` or the form on the page (a POST body, never a URL). 401 without it, 404 when no secret is set |
 
 `cid` is a client id: a retried POST with the same id is applied once. Limits per key: 60 moves, 10 messages and 30 other actions a
 minute; a body over 4 KB is refused. `POST /events`: 20 events and 16 KB per request, 10 requests a minute and 2000 events a day per key. Wrong `/stats` secrets are throttled like wrong codes (5 per IP in 10 minutes).
+
+## Web push (CHE-272, ADR 0013)
+
+`server/push.mjs`, `node:crypto` only. Messages are encrypted per RFC 8291 (aes128gcm) and signed with VAPID (ES256 JWT, `aud` the endpoint origin, 12 h). Table `push_subs(player, endpoint, p256dh, auth, created)`. Five kinds, each sent once to every subscription of the player it concerns: `challenge` (to the challenged), `accepted` (to the challenger), `turn` (to the player on move), `chat` (to the receiver, the sender name only, never the text), `over` (to both, with the result). Tags: `challenge:<from>`, `accepted:<from>`, `turn:<game>`, `chat:<from>`, `over:<game>`, so a newer push replaces the older one of its kind. No push while the player has a live stream open. A 404 or 410 from the push service deletes the row; revoke, delete and `invite --new` delete all rows of the player. Endpoints are never logged in full (host only). Test: `test/online-push.mjs` (RFC 8291 appendix A vector, fake push service).
 
 ## Own stats (CHE-291)
 

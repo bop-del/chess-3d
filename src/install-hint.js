@@ -6,6 +6,9 @@
 // Remembered per device in localStorage: shown on the first visit, then at most twice more, at least SPACING visits apart.
 // Without working storage it is not shown (it could not be remembered). No service worker, no network.
 import { device } from './device.js';
+import { readLogin } from './online/store.js';
+import { t } from './i18n.js';
+import './online/strings.js';
 
 const KEY = 'chess3d.install-hint';
 const MAX_SHOWS = 3;       // the first time plus at most two reminders
@@ -75,6 +78,9 @@ const CSS = `
 .ih-scrim.in .ih-sheet{transform:none}
 .ih-title{margin:0 0 2px;font-size:16px;font-weight:600;letter-spacing:.02em}
 .ih-sub{margin:0 0 12px;font-size:13px;line-height:1.4;color:#9a9ba6}
+.ih-code{margin:0 0 12px;padding:10px;border-radius:12px;border:1px solid rgba(216,180,104,.55);background:rgba(216,180,104,.08)}
+.ih-code small{display:block;font-size:12px;line-height:1.4;color:#9a9ba6}
+.ih-code b{display:block;margin:4px 0;font:700 28px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.08em;user-select:all;color:${GOLD}}
 .ih-row{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
 .ih-tile{display:flex;align-items:center;gap:12px;text-align:left}
 .ih-art{width:42%;flex:none}
@@ -88,6 +94,18 @@ const CSS = `
   .ih-art{width:30%}
   .ih-cap{font-size:12px}
 }`;
+
+// CHE-272: a logged in online player gets a fresh code from POST /my-code (the server keeps only the hash) and sees it large to copy
+async function ownCode(box) {
+  const l = readLogin();
+  if (!l || !l.server) return;
+  try {
+    const r = await fetch(l.server.replace(/\/+$/, '') + '/my-code', { method: 'POST', headers: { Authorization: `Bearer ${l.key}`, 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' });
+    const j = r.ok ? await r.json() : null;
+    const code = String(j?.code || '').replace(/[^A-Za-z0-9-]/g, '');
+    if (code) { box.querySelector('b').textContent = code; box.hidden = false; }
+  } catch (e) { /* no server, no code line */ }
+}
 
 export function mountInstallHint() {
   if (!wantInstallHint()) return null;
@@ -105,7 +123,8 @@ function show() {
   const sheet = document.createElement('div');
   sheet.className = 'ih-sheet';
   const rows = STEPS.map((st, i) => `<div class="ih-tile"><div class="ih-art">${st.art}</div><div class="ih-cap"><span class="ih-n">${i + 1}</span>${st.text}</div></div>`).join('');
-  sheet.innerHTML = `<h2 class="ih-title">Play full screen</h2><p class="ih-sub">Add Chess 3D to your Home Screen to lose the browser bars.</p><div class="ih-row">${rows}</div>`;
+  sheet.innerHTML = `<h2 class="ih-title">Play full screen</h2><p class="ih-sub">Add Chess 3D to your Home Screen to lose the browser bars.</p><div class="ih-code" hidden><small>${t('online.yourCode', 'Your code')}</small><b></b><small>${t('online.yourCodeHint', 'Type it in the app from your Home Screen to log in there.')}</small></div><div class="ih-row">${rows}</div>`;
+  ownCode(sheet.querySelector('.ih-code'));
   const later = document.createElement('button');
   later.type = 'button';
   later.className = 'ih-later';

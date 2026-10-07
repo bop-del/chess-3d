@@ -1,10 +1,10 @@
-// Test aid for the Online tab (CHE-301, CHE-290): ?online=<any url>&onlinepv=list|wait|chat|min|stats|card (stats: own numbers and a long name
-// with no game; card: the detail card of Nina is open).
+// Test aid for the Online tab (CHE-301, CHE-290, CHE-272): ?online=<any url>&onlinepv=list|wait|chat|min|stats|card|pushcard|bell (stats: own numbers and a long
+// name with no game; card: the detail card of Nina is open; pushcard and bell: the push permission card and the bell on a fake push).
 // A fake api with fake players and messages, no server. index.js uses it instead of createApi when the flag is set.
 export const previewOn = (search = typeof location !== 'undefined' ? location.search : '') => new URLSearchParams(search).has('onlinepv');
 export const previewScene = (search = typeof location !== 'undefined' ? location.search : '') => {
   const v = new URLSearchParams(search).get('onlinepv');
-  return ['list', 'wait', 'chat', 'min', 'stats', 'card'].includes(v) ? v : 'list';
+  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell'].includes(v) ? v : 'list';
 };
 
 const MIN = 60000;
@@ -53,5 +53,17 @@ export function createPreviewApi({ scene, onState, onStatus }) {
       push();
       return {};
     },
+  };
+}
+
+/** CHE-272: a fake browser for push, so the card and the bell can be looked at with no server and no permission prompt */
+export function previewPushEnv(scene) {
+  let permission = scene === 'bell' ? 'granted' : 'default', sub = scene === 'bell' ? { endpoint: 'https://push.invalid/x', toJSON: () => ({ endpoint: 'https://push.invalid/x', keys: { p256dh: 'p', auth: 'a' } }), unsubscribe: async () => { sub = null; return true; } } : null;
+  const pm = { getSubscription: async () => sub, subscribe: async () => (sub = { endpoint: 'https://push.invalid/x', toJSON: () => ({ endpoint: 'https://push.invalid/x', keys: { p256dh: 'p', auth: 'a' } }), unsubscribe: async () => { sub = null; return true; } }) };
+  const reg = { pushManager: pm };
+  return {
+    sw: { register: async () => reg, ready: Promise.resolve(reg), getRegistration: async () => reg },
+    hasPush: true, iosTab: false,
+    Notification: { get permission() { return permission; }, requestPermission: async () => (permission = 'granted') },
   };
 }

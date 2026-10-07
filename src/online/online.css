@@ -207,6 +207,15 @@ body.phone.ochat-open .obub[data-k="chat"] { bottom: calc(var(--obot, 0px) + var
 /* on a phone the Online sheet shows the unread counts on the cards itself: the pill and the bubble never cover a card button */
 body.phone:has(.psheet.ponline.open) .ochpill, body.phone:has(.psheet.ponline.open) .obub[data-k="chat"] { display: none; }
 
+/* push: the bell beside the name and the permission card (CHE-272) */
+.omehead { display: flex; align-items: center; gap: 8px; }
+.omehead .ome { flex: 1; }
+.obell { appearance: none; flex: none; width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line-strong, rgba(255, 255, 255, 0.16)); background: rgba(255, 255, 255, 0.06); color: var(--dim); display: grid; place-items: center; cursor: pointer; touch-action: manipulation; }
+.obell[data-s="on"] { color: #1b1608; background: linear-gradient(180deg, #e6c987, #c9a24f); border-color: transparent; }
+.obell[data-s="denied"], .obell[data-s="install"] { opacity: 0.6; }
+.opushcard { border-color: rgba(216, 180, 104, 0.55); }
+.opushnote { color: var(--dim); }
+.ocodebig { font: 700 28px/1.2 ui-monospace, Menlo, monospace; letter-spacing: 0.08em; user-select: all; }
 /* --- player card (CHE-290): the own numbers at the top, the detail card of one player --- */
 .ostat { appearance: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 6px; width: 100%; box-sizing: border-box; padding: 8px; font: inherit; color: var(--text); text-align: center; cursor: pointer; touch-action: manipulation; border: 2px solid rgba(255, 255, 255, 0.14); border-radius: 14px; background: rgba(30, 32, 44, 0.8); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
 .ostat[hidden], .opd[hidden] { display: none; }

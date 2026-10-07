@@ -7,16 +7,17 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { existsSync } from 'node:fs';
 import { Chess, nameSq } from '../src/rules.js';
-import { openDb, sha256, normCode, adminOps, newKey } from './db.mjs';
+import { openDb, sha256, normCode, adminOps, newKey, newCode } from './db.mjs';
 import { createLive } from './live.mjs';
 import { createHealth, serverSection, systemProbe, SAMPLE_MS } from './health.mjs';
+import { createPush, overLine, vapidLoad } from './push.mjs';
 import { statsFor } from './playerstats.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
 export const STALE_MS = 3 * 24 * 3600 * 1000;   // a game with no move for 3 days: the waiting player may end it as a win
 export const CHAT_MAX = 200;
 const BODY_MAX = 4096;
-const LIMITS = { move: [60, 60e3], chat: [10, 60e3], other: [30, 60e3], login: [5, 10 * 60e3], events: [10, 60e3] };   // [count, window ms]
+const LIMITS = { move: [60, 60e3], chat: [10, 60e3], other: [30, 60e3], login: [5, 10 * 60e3], events: [10, 60e3], mycode: [5, 10 * 60e3] };   // [count, window ms]
 
 /** Is this browser origin allowed? A list from ONLINE_ORIGINS, else the local preview origins (localhost, 127.0.0.1, the Tailscale range). */
 export function originAllowed(origin, list) {
@@ -29,7 +30,7 @@ export function originAllowed(origin, list) {
   } catch (e) { return false; }
 }
 
-export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', log = () => {}, random = Math.random } = {}) {
+export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', pushFetch, log = () => {}, random = Math.random } = {}) {
   const admin = adminOps(db, now);
   const stats = createStats(db, { now });
   const health = createHealth(db, { now, probe: probe || systemProbe({ dbFile: dbFile || ':memory:' }), gauges: {
@@ -42,6 +43,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   const sampleTimer = setInterval(sampleSafe, sampleMs), firstTimer = setTimeout(sampleSafe, firstSampleMs);   // CHE-306: one row per 5 minutes, one soon after start
   sampleTimer.unref(); firstTimer.unref();
   const q = (sql) => db.prepare(sql);
+  const push = createPush(db, { vapid, subject: vapidSubject, gameUrl, now, log, ...(pushFetch ? { fetchFn: pushFetch } : {}) });   // CHE-272: off without a VAPID key
   const playerById = (id) => q('SELECT * FROM players WHERE id = ?').get(id);
   const playerByName = (name) => q('SELECT * FROM players WHERE name = ?').get(String(name));
   const authKey = (key) => {
@@ -133,6 +135,36 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     onStream: () => health.touch(),
     onBeat: () => { for (const id of live.ids()) { const p = playerById(id); if (!p || p.revoked) live.drop(id); } },
   });
+  /** CHE-272: the web push of one action, after it is committed. Never a chat text, only the sender name. A live stream suppresses it. */
+  function pushAfter(name, me, body, out) {
+    if (!push.enabled) return;
+    const to = (pid, kind, o) => push.notify(pid, kind, { streamOpen: live.online(pid), ...o });
+    const overTo = (g) => {
+      const row = q('SELECT * FROM games WHERE id = ?').get(g.id);
+      for (const pid of [row.white_id, row.black_id]) {
+        const from = playerById(pid === row.white_id ? row.black_id : row.white_id).name;
+        to(pid, 'over', { from, line: overLine(from, row.winner_id === pid, !row.winner_id), tag: `over:${row.id}`, query: '?open=online', data: { with: from, game: row.id } });
+      }
+    };
+    if (name === 'challenge') {
+      const other = playerByName(body.to);
+      to(other.id, 'challenge', { from: me.name, tag: `challenge:${me.name}`, query: '?open=online', data: { with: me.name } });
+    } else if (name === 'challenge/answer' && out.game) {
+      const g = q('SELECT * FROM games WHERE id = ?').get(out.game);
+      const from = g.white_id === me.id ? g.black_id : g.white_id;
+      to(from, 'accepted', { from: me.name, tag: `accepted:${me.name}`, query: '?open=online', data: { with: me.name, game: g.id } });
+    } else if (name === 'move' || name === 'resign' || name === 'finish-stale') {
+      const g = q('SELECT * FROM games WHERE id = ?').get(Number(body.game));
+      if (g.status === 'over') overTo(g);
+      else {
+        const next = g.white_id === me.id ? g.black_id : g.white_id;
+        to(next, 'turn', { from: me.name, tag: `turn:${g.id}`, query: `?open=online&with=${encodeURIComponent(me.name)}`, data: { with: me.name, game: g.id } });
+      }
+    } else if (name === 'chat') {
+      const other = playerByName(body.to);
+      to(other.id, 'chat', { from: me.name, tag: `chat:${me.name}`, query: `?open=online&with=${encodeURIComponent(me.name)}`, data: { with: me.name } });
+    }
+  }
   function broadcast() { for (const id of live.ids()) { const s = stateFor(id); if (s) live.send(id, 'state', s); else live.drop(id); } }
 
   // ------------------------------------------------------------ actions
@@ -280,7 +312,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       }
       const auth = String(req.headers.authorization || '');
       const me = authKey(auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
-      const known = ['/state', '/events', ...Object.keys(ACTIONS).map((a) => '/' + a)];
+      const known = ['/state', '/events', '/my-code', ...Object.keys(ACTIONS).map((a) => '/' + a), ...(push.enabled ? ['/push/key', '/push/subscribe', '/push/unsubscribe'] : [])];   // push off: its routes do not exist (404)
       const playerPath = req.method === 'GET' && path.startsWith('/player/');   // CHE-290
       if (!known.includes(path) && !playerPath) { status = 404; return send(req, res, 404); }
       if (!me) { status = 401; return send(req, res, 401); }   // an unknown key gets 401 and nothing else
@@ -289,6 +321,22 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         const out = stats.ingest(me.id, await readBody(req, EVENTS_BODY_MAX));
         if (out.error) { status = out.status; return send(req, res, out.status, { error: out.error }); }
         status = 202; return send(req, res, 202, { ok: true, n: out.n });
+      }
+      if (path === '/my-code') {   // CHE-272: a fresh login code for the calling player; the old code stops working, keys stay valid. The code is never logged.
+        if (req.method !== 'POST') { status = 405; return send(req, res, 405); }
+        if (limited('mycode', me.id)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+        const code = newCode(me.name);
+        q('UPDATE players SET code_hash = ? WHERE id = ?').run(sha256(code), me.id);
+        return send(req, res, 200, { ok: true, code });
+      }
+      if (path.startsWith('/push/')) {   // CHE-272
+        if (path === '/push/key') { if (req.method !== 'GET') { status = 405; return send(req, res, 405); } return send(req, res, 200, { key: push.publicKey() }); }
+        if (req.method !== 'POST') { status = 405; return send(req, res, 405); }
+        if (limited('other', me.id)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+        const body = await readBody(req);
+        if (path === '/push/subscribe') { const err = push.subscribe(me.id, body); if (err) { status = 400; return send(req, res, 400, { error: err }); } }
+        else push.unsubscribe(me.id, body.endpoint);
+        return send(req, res, 200, { ok: true });
       }
       if (playerPath) {   // CHE-290: the numbers of one player and your head to head with them; unknown, revoked or deleted: 404
         let name = ''; try { name = decodeURIComponent(path.slice('/player/'.length)); } catch (e) { /* bad escape: no such player */ }
@@ -318,6 +366,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       send(req, res, 200, out);
       health.touch();
       broadcast();
+      try { pushAfter(name, me, body, out); } catch (e) { console.error(e); }
     } catch (e) {
       if (e instanceof Fail) { status = e.status; if (!res.headersSent) send(req, res, e.status, { error: e.code }); }
       else { status = 500; console.error(e); if (!res.headersSent) send(req, res, 500, { error: 'server' }); }
@@ -330,9 +379,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   const server = createServer((req, res) => { handle(req, res); });
   server.keepAliveTimeout = 65000;
   return {
-    server, db, admin, live, stats, health, stateFor, broadcast,
+    server, db, admin, live, stats, health, push, stateFor, broadcast,
     listen: (port, host) => new Promise((ok) => server.listen(port, host, () => ok(server.address().port))),
-    close: () => new Promise((ok) => { clearInterval(statsTimer); clearInterval(sampleTimer); clearTimeout(firstTimer); health.stop(); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
+    close: () => new Promise((ok) => { push.flush().catch(() => {}); clearInterval(statsTimer); clearInterval(sampleTimer); clearTimeout(firstTimer); health.stop(); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
   };
 }
 
@@ -348,11 +397,16 @@ export function loadEnv() {
     origins: (process.env.ONLINE_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
     trustProxy: process.env.ONLINE_TRUST_PROXY === '1',
     adminSecret: process.env.ONLINE_ADMIN_SECRET || '',
+    vapidFile: process.env.ONLINE_VAPID_FILE || '',   // CHE-272: no file, no push
+    vapidSubject: process.env.ONLINE_VAPID_SUBJECT || '',
+    gameUrl: process.env.ONLINE_GAME_URL || '',
   };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const env = loadEnv();
-  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
+  const vapid = vapidLoad(env.vapidFile);
+  if (!vapid || !/^(mailto:|https:)/.test(env.vapidSubject)) console.log(`push is off (${vapid ? 'ONLINE_VAPID_SUBJECT is not a mailto: or https: address' : 'no ONLINE_VAPID_FILE'})`);
+  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
   const port = await app.listen(env.port, env.host);
   console.log(`online server on http://${env.host}:${port} (db ${env.db})`);
   const stop = () => { app.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 2000).unref(); };
