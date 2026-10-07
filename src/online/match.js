@@ -5,7 +5,8 @@
 import { sqName } from '../rules.js';
 
 export function createMatch({ game, controls, api, onChange = () => {}, setBoard = () => {} }) {
-  let g = null;              // the server's game (state.game) last seen
+  let games = [];            // the server's games (state.games) last seen (CHE-335: one per opponent, any number)
+  let g = null;              // the game on the board: its last state from the server, or null
   let attached = false;      // the board shows the online game
   let applying = false;      // our own moves on the board: not sent, not a reason to detach
   let local = [];            // the moves on the board, uci
@@ -21,8 +22,12 @@ export function createMatch({ game, controls, api, onChange = () => {}, setBoard
     if (!attached || !g) return true;
     return api.connected && !pending && g.status === 'active' && game.getState().turn === g.color;
   }
-  function attach(gj = g) {
+  /** put the game with this id on the board (the one on it leaves cleanly: queue and unsent move cleared); false when it is not an active game or the board is busy */
+  function attach(id = g?.id) {
+    const gj = games.find((x) => x.id === id);
     if (!gj || gj.status !== 'active' || game.mode !== 'play') return false;
+    if (g && g.id !== gj.id) { queue.length = 0; pending = null; }
+    g = gj;
     applying = true;
     try {
       if (!attached) { const st = game.getState(); prevAi = { on: st.vsComputer, color: st.computerColor, level: st.level }; }
@@ -109,16 +114,19 @@ export function createMatch({ game, controls, api, onChange = () => {}, setBoard
     if (g.reason === 'resign' || g.reason === 'stale') game.end({ result: g.result, reason: g.reason, winner: g.winner });
   }
 
-  /** a new state from the server */
+  /** a new state from the server. The board never switches by itself, except for one case: no active online game is on it and exactly one is running */
   function update(state) {
-    const prev = g;
-    g = state.game || null;
-    if (!g) { if (attached) detach(); return; }
-    if (prev && prev.id !== g.id) { queue.length = 0; pending = null; if (attached) detach({ restore: false }); }
-    if (!attached) {
-      if (g.status === 'active' && g.id !== left && game.mode === 'play') attach(g);   // a new game, or the page opened with one running
-      return;
+    games = state.games || (state.game ? [state.game] : []);
+    if (g) {
+      const now = games.find((x) => x.id === g.id) || null;   // the board game, from its newest state
+      if (!now) { g = null; queue.length = 0; pending = null; if (attached) detach(); return; }
+      g = now;
     }
+    if (!attached || g?.status === 'over') {   // nothing running on the board
+      const act = games.filter((x) => x.status === 'active');
+      if (act.length === 1 && act[0].id !== left && game.mode === 'play') attach(act[0].id);   // the page opened with one game, or a new one is your only one
+    }
+    if (!attached) return;
     // the board is attached: bring it to the server's moves
     const sm = g.moves;
     const prefix = (a, b) => a.length <= b.length && a.every((x, i) => x === b[i]);
@@ -137,7 +145,7 @@ export function createMatch({ game, controls, api, onChange = () => {}, setBoard
   }
 
   return {
-    update, attach: () => attach(g), detach,
+    update, attach, detach,
     get attached() { return attached; },
     get game() { return g; },
     get pending() { return !!pending; },

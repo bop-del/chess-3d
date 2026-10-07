@@ -61,11 +61,11 @@ JSON, `Authorization: Bearer <key>` except `/up` and `/login-code`. An unknown k
 | `GET /up` | | `ok` (health check, no auth) |
 | `GET /health`, `HEAD /health` | | `ok` (200) or a one line reason (503), for an external monitor, no auth (see Health check for a monitor) |
 | `POST /login-code` | `{ code }` | `{ key, name }` (a new device key for that player) |
-| `GET /state` | | `{ me, now, players, challenges: { in, out }, game, chats, unread }` |
+| `GET /state` | | `{ me, now, players, challenges: { in, out }, games, game, chats, unread }`. `games` (CHE-335): every active game of the player, newest first, plus the finished ones of the last 7 days (at most 5), each `{ id, color, opponent, white, black, moves, sans, turn, status, result, reason, winner, lastMoveAt, staleAt, canFinish }` (`canFinish` is per game). `challenges.out`: every open challenge plus the last declined one per player. `players[]`: `name, online, score, played, unread`, and for the v1.10 client `playing` (in a game with someone else, blocks nothing now) and `withMe` (the pair has an active game). `game` is **deprecated** (the newest active game, else the last one) and stays for one release for the v1.10 client |
 | `GET /events` | | the live stream: event `state` (the same shape) on every change, `: hb` every 20 s |
-| `POST /challenge` | `{ to }` | `{ id }` |
+| `POST /challenge` | `{ to }` | `{ id }`. Several can be open at once; a second one to the same player while one is open returns that id (`again: true`) and sends no second push. 409 `you-are-playing` when the pair has an active game, in both directions (`they-are-playing` is no longer returned: a player in a game can be challenged) |
 | `POST /challenge/cancel` | `{ id?, cid }` | `{ cancelled }`: the challenger withdraws their open challenge (id optional); only their own; none open gives `cancelled: 0` |
-| `POST /challenge/answer` | `{ id, accept }` | `{ game }` or `{ declined }` |
+| `POST /challenge/answer` | `{ id, accept }` | `{ game }` or `{ declined }`. Accepting cancels only the open challenges between the same two players (both directions), never the others; 409 `you-are-playing` when the pair already has a game |
 | `POST /move` | `{ game, uci, cid }` | `{ ply, san, over }`; an illegal move is 400 `illegal` |
 | `POST /resign` | `{ game }` | `{ over: 'resign' }` |
 | `POST /finish-stale` | `{ game }` | after 3 days without a move, the waiting player wins |

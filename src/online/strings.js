@@ -19,6 +19,7 @@ addDE({
   'online.challengesYou': '{name} fordert dich heraus', 'online.accept': 'Annehmen', 'online.decline': 'Nein danke',
   'online.waiting': 'Warte auf {name}...', 'online.declined': '{name} hat abgelehnt', 'online.ok': 'OK',
   'online.gameWith': 'Partie gegen {name}', 'online.youPlay': 'Du spielst {side}', 'online.yourTurn': 'Du bist am Zug', 'online.theirTurn': '{name} ist am Zug',
+  'online.askedLine': 'Herausgefordert, wartet...', 'online.withdraw': 'Zurückziehen', 'online.incoming': 'fordert dich heraus', 'online.theirTurnCard': '{name} ist dran', 'online.yourTurnCard': 'Du bist dran', 'online.toGame': 'Zur Partie', 'online.onBoard': 'auf dem Brett',
   'online.sending': 'Zug wird gesendet...',
   'online.toBoard': 'Zur Partie', 'online.resign': 'Aufgeben', 'online.resignAsk': 'Partie wirklich aufgeben?', 'online.yes': 'Ja', 'online.cancel': 'Abbrechen',
   'online.finish': 'Partie beenden', 'online.finishHint': '{name} hat seit 3 Tagen nicht gezogen. Beenden zählt als Sieg für dich.',

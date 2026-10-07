@@ -237,11 +237,11 @@ The short code of an invite, like `FELIX-7K3Q`, typed into the Online tab to log
 _Avoid_: password, PIN, token
 
 **Challenge**:
-One player's request to play a game with another; the other accepts or says no thanks. A player in a game cannot challenge or be challenged.
+One player's request to play a game with another; the other accepts or says no thanks. A player in a game can still challenge and be challenged, and several challenges can be open at once; accepting one does not cancel the others, only the other open challenge between the same two players.
 _Avoid_: invite (that is the login), match request
 
 **Online game**:
-A game between two invited players through the server, one at a time per player, no clock, no takeback. It ends by the rules, by resigning, or after 3 days without a move as a win for the waiting player.
+A game between two invited players through the server, one per pair of players and any number per player at once, no clock, no takeback. It ends by the rules, by resigning, or after 3 days without a move as a win for the waiting player.
 _Avoid_: match, remote game, multiplayer
 
 **Score**:

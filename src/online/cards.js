@@ -4,13 +4,21 @@
 /** wins : losses from your side, the draws only when there are some; '' when never played */
 export const scoreOf = (s) => (!s || !(s.w + s.l + s.d) ? '' : `${s.w} : ${s.l}${s.d ? `  ½ ${s.d}` : ''}`);
 
-/** the second button of a card: 'challenge' (gold, works), or a disabled one: 'playing', 'asked', 'busy' (you are in a game or already with this player) */
-export function secondAction(p, { active = false, outTo = '' } = {}) {
-  if (p.playing) return 'playing';
-  if (outTo === p.name) return 'asked';
-  if (active || p.withMe) return 'busy';
+/** the second button of a card (CHE-335): 'game' (a running game with this player: "Zur Partie"), 'asked' (your challenge is open: "Zurückziehen"),
+ * 'incoming' (they challenged you: answered in the card above the list), else 'challenge' (gold). `game`: a running game with this player. */
+export function secondAction(p, { game = false, out = [], inc = [] } = {}) {
+  const has = (l) => (Array.isArray(l) ? l.includes(p.name) : l === p.name);
+  if (game) return 'game';
+  if (has(out)) return 'asked';
+  if (has(inc)) return 'incoming';
   return 'challenge';
 }
+
+/** the line of a card with a running game: 'mine' (your move, highlighted) or 'theirs' ("<name> ist dran") */
+export const gameLine = (g) => (g.turn === g.color ? 'mine' : 'theirs');
+
+/** the number on the bell: running games where it is your move */
+export const myTurnCount = (games = []) => games.filter((g) => g.status === 'active' && g.turn === g.color).length;
 
 /** the chat window: { with, shown, min }. actions: open(name), to(name) switcher, min, expand, close */
 export function chatStep(st, action, name = '') {

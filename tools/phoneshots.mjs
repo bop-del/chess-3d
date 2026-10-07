@@ -1,7 +1,7 @@
 // Phone tier, part 1: screenshots and layout audits at five iPhone sizes (headless Chrome, touch emulation, software GL).
 // Usage: node tools/phoneshots.mjs [--skip-build] [--port=<default: claimed from the lane name>] [--only=portrait,se] [--dpr=3]
 //   Builds into .tmp/phone-dist, serves it on a claimed port and, for each size, loads the page with quality=low&manual=1&ai=0&touch=1
-//   and takes five shots into .tmp/phone-shots/<size>/ : start, selected (a real tap on e2), menu (the Menu sheet opened by tap), help, promo.
+//   and takes six shots into .tmp/phone-shots/<size>/ : start, selected (a real tap on e2), menu (the Menu sheet opened by tap), help, promo, online (the lobby with several games, fake server).
 //   Simulated safe area insets (portrait 47 top 34 bottom, landscape 47 left and right 21 bottom, the short sizes keep the side
 //   insets and drop the bottom one) go through CDP Emulation.setSafeAreaInsetsOverride. One contact sheet per size follows.
 // Audits per size, on every shot, duplicates merged:
@@ -228,6 +228,11 @@ try {
       const promoUp = await page.evaluate(() => { const p = document.getElementById('promo'); return !!p && !p.hidden && p.children.length > 0; });
       R.expect(`${name} promotion chooser shown`, promoUp, '', 'chooser not visible');
       await shot('promo');
+
+      // the Online lobby with several games and challenges (CHE-335, the fake server scene onlinepv=multi)
+      await load('&online=http%3A%2F%2Fpreview.invalid&onlinepv=multi&open=online');
+      R.expect(`${name} Online lobby (multi) shows its cards`, await page.evaluate(() => document.querySelectorAll('.opc .ostate').length === 3).catch(() => false), '', 'the three card states are missing');
+      await shot('online');
 
       const bad = [...watch.errs, ...watch.foreign.map((u) => 'foreign ' + u)];
       R.expect(`${name} no page errors`, !bad.length, `${watch.warns.length} console warnings`, bad.slice(0, 3).join(' | '));

@@ -1,10 +1,10 @@
-// Test aid for the Online tab (CHE-301, CHE-290, CHE-272): ?online=<any url>&onlinepv=list|wait|chat|min|stats|card|pushcard|bell (stats: own numbers and a long
+// Test aid for the Online tab (CHE-301, CHE-290, CHE-272): ?online=<any url>&onlinepv=list|wait|chat|min|stats|card|pushcard|bell|multi (multi: two running games, an open challenge out, one in; stats: own numbers and a long
 // name with no game; card: the detail card of Nina is open; pushcard and bell: the push permission card and the bell on a fake push).
 // A fake api with fake players and messages, no server. index.js uses it instead of createApi when the flag is set.
 export const previewOn = (search = typeof location !== 'undefined' ? location.search : '') => new URLSearchParams(search).has('onlinepv');
 export const previewScene = (search = typeof location !== 'undefined' ? location.search : '') => {
   const v = new URLSearchParams(search).get('onlinepv');
-  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell'].includes(v) ? v : 'list';
+  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell', 'multi'].includes(v) ? v : 'list';
 };
 
 const MIN = 60000;
@@ -31,7 +31,7 @@ export function createPreviewApi({ scene, onState, onStatus }) {
       ...(scene === 'stats' || scene === 'card' ? [{ name: 'Maximiliane-Charlotte', online: false, playing: false, withMe: false, score: null, unread: 0 }] : []),
     ],
     challenges: { in: [], out: scene === 'wait' ? [{ id: 7, to: 'Nina', status: 'open' }] : [] },
-    game: null,
+    games: [], game: null,
     chats: {
       Nina: [msg(false, 'Hallo Boris! Spielen wir?', 9), msg(true, 'Gleich, ich mache erst den Tisch fertig.', 7), msg(false, 'Okay, ich warte.', 3), msg(false, 'Ich nehme Weiß!', 2)],
       Felix: [msg(false, 'Schau mal, mein neuer Zug', 5)],
@@ -39,16 +39,36 @@ export function createPreviewApi({ scene, onState, onStatus }) {
     },
     unread: { Nina: 2, Felix: 1 },
   };
+  const mk = (gid, opp, moves, color) => ({
+    id: gid, color, opponent: opp, white: color === 'w' ? 'Boris' : opp, black: color === 'w' ? opp : 'Boris', moves, sans: moves, turn: (moves.length % 2 ? 'b' : 'w'),
+    status: 'active', result: null, reason: null, winner: null, lastMoveAt: now - 60 * MIN, staleAt: now + 71 * 60 * MIN, canFinish: false,
+  });
+  if (scene === 'multi') {   // CHE-335: Boris plays Nina (his move) and Mia (her move), asked Felix, and Opa asks him
+    st.games = [mk(12, 'Mia', ['d2d4'], 'w'), mk(11, 'Nina', ['e2e4', 'e7e5'], 'w')];
+    st.players.find((p) => p.name === 'Nina').withMe = true; st.players.find((p) => p.name === 'Mia').withMe = true;
+    st.players.find((p) => p.name === 'Opa').playing = false;
+    st.challenges = { in: [{ id: 9, from: 'Opa', at: now }], out: [{ id: 7, to: 'Felix', status: 'open', at: now }] };
+    st.game = st.games[0];
+  }
   setTimeout(() => { onStatus('connected'); onState(JSON.parse(JSON.stringify(st))); }, 0);
   const push = () => onState(JSON.parse(JSON.stringify(st)));
   return {
-    stop() {}, retry() {},
+    stop() {}, retry() {}, connected: true,
+    sim(mutate) { mutate(st); st.now = Date.now(); push(); },   // test aid: the server changes something (a move in another game)
     stats: async (name) => ({ name, own: name === 'Boris', ...(FAKE_STATS[name] || ZERO) }), details: () => ({ cause: '', lastOk: now, retryIn: 0 }),
     async post(path, body) {
       if (path === '/chat') (st.chats[body.to] ||= []).push({ id: ++id, mine: true, text: body.text, at: Date.now() });
       else if (path === '/chat/read') { const p = st.players.find((x) => x.name === body.with); if (p) p.unread = 0; delete st.unread[body.with]; }
-      else if (path === '/challenge') st.challenges.out = [{ id: ++id, to: body.to, status: 'open' }];
-      else if (path === '/challenge/cancel') st.challenges.out = [];
+      else if (path === '/challenge') { if (!st.challenges.out.some((c) => c.to === body.to && c.status === 'open')) st.challenges.out.push({ id: ++id, to: body.to, status: 'open' }); }   // several at once, the same player only once
+      else if (path === '/challenge/cancel') st.challenges.out = st.challenges.out.filter((c) => body.id != null && c.id !== body.id);
+      else if (path === '/challenge/answer') {
+        const c = st.challenges.in.find((x) => x.id === body.id);
+        st.challenges.in = st.challenges.in.filter((x) => x.id !== body.id);
+        if (c && body.accept) {
+          const gm = mk(++id, c.from, [], 'w'); st.games = [gm, ...(st.games || [])]; st.game = gm;
+          const p = st.players.find((x) => x.name === c.from); if (p) p.withMe = true;
+        }
+      }
       st.now = Date.now();
       push();
       return {};

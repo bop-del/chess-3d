@@ -1,14 +1,21 @@
 // Online tab logic (CHE-301, fast tier): the second button of a player card and the floating chat state.
 import assert from 'node:assert/strict';
-import { secondAction, scoreOf, chatStep, chatView } from '../src/online/cards.js';
+import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, chatView } from '../src/online/cards.js';
 
 const P = (o) => ({ name: 'Nina', playing: false, withMe: false, ...o });
 assert.equal(secondAction(P({})), 'challenge');
-assert.equal(secondAction(P({ playing: true })), 'playing');
-assert.equal(secondAction(P({}), { outTo: 'Nina' }), 'asked');
-assert.equal(secondAction(P({}), { outTo: 'Felix' }), 'challenge');
-assert.equal(secondAction(P({}), { active: true }), 'busy');
-assert.equal(secondAction(P({ withMe: true })), 'busy');
+assert.equal(secondAction(P({}), { out: ['Nina'] }), 'asked', 'your challenge is open: Zurückziehen');
+assert.equal(secondAction(P({}), { out: 'Nina' }), 'asked', 'a plain name works too');
+assert.equal(secondAction(P({}), { out: ['Felix'] }), 'challenge', 'a challenge to somebody else does not matter');
+assert.equal(secondAction(P({}), { inc: ['Nina'] }), 'incoming');
+assert.equal(secondAction(P({}), { out: ['Nina'], inc: ['Nina'] }), 'asked', 'both ways: withdraw your own');
+assert.equal(secondAction(P({}), { game: true }), 'game', 'a running game: Zur Partie');
+assert.equal(secondAction(P({}), { game: true, out: ['Nina'], inc: ['Nina'] }), 'game');
+assert.equal(secondAction(P({ playing: true })), 'challenge', 'a player in a game with someone else can be challenged');
+assert.equal(gameLine({ turn: 'w', color: 'w' }), 'mine');
+assert.equal(gameLine({ turn: 'b', color: 'w' }), 'theirs');
+assert.equal(myTurnCount([{ status: 'active', turn: 'w', color: 'w' }, { status: 'active', turn: 'b', color: 'w' }, { status: 'over', turn: 'w', color: 'w' }, { status: 'active', turn: 'b', color: 'b' }]), 2, 'only running games where it is your move');
+assert.equal(myTurnCount(), 0);
 assert.equal(scoreOf(null), '');
 assert.equal(scoreOf({ w: 0, l: 0, d: 0 }), '');
 assert.equal(scoreOf({ w: 2, l: 1, d: 0 }), '2 : 1');

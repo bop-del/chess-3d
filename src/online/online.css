@@ -129,19 +129,24 @@ body.phone .ochat-x { width: 44px; height: 44px; margin-right: -8px; }
 @keyframes ochsin { from { transform: translateY(40%); opacity: 0; } }
 
 /* ===== CHE-301 style previews (?onlinestyle=a|b|c): player cards, waiting line, floating chat, collapsed chat ===== */
-.owait { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 4px 4px 12px; border-radius: 999px; border: 1px dashed rgba(216, 180, 104, 0.5); color: var(--text); font-size: 13.5px; font-weight: 650; }
-.owtxt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .odots { display: inline-flex; gap: 4px; }
 .odots i { width: 6px; height: 6px; border-radius: 50%; background: #e6c987; animation: odot 1.2s infinite ease-in-out; }
 .odots i:nth-child(2) { animation-delay: 0.2s; }
 .odots i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes odot { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.15); } }
 .ocards { gap: 8px; }
-.opc { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av body" "acts acts"; align-items: center; gap: 8px 10px; padding: 10px; border-radius: 12px; border: 1px solid var(--line, rgba(255, 255, 255, 0.09)); background: rgba(8, 9, 12, 0.45); }
+.opc { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av body" "state state" "acts acts"; align-items: center; gap: 8px 10px; padding: 10px; border-radius: 12px; border: 1px solid var(--line, rgba(255, 255, 255, 0.09)); background: rgba(8, 9, 12, 0.45); }
 .opc .oav { grid-area: av; position: relative; display: flex; align-items: center; }
 .opc .obody { grid-area: body; display: flex; flex-direction: column; min-width: 0; }
 .opc .oname { font-size: 15px; }
 .opc .oscore { margin: 0; font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.opc .ostatew { grid-area: state; min-width: 0; }
+.ostate { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-height: 36px; color: var(--dim); font-size: 13.5px; font-weight: 650; }
+.ostate.asked { color: var(--text); }
+.ostate.game .oturn { color: var(--text); }
+.ostate.game.mine .oturn { padding: 3px 10px; border-radius: 999px; background: #f0c24b; color: #1b1608; font-weight: 800; }
+.ostate .oside { flex: 1; min-width: 0; font-size: 12.5px; }
+.opc.ingame { border-color: rgba(216, 180, 104, 0.35); }
 .opc .oacts2 { grid-area: acts; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .opc .oacts2 .obtn { width: 100%; min-width: 0; }
 .oglyph, .oinit { display: grid; place-items: center; font-weight: 800; }
@@ -184,7 +189,6 @@ body.phone .ochat.ochf .grip { display: block; }
 .opc .oname { font-size: 16px; font-weight: 800; }
 .obtn { border-width: 2px; border-radius: 10px; font-weight: 800; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
 .obtn.gold { background: #f0c24b; }
-.owait { border-style: solid; border-width: 2px; border-color: #f0c24b; background: rgba(240, 194, 75, 0.1); }
 .ochat.ochf { border-width: 2px; border-radius: 18px; }
 .omsgs li { border-radius: 10px; border: 2px solid rgba(0, 0, 0, 0.25); font-weight: 600; }
 .omsgs li.mine { background: #f0c24b; color: #1b1608; }

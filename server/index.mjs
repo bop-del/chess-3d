@@ -53,7 +53,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     const row = q('SELECT p.* FROM keys k JOIN players p ON p.id = k.player_id WHERE k.key_hash = ?').get(sha256(key));
     return row && !row.revoked ? row : null;
   };
-  const activeGame = (pid) => q("SELECT * FROM games WHERE status = 'active' AND (white_id = ? OR black_id = ?) ORDER BY id DESC LIMIT 1").get(pid, pid);
+  // CHE-335: any number of games per player, one active game per pair
+  const activeGames = (pid) => q("SELECT * FROM games WHERE status = 'active' AND (white_id = ? OR black_id = ?) ORDER BY id DESC").all(pid, pid);
+  const activeGameWith = (a, b) => q("SELECT * FROM games WHERE status = 'active' AND ((white_id = ? AND black_id = ?) OR (white_id = ? AND black_id = ?)) ORDER BY id DESC LIMIT 1").get(a, b, b, a);
   const lastGame = (pid) => q('SELECT * FROM games WHERE white_id = ? OR black_id = ? ORDER BY id DESC LIMIT 1').get(pid, pid);
   const movesOf = (gid) => q('SELECT uci, san FROM moves WHERE game_id = ? ORDER BY ply').all(gid);
 
@@ -99,23 +101,26 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     const me = playerById(pid);
     if (!me || me.revoked) return null;
     const score = scoreTable(pid);
-    const mine = activeGame(pid);
+    const mineAll = activeGames(pid);
     const players = q('SELECT * FROM players WHERE id != ? AND revoked = 0 ORDER BY name COLLATE NOCASE').all(pid).map((p) => {
-      const g = activeGame(p.id);
       const s = score.get(p.id) || { w: 0, l: 0, d: 0 };
       return {
         name: p.name, online: live.online(p.id),
-        playing: !!g && !(mine && g.id === mine.id),
-        withMe: !!g && !!mine && g.id === mine.id,
+        playing: activeGames(p.id).some((x) => x.white_id !== pid && x.black_id !== pid),   // deprecated for the v1.10 client: in a game with someone else, blocks nothing now
+        withMe: !!activeGameWith(pid, p.id),
         score: s, played: s.w + s.l + s.d,
         unread: q('SELECT COUNT(*) AS n FROM messages WHERE from_id = ? AND to_id = ? AND read = 0').get(p.id, pid).n,
       };
     });
     const cin = q("SELECT c.id, c.created AS at, p.name AS from_name FROM challenges c JOIN players p ON p.id = c.from_id WHERE c.to_id = ? AND c.status = 'open' ORDER BY c.id").all(pid)
       .map((c) => ({ id: c.id, from: c.from_name, at: c.at }));
-    const lastOut = q('SELECT c.*, p.name AS to_name FROM challenges c JOIN players p ON p.id = c.to_id WHERE c.from_id = ? ORDER BY c.id DESC LIMIT 1').get(pid);
-    const out = lastOut && (lastOut.status === 'open' || lastOut.status === 'declined') ? [{ id: lastOut.id, to: lastOut.to_name, status: lastOut.status, at: lastOut.created }] : [];
-    const g = mine || lastGame(pid);
+    // every open challenge out, plus the last one to each player when that one was declined (so the answer can be acknowledged)
+    const out = q('SELECT c.*, p.name AS to_name FROM challenges c JOIN players p ON p.id = c.to_id WHERE c.from_id = ? ORDER BY c.id').all(pid)
+      .filter((c, _, all) => c.status === 'open' || (c.status === 'declined' && !all.some((d) => d.to_id === c.to_id && d.id > c.id)))
+      .map((c) => ({ id: c.id, to: c.to_name, status: c.status, at: c.created }));
+    const g = mineAll[0] || lastGame(pid);
+    const recent = q("SELECT * FROM games WHERE status = 'over' AND ended >= ? AND (white_id = ? OR black_id = ?) ORDER BY id DESC LIMIT 5").all(now() - 7 * 24 * 3600 * 1000, pid, pid);
+    const games = [...mineAll, ...recent].map((x) => gameJson(x, pid));
     const chats = {}, unread = {};
     for (const p of players) {
       const other = playerByName(p.name);
@@ -126,7 +131,8 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     }
     return {
       me: { name: me.name, muted: !!me.muted }, now: now(), players, challenges: { in: cin, out },
-      game: g ? gameJson(g, pid) : null, chats, unread,
+      games, game: g ? gameJson(g, pid) : null,   // game: deprecated, the newest active game else the last one (the v1.10 client reads it)
+      chats, unread,
     };
   }
 
@@ -148,7 +154,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         to(pid, 'over', { from, line: overLine(from, row.winner_id === pid, !row.winner_id), tag: `over:${row.id}`, query: '?open=online', data: { with: from, game: row.id } });
       }
     };
-    if (name === 'challenge') {
+    if (name === 'challenge' && !out.again) {
       const other = playerByName(body.to);
       to(other.id, 'challenge', { from: me.name, tag: `challenge:${me.name}`, query: '?open=online', data: { with: me.name } });
     } else if (name === 'challenge/answer' && out.game) {
@@ -191,9 +197,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     challenge(me, { to }) {
       const other = playerByName(to);
       if (!other || other.revoked || other.id === me.id) fail(404, 'unknown-player');
-      if (activeGame(me.id)) fail(409, 'you-are-playing');
-      if (activeGame(other.id)) fail(409, 'they-are-playing');
-      q("UPDATE challenges SET status = 'cancelled', answered = ? WHERE from_id = ? AND status = 'open'").run(now(), me.id);   // one open challenge out at a time
+      if (activeGameWith(me.id, other.id)) fail(409, 'you-are-playing');   // one game per pair, either way round
+      const open = q("SELECT id FROM challenges WHERE from_id = ? AND to_id = ? AND status = 'open'").get(me.id, other.id);
+      if (open) return { id: open.id, again: true };   // already asked: the same challenge, no second push
       const r = q("INSERT INTO challenges (from_id, to_id, status, created) VALUES (?, ?, 'open', ?)").run(me.id, other.id, now());
       return { id: Number(r.lastInsertRowid) };
     },
@@ -201,12 +207,12 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       const c = q("SELECT * FROM challenges WHERE id = ? AND to_id = ? AND status = 'open'").get(Number(id), me.id);
       if (!c) fail(404, 'no-challenge');
       if (!accept) { q("UPDATE challenges SET status = 'declined', answered = ? WHERE id = ?").run(now(), c.id); return { declined: true }; }
-      if (activeGame(me.id) || activeGame(c.from_id)) fail(409, 'they-are-playing');
+      if (activeGameWith(me.id, c.from_id)) fail(409, 'you-are-playing');
       const white = random() < 0.5 ? c.from_id : me.id, black = white === me.id ? c.from_id : me.id;   // colours drawn at random
       const r = q("INSERT INTO games (white_id, black_id, status, created, last_move_at) VALUES (?, ?, 'active', ?, ?)").run(white, black, now(), now());
       q("UPDATE challenges SET status = 'accepted', answered = ? WHERE id = ?").run(now(), c.id);
-      // both are in a game now: every other open challenge from or to either of them is void
-      q("UPDATE challenges SET status = 'cancelled', answered = ? WHERE status = 'open' AND (from_id IN (?, ?) OR to_id IN (?, ?))").run(now(), me.id, c.from_id, me.id, c.from_id);
+      // a second game against the same person is not possible: only the open challenge the other way round is void, all others stay
+      q("UPDATE challenges SET status = 'cancelled', answered = ? WHERE status = 'open' AND ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))").run(now(), me.id, c.from_id, c.from_id, me.id);
       return { game: Number(r.lastInsertRowid) };
     },
     'challenge/cancel'(me, { id }) {   // the challenger withdraws an open challenge (only their own; none open is fine, so a retry is harmless)

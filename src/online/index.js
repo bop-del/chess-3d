@@ -10,7 +10,7 @@ import { loginFor, writeLogin } from './store.js';
 import { createApi, loginWithCode } from './api.js';
 import { createMatch } from './match.js';
 import { detailsText } from './details.js';
-import { secondAction, scoreOf, chatStep, statView } from './cards.js';
+import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, statView } from './cards.js';
 import { previewOn, previewScene, createPreviewApi, previewPushEnv } from './preview.js';
 import { createPush } from './push.js';
 import { startStats } from './stats.js';
@@ -29,8 +29,11 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   let chatMin = false;
   let push = null;
   let api = null, match = null, state = null, status = 'connecting', receivedAt = 0;
-  let chatWith = null, chatShown = false, bub = null, bubTimer = 0, bubDone = false, gbub = null, gTimer = 0, confirmResign = false, detailsOpen = false, lockDetails = false, codeErr = '';
-  const seen = seenGet();   // { game: last finished game id acknowledged, out: last declined challenge id acknowledged }
+  let chatWith = null, chatShown = false, bub = null, bubTimer = 0, bubDone = false, gbub = null, gTimer = 0, confirmResign = 0, detailsOpen = false, lockDetails = false, codeErr = '';
+  const seen = seenGet();   // { game: finished game ids up to this one are acknowledged, games: more acknowledged ids, out: older single declined challenge id, outs: acknowledged declined challenge ids }
+  const ackGame = (id) => id <= (seen.game || 0) || (seen.games || []).includes(id);
+  const ackOut = (id) => seen.out === id || (seen.outs || []).includes(id);
+  const ack = (k, id) => { seen[k] = [...(seen[k] || []).filter((x) => x !== id), id].slice(-40); seenSet(seen); };
 
   const root = document.createElement('div');
   root.className = 'onl';
@@ -149,7 +152,11 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   // ------------------------------------------------------------ rendering
   const sideName = (c) => (c === 'w' ? t('side.white', 'White') : t('side.black', 'Black'));
   const nowServer = () => (state ? state.now + (Date.now() - receivedAt) : Date.now());
-  const myGame = () => (state?.game && state.game.status === 'active' ? state.game : null);
+  const gamesOf = () => state?.games || [];
+  const activeGames = () => gamesOf().filter((g) => g.status === 'active');
+  const gameById = (id) => gamesOf().find((g) => g.id === id) || null;
+  const gameWith = (name) => activeGames().find((g) => g.opponent === name) || null;
+  const boardGame = () => (match?.attached && match.game ? gameById(match.game.id) : null);   // the game on the board, as the server last saw it
   const scoreWith = (name) => state?.players.find((p) => p.name === name)?.score;
 
   function renderConn() {
@@ -171,14 +178,28 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const hashN = (name) => Math.max(0, (state?.players || []).findIndex((p) => p.name === name));   // one piece and colour per player, in list order
   const avatarOf = (name) => `<b class="oglyph" data-c="${hashN(name) % 6}">${PIECES[hashN(name) % PIECES.length]}</b>`;
   const scoreLine = (s) => scoreOf(s) || t('online.noGameYet', 'no game yet');
-  // one player card: dot, name, score or "noch keine Partie"; Chat and Challenge sit the same on every card
-  function playerCard(p, active, outTo) {
+  // one player card (CHE-335): dot, name, score; the state of the game or the challenge with this player; Chat and the second button
+  function playerCard(p) {
     const n = p.unread || 0;
-    const kind = secondAction(p, { active: !!active, outTo });
-    const second = kind === 'challenge' ? `<button class="obtn gold" type="button" data-a="challenge" data-n="${esc(p.name)}">${esc(t('online.challenge', 'Challenge'))}</button>`
-      : `<button class="obtn" type="button" disabled>${esc(kind === 'playing' ? t('online.playing', 'playing') : kind === 'asked' ? t('online.asked', 'Asked') : t('online.challenge', 'Challenge'))}</button>`;
+    const g = gameWith(p.name);
+    const mineOut = state.challenges.out.find((c) => c.status === 'open' && c.to === p.name);
+    const kind = secondAction(p, { game: !!g, out: state.challenges.out.filter((c) => c.status === 'open').map((c) => c.to), inc: state.challenges.in.map((c) => c.from) });
+    const second = kind === 'game' ? `<button class="obtn gold" type="button" data-a="board" data-id="${g.id}">${esc(t('online.toGame', 'To the game'))}</button>`
+      : kind === 'asked' ? `<button class="obtn" type="button" data-a="cancel-out" data-id="${mineOut.id}">${esc(t('online.withdraw', 'Withdraw'))}</button>`
+      : kind === 'incoming' ? `<button class="obtn" type="button" disabled>${esc(t('online.challenge', 'Challenge'))}</button>`
+      : `<button class="obtn gold" type="button" data-a="challenge" data-n="${esc(p.name)}">${esc(t('online.challenge', 'Challenge'))}</button>`;
     const chat = `<button class="obtn ochatbtn" type="button" data-a="chat" data-n="${esc(p.name)}" aria-label="${esc(t('online.chatWith', 'Chat with {name}', { name: p.name }) + (n ? ` (${n})` : ''))}">${esc(t('online.chat', 'Chat'))}${n ? ` <b class="ocnt">${n}</b>` : ''}</button>`;
-    return `<li class="op opc${chatWith === p.name ? ' on' : ''}${n ? ' unread' : ''}"><span class="oav" data-a="stats" data-n="${esc(p.name)}" role="button" aria-label="${esc(t('online.st.open', 'Numbers of {name}', { name: p.name }))}">${avatarOf(p.name)}<i class="pres${p.online ? ' on' : ''}" title="${esc(p.online ? t('online.online', 'online') : t('online.offline', 'away'))}"></i></span><div class="obody" data-a="stats" data-n="${esc(p.name)}" role="button"><span class="oname">${esc(p.name)}</span><span class="oscore">${esc(scoreLine(p.score))}</span></div><div class="oacts2">${chat}${second}</div></li>`;
+    let line = '';
+    if (kind === 'asked') line = `<div class="ostate asked" role="status"><span class="odots"><i></i><i></i><i></i></span><span>${esc(t('online.askedLine', 'Challenged, waiting...'))}</span></div>`;
+    else if (g) {
+      const mine = gameLine(g) === 'mine', onBoard = match?.attached && match.game?.id === g.id;
+      const turn = onBoard && match.pending ? t('online.sending', 'Sending the move...') : mine ? t('online.yourTurnCard', 'Your move') : t('online.theirTurnCard', '{name} to move', { name: p.name });
+      const canFinish = g.turn !== g.color && nowServer() >= g.staleAt;
+      line = `<div class="ostate game${mine ? ' mine' : ''}"><span class="oturn">${esc(turn)}</span><span class="oside">${esc(sideName(g.color))}${onBoard ? ` · ${esc(t('online.onBoard', 'on the board'))}` : ''}</span><button class="obtn small" type="button" data-a="resign" data-id="${g.id}">${esc(t('online.resign', 'Resign'))}</button></div>
+        ${confirmResign === g.id ? `<div class="oconfirm"><p>${esc(t('online.resignAsk', 'Really resign the game?'))}</p><div class="orow"><button class="obtn gold" type="button" data-a="resign-yes" data-id="${g.id}">${esc(t('online.yes', 'Yes'))}</button><button class="obtn" type="button" data-a="resign-no">${esc(t('online.cancel', 'Cancel'))}</button></div></div>` : ''}
+        ${canFinish ? `<p class="ohint">${esc(t('online.finishHint', '{name} has not moved for 3 days. Ending counts as a win for you.', { name: p.name }))}</p><div class="orow"><button class="obtn gold" type="button" data-a="finish" data-id="${g.id}">${esc(t('online.finish', 'End the game'))}</button></div>` : ''}`;
+    }
+    return `<li class="op opc${chatWith === p.name ? ' on' : ''}${n ? ' unread' : ''}${g ? ' ingame' : ''}"><span class="oav" data-a="stats" data-n="${esc(p.name)}" role="button" aria-label="${esc(t('online.st.open', 'Numbers of {name}', { name: p.name }))}">${avatarOf(p.name)}<i class="pres${p.online ? ' on' : ''}" title="${esc(p.online ? t('online.online', 'online') : t('online.offline', 'away'))}"></i></span><div class="obody" data-a="stats" data-n="${esc(p.name)}" role="button"><span class="oname">${esc(p.name)}</span><span class="oscore">${esc(scoreLine(p.score))}</span></div>${line ? `<div class="ostatew">${line}</div>` : ''}<div class="oacts2">${chat}${second}</div></li>`;
   }
   const nums = (v) => ['games', 'wins', 'losses', 'draws'].map((k) => `<span class="ostc ${k}"><b>${v[k]}</b><small>${esc(t(`online.st.${k}`, { games: 'Games', wins: 'Wins', losses: 'Losses', draws: 'Draws' }[k]))}</small></span>`).join('');
   const STREAK_EN = { win1: '1 win', winN: '{n} wins in a row', loss1: '1 loss', lossN: '{n} losses in a row', draw1: '1 draw', drawN: '{n} draws in a row' };
@@ -216,7 +237,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   function openStats(name) { statWith = name; loadStats(name, true); renderStats(); }
   // the own numbers and an open card are fetched again when a game ends (the finished game id changes the key)
   function watchStats() {
-    const g = state.game, key = g ? `${g.id}:${g.status}` : '';
+    const key = gamesOf().map((g) => `${g.id}:${g.status}`).join(',');
     if (key !== statKey) { const first = statKey === '' && !statCache.size; statKey = key; if (!first) statCache.clear(); }
     loadStats(state.me.name);
     if (statWith) loadStats(statWith);
@@ -228,7 +249,6 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     const err = $('.ologin .oerr'); err.hidden = !codeErr; err.textContent = codeErr;
     $('.omain').hidden = !logged;
     if (!logged) return;
-    const g = state.game, active = myGame();
     $('.ome').textContent = t('online.you', 'You are {name}', { name: state.me.name });
     watchStats(); renderStats();
 
@@ -237,33 +257,19 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     for (const c of state.challenges.in) {
       parts.push(`<div class="ocard"><p>${esc(t('online.challengesYou', '{name} challenges you', { name: c.from }))}</p><div class="orow"><button class="obtn gold" type="button" data-a="accept" data-id="${c.id}">${esc(t('online.accept', 'Accept'))}</button><button class="obtn" type="button" data-a="decline" data-id="${c.id}">${esc(t('online.decline', 'No thanks'))}</button></div></div>`);
     }
-    for (const c of state.challenges.out) {
-      if (c.status === 'open') parts.push(`<div class="owait" role="status"><span class="odots"><i></i><i></i><i></i></span><span class="owtxt">${esc(t('online.waitingShort', 'Waiting for {name}', { name: c.to }))}</span><button class="obtn small" type="button" data-a="cancel-out" data-id="${c.id}">${esc(t('online.cancel', 'Cancel'))}</button></div>`);
-      else if (c.status === 'declined' && seen.out !== c.id) parts.push(`<div class="ocard"><p>${esc(t('online.declined', '{name} declined', { name: c.to }))}</p><div class="orow"><button class="obtn" type="button" data-a="seen-out" data-id="${c.id}">${esc(t('online.ok', 'OK'))}</button></div></div>`);
+    for (const c of state.challenges.out) {   // an open one is the status of its player card; a declined one is told once
+      if (c.status === 'declined' && !ackOut(c.id)) parts.push(`<div class="ocard"><p>${esc(t('online.declined', '{name} declined', { name: c.to }))}</p><div class="orow"><button class="obtn" type="button" data-a="seen-out" data-id="${c.id}">${esc(t('online.ok', 'OK'))}</button></div></div>`);
     }
     $('.ochal').innerHTML = parts.join('');
 
-    // the game: running, or the last one finished and not yet acknowledged
-    let gh = '';
-    if (active) {
-      const mine = active.turn === active.color;
-      const turnTxt = match?.pending ? t('online.sending', 'Sending the move...') : mine ? t('online.yourTurn', 'Your move') : t('online.theirTurn', '{name} to move', { name: active.opponent });
-      const canFinish = active.turn !== active.color && nowServer() >= active.staleAt;
-      gh = `<div class="ocard ogamecard${mine ? ' mine' : ''}"><p><b>${esc(t('online.gameWith', 'Game against {name}', { name: active.opponent }))}</b><br>${esc(t('online.youPlay', 'You play {side}', { side: sideName(active.color) }))} · ${esc(turnTxt)}</p>
-        <div class="orow">${match?.attached ? '' : `<button class="obtn gold" type="button" data-a="board">${esc(t('online.toBoard', 'Show the game'))}</button>`}${chatBtn(active.opponent, state.unread?.[active.opponent] || 0)}<button class="obtn" type="button" data-a="resign">${esc(t('online.resign', 'Resign'))}</button></div>
-        ${confirmResign ? `<div class="oconfirm"><p>${esc(t('online.resignAsk', 'Really resign the game?'))}</p><div class="orow"><button class="obtn gold" type="button" data-a="resign-yes">${esc(t('online.yes', 'Yes'))}</button><button class="obtn" type="button" data-a="resign-no">${esc(t('online.cancel', 'Cancel'))}</button></div></div>` : ''}
-        ${canFinish ? `<p class="ohint">${esc(t('online.finishHint', '{name} has not moved for 3 days. Ending counts as a win for you.', { name: active.opponent }))}</p><div class="orow"><button class="obtn gold" type="button" data-a="finish">${esc(t('online.finish', 'End the game'))}</button></div>` : ''}</div>`;
-    } else if (g && g.status === 'over' && seen.game !== g.id) {
+    // finished games not yet acknowledged (the running ones are in their player cards)
+    $('.ogame').innerHTML = gamesOf().filter((g) => g.status === 'over' && !ackGame(g.id)).slice(0, 3).map((g) => {
       const res = !g.winner ? t('online.drawn', 'Draw') : g.winner === g.color ? t('online.won', 'You won') : t('online.lost', 'You lost');
-      gh = `<div class="ocard oresult"><p><b>${esc(res)}</b><br><span class="oscoreline">${esc(t('online.scoreNow', 'Against {name} now {score}', { name: g.opponent, score: scoreText(scoreWith(g.opponent)) }))}</span></p><div class="orow"><button class="obtn" type="button" data-a="seen-game" data-id="${g.id}">${esc(t('online.ok', 'OK'))}</button></div></div>`;
-    }
-    $('.ogame').innerHTML = gh;
+      return `<div class="ocard oresult"><p><b>${esc(res)}</b> · ${esc(g.opponent)}<br><span class="oscoreline">${esc(t('online.scoreNow', 'Against {name} now {score}', { name: g.opponent, score: scoreText(scoreWith(g.opponent)) }))}</span></p><div class="orow"><button class="obtn" type="button" data-a="seen-game" data-id="${g.id}">${esc(t('online.ok', 'OK'))}</button></div></div>`;
+    }).join('');
 
     // the players
-    const outTo = state.challenges.out.find((c) => c.status === 'open')?.to;
-    $('.oplayers').innerHTML = state.players.length ? state.players.map((p) => {
-      return playerCard(p, active, outTo);
-    }).join('') : `<li class="oempty">${esc(t('online.noPlayers', 'Nobody else is invited yet.'))}</li>`;
+    $('.oplayers').innerHTML = state.players.length ? state.players.map((p) => playerCard(p)).join('') : `<li class="oempty">${esc(t('online.noPlayers', 'Nobody else is invited yet.'))}</li>`;
 
     // the chat with one opponent
     const open = !!chatWith && state.players.some((p) => p.name === chatWith) && chatShown;
@@ -299,8 +305,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const unreadTotal = () => Object.values(state?.unread || {}).reduce((a, b) => a + b, 0);
   function renderDot() {
     if (!state) { setDot(false, 0); return; }
-    const g = myGame(), n = unreadTotal();
-    setDot(n > 0 || state.challenges.in.length > 0 || (!!g && g.turn === g.color), n);   // the number while something is unread, else the plain dot
+    const n = unreadTotal() + myTurnCount(gamesOf());   // unread messages plus the games where it is your move
+    setDot(n > 0 || state.challenges.in.length > 0, n);
   }
 
   // ------------------------------------------------------------ the bubble
@@ -317,11 +323,11 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   }
   const turnText = (g) => (g.turn === g.color ? t('online.yourTurn', 'Your move') : t('online.theirTurn', '{name} to move', { name: g.opponent }));
   function renderGame() {
-    const g = myGame();
-    if (gbub && (!g || (gbub.kind === 'moved' && match?.attached))) gbub = null;
+    const g = boardGame(), bg = gbub ? gameById(gbub.id) : null;   // the game on the board names the top row; the bubble names the game it is about
+    if (gbub && (!bg || bg.status !== 'active' || (gbub.kind === 'moved' && match?.attached && match.game?.id === bg.id))) gbub = null;
     gameBubEl.hidden = !gbub;
-    if (gbub) $('.obub-main', gameBubEl).textContent = gbub.kind === 'moved' ? t('online.movedBubble', '♟ {name} moved: {turn} ›', { name: g.opponent, turn: turnText(g) }) : t('online.gameBubble', '♟ Game against {name}: {turn} ›', { name: g.opponent, turn: turnText(g) });
-    gline.hidden = !(g && match?.attached) || !!match?.locked;   // the lock line takes the place when there is no connection
+    if (gbub) $('.obub-main', gameBubEl).textContent = gbub.kind === 'moved' ? t('online.movedBubble', '♟ {name} moved: {turn} ›', { name: bg.opponent, turn: turnText(bg) }) : t('online.gameBubble', '♟ Game against {name}: {turn} ›', { name: bg.opponent, turn: turnText(bg) });
+    gline.hidden = !(g && g.status === 'active' && match?.attached) || !!match?.locked;   // the lock line takes the place when there is no connection
     if (!gline.hidden) gline.textContent = t('online.gameLine', 'Online against {name} · {turn}', { name: g.opponent, turn: turnText(g) });
   }
   function showGameBub(b) {
@@ -329,7 +335,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     gTimer = setTimeout(() => { if (gbub === b) { gbub = null; renderGame(); } }, 8000);
     renderGame();
   }
-  const attachGame = () => { if (match.attached) return; if (game.mode !== 'play') game.setMode('play'); match.attach(); };
+  const attachGame = (id) => { if (match.attached && match.game?.id === id) return; if (game.mode !== 'play') game.setMode('play'); match.attach(id); };
   function renderBub() {
     if (bub && bub.kind === 'sum' && !unreadTotal()) bub = null;
     if (bub && bub.name && chatWith === bub.name && chatVisible()) bub = null;
@@ -390,8 +396,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
 
   // the result line on the game over card: "Against Felix now 4 : 2"
   function scoreOnBanner() {
-    const g = state?.game;
-    if (!g || g.status !== 'over' || !match?.attached) return;
+    const g = match?.attached && match.game ? gameById(match.game.id) : null;
+    if (!g || g.status !== 'over') return;
     const card = document.querySelector('#banner .banner-card');
     if (!card) return;
     let p = card.querySelector('.oscore-line');
@@ -423,15 +429,15 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (a === 'bell') { if (push?.state() === 'install') { pushNote = t('online.bellInstall', 'Add to Home Screen to get notifications'); renderPush(); } else if (push?.state() !== 'denied') pushDo(push.toggle()); else { pushNote = t('online.bellDenied', 'Notifications are blocked in the browser'); renderPush(); } return; }
     if (a === 'push-yes') { pushDo(push.answer(true)); return; }
     if (a === 'push-no') { push.answer(false); return; }
-    if (a === 'accept') { if (await act('/challenge/answer', { id, accept: true })) { closeSheets(); push?.acted(); } return; }
+    if (a === 'accept') { if (await act('/challenge/answer', { id, accept: true })) push?.acted(); return; }   // the sheet closes when the new game lands on the board
     if (a === 'decline') { await act('/challenge/answer', { id, accept: false }); return; }
-    if (a === 'seen-out') { seen.out = id; seenSet(seen); render(); return; }
-    if (a === 'seen-game') { seen.game = id; seenSet(seen); render(); return; }
-    if (a === 'board') { match.attach(); closeSheets(); render(); return; }
-    if (a === 'resign') { confirmResign = true; render(); return; }
-    if (a === 'resign-no') { confirmResign = false; render(); return; }
-    if (a === 'resign-yes') { confirmResign = false; const g = myGame(); if (g) await act('/resign', { game: g.id }); render(); return; }
-    if (a === 'finish') { const g = myGame(); if (g) await act('/finish-stale', { game: g.id }); return; }
+    if (a === 'seen-out') { ack('outs', id); render(); return; }
+    if (a === 'seen-game') { ack('games', id); render(); return; }
+    if (a === 'board') { attachGame(id); closeSheets(); render(); return; }
+    if (a === 'resign') { confirmResign = id; render(); return; }
+    if (a === 'resign-no') { confirmResign = 0; render(); return; }
+    if (a === 'resign-yes') { confirmResign = 0; if (gameById(id)) await act('/resign', { game: id }); render(); return; }
+    if (a === 'finish') { if (gameById(id)) await act('/finish-stale', { game: id }); return; }
     if (a === 'stats') { if (statWith === n) { statWith = null; renderStats(); } else openStats(n); return; }
     if (a === 'stats-x') { statWith = null; renderStats(); return; }
     if (a === 'chat') { openChat(n); return; }
@@ -451,7 +457,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (b.closest('.obub').dataset.k === 'game') {
       const had = gbub;
       gbub = null; clearTimeout(gTimer);
-      if (b.dataset.a === 'bub' && had) { attachGame(); closeSheets(); }
+      if (b.dataset.a === 'bub' && had) { attachGame(had.id); closeSheets(); }
       render();
       return;
     }
@@ -515,7 +521,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   ch.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape' && e.target.matches?.('.osend input')) e.target.blur(); });   // typing a code or a message never reaches the board's keys
 
   // ------------------------------------------------------------ start with a login
-  let lastIn = new Set(), lastGameId = 0;
+  let lastIn = new Set(); const knownGames = new Set();
   let withParam = new URLSearchParams(location.search).get('with') || '';   // a tapped notification: ?open=online&with=<name> opens that chat
   const memStorage = () => { const m = {}; return { getItem: (k) => m[k] ?? null, setItem: (k, v) => { m[k] = String(v); } }; };
   function start(l) {
@@ -532,22 +538,28 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       server, key: l.key, version: VERSION,
       onStatus: (s) => { status = s; if (s === 'connected') match?.retrySend(); render(); },
       onState: (s) => {
-        const first = !state, prevG = state?.game || null;
+        const first = !state, prevGames = gamesOf();
         state = s; receivedAt = Date.now();
         if (login.name !== s.me.name) { login = { ...login, name: s.me.name }; if (!preview) writeLogin(login); }
         // a new challenge to you, a new game
         const ins = new Set(s.challenges.in.map((c) => c.id));
         if (!first) for (const c of s.challenges.in) if (!lastIn.has(c.id)) toast(t('online.challengesYou', '{name} challenges you', { name: c.from }), 'info', 3200);
         lastIn = ins;
-        const g = s.game;
-        match.update(s);
+        match.update(s);   // the board never switches by itself (match.js has the one exception)
         watchMessages(first);
-        const mine = myGame();
-        if (mine && first) showGameBub({ kind: 'open' });
-        else if (mine && prevG && prevG.id === mine.id && mine.moves.length > prevG.moves.length && mine.turn === mine.color && !match.attached) showGameBub({ kind: 'moved' });
-        if (g && g.status === 'active' && g.id !== lastGameId) {
-          if (lastGameId || !first) { toast(t('online.started', 'Game against {name}. You play {side}.', { name: g.opponent, side: sideName(g.color) }), 'info', 3200); closeSheets(); }
-          lastGameId = g.id; push?.acted();
+        const running = activeGames();
+        if (first) {
+          const open = boardGame() && boardGame().status === 'active' ? boardGame() : running.find((g) => g.turn === g.color) || running[0];
+          if (open) showGameBub({ kind: 'open', id: open.id });
+        } else {
+          const moved = running.find((g) => { const p = prevGames.find((x) => x.id === g.id); return p && g.moves.length > p.moves.length && g.turn === g.color && !(match.attached && match.game?.id === g.id); });
+          if (moved) showGameBub({ kind: 'moved', id: moved.id });
+        }
+        for (const g of running) {
+          if (knownGames.has(g.id)) continue;
+          knownGames.add(g.id);
+          if (!first) { toast(t('online.started', 'Game against {name}. You play {side}.', { name: g.opponent, side: sideName(g.color) }), 'info', 3200); if (match.attached && match.game?.id === g.id) closeSheets(); }
+          push?.acted();
         }
         scoreOnBanner();
         if (first && withParam && s.players.some((p) => p.name === withParam)) { openChat(withParam); withParam = ''; }
@@ -563,7 +575,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
 
   // the countdown in an open Details box, the 3 day finish appearing on time
   setInterval(() => { if ((detailsOpen || lockDetails) && status === 'unreachable') renderDetails(); else if (lockDetails) renderDetails(); }, 1000);
-  setInterval(() => { if (myGame()) renderMain(); }, 30000);
+  setInterval(() => { if (activeGames().length) renderMain(); }, 30000);
   onLanguage(() => { translateTree(root); translateTree(lock); translateTree(ch); translateTree(bubEl); translateTree(gameBubEl); render(); });
   translateTree(root); translateTree(lock); translateTree(ch); translateTree(bubEl); translateTree(gameBubEl);
   onShown?.(() => { markRead(); renderMain(); });
@@ -571,7 +583,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const hook = {
     get state() { return state; }, get status() { return status; }, get match() { return match; }, get api() { return api; },
     get login() { return login ? { server: login.server, name: login.name } : null },
-    get push() { return push; }, render, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; },
+    get push() { return push; }, render, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; }, get boardGame() { return boardGame(); },
   };
   window.__chessOnline = hook;
   return hook;
