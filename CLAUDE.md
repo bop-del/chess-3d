@@ -1,6 +1,6 @@
 # chess-3d
 
-A 3D chess game for the browser (three.js 0.186, Vite, fully procedural, no asset files except the 17 Options tile pictures in public/tiles/, docs/adr/0011). Public repo bop-del/chess-3d, live at https://bop-del.github.io/chess-3d/.
+A 3D chess game for the browser (three.js 0.186, Vite, fully procedural, no asset files except the 17 Options tile pictures in public/tiles/, docs/adr/0011). Public repo bop-del/chess-3d, live at https://chess3d.borisdiebold.com/ (previous address https://bop-del.github.io/chess-3d/, until the switch), docs/adr/0012.
 
 ## Commands
 

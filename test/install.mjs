@@ -39,7 +39,7 @@ try {
     }
     const html = readFileSync(join(ROOT, DIST, 'index.html'), 'utf8');
     R.expect('index.html links the manifest and the touch icon', /rel="manifest"/.test(html) && /rel="apple-touch-icon"/.test(html));
-    R.expect('og and twitter tags use absolute URLs under the Pages address', /og:image" content="https:\/\/bop-del\.github\.io\/chess-3d\/og-image\.png"/.test(html) && /twitter:image" content="https:\/\/bop-del\.github\.io\/chess-3d\/og-image\.png"/.test(html) && /twitter:card" content="summary_large_image"/.test(html));
+    R.expect('og and twitter tags use absolute URLs under the own domain address', /og:image" content="https:\/\/chess3d\.borisdiebold\.com\/og-image\.png"/.test(html) && /twitter:image" content="https:\/\/chess3d\.borisdiebold\.com\/og-image\.png"/.test(html) && /twitter:card" content="summary_large_image"/.test(html));
 
   }
 

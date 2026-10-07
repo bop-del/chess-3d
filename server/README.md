@@ -23,7 +23,7 @@ Invite players (the command prints the link and the code):
 | `ONLINE_PORT` (or `PORT`) | `5502` | Port to listen on (the image sets `PORT=3000`) |
 | `ONLINE_HOST` | `0.0.0.0` | Address to listen on |
 | `ONLINE_DB` | `.tmp/online/online.db` | The SQLite file (the image: `/data/online.db`) |
-| `ONLINE_ORIGINS` | the local preview origins | Comma separated list of game origins allowed by CORS, for example `https://bop-del.github.io`. Without it: `http://localhost:*`, `http://127.0.0.1:*`, the Tailscale address range (CGNAT, carrier grade NAT block) and `*.ts.net` |
+| `ONLINE_ORIGINS` | the local preview origins | Comma separated list of game origins allowed by CORS, for example `https://chess3d.borisdiebold.com,https://bop-del.github.io` (both while the old address is still around, ADR 0012). Without it: `http://localhost:*`, `http://127.0.0.1:*`, the Tailscale address range (CGNAT, carrier grade NAT block) and `*.ts.net` |
 | `ONLINE_TRUST_PROXY` | off | `1` takes the client IP from `X-Forwarded-For` (behind kamal-proxy), for the wrong code throttle |
 | `ONLINE_ADMIN_SECRET` | none | The secret for the `/stats` dashboard. Without it `/stats` answers 404 (the page does not exist). Keep it in the `ONLINE_ENV` file, never in the repo |
 | `ONLINE_GAME_URL` | `http://localhost:5173/` | The game page the invite link points to (admin only) |
