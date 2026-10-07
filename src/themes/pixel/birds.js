@@ -99,6 +99,10 @@ export function createBirds({ kit, parent, tree }) {
     if (!BIRD_VARIANTS.includes(variant)) return 0;
     stop();
     const f = variant === 'a' ? flightA() : variant === 'b' ? flightB() : flightC(landing());
+    if (variant !== 'c') {   // CHE-299 birdlow: the flight goes lower, behind the island, on the side the camera looks at, so it crosses the top of the default views
+      const path = f.path, dy = variant === 'a' ? -13 : -15, flip = (globalThis.__chess?.stage?.camera?.position.z ?? 1) < 0 ? -1 : 1;
+      f.path = (t) => { const v = path(t); return new THREE.Vector3(v.x * flip, v.y + dy, v.z * flip); };
+    }
     run = { f, t: 0, variant, birds: f.birds.map((b) => ({ ...b, bird: makeBird(variant, mat) })) };
     for (const b of run.birds) group.add(b.bird.group);
     group.visible = true;

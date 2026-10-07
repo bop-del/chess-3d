@@ -51,11 +51,13 @@ export function createSkyLayer({ group, kit, clouds, light = false } = {}) {
     return g;
   }
 
-  function buildStars(n) {
+  function buildStars(n, backdrop) {
     const m = new Mesher({ shade: false });
     for (let i = 0; i < n; i++) {
       // a sphere of stars: the island floats in the sky, so they stand below the horizon too (hidden where a backdrop's ground is)
       const u = R() * 2 - 1, a = R() * Math.PI * 2, r = 80 + R() * 10, s = Math.sqrt(1 - u * u), sz = 0.45 + R() * 0.4;
+      // CHE-299 starclip: over the castle land the stars below the horizon of that land would shine in front of the meadow; leave them out
+      if (backdrop === 'castle' && r * u < -6) continue;
       m.box('flat', r * s * Math.cos(a), r * u, r * s * Math.sin(a), sz, sz, sz, { color: R() < 0.2 ? 0xffe9a8 : 0xffffff });
     }
     return meshesOf(m, kit, 'stars');
@@ -103,7 +105,7 @@ export function createSkyLayer({ group, kit, clouds, light = false } = {}) {
       kit.mats.sun.color.setHex(sky.sun ? sky.sun.color : 0xffffff);
     }
     if (sky.moon) { celestial = buildMoon(); layer.add(celestial); }
-    if (sky.stars) { stars = buildStars(light ? sky.stars >> 1 : sky.stars); layer.add(stars); }
+    if (sky.stars) { stars = buildStars(light ? sky.stars >> 1 : sky.stars, l.backdrop); layer.add(stars); }
     if (sky.weather) { parts = buildParticles(sky.weather); layer.add(parts.mesh); }
     if (sky.flash) { bolt = buildBolt(); layer.add(bolt); nextFlash = time + 1.4; flashT = -1; }
     if (l.backdrop && l.backdrop !== 'none') { backdropGroup = buildBackdrop(l.backdrop, sky, kit, { light }); if (backdropGroup) layer.add(backdropGroup); }

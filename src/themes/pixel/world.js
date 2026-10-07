@@ -160,6 +160,17 @@ export function createPixelWorld({ track, view, light } = {}) {
   const sky = createSkyLayer({ group, kit, clouds, light });   // CHE-239: sky mood, weather and backdrop
   group.userData.sky = sky;
   let time = 2.2, tick = -1;
+  // CHE-299 treefade: the camera inside or within 1.5 of the oak's box shrinks the whole tree softly (0.35 s ease), so no green fills the screen.
+  const treeBox = new THREE.Box3(), camPos = new THREE.Vector3();
+  let treeK = 1;
+  const treeFade = (dt) => {
+    const c = view?.()?.camera;
+    if (!c) return;
+    tree.group.visible = true; tree.group.scale.setScalar(1);
+    treeBox.setFromObject(tree.group).expandByScalar(1.5);
+    treeK = approach(treeK, treeBox.containsPoint(c.getWorldPosition(camPos)) ? 0 : 1, dt / 0.35);
+    tree.group.scale.setScalar(Math.max(treeK, 0.0001)); tree.group.visible = treeK > 0.02;
+  };
   const anim = (t) => {
     const f = Math.floor(t * 3);   // the water steps like animation frames: a pixel row every few frames
     // the pond drifts toward its back edge (-z, where the fall is: a top face's v grows toward -z, so the offset counts down) and the
@@ -170,7 +181,7 @@ export function createPixelWorld({ track, view, light } = {}) {
   anim(time);
   return {
     group, kit, avoid: avoid.state,
-    update(dt) { time += dt; anim(time); avoid.update(dt); sky.update(dt); },
+    update(dt) { time += dt; anim(time); avoid.update(dt); sky.update(dt); treeFade(dt); },
     settle() { avoid.update(5); },
     dispose() {
       sky.dispose();

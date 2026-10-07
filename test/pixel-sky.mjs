@@ -138,6 +138,19 @@ const track = (set) => { for (const g of set) if (!g.userData.__watched) { g.use
   r.w.dispose();
   r = probe('?sky=night'); check('night: stars and a moon, no weather', !!r.layer.getObjectByName('stars') && !!r.layer.getObjectByName('moon') && !r.layer.getObjectByName('weather') && r.w.group.getObjectByName('sun').visible === false);
   r.w.dispose();
+  {   // treefade (CHE-299): the camera at the oak shrinks it softly, a far camera brings it back
+    reset(); at('');
+    const cam = new THREE.PerspectiveCamera(); cam.position.set(-8.5, 3, -8.5); cam.updateMatrixWorld(true);
+    const w = createPixelWorld({ view: () => ({ camera: cam }) }), tree = w.group.getObjectByName('tree-foot');
+    w.update(0.1); const mid = tree.scale.x; for (let i = 0; i < 10; i++) w.update(0.1);
+    check('treefade: the oak shrinks softly while the camera is inside its box', mid > 0.1 && mid < 1 && tree.scale.x < 0.01 && !tree.visible, `${mid.toFixed(2)} then ${tree.scale.x.toFixed(3)}`);
+    cam.position.set(0, 20, 20); cam.updateMatrixWorld(true); for (let i = 0; i < 10; i++) w.update(0.1);
+    check('treefade: the oak is back at full size with the camera away', tree.scale.x === 1 && tree.visible);
+    w.dispose();
+  }
+  const lowestStar = (rr) => { const g = rr.layer.getObjectByName('stars'); let lo = Infinity; g.traverse((o) => { if (o.isMesh) { const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) lo = Math.min(lo, p.getY(i)); } }); return lo; };
+  r = probe('?sky=night&backdrop=castle'); check('starclip: no stars below y -6 over the castle meadow (CHE-299)', lowestStar(r) >= -7, `lowest ${lowestStar(r).toFixed(1)}`);
+  r.w.dispose();
   r = probe('?sky=evening'); check('evening: no stars, no weather, the sun is up', !r.layer.getObjectByName('stars') && !r.layer.getObjectByName('weather') && r.w.group.getObjectByName('sun').visible);
   r.w.dispose();
   r.w.dispose();

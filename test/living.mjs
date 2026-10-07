@@ -92,14 +92,14 @@ for (const [theme, opts] of themes) {
         }
         if (o.name === 'bird' && o.visible) {
           const p = new THREE.Vector3(); o.getWorldPosition(p);
-          if (p.y < 4) lowest.push(`${v} y ${p.y.toFixed(1)} at ${t.toFixed(1)}`);
+          if (p.y < -5) lowest.push(`${v} y ${p.y.toFixed(1)} at ${t.toFixed(1)}`);
           if (Math.hypot(p.x, p.z) < 9) near.push(`${v} r ${Math.hypot(p.x, p.z).toFixed(1)} at ${t.toFixed(1)}`);
         }
       });
     }
     check(`bird ${v}: the flight ends and removes its birds`, !world.birds.active && world.birds.group.children.length === 0 && !world.birds.group.visible, `${t.toFixed(1)} s`);
   }
-  check('birds stay above y 4', lowest.length === 0, lowest.slice(0, 2).join('; '));
+  check('birds stay above y -5 (the low flights fly behind the island, CHE-299)', lowest.length === 0, lowest.slice(0, 2).join('; '));
   check('birds stay at least 9 from the board centre', near.length === 0, near.slice(0, 2).join('; '));
   check('birds use the flat unlit material with a pixel texture', badMat.length === 0, badMat.slice(0, 2).join('; '));
   // automatic flights: only with the setting on, armed, not paused
