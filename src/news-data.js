@@ -3,6 +3,21 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.9.1', date: '2026-10-07',
+    de: [
+      'Der Online-Reiter sieht besser aus: Spielerkarten, ein schwebender Chat und eine klare Wartezeile.',
+      'Symbole bleiben am Brett ausgerichtet und drehen sich nicht mehr zu dir.',
+      'Das rechte Fenster am Computer lässt sich wieder nach oben scrollen.',
+      'Glattere Kanten und ein weicher Nebel in der Ferne, Pixelwelt ohne kleine Fehler.',
+    ],
+    en: [
+      'The Online tab looks better: player cards, a floating chat and a clear waiting line.',
+      'Symbols stay aligned to the board and no longer turn toward you.',
+      'The right panel on a computer scrolls back to the top again.',
+      'Smoother edges and a soft haze in the distance, Pixelwelt without small glitches.',
+    ],
+  },
+  {
     version: '1.9.0', date: '2026-10-06',
     de: [
       'Lernen erklärt jetzt mehr: worum es geht, was jede Seite will, Pläne und Fallen, und bei jedem Zug ein Warum.',
