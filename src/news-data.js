@@ -3,6 +3,23 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.9.0', date: '2026-10-06',
+    de: [
+      'Lernen erklärt jetzt mehr: worum es geht, was jede Seite will, Pläne und Fallen, und bei jedem Zug ein Warum.',
+      'Pixelwelt-Bauern stehen wieder wie früher da, den Speer nehmen sie nur im Kampf.',
+      'Die Kacheln in den Optionen zeigen echte Bilder.',
+      'Neue Kampfklänge, alle gleich laut.',
+      'Das Thema Blocks ist weg, Pixelwelt ist geblieben.',
+    ],
+    en: [
+      'Learn explains more: what it is about, what each side wants, plans and traps, and a Why for every move.',
+      'Pixelwelt pawns stand as before again, they take up the spear only in a fight.',
+      'The tiles in Options show real pictures.',
+      'New battle sounds, all at the same level.',
+      'The Blocks theme is gone, Pixelwelt stays.',
+    ],
+  },
+  {
     version: '1.8.0', date: '2026-10-06',
     de: [
       'Pixelwelt hat neue Himmel: Abend, Nacht, Sonnenaufgang, Sturm und Schnee.',

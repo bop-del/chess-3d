@@ -30,6 +30,10 @@ The Tournament theme (vinyl green and warm cream squares) and the Pixelwelt them
 
 ![Pixelwelt theme](docs/pixel.jpg)
 
+The Options tab with the tiles for Theme, World, Sky, Backdrop and Light.
+
+![Options tiles](docs/settings-tiles.jpg)
+
 The chess clock (here 5+0, chosen in Options) with a face for each side, and the Badges card with the daily puzzle card on the Play tab.
 
 ![Chess clock running beside the move list](docs/clock.jpg)
@@ -42,13 +46,14 @@ Game review after a game: a move strip with marked mistakes, a gold arrow for th
 
 ![Game review with Details open: evaluation graph, best line and accuracy](docs/review-details.jpg)
 
-On a phone, in portrait: the game with its thumb bar, the Options sheet, the Learn sheet with an Explain button on every opening, an opening's goal screen, and the puzzle path.
+On a phone, in portrait: the game with its thumb bar, the Options sheet, the Learn sheet with an Explain button on every opening, an opening's goal screen, a move card with its Why, and the puzzle path.
 
 <p>
   <img src="docs/phone-portrait.jpg" alt="Phone, portrait: status line, board and thumb bar" width="240">
   <img src="docs/phone-menu.jpg" alt="Phone, portrait: the Options sheet" width="240">
   <img src="docs/phone-learning.jpg" alt="Phone, portrait: the Learn sheet with an Explain button on every opening" width="240">
-  <img src="docs/phone-line.jpg" alt="Phone, portrait: the goal screen of an opening with Go and End" width="240">
+  <img src="docs/phone-line.jpg" alt="Phone, portrait: the goal screen of an opening with its intro, Go and End" width="240">
+  <img src="docs/phone-why.jpg" alt="Phone, portrait: a move card with its Why opened" width="240">
   <img src="docs/phone-puzzles.jpg" alt="Phone, portrait: the puzzle path in the Learn sheet" width="240">
 </p>
 
@@ -56,7 +61,9 @@ On a phone, in portrait: the game with its thumb bar, the Options sheet, the Lea
 
 The Learn tab (on a computer) and the Learn button (sixth button of the thumb bar on a phone, which opens the Learn sheet) have three tabs: Openings, Mine and Practise. The Openings tab teaches 27 lines, twelve classic openings and 15 side lines for the common replies you meet (Queen's Gambit Accepted and Slav, London against ...c5 and ...Bf5, Najdorf, Dragon and Alapin Sicilians, and so on). The twelve openings are: Italian Game, Ruy Lopez, Scotch Game, Vienna Game, King's Gambit, London System and Queen's Gambit as white, and Scandinavian Defense, Caro-Kann Defense, French Defense, Sicilian Defense and King's Indian Defense as black.
 
-Pick a line and the board turns to your side and shows the goal first: the position the line ends in, the squares where its pieces end up marked in gold, and one line at the top ("Goal: centre with e4 and d4, bishop on c4"). Tap Go to start from the beginning. Then the top bar only says what to do now ("Play e4"), the bottom holds only buttons (Next, Hint, Again, End), and after every move a short text card says what the move is for. The card stays until you tap Next, so you can read it in peace; the other side replies only after that. Any other move is refused and the top bar tells you which move the line plays. The same screens work for the lines of My openings and in Practise (there the card follows your own moves).
+![The goal screen of an opening in the Learn tab](docs/learn-goal.jpg)
+
+Pick a line and the board turns to your side and shows the goal first: the position the line ends in, the squares where its pieces end up marked in gold, and one line at the top ("Goal: centre with e4 and d4, bishop on c4"). Under it the goal screen has a short intro in sections: what the line is about, what White wants, what Black wants, typical plans and traps (a section a line has no text for is left out). Tap Go to start from the beginning. Then the top bar only says what to do now ("Play e4"), the bottom holds only buttons (Next, Hint, Again, End), and after every move a short text card says what the move is for, with a "Why" and, where the move makes a threat, a "Threat" (red arrows on the board while the card shows); on a phone the card shows the sentence and a "Why?" button (German "Warum?") opens why and threat. The card stays until you tap Next, so you can read it in peace; the other side replies only after that. Any other move is refused and the top bar tells you which move the line plays. The same screens work for the lines of My openings and in Practise (there the card follows your own moves).
 
 - Every opening card in the Openings tab has an Explain button; the whole card starts the line as well. After a move, Show next move (Continue after the last one) lets the card wait until you have read it.
 - A gold marker shows the move you are about to play: a faint square where the piece stands, a strong square where it goes and an arrow between them. Hide the hint with the Hint button. The choice is kept in your browser.
@@ -241,9 +248,9 @@ Two invited players play one game against each other through a small server of o
 - **Invite**: the owner runs `node server/admin.mjs invite <Name>`, which prints a link and a code like `FELIX-7K3Q`. The link logs in on that device; the code entered in the Online tab logs in on another (for example the home screen app). Without an invite the tab asks for one. Names are set by the owner.
 - **Players**: a green dot while the other player has the game open, "spielt" while they play someone else, the score from your side (`3 : 2  ½ 1`, a dash before the first game).
 - **Challenge**: accept or "Nein danke" (the challenger sees "<Name> hat abgelehnt"). One game at a time; colours are drawn at random; no clock, no takeback, no draw offer. A move waits while the other is offline. Resign any time (with a question first); after 3 days without a move the waiting player can end the game as a win. At the end the game over card shows the new score.
-- **Chat**: one conversation per opponent, at most 200 characters per message, with an unread dot; "Chat wird mitgelesen" under the field.
+- **Chat**: one conversation per opponent, opened with the Chat button on the player row and on the running game, at most 200 characters per message, with an unread count; "Chat wird mitgelesen" under the field.
 - **Connection**: a line at the top of the tab, green "Server verbunden", grey "verbinde..." after a drop, red "Server nicht erreichbar" after 10 s with a Details box (cause, last connected, next try, Nochmal versuchen, Details kopieren). During a game without a connection the board is locked with a line over it; no move is lost or sent twice.
-- A dot on the tab (and the phone button) for a challenge to you, your move or an unread message.
+- A dot on the tab (and the phone button) for a challenge to you or your move, and a count for unread messages. A new message of a closed chat, unread messages after a load and the running game also show as a tappable bubble over the board with an x (game on top, chat below; hiding one never marks a message read).
 
     npm run server                      # the server on port 5502, database in .tmp/online/
 
