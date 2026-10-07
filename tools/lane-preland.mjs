@@ -23,6 +23,19 @@ export function parsePrelandArgs(args) {
 
 const tail = (s, n = 6) => String(s).trim().split('\n').slice(-n).join(' | ');
 
+// CHE-329: the files a merge of main into the branch would conflict on, read off `git merge-tree --write-tree --name-only main <branch>`
+// without touching any worktree. exit 1 = conflicts: stdout is the tree id, then the conflicted file names, then a blank line and messages.
+// -> string[] (empty: clean, or git too old to tell: the real merge still reports its own conflict)
+export function mergePreviewFiles(run, branch) {
+  const t = run('git', ['merge-tree', '--write-tree', '--name-only', 'main', branch]);
+  if (t.status !== 1) return [];
+  return t.out.split('\n\n')[0].split('\n').slice(1).filter(Boolean);
+}
+export const previewText = (preview) => {
+  const parts = Object.entries(preview || {}).filter(([, files]) => files && files.length).map(([k, files]) => `${k === 'game' ? '' : `${k}: `}${files.join(', ')}`);
+  return parts.length ? `merge preview: conflicts expected in ${parts.join('; ')}` : 'merge preview: no conflicts expected';
+};
+
 // the stamp is valid for the tree it was written for: green, smoke ran, and HEAD is the stamped commit
 export function stampOk(stamp, head) {
   return !!stamp && stamp.ok === true && stamp.smoke === true && !!head && stamp.head === head;
@@ -36,23 +49,27 @@ export function prelandRun({ dir, branch, io, all = false, noCache = false }) {
   const git = (...a) => sh('git', a);
   const done = (ok, kind, line, detail) => ({ ok, kind, line, detail });
   if (git('status', '--porcelain').out.trim()) return done(false, 'dirty', 'dirty: commit the lane first (git add -A && git commit -m WIP), then run preland again');
+  // CHE-329: what the merge of main would conflict on, asked before the merge (and kept in the stamp): the builder sees a conflict as a file list
+  const preview = { game: mergePreviewFiles(sh, branch) };
+  if (io.privateDir) preview.private = mergePreviewFiles((c, a) => io.sh(c, a, { cwd: io.privateDir }), branch);   // the private worktree's branch has the lane's name
+  const pv = previewText(preview), conflictsKnown = Object.values(preview).some((f) => f.length);
   let moved = false;
   if (git('merge-base', '--is-ancestor', 'main', 'HEAD').status !== 0) {
     const m = git('merge', 'main', '-m', `Merge main into ${branch}`);
     if (m.status !== 0) {
       const files = git('diff', '--name-only', '--diff-filter=U').out.split('\n').filter(Boolean);
       git('merge', '--abort');
-      return done(false, 'conflict', `conflict: ${files.length ? files.join(', ') : tail(m.out, 2)}`);
+      return done(false, 'conflict', `conflict: ${files.length ? files.join(', ') : tail(m.out, 2)}`, conflictsKnown ? pv : undefined);
     }
     moved = true;
   }
   if (io.privateMerge) {   // the lane's private worktree: its WIP committed (never the live files), private main merged in (bin/private-lane wip, merge-main)
     const pm = io.privateMerge();
-    if (!pm.ok) return done(false, 'conflict', `conflict: private: ${pm.files && pm.files.length ? pm.files.join(', ') : tail(pm.out || '', 2)}`);
+    if (!pm.ok) return done(false, 'conflict', `conflict: private: ${pm.files && pm.files.length ? pm.files.join(', ') : tail(pm.out || '', 2)}`, conflictsKnown ? pv : undefined);
     moved = moved || !!pm.moved;
   }
   const head = git('rev-parse', 'HEAD').out.trim();
-  const stamp = (extra) => { try { mkdirSync(join(dir, '.tmp'), { recursive: true }); writeFileSync(join(dir, STAMP), JSON.stringify({ branch, head, t: io.now(), ...extra })); } catch (e) { /* the gate then asks for a rerun */ } };
+  const stamp = (extra) => { try { mkdirSync(join(dir, '.tmp'), { recursive: true }); writeFileSync(join(dir, STAMP), JSON.stringify({ branch, head, t: io.now(), preview, ...extra })); } catch (e) { /* the gate then asks for a rerun */ } };
   const f = sh(io.fast, [], { shell: true });
   if (f.status) { stamp({ ok: false, smoke: false, red: 'fast tier' }); return done(false, 'red', 'red: fast tier', tail(f.out)); }
   const smoke = `${io.smoke}${all ? ' --all' : ''}${noCache ? ' --no-cache' : ''}`;
@@ -66,7 +83,7 @@ export function prelandRun({ dir, branch, io, all = false, noCache = false }) {
     }
   }
   stamp({ ok: true, smoke: true });
-  return done(true, 'green', `preland green: main ${moved ? 'merged' : 'already in'}, fast tier and affected smoke groups pass on ${head.slice(0, 7)}`);
+  return done(true, 'green', `preland green: main ${moved ? 'merged' : 'already in'}, fast tier and affected smoke groups pass on ${head.slice(0, 7)}; ${pv}`);
 }
 
 /** CHE-341: a lane gets server/node_modules (jose) linked from the main checkout, like node_modules. Returns 'linked', 'present', 'no-server' (the lane has no server/package.json) or 'missing-main' (hint for the caller). */

@@ -30,7 +30,7 @@ try {
 
   // main has not moved: nothing to merge, green, stamp written and valid for HEAD
   let r = run('true', 'true');
-  assert.equal(r.ok, true); assert.match(r.line, /^preland green: main already in/);
+  assert.equal(r.ok, true); assert.match(r.line, /^preland green: main already in/); assert.match(r.line, /merge preview: no conflicts expected$/); assert.deepEqual(readStamp(lane).preview, { game: [] });
   assert.equal(stampOk(readStamp(lane), g(lane, 'rev-parse', 'HEAD')), true);
   // --all and --no-cache reach the smoke command
   run('true', 'echo smoke', { all: true, noCache: true }); assert.deepEqual(calls, ['true', 'echo smoke --all --no-cache']);
@@ -58,7 +58,7 @@ try {
   // conflict: merge aborted, lane unchanged, files named
   writeFileSync(join(repo, 'b.txt'), 'main side\n'); g(repo, 'add', '-A'); g(repo, 'commit', '-qm', 'main b');
   const head = g(lane, 'rev-parse', 'HEAD');
-  r = run('true', 'true'); assert.equal(r.kind, 'conflict'); assert.equal(r.line, 'conflict: b.txt'); assert.equal(g(lane, 'rev-parse', 'HEAD'), head); assert.equal(g(lane, 'status', '--porcelain'), '');
+  r = run('true', 'true'); assert.equal(r.kind, 'conflict'); assert.equal(r.line, 'conflict: b.txt'); assert.equal(r.detail, 'merge preview: conflicts expected in b.txt'); assert.equal(g(lane, 'rev-parse', 'HEAD'), head); assert.equal(g(lane, 'status', '--porcelain'), '');
   assert.equal(stampOk(null, 'x'), false); assert.equal(existsSync(join(lane, '.tmp')), true);
   // CHE-341: server/node_modules link
   const L = join(tmp, 'l2'), M = join(tmp, 'm2');
