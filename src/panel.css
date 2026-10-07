@@ -165,8 +165,9 @@ body[data-trays-shown="on"] .cap-sec { display: none; }
 .panel .swatches { display: flex; flex-wrap: wrap; gap: 6px; }   /* a tile is as wide as its longest word, the row wraps between tiles (CHE-287) */
 .panel .swatch { min-width: max(54px, min-content); padding: 7px 2px 6px; border-radius: 9px; border-color: transparent; background: none; font-size: 11.5px; }
 .panel .swatch b { font-weight: 500; font-size: 11px; }
-.panel .swatches[data-tiles] .swatch.on i { border-color: var(--gold); }
 .panel .swatch.on { border-color: var(--gold); background: var(--p-soft); color: var(--p-gold-text); }
+.panel .swatches[data-tiles] .swatch.on { border-color: transparent; background: none; }   /* CHE-325: a picture tile shows the selection on the picture only, see style.css */
+.panel .swatches[data-tiles] .swatch.on b { color: var(--gold); font-weight: 600; }
 .panel .field.themes { margin: 0; gap: 0; }
 .panel .field.themes + .field.themes { margin-top: 16px; }   /* the same gap above every row heading (CHE-287) */
 .panel .field.themes > span { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }

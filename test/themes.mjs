@@ -152,6 +152,30 @@ try {
   const trBack = await t(false);
   R.expect('Glass: no transmission on Low, real transmission on High, and back', lowT === 'low' && trLow === 0 && trHigh > 0.5 && trBack === 0, `low ${trLow}, high ${trHigh}, low ${trBack}`);
 
+  // picture tiles, selected state (CHE-325): one width per row, no box on the selected tile, one ring on the picture, gold semibold label
+  await page.setViewport({ width: 1280, height: 1000 });
+  await page.goto(`${URL0}/?quality=low&manual=1&ai=0&theme=pixel&open=options`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+  await page.waitForFunction(() => document.querySelectorAll('.swatches[data-tiles] .swatch.on').length >= 4 && [...document.querySelectorAll('.swatches[data-tiles] .swatch')].every((b) => b.getBoundingClientRect().width > 0), { timeout: 30000 }).catch(() => null);
+  const tl = await page.evaluate(() => [...document.querySelectorAll('.swatches[data-tiles]')].map((row) => {
+    const tiles = [...row.querySelectorAll('.swatch')], rect = (b) => b.getBoundingClientRect();
+    const on = tiles.find((b) => b.classList.contains('on')), unsel = tiles.find((b) => !b.classList.contains('on'));
+    const cs = on && getComputedStyle(on), ci = on && getComputedStyle(on.querySelector('i')), lb = on && getComputedStyle(on.querySelector('b')), lu = unsel && getComputedStyle(unsel.querySelector('b'));
+    return {
+      widths: [...new Set(tiles.map((b) => Math.round(rect(b).width * 10) / 10))], tiles: tiles.length, minH: Math.min(...tiles.map((b) => rect(b).height)),
+      box: on ? { borderA: /rgba\(0, 0, 0, 0\)|transparent/.test(cs.borderTopColor), bg: /rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor), outline: cs.outlineStyle === 'none' || parseFloat(cs.outlineWidth) === 0 } : null,
+      ring: on ? { color: ci.borderTopColor, width: parseFloat(ci.borderTopWidth), glow: ci.boxShadow !== 'none' && !/ 0px 0px 0px /.test(ci.boxShadow.replace(/rgba?\([^)]*\)/g, '')) } : null,
+      label: on ? { gold: lb.color === 'rgb(216, 180, 104)', weight: Number(lb.fontWeight) >= 600, unselWeight: lu ? Number(lu.fontWeight) : 0 } : null,
+    };
+  }));
+  const rowsOk = tl.length === 4 && tl.every((r) => r.tiles > 0);
+  R.expect('picture rows: Theme, World, Sky, Backdrop', rowsOk, '4 rows', JSON.stringify(tl.map((r) => r.tiles)));
+  R.expect('each picture row: every tile the same width (Tournament, Island morning, Pixel world included)', rowsOk && tl.every((r) => r.widths.length === 1 && r.widths[0] >= 44), 'one width per row', JSON.stringify(tl.map((r) => r.widths)));
+  R.expect('selected tile has no box: transparent border and background, no outline', rowsOk && tl.every((r) => r.box && r.box.borderA && r.box.bg && r.box.outline), 'no box', JSON.stringify(tl.map((r) => r.box)));
+  R.expect('selected tile: one 2 px gold ring on the picture plus a glow', rowsOk && tl.every((r) => r.ring && r.ring.color === 'rgb(216, 180, 104)' && r.ring.width === 2 && r.ring.glow), 'ring', JSON.stringify(tl.map((r) => r.ring)));
+  R.expect('selected label gold and semibold, unselected unchanged', rowsOk && tl.every((r) => r.label && r.label.gold && r.label.weight && r.label.unselWeight === 500), 'gold 600 / 500', JSON.stringify(tl.map((r) => r.label)));
+  R.expect('picture tiles stay at least 44 px high', rowsOk && tl.every((r) => r.minH >= 44), '>= 44', JSON.stringify(tl.map((r) => Math.round(r.minH))));
+
   // phone: the swatches are in the Menu sheet and reachable by tap
   await page.evaluate(() => localStorage.removeItem('chess3d.theme'));
   await load('', { width: 390, height: 844 });
