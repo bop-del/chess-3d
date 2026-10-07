@@ -112,10 +112,10 @@ const flatSpec = (color) => ({
   envMapIntensity: 0.15, transparent: false, transmission: 0, specularIntensity: 1, color,
 });
 
-// createSymbols({ gimbal, game, stage, controls?, themes?, views?, size? }) -> { setVisible(on), sync(dt), fadeOut(obj), dispose(), visible }
+// createSymbols({ gimbal, game, stage, controls?, themes?, size? }) -> { setVisible(on), sync(dt), fadeOut(obj), dispose(), visible }
 //   size is the texture size in px (384, or 256 on a phone). sync() is cheap and safe to call every frame; pieces made after
 //   setVisible (promotion) get their symbol at once (root.add is wrapped).
-export function createSymbols({ gimbal, game, stage, controls = null, themes = null, views = null, size = 384 }) {
+export function createSymbols({ gimbal, game, stage, controls = null, themes = null, size = 384 }) {
   const root = game.root;
   let planeGeo = null;
   let cache = {};
@@ -136,8 +136,7 @@ export function createSymbols({ gimbal, game, stage, controls = null, themes = n
     if (!info || group.userData.sym) return;
     const holder = new THREE.Group();
     holder.name = 'symbol';
-    holder.userData.black = info.color === 'b';
-    holder.rotation.y = yaw + (holder.userData.black ? extra : 0);
+    holder.rotation.y = yaw;
     const card = new THREE.Mesh(planeGeo || (planeGeo = new THREE.PlaneGeometry(1, 1)), material(info.type, info.color));
     card.scale.setScalar(SCALE); card.raycast = () => {}; card.renderOrder = 11;
     card.rotation.x = -Math.PI / 2; card.position.set(0, 0.012, 0.033 * SCALE);
@@ -170,20 +169,9 @@ export function createSymbols({ gimbal, game, stage, controls = null, themes = n
   const TURN = 0.9;
   let turn = null;   // { t, from, to }
   const sideYaw = () => (controls?.side === 'b' ? Math.PI : 0);
-  // CHE-308: in the Symbols view proper (not From above, not Pixelwelt) Black's symbols face the black side: half a turn on top of
-  // the side yaw. Without views or themes the extra turn stays off.
-  const wantExtra = () => {
-    const t = themes?.current?.();
-    return views && views.current() !== 'above' && t !== 'pixel' && t !== 'blocks' ? Math.PI : 0;
-  };
-  let extra = 0;
-  const setYaw = (a) => {
-    yaw = a;
-    for (const h of holders) { if (!h.parent) holders.delete(h); else h.rotation.y = yaw + (h.userData.black ? extra : 0); }
-  };
+  const setYaw = (a) => { yaw = a; for (const h of holders) { if (!h.parent) holders.delete(h); else h.rotation.y = yaw; } };
   function orient(dt = 0, snap = false) {
-    const to = sideYaw(), ex = wantExtra();
-    if (ex !== extra) { extra = ex; setYaw(yaw); }   // a view or theme change: Black's extra turn switches at once
+    const to = sideYaw();
     if (snap) { turn = null; if (yaw !== to) setYaw(to); return; }
     if (!turn && Math.abs(yaw - to) > 1e-6) turn = { t: 0, from: yaw, to: yaw + Math.PI };   // always the same way round
     if (!turn) return;
@@ -252,7 +240,7 @@ export function createSymbols({ gimbal, game, stage, controls = null, themes = n
       if (on) { flatten(); stage.scene.onBeforeRender = beforeRender; }
       else { unflatten(); if (stage.scene.onBeforeRender === beforeRender) stage.scene.onBeforeRender = () => {}; }
       eachPiece(apply);
-      if (on) { extra = wantExtra(); setYaw(yaw); orient(0, true); } else release();
+      if (on) orient(0, true); else release();
     },
     fadeOut,
     sync(dt = 0) {

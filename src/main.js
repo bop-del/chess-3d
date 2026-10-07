@@ -224,7 +224,7 @@ async function boot() {
   controls.onResize(window.innerWidth, window.innerHeight);   // reads the HUD column width
   const [{ createPlayView }, { createSymbols }] = await Promise.all([import('./views/play.js'), import('./views/symbols.js')]);
   const play = createPlayView({ controls, game, views, device, stage });
-  symbols = createSymbols({ gimbal, game, stage, controls, themes, views, size: device.phone ? 256 : 384 });
+  symbols = createSymbols({ gimbal, game, stage, controls, themes, size: device.phone ? 256 : 384 });
   const showSymbols = () => symbols.setVisible(views.isSymbols());
   views.onSymbols(showSymbols);
   showSymbols();
