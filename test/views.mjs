@@ -137,6 +137,24 @@ try {
     await page.evaluate(() => { window.__chess.controls.setPreset('Isometric'); window.__chess.step(1.5); });
     R.expect('symbols: a view preset other than White or Black keeps the side', Math.abs((await hy()) - w3) < 1e-6, String(await hy()));
   }
+  // CHE-308: Black's symbols turn half a turn against White's in the Symbols view; From above and Pixelwelt keep one yaw
+  if (mine()) {
+    const cy = () => page.evaluate(() => { const c = window.__chess; const y = (col) => c.game.root.children.find((o) => o.userData.piece?.color === col && o.userData.sym).userData.sym.rotation.y; return { w: y('w'), b: y('b') }; });
+    const half = (a, b) => Math.abs(Math.abs(a - b) - Math.PI) < 1e-6, same = (a, b) => Math.abs(a - b) < 1e-6;
+    await open(page, SIZES[0], '&view=symbols');
+    const a = await cy();
+    R.expect('symbols 180: White view, White upright, Black turned half a turn', same(a.w, 0) && half(a.b, a.w), JSON.stringify(a));
+    await page.evaluate(() => { window.__chess.controls.flip(); window.__chess.step(1.5); window.__chess.draw(); });
+    const f = await cy();
+    R.expect('symbols 180: after a flip Black is upright for the bottom side, White turned', half(f.w, a.w) && half(f.b, f.w) && same(Math.cos(f.b), 1), JSON.stringify({ a, f }));
+    await open(page, SIZES[0], '&view=above&symbols=1');
+    const ab = await cy();
+    R.expect('symbols 180: From above keeps one yaw for both colours', same(ab.w, ab.b), JSON.stringify(ab));
+    await open(page, SIZES[0], '&theme=pixel&symbols=1');
+    const px = await cy();
+    R.expect('symbols 180: Pixelwelt keeps one yaw for both colours', same(px.w, px.b), JSON.stringify(px));
+    await page.evaluate(() => localStorage.removeItem('chess3d.symbols'));
+  }
   // Symbols is a switch over every view (CHE-227): a flat symbol on every piece, the 3D bodies hidden, a plain board; the view and the camera stay
   if (mine()) for (const size of [SIZES[0], SIZES[1]]) {
     const tag = `${size.w}x${size.h}`;
