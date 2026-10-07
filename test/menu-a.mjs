@@ -165,6 +165,17 @@ try {
   R.expect('menu=old phone: the bar still ends in Menu and Back is in place', await ev(page, () => [...document.querySelectorAll('.pbar:not(.plbar) .tb')].map((b) => b.dataset.act).join(',') === 'undo,new,symbols,views,learn,menu' && !document.body.classList.contains('menu-a')));
   await load(page, DESK, '', { menu: 'old' });
   R.expect('menu=old desktop: Play and Back stay in the header', await ev(page, () => !!document.querySelector('.phead #btn-new') && !!document.querySelector('.phead #btn-undo')));
+  // CHE-297: scrollIntoView must never scroll the panel frame itself (it has no scrollbar, so the header stayed cut off and an empty strip stayed below)
+  for (const [w, h] of [[1440, 900], [1280, 800]]) {
+    for (const open of ['settings', 'music', 'options']) {
+      await load(page, ['desktop', w, h, false], `&open=${open}&sound=0`);
+      await sleep(600);   // the panel scrolls its target again after 450 ms
+      await ev(page, () => { const m = document.querySelector('[data-audio-mute]'); m?.scrollIntoView({ block: 'center' }); m?.closest('label').click(); document.querySelector('[data-music-on]')?.closest('label').click(); });
+      await sleep(300);
+      const st = await ev(page, () => { const p = document.querySelector('.panel'), tp = [...document.querySelectorAll('.tp')].find((e) => !e.hidden); tp.scrollTop = 0; return { frame: p.scrollTop, tp: tp.scrollTop, head: Math.round(p.querySelector('.phead').getBoundingClientRect().top) }; });
+      R.expect(`desktop ${w}x${h} ?open=${open}: the panel frame stays unscrolled and its pane scrolls back to the top`, st.frame === 0 && st.tp === 0 && st.head === 0, JSON.stringify(st), JSON.stringify(st));
+    }
+  }
   R.expect('no console errors', !watch.errs.length, '', watch.errs.slice(0, 2).join(' | '));
   R.expect('no foreign requests', !watch.foreign.length, '', watch.foreign.slice(0, 2).join(' | '));
   await page.close();

@@ -11,7 +11,7 @@
 
 /* ---------------------------------------------------------------- panel frame */
 .panel {
-  position: absolute; top: 0; right: 0; bottom: 0; width: var(--pw); display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  position: absolute; top: 0; right: 0; bottom: 0; width: var(--pw); display: flex; flex-direction: column; min-height: 0; overflow: hidden; overflow: clip;   /* clip: scrollIntoView cannot scroll the frame itself (CHE-297) */
   pointer-events: auto; container-type: inline-size; background: var(--p-bg); border-left: 1px solid var(--p-line);
   backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4); box-shadow: -18px 0 50px rgba(0, 0, 0, 0.28);
   transition: width 0.3s ease, opacity 0.35s ease; padding-right: env(safe-area-inset-right);
@@ -93,7 +93,7 @@
 
 /* body: one scrolling pane per tab */
 .pbody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.tp { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 16px; }
+.tp { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 16px; }
 .tp .sec.grow { flex: 1 1 auto; min-height: 110px; display: flex; flex-direction: column; }
 .tp .sec.grow .moves { flex: 1 1 0; min-height: 80px; }
 
