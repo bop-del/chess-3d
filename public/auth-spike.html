@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Sign-in spike</title>
+<style>
+  body { font: 18px/1.4 system-ui, sans-serif; margin: 0; padding: 20px 16px; background: #1b2230; color: #f2f2f2; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  h2 { font-size: 18px; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  a.btn { display: block; padding: 14px 16px; margin: 8px 0; background: #3a7bd5; color: #fff; text-align: center; text-decoration: none; min-height: 44px; box-sizing: border-box; }
+  .warn { background: #6b3a00; padding: 10px 12px; }
+  .box { background: #263044; padding: 10px 12px; word-break: break-all; }
+  b { color: #ffd479; }
+</style>
+</head>
+<body>
+<h1>Sign-in spike</h1>
+<p>Does Google sign-in stay inside the Home Screen app? Nothing is stored here.</p>
+<p id="warn" class="warn" hidden>The client id is still the placeholder. Set CLIENT_ID at the top of this page.</p>
+
+<p>Google allows one setup per page load, so each flow has its own load. Pick one:</p>
+<a class="btn" href="?flow=popup">1. Popup flow</a>
+<a class="btn" href="?flow=redirect">2. Redirect flow</a>
+<p>Active flow: <b id="active">none (pick one)</b></p>
+<div id="gbtn"></div>
+
+<h2>Result</h2>
+<div class="box">
+  <p>Flow: <b id="flow">none yet</b></p>
+  <p>Context now: <b id="ctx"></b></p>
+  <p>Context (standalone): <b id="sa"></b></p>
+  <p>sub: <b id="sub">none yet</b></p>
+</div>
+
+<script>
+// Config: the OAuth client id of the spike and the redirect endpoint on the online server.
+const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
+const SPIKE_ENDPOINT = 'https://chess.borisdiebold.com/auth-spike';
+
+const $ = (id) => document.getElementById(id);
+const standalone = matchMedia('(display-mode: standalone)').matches;
+$('ctx').textContent = standalone ? 'standalone' : 'browser';
+$('sa').textContent = 'navigator.standalone = ' + String(navigator.standalone);
+if (CLIENT_ID.startsWith('YOUR_CLIENT_ID')) $('warn').hidden = false;
+
+const show = (flow, sub) => { $('flow').textContent = flow; $('sub').textContent = sub; };
+const b64 = (s) => decodeURIComponent(atob(s.replace(/-/g, '+').replace(/_/g, '/')).split('').map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
+
+// Back from the redirect flow: the marker is in the fragment, then the page clears it.
+const frag = new URLSearchParams(location.hash.slice(1));
+if (frag.get('spike') === 'redirect') {
+  show('redirect', frag.get('sub') || '?');
+  history.replaceState(null, '', location.pathname);
+}
+
+const flowParam = new URLSearchParams(location.search).get('flow');
+const active = flowParam === 'popup' || flowParam === 'redirect' ? flowParam : '';
+if (active) $('active').textContent = active;
+
+function start() {
+  const g = window.google && google.accounts && google.accounts.id;
+  if (!active) return;
+  if (!g) { $('gbtn').textContent = 'The Google script did not load (no network?).'; return; }
+  if (active === 'popup') {
+    g.initialize({
+      client_id: CLIENT_ID,
+      callback: (r) => { try { show('popup', JSON.parse(b64(r.credential.split('.')[1])).sub); } catch (e) { show('popup', 'unreadable token'); } },
+    });
+  } else {
+    // ux_mode redirect: Google POSTs the credential to SPIKE_ENDPOINT, which sends the browser back here with #spike=redirect&sub=...
+    g.initialize({ client_id: CLIENT_ID, ux_mode: 'redirect', login_uri: SPIKE_ENDPOINT });
+  }
+  g.renderButton($('gbtn'), { theme: 'filled_blue', size: 'large', text: 'signin_with' });
+}
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="start()"></script>
+</body>
+</html>

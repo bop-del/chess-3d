@@ -107,6 +107,7 @@ const FAST = [
   ['online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs'],
   ['player stats: statsFor, GET /player/<name>, head to head, openings (test/online-stats-player.mjs)', 'test/online-stats-player.mjs', true],
   ['own stats: events, limits, roll up, cleanup, /stats auth, sender (test/online-stats.mjs)', 'test/online-stats.mjs', true],
+  ['Google sign-in spike: POST /auth-spike with local keys, CSRF, allow list, page text (test/auth-spike.mjs)', 'test/auth-spike.mjs'],
   ['server history: samples, maxima, retention, gaps, markers, /stats Server section (test/online-health.mjs)', 'test/online-health.mjs', true],
 ];
 const POOL = 4;

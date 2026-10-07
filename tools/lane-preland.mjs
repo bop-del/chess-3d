@@ -4,7 +4,7 @@
 // Why this exists: CHE-300 and CHE-291 passed in their lanes on the tree from before main moved; land merged main and ran the groups on
 // the merged tree, where the music group went red (a favicon 404 check in test/music-page.mjs, then "killed quiet child" under load).
 // Pure parts (parsePrelandArgs, stampOk) and prelandRun with injected io, so the fast tier drives it with a temp git repo.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const STAMP = join('.tmp', 'preland.json');
@@ -68,3 +68,15 @@ export function prelandRun({ dir, branch, io, all = false, noCache = false }) {
   stamp({ ok: true, smoke: true });
   return done(true, 'green', `preland green: main ${moved ? 'merged' : 'already in'}, fast tier and affected smoke groups pass on ${head.slice(0, 7)}`);
 }
+
+/** CHE-341: a lane gets server/node_modules (jose) linked from the main checkout, like node_modules. Returns 'linked', 'present', 'no-server' (the lane has no server/package.json) or 'missing-main' (hint for the caller). */
+export function linkServerModules(laneDir, mainDir) {
+  if (!existsSync(join(laneDir, 'server', 'package.json'))) return 'no-server';
+  const nm = join(laneDir, 'server', 'node_modules');
+  try { lstatSync(nm); return 'present'; } catch (e) { /* not there */ }
+  const src = join(mainDir, 'server', 'node_modules');
+  if (!existsSync(src)) return 'missing-main';
+  symlinkSync(src, nm);
+  return 'linked';
+}
+export const SERVER_MODULES_HINT = 'server/node_modules is missing in the main checkout: run npm ci in server/ of the main checkout (test/auth-spike.mjs needs jose)';

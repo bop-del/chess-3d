@@ -50,7 +50,7 @@ import { fileURLToPath } from 'node:url';
 import { parseLaneFlags } from '../tools/lane-args.mjs';
 import { agentPrompt } from '../tools/lane-identity.mjs';
 import { sendKickoff } from '../tools/kickoff.mjs';
-import { parsePrelandArgs, prelandRun } from '../tools/lane-preland.mjs';
+import { parsePrelandArgs, prelandRun, linkServerModules, SERVER_MODULES_HINT } from '../tools/lane-preland.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USAGE = 'usage: bin/lane open <che-n-words | branch --key CHE-n> [--key CHE-n]... [--private] [--agent <name> <brief> [--model <m>]] | bin/lane agent <branch> <name> <brief> [--model <m>] | bin/lane list | bin/lane preland [<branch>] [--all] [--no-cache] | bin/lane land <branch> [-m <message>] | bin/lane close <branch> [-m <message>] [--no-linear]';
@@ -106,6 +106,7 @@ function open(branch, given = [], withPrivate = false, withAgent = null, model =
   run('herdr', ['tab', 'rename', tab, 'diff']);
   const nm = join(path, 'node_modules');
   if (!existsSync(nm)) symlinkSync(join(MAIN, 'node_modules'), nm);
+  serverModules(path);
   let priv = null;
   if (withPrivate) {
     const r = privateLane('open', branch);
@@ -296,12 +297,16 @@ function closeLocked(branch, message, noLinear) {
   console.log('Servers the lane started are not stopped here: stop them by PID. Pushing needs the owner\'s go.');
 }
 
+// CHE-341: link server/node_modules from the main checkout when the lane lacks it; one hint line when main has none
+function serverModules(dir) { if (linkServerModules(dir, MAIN) === 'missing-main') console.log(SERVER_MODULES_HINT); }
+
 // CHE-311: the builder's last step. Runs in the lane's own worktree (the lane of the current directory, or <branch>'s).
 function preland(args) {
   let o; try { o = parsePrelandArgs(args); } catch (e) { die(USAGE, 2); }
   const here = (() => { try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: process.cwd(), encoding: 'utf8' }).trim(); } catch (e) { return null; } })();
   const lane = o.branch ? lanes().find((w) => w.branch === o.branch) : lanes().find((w) => w.path === here);
   if (!lane) die(o.branch ? `no open lane ${o.branch}: bin/lane list` : 'preland runs inside a lane worktree (or name the lane: bin/lane preland <branch>)', 2);
+  serverModules(lane.path);
   const priv = privatePathOf(lane.branch);
   const sh = (cmd, a, { cwd, shell = false } = {}) => { const r = spawnSync(cmd, a, { cwd, encoding: 'utf8', shell, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }); return { status: r.status ?? 1, out: `${r.stdout || ''}${r.stderr || ''}` }; };
   const io = { sh, fast: process.env.PRELAND_FAST_CMD || 'node test/run.mjs', smoke: process.env.PRELAND_SMOKE_CMD || 'node test/run.mjs smoke', now: () => Date.now(),
@@ -318,6 +323,7 @@ function preland(args) {
 
 // landing by script (S49): hands over to the private bin/land-lane, which ends in `bin/lane close` itself
 function land(branch, message) {
+  const lane = lanes().find((w) => w.branch === branch); if (lane) serverModules(lane.path);
   const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'land-lane');
   if (!existsSync(h)) die('bin/lane land needs ~/code/chess-3d-private/bin/land-lane (the private landing script)');
   const r = spawnSync(process.execPath, [h, branch, ...(message ? ['-m', message] : [])], { stdio: 'inherit', env: { ...process.env, LAND_MAIN: MAIN } });

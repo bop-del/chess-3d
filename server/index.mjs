@@ -12,6 +12,7 @@ import { createLive } from './live.mjs';
 import { createHealth, healthVerdict, serverSection, systemProbe, SAMPLE_MS } from './health.mjs';
 import { createPush, overLine, vapidLoad } from './push.mjs';
 import { statsFor } from './playerstats.mjs';
+import { createAuthSpike } from './auth-spike.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
 export const STALE_MS = 3 * 24 * 3600 * 1000;   // a game with no move for 3 days: the waiting player may end it as a win
@@ -30,8 +31,9 @@ export function originAllowed(origin, list) {
   } catch (e) { return false; }
 }
 
-export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', pushFetch, log = () => {}, random = Math.random } = {}) {
+export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', authSpike = {}, pushFetch, log = () => {}, random = Math.random } = {}) {
   const admin = adminOps(db, now);
+  const spike = createAuthSpike({ origins, originOk: (o) => originAllowed(o, origins), ...authSpike });   // CHE-341: a spike, off without a client id
   const stats = createStats(db, { now });
   const health = createHealth(db, { now, probe: probe || systemProbe({ dbFile: dbFile || ':memory:' }), gauges: {
     present: () => live.ids().length, streams: () => live.streamCount(), games: () => q("SELECT COUNT(*) AS n FROM games WHERE status = 'active'").get().n,
@@ -286,6 +288,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     try {
       if (req.method === 'OPTIONS') { status = 204; return send(req, res, 204); }
       if (req.method === 'GET' && path === '/up') { status = 200; res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }); return res.end('ok'); }
+      if (spike.enabled && path === '/auth-spike') { await spike.handle(req, res, path, readBody); status = res.statusCode; return; }   // CHE-341 spike, no key, no database
       if ((req.method === 'GET' || req.method === 'HEAD') && path === '/health') {   // CHE-307: for an external monitor, public, derived from server_health
         counted = false;
         const v = healthVerdict(db, { now: now() });
@@ -407,13 +410,14 @@ export function loadEnv() {
     vapidFile: process.env.ONLINE_VAPID_FILE || '',   // CHE-272: no file, no push
     vapidSubject: process.env.ONLINE_VAPID_SUBJECT || '',
     gameUrl: process.env.ONLINE_GAME_URL || '',
+    authSpike: { clientId: process.env.AUTH_SPIKE_CLIENT_ID || '', returnUrl: process.env.AUTH_SPIKE_RETURN || '' },   // CHE-341
   };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const env = loadEnv();
   const vapid = vapidLoad(env.vapidFile);
   if (!vapid || !/^(mailto:|https:)/.test(env.vapidSubject)) console.log(`push is off (${vapid ? 'ONLINE_VAPID_SUBJECT is not a mailto: or https: address' : 'no ONLINE_VAPID_FILE'})`);
-  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
+  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, authSpike: env.authSpike, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
   const port = await app.listen(env.port, env.host);
   console.log(`online server on http://${env.host}:${port} (db ${env.db})`);
   const stop = () => { app.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 2000).unref(); };

@@ -5,7 +5,8 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parsePrelandArgs as P, prelandRun, readStamp, stampOk } from '../tools/lane-preland.mjs';
+import { mkdirSync, lstatSync } from 'node:fs';
+import { parsePrelandArgs as P, prelandRun, readStamp, stampOk, linkServerModules } from '../tools/lane-preland.mjs';
 
 const bad = (a) => assert.throws(() => P(a), /usage/);
 assert.deepEqual(P([]), { branch: null, all: false, noCache: false });
@@ -59,5 +60,14 @@ try {
   const head = g(lane, 'rev-parse', 'HEAD');
   r = run('true', 'true'); assert.equal(r.kind, 'conflict'); assert.equal(r.line, 'conflict: b.txt'); assert.equal(g(lane, 'rev-parse', 'HEAD'), head); assert.equal(g(lane, 'status', '--porcelain'), '');
   assert.equal(stampOk(null, 'x'), false); assert.equal(existsSync(join(lane, '.tmp')), true);
+  // CHE-341: server/node_modules link
+  const L = join(tmp, 'l2'), M = join(tmp, 'm2');
+  mkdirSync(join(L, 'server'), { recursive: true }); mkdirSync(join(M, 'server'), { recursive: true });
+  assert.equal(linkServerModules(L, M), 'no-server');
+  writeFileSync(join(L, 'server', 'package.json'), '{}');
+  assert.equal(linkServerModules(L, M), 'missing-main');
+  mkdirSync(join(M, 'server', 'node_modules'));
+  assert.equal(linkServerModules(L, M), 'linked'); assert.equal(lstatSync(join(L, 'server', 'node_modules')).isSymbolicLink(), true);
+  assert.equal(linkServerModules(L, M), 'present');
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 console.log('lane preland tests ok');
