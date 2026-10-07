@@ -13,13 +13,16 @@ export function cleanServer(s) {
   } catch (e) { return ''; }
 }
 
-/** the server of this session: ?online=<url> (then remembered in sessionStorage) or the remembered one, '' when online play is off */
-export function onlineServer(search = typeof location !== 'undefined' ? location.search : '') {
+/** the server of a release build (vite.config.js defines __ONLINE_DEFAULT__ only with CHESS_RELEASE=1), '' in dev and test builds */
+export const DEFAULT_SERVER = typeof __ONLINE_DEFAULT__ === 'string' ? cleanServer(__ONLINE_DEFAULT__) : '';
+
+/** the server of this session: ?online=<url> (then remembered in sessionStorage), the remembered one, else the release default; '' when online play is off */
+export function onlineServer(search = typeof location !== 'undefined' ? location.search : '', fallback = DEFAULT_SERVER) {
   const flag = cleanServer(new URLSearchParams(search).get('online'));
   try {
     if (flag) { sessionStorage.setItem(SESSION, flag); return flag; }
-    return cleanServer(sessionStorage.getItem(SESSION));
-  } catch (e) { return flag; }
+    return cleanServer(sessionStorage.getItem(SESSION)) || fallback;
+  } catch (e) { return flag || fallback; }
 }
 
 export function readLogin() {

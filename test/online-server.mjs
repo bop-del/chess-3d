@@ -7,7 +7,7 @@ import { createOnlineServer, STALE_MS, originAllowed } from '../server/index.mjs
 import { openDb, CODE_ALPHABET } from '../server/db.mjs';
 import { inviteLink } from '../server/admin.mjs';
 import { detailsText } from '../src/online/details.js';
-import { cleanServer, takeFragment } from '../src/online/store.js';
+import { cleanServer, takeFragment, onlineServer, DEFAULT_SERVER } from '../src/online/store.js';
 
 let failed = 0;
 const ok = (name, pass, detail = '') => { if (!pass) failed++; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${pass ? '' : '  ' + detail}`); };
@@ -195,6 +195,7 @@ try {
   const text = detailsText({ cause: 'server', lastOk: clock, request: 'GET /events', status: 500, error: `boom ${felix.key} and ${mia.code} and FELIX-ZZZZ`, host: '127.0.0.1:5702', version: 'v1.8.0', time: clock }, [felix.key]);
   ok('the copied details never contain the key or a code', !text.includes(felix.key) && !text.includes(mia.code) && !text.includes('FELIX-ZZZZ') && text.includes('http status: 500') && text.includes('server host: 127.0.0.1:5702'), text);
   ok('the details text has no chat field', !/chat|message:/i.test(text));
+  ok('release default (CHE-326): no flag uses the fallback, ?online= wins, a dev build has no default', onlineServer('', 'https://chess.borisdiebold.com') === 'https://chess.borisdiebold.com' && onlineServer('?online=http://localhost:5502', 'https://chess.borisdiebold.com') === 'http://localhost:5502' && DEFAULT_SERVER === '');
   ok('the server flag is cleaned (no credentials, no other scheme)', cleanServer('http://u:p@h:1/') === '' && cleanServer('javascript:alert(1)') === '' && cleanServer('http://127.0.0.1:5702/') === 'http://127.0.0.1:5702');
   // the fragment is stripped at once and stored (a stand in for location, history and storage)
   const store = new Map();

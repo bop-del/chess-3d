@@ -15,6 +15,10 @@ if (process.env.CHESS_RELEASE !== '1') {
 // (for example https://bop-del.github.io/chess-3d/) as well as from a domain root.
 export default defineConfig({
   base: './',
-  define: { __APP_VERSION__: JSON.stringify(VERSION), __APP_COMMIT__: JSON.stringify(COMMIT) },
+  define: {
+    __APP_VERSION__: JSON.stringify(VERSION), __APP_COMMIT__: JSON.stringify(COMMIT),
+    // online play (CHE-326): a release build (CHESS_RELEASE=1) uses the live server without ?online=, dev and test builds none
+    __ONLINE_DEFAULT__: JSON.stringify(process.env.CHESS_RELEASE === '1' ? 'https://chess.borisdiebold.com' : ''),
+  },
   build: { target: 'safari15', chunkSizeWarningLimit: 1400 },
 });
