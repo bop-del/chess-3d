@@ -48,7 +48,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileS
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseLaneFlags } from '../tools/lane-args.mjs';
-import { agentPrompt } from '../tools/lane-identity.mjs';
+import { agentPrompt, agentId, MAX_AGENT_ID, MAX_ROLE } from '../tools/lane-identity.mjs';
 import { sendKickoff } from '../tools/kickoff.mjs';
 import { parsePrelandArgs, prelandRun, linkServerModules, SERVER_MODULES_HINT } from '../tools/lane-preland.mjs';
 
@@ -97,6 +97,7 @@ function open(branch, given = [], withPrivate = false, withAgent = null, model =
   if (git('branch', '--list', branch)) die(`branch ${branch} exists already`);
   // owner, 2026-10-04: the Linear key is the only id. A lane named after an old item id (s73-..., n8-...) without --key is refused.
   if (!given.length && !releasePrep(branch) && /^[a-z]+\d+-/.test(branch) && linearHook()) die(`lane ${branch} not opened: it starts with an old item id. Name lanes che-<n>-words (the Linear key is the only id, for example che-177-private-worktrees), or pass --key CHE-n.`);
+  if (withAgent && withAgent.name.length > MAX_ROLE) die(`lane ${branch} not opened: agent role "${withAgent.name}" is over ${MAX_ROLE} characters (the Herdr id is at most ${MAX_AGENT_ID})`, 2);
   if (withAgent && (!/^[a-z0-9][a-z0-9-]*$/.test(withAgent.name) || !existsSync(withAgent.brief))) die(`lane ${branch} not opened: --agent needs a lower case name and an existing brief file (${withAgent.brief})`, 2);
   if (withPrivate && !privateLaneTool()) die(`lane ${branch} not opened: --private needs ~/code/chess-3d-private/bin/private-lane`);
   const keys = releasePrep(branch) && !given.length ? [] : laneKeys(branch, given);
@@ -150,6 +151,7 @@ function ensurePrivateDiffTab(lane, privPath) {
 
 function agent(branch, name, brief, model = 'sonnet') {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(name || '')) die(`agent names are lower case words joined by hyphens\n${USAGE}`, 2);
+  if (name.length > MAX_ROLE) die(`agent role "${name}" is over ${MAX_ROLE} characters (the Herdr id is at most ${MAX_AGENT_ID})`, 2);
   if (!existsSync(brief || '')) die(`brief not found: ${brief}`, 2);
   const lane = lanes().find((w) => w.branch === branch);
   if (!lane || !lane.open_workspace_id) die(`no open lane ${branch} with a workspace: bin/lane open ${branch} first`);
@@ -165,7 +167,7 @@ function agent(branch, name, brief, model = 'sonnet') {
   const tab = herdr('tab', 'create', '--workspace', lane.open_workspace_id, '--cwd', lane.path, '--label', `${name} agent`);
   const pane = (tab.root_pane || tab.pane || {}).pane_id;
   if (!pane) die(`could not read the new tab's pane from herdr: ${JSON.stringify(tab).slice(0, 200)}`);
-  const id = `${branch}-${name}`;
+  const id = agentId(branch, name);
   // optional private hook: a Stop hook that keeps the agent's final report (settings file per agent, in the lane's gitignored .claude/)
   const extra = [];
   { const h = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'agent-stop-hook');
@@ -179,7 +181,7 @@ function agent(branch, name, brief, model = 'sonnet') {
       const relTool = (t) => `Bash(${join(process.env.HOME, 'code', 'chess-3d-private', 'bin', t)} *)`;
       const permissions = name === 'land' ? { allow: [`Bash(${lockTool} *)`, `Bash(${root}/bin/lane close *)`, `Bash(bin/lane close *)`, relTool('release-next'), relTool('release-result')] }
         : name === 'release' ? { allow: [relTool('release-next'), relTool('release-result')] } : undefined;
-      writeFileSync(f, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node ${h} ${branch} ${name}` }] }] }, ...(permissions ? { permissions } : {}) }, null, 2));
+      writeFileSync(f, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node ${h} ${branch} ${name} ${id}` }] }] }, ...(permissions ? { permissions } : {}) }, null, 2));
       extra.push('--settings', f);
     } }
   // a fresh tab needs a moment before its shell takes input: retry while herdr says the pane is busy
