@@ -196,7 +196,7 @@ function agent(branch, name, brief, model = 'sonnet') {
   const prompt = `You are the "${name}" agent of lane ${branch} (worktree ${lane.path}). Read your brief at ${resolve(brief)} and follow it exactly. `
     + `When you are done, write your final report to .tmp/${name}/report.md in the lane AND send it to the lead session with: herdr agent prompt ${LEAD} "<your report>" (one message, plain text). `
     + (priv ? `This lane also has a private repo worktree: ${priv}. Edit the private repo files ONLY there (never ~/code/chess-3d-private itself), commit WIP there with git add -A and a message ending in [no-doc]. board.json, pulse.json, sdlc-events.jsonl, metrics/, .tmp/, review/out/ and RESTART-PROMPT.md are live files: never commit them. ` : '')
-    + 'If the send is refused (the lead may be waiting on the owner), retry every 2 minutes, at most 10 times. '
+    + 'Send the report once with herdr agent prompt; if it is refused or the lead is busy, stop: the Stop hook has the report file and the board loop delivers it when the lead can take it. '
     + 'Then stop and wait; the lead may message you with follow ups.';
   // CHE-104: the private agents/builder.md (identity, owner, goals, mode) goes first when it exists
   // CHE-241: the kickoff is verified: the agent must turn working within 60 s, else it is resent (3 times at most), then a red line.

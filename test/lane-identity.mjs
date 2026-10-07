@@ -33,5 +33,9 @@ try {
   assert.ok(agentPrompt('You are the "land" agent of lane che-1-x.', plain, id).startsWith('# Who you are'));
   // bin/lane agent sends the prompt through agentPrompt with the brief
   assert.match(readFileSync(new URL('../bin/lane', import.meta.url), 'utf8'), /const text = agentPrompt\(prompt, brief\);[\s\S]*sendKickoff\(\{ id, text,[\s\S]*\['agent', 'prompt', id, t\]/);
+  // CHE-316: the builder sends its report once; the Stop hook file is delivered by the board loop, so no retry sentence
+  const laneSrc = readFileSync(new URL('../bin/lane', import.meta.url), 'utf8');
+  assert.ok(!/retry every 2 minutes/.test(laneSrc), 'agent prompt must not tell the builder to retry');
+  assert.match(laneSrc, /Send the report once with herdr agent prompt; if it is refused or the lead is busy, stop: the Stop hook has the report file/);
 } finally { rmSync(dir, { recursive: true, force: true }); }
 console.log('lane identity tests ok');
