@@ -206,3 +206,49 @@ body.phone .obub[data-k="chat"] { right: 12px; bottom: calc(var(--sb, 0px) + var
 body.phone.ochat-open .obub[data-k="chat"] { bottom: calc(var(--obot, 0px) + var(--ohmax, 50vh) + 8px); }
 /* on a phone the Online sheet shows the unread counts on the cards itself: the pill and the bubble never cover a card button */
 body.phone:has(.psheet.ponline.open) .ochpill, body.phone:has(.psheet.ponline.open) .obub[data-k="chat"] { display: none; }
+
+/* --- player card (CHE-290): the own numbers at the top, the detail card of one player --- */
+.ostat { appearance: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 6px; width: 100%; box-sizing: border-box; padding: 8px; font: inherit; color: var(--text); text-align: center; cursor: pointer; touch-action: manipulation; border: 2px solid rgba(255, 255, 255, 0.14); border-radius: 14px; background: rgba(30, 32, 44, 0.8); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
+.ostat[hidden], .opd[hidden] { display: none; }
+.ostx { grid-column: 1 / -1; flex: 1; align-self: center; color: var(--dim); font-size: 13px; }
+.ostc { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 2px; border-radius: 8px; background: rgba(0, 0, 0, 0.22); }
+.ostc b { font-size: 20px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ostc small { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap; }
+.ostc.wins b { color: #6fd08c; }
+.ostc.losses b { color: #ff8a7a; }
+.ostc.draws b { color: #c3c8d6; }
+.ostat .ostc.streak { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; padding: 6px 12px; }
+.ostat .ostc.streak b { font-size: 14px; line-height: 1.2; font-weight: 800; overflow: hidden; text-overflow: ellipsis; }
+.ostat .ostc.streak small { order: -1; font-size: 12px; }
+.ostc.streak.win b { color: #6fd08c; }
+.ostc.streak.loss b { color: #ff8a7a; }
+.opc .oav[data-a], .opc .obody[data-a] { cursor: pointer; }
+.opc .obody { min-height: 44px; justify-content: center; }
+.opd { display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; padding: 10px 12px 12px; border-radius: 16px; border: 2px solid #f0c24b; background: #14161c; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
+.opd header { display: flex; align-items: center; gap: 10px; }
+.opd .opd-name { flex: 1; min-width: 0; font-size: 17px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opd .oglyph { width: 36px; height: 36px; font-size: 22px; }
+.opd-x { appearance: none; flex: none; width: 44px; height: 44px; border: 0; border-radius: 10px; background: none; color: var(--dim); font-size: 26px; line-height: 1; cursor: pointer; touch-action: manipulation; }
+.ostats4 { display: flex; gap: 6px; }
+.ostats4 .ostc b { font-size: 24px; }
+.obar { display: flex; height: 14px; overflow: hidden; border-radius: 4px; border: 2px solid rgba(0, 0, 0, 0.4); background: rgba(255, 255, 255, 0.08); }
+.obar i { display: block; height: 100%; }
+.obar .w { background: #5cb85c; }
+.obar .d { background: #8a90a0; }
+.obar .l { background: #e0654f; }
+.oh2h { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px; border-radius: 10px; background: rgba(240, 194, 75, 0.12); border: 2px solid rgba(240, 194, 75, 0.5); }
+.oh2h small { font-size: 11px; color: var(--dim); }
+.oh2h b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ost { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.ost > div { display: flex; justify-content: space-between; gap: 10px; }
+.ost dt { color: var(--dim); }
+.ost dd { margin: 0; font-weight: 700; text-align: right; }
+.opd h5 { margin: 2px 0 0; font-size: 12px; color: var(--dim); font-weight: 700; }
+.oopen { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.oopen li { display: flex; justify-content: space-between; gap: 10px; }
+.oopen span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oopen b { font-variant-numeric: tabular-nums; }
+/* on a phone the card is a sheet over the Online sheet, above the bar, scrolling inside; gone with the Online sheet */
+body.phone .opd.opds { position: fixed; z-index: 18; left: var(--sl, 0px); right: var(--sr, 0px); bottom: calc(var(--sb, 0px) + var(--bar, 56px) + var(--gap, 8px)); max-width: 520px; margin-inline: auto; max-height: min(68vh, calc(100vh - 140px)); overflow-y: auto; border-radius: 18px 18px 0 0; box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.35); animation: ochsin 0.28s ease; }
+body.phone .opd.opds[hidden] { display: none; }
+body.phone:not(:has(.psheet.ponline.open)) .opd.opds { display: none; }

@@ -104,6 +104,7 @@ const FAST = [
   ['training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs'],
   ['online play server: invite, login, challenge, moves, chat, admin (test/online-server.mjs)', 'test/online-server.mjs', true],
   ['online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs'],
+  ['player stats: statsFor, GET /player/<name>, head to head, openings (test/online-stats-player.mjs)', 'test/online-stats-player.mjs', true],
   ['own stats: events, limits, roll up, cleanup, /stats auth, sender (test/online-stats.mjs)', 'test/online-stats.mjs', true],
   ['server history: samples, maxima, retention, gaps, markers, /stats Server section (test/online-health.mjs)', 'test/online-health.mjs', true],
 ];

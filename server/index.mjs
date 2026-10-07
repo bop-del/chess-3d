@@ -10,6 +10,7 @@ import { Chess, nameSq } from '../src/rules.js';
 import { openDb, sha256, normCode, adminOps, newKey } from './db.mjs';
 import { createLive } from './live.mjs';
 import { createHealth, serverSection, systemProbe, SAMPLE_MS } from './health.mjs';
+import { statsFor } from './playerstats.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
 export const STALE_MS = 3 * 24 * 3600 * 1000;   // a game with no move for 3 days: the waiting player may end it as a win
@@ -280,13 +281,21 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       const auth = String(req.headers.authorization || '');
       const me = authKey(auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
       const known = ['/state', '/events', ...Object.keys(ACTIONS).map((a) => '/' + a)];
-      if (!known.includes(path)) { status = 404; return send(req, res, 404); }
+      const playerPath = req.method === 'GET' && path.startsWith('/player/');   // CHE-290
+      if (!known.includes(path) && !playerPath) { status = 404; return send(req, res, 404); }
       if (!me) { status = 401; return send(req, res, 401); }   // an unknown key gets 401 and nothing else
       if (req.method === 'POST' && path === '/events') {   // CHE-291: usage events of a logged in player
         if (limited('events', me.id)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
         const out = stats.ingest(me.id, await readBody(req, EVENTS_BODY_MAX));
         if (out.error) { status = out.status; return send(req, res, out.status, { error: out.error }); }
         status = 202; return send(req, res, 202, { ok: true, n: out.n });
+      }
+      if (playerPath) {   // CHE-290: the numbers of one player and your head to head with them; unknown, revoked or deleted: 404
+        let name = ''; try { name = decodeURIComponent(path.slice('/player/'.length)); } catch (e) { /* bad escape: no such player */ }
+        const p = name && playerByName(name);
+        if (!p || p.revoked) { status = 404; return send(req, res, 404, { error: 'unknown-player' }); }
+        const own = p.id === me.id;
+        return send(req, res, 200, { name: p.name, own, ...statsFor(db, p.id, { vs: own ? null : me.id }) });
       }
       if (req.method === 'GET' && path === '/state') return send(req, res, 200, stateFor(me.id));
       if (req.method === 'GET' && path === '/events') { live.open(req, res, me.id, stateFor(me.id), cors(req)); return; }

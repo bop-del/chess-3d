@@ -1,7 +1,7 @@
 // The Online tab (CHE-271): loaded by ui.js only with ?online=<server url>. Login by invite (the link's key or the code field), the
 // connection line with its Details box, challenges, the one online game, the player list with presence and score, and one chat per
 // opponent. The game itself runs through src/online/match.js on the normal 3D board; the transport is src/online/api.js.
-// Test hook: window.__chessOnline { state, status, match, api, login(code), render() }.
+// Test hook: window.__chessOnline { state, status, match, api, login(code), render(), openStats(name) }.
 import { t, onLanguage, translateTree } from '../i18n.js';
 import { LABEL as VERSION } from '../version.js';
 import './strings.js';
@@ -10,7 +10,7 @@ import { loginFor, writeLogin } from './store.js';
 import { createApi, loginWithCode } from './api.js';
 import { createMatch } from './match.js';
 import { detailsText } from './details.js';
-import { secondAction, scoreOf, chatStep } from './cards.js';
+import { secondAction, scoreOf, chatStep, statView } from './cards.js';
 import { previewOn, previewScene, createPreviewApi } from './preview.js';
 import { startStats } from './stats.js';
 
@@ -23,7 +23,7 @@ const seenGet = () => { try { return JSON.parse(localStorage.getItem(SEEN) || '{
 const seenSet = (v) => { try { localStorage.setItem(SEEN, JSON.stringify(v)); } catch (e) { /* blocked: for this page only */ } };
 
 export function mountOnline({ server, host, hud, game, controls, toast = () => {}, setDot = () => {}, isVisible = () => true, closeSheets = () => {}, setBoard = () => {}, onShown, phone = false, showTab = () => {} }) {
-  const preview = previewOn(), scene = previewScene();   // test aid: ?onlinepv=list|wait|chat|min runs the tab on fake players, no server
+  const preview = previewOn(), scene = previewScene();   // test aid: ?onlinepv=list|wait|chat|min|stats|card runs the tab on fake players, no server
   let login = loginFor(server) || (preview ? { server, key: 'preview', name: 'Boris' } : null);
   let chatMin = false;
   let api = null, match = null, state = null, status = 'connecting', receivedAt = 0;
@@ -42,6 +42,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     </div>
     <div class="omain" hidden>
       <p class="ome"></p>
+      <button class="ostat own" type="button" data-a="stats" hidden></button>
+      <section class="opd" hidden></section>
       <div class="ochal"></div>
       <div class="ogame"></div>
       <h4 data-i18n="online.players">Players</h4>
@@ -65,6 +67,24 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const pill = document.createElement('button');
   pill.className = 'ochpill'; pill.type = 'button'; pill.hidden = true; pill.dataset.a = 'chat-open';
   hud.append(pill);
+  // the player card (CHE-290): the own numbers at the top of the tab, the detail card of one player (a section in the panel on a desktop,
+  // a sheet over the Online sheet on a phone, moved into the hud like the chat); the numbers come from GET /player/<name>, loaded on tap
+  const det = $('.opd');
+  if (phone) { det.classList.add('opds'); hud.append(det); }
+  let statWith = null, statKey = '';
+  const statCache = new Map();   // name -> { loading } | { s } | { err }
+  const getStats = async (name) => {
+    if (api?.stats) return api.stats(name);
+    const r = await fetch(`${server.replace(/\/$/, '')}/player/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${login.key}` } });
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  };
+  function loadStats(name, force = false) {
+    const e = statCache.get(name);
+    if (!force && e) return;   // a failed load is not retried until the next tap or the next finished game
+    statCache.set(name, { loading: true });
+    getStats(name).then((s) => statCache.set(name, { s }), () => statCache.set(name, { err: true })).then(() => renderStats());
+  }
   const chatVisible = () => !!chatWith && (chatShown && !chatMin);
 
   // the bubble over the board: a new message of a closed chat, or the summary after a load with unread messages
@@ -154,7 +174,48 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     const second = kind === 'challenge' ? `<button class="obtn gold" type="button" data-a="challenge" data-n="${esc(p.name)}">${esc(t('online.challenge', 'Challenge'))}</button>`
       : `<button class="obtn" type="button" disabled>${esc(kind === 'playing' ? t('online.playing', 'playing') : kind === 'asked' ? t('online.asked', 'Asked') : t('online.challenge', 'Challenge'))}</button>`;
     const chat = `<button class="obtn ochatbtn" type="button" data-a="chat" data-n="${esc(p.name)}" aria-label="${esc(t('online.chatWith', 'Chat with {name}', { name: p.name }) + (n ? ` (${n})` : ''))}">${esc(t('online.chat', 'Chat'))}${n ? ` <b class="ocnt">${n}</b>` : ''}</button>`;
-    return `<li class="op opc${chatWith === p.name ? ' on' : ''}${n ? ' unread' : ''}"><span class="oav">${avatarOf(p.name)}<i class="pres${p.online ? ' on' : ''}" title="${esc(p.online ? t('online.online', 'online') : t('online.offline', 'away'))}"></i></span><div class="obody"><span class="oname">${esc(p.name)}</span><span class="oscore">${esc(scoreLine(p.score))}</span></div><div class="oacts2">${chat}${second}</div></li>`;
+    return `<li class="op opc${chatWith === p.name ? ' on' : ''}${n ? ' unread' : ''}"><span class="oav" data-a="stats" data-n="${esc(p.name)}" role="button" aria-label="${esc(t('online.st.open', 'Numbers of {name}', { name: p.name }))}">${avatarOf(p.name)}<i class="pres${p.online ? ' on' : ''}" title="${esc(p.online ? t('online.online', 'online') : t('online.offline', 'away'))}"></i></span><div class="obody" data-a="stats" data-n="${esc(p.name)}" role="button"><span class="oname">${esc(p.name)}</span><span class="oscore">${esc(scoreLine(p.score))}</span></div><div class="oacts2">${chat}${second}</div></li>`;
+  }
+  const nums = (v) => ['games', 'wins', 'losses', 'draws'].map((k) => `<span class="ostc ${k}"><b>${v[k]}</b><small>${esc(t(`online.st.${k}`, { games: 'Games', wins: 'Wins', losses: 'Losses', draws: 'Draws' }[k]))}</small></span>`).join('');
+  const STREAK_EN = { win1: '1 win', winN: '{n} wins in a row', loss1: '1 loss', lossN: '{n} losses in a row', draw1: '1 draw', drawN: '{n} draws in a row' };
+  const streakText = (v) => { const k = v.streak.type ? `${v.streak.type}${v.streak.n === 1 ? '1' : 'N'}` : ''; return k ? t(`online.st.s.${k}`, STREAK_EN[k], { n: v.streak.n }) : '-'; };
+  function renderStats() {
+    if (!state) return;
+    const me = state.me.name, own = $('.ostat.own');
+    const e = statCache.get(me), v = e?.s ? statView(e.s) : null;
+    own.hidden = !e || e.err;
+    own.dataset.n = me;
+    own.setAttribute('aria-label', t('online.st.open', 'Numbers of {name}', { name: me }));
+    own.innerHTML = !v ? `<span class="ostx">${esc(t('online.st.loading', 'Loading numbers...'))}</span>` : v.empty ? `<span class="ostx">${esc(t('online.st.none', 'no game yet'))}</span>`
+      : `${nums(v)}<span class="ostc streak ${v.streak.type || ''}"><b>${esc(streakText(v))}</b><small>${esc(t('online.st.streak', 'Streak'))}</small></span>`;
+    // the detail card of one player
+    det.hidden = !statWith;
+    if (!statWith) return;
+    const d = statCache.get(statWith), dv = d?.s ? statView(d.s) : null, isOwn = statWith === me;
+    let body;
+    if (!d || d.loading) body = `<p class="ostx">${esc(t('online.st.loading', 'Loading numbers...'))}</p>`;
+    else if (d.err) body = `<p class="ostx">${esc(t('online.st.failed', 'The numbers are not available right now.'))}</p>`;
+    else if (dv.empty) body = `<p class="ostx">${esc(t('online.st.none', 'no game yet'))}</p>${isOwn ? '' : `<p class="oh2h">${esc(t('online.st.h2hNone', 'Never played each other'))}</p>`}`;
+    else {
+      const h = isOwn ? '' : dv.h2h ? `<p class="oh2h"><small>${esc(t('online.st.h2h', 'Head to head'))}</small><b>${esc(t('online.st.h2hLine', 'You {score} {name}', { score: dv.h2h.line, name: statWith }))}</b></p>` : `<p class="oh2h"><small>${esc(t('online.st.h2h', 'Head to head'))}</small><b>${esc(t('online.st.h2hNone', 'Never played each other'))}</b></p>`;
+      const rows = [
+        [t('online.st.nowStreak', 'Streak now'), streakText(dv)], [t('online.st.bestStreak', 'Best win streak'), t('online.st.bestN', '{n} wins', { n: dv.bestWins })],
+        [t('online.st.avgLen', 'Average length'), t('online.st.lenN', '{n} moves', { n: dv.avgMoves })], dv.avgMinutes ? [t('online.st.avgTime', 'Average time'), t('online.st.timeN', '{n} min', { n: dv.avgMinutes })] : null,
+      ].filter(Boolean);
+      body = `<div class="ostats4">${nums(dv)}</div>
+        <div class="obar" role="img" aria-label="${esc(`${dv.wins} / ${dv.draws} / ${dv.losses}`)}"><i class="w" style="width:${dv.bar.w}%"></i><i class="d" style="width:${dv.bar.d}%"></i><i class="l" style="width:${dv.bar.l}%"></i></div>
+        ${h}<dl class="ost">${rows.map(([k, x]) => `<div><dt>${esc(k)}</dt><dd>${esc(x)}</dd></div>`).join('')}</dl>
+        ${dv.openings.length ? `<h5>${esc(t('online.st.openings', 'Favourite openings'))}</h5><ul class="oopen">${dv.openings.map((o) => `<li><span>${esc(o.name)}</span><b>${o.n}</b></li>`).join('')}</ul>` : ''}`;
+    }
+    det.innerHTML = `<header><span class="oav">${avatarOf(statWith)}</span><b class="opd-name">${esc(isOwn ? t('online.st.own', 'Your numbers') : statWith)}</b><button class="opd-x" type="button" data-a="stats-x" aria-label="${esc(t('online.close', 'Close'))}">×</button></header>${body}`;
+  }
+  function openStats(name) { statWith = name; loadStats(name, true); renderStats(); }
+  // the own numbers and an open card are fetched again when a game ends (the finished game id changes the key)
+  function watchStats() {
+    const g = state.game, key = g ? `${g.id}:${g.status}` : '';
+    if (key !== statKey) { const first = statKey === '' && !statCache.size; statKey = key; if (!first) statCache.clear(); }
+    loadStats(state.me.name);
+    if (statWith) loadStats(statWith);
   }
   function renderMain() {
     const logged = !!login && !!state;
@@ -165,6 +226,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (!logged) return;
     const g = state.game, active = myGame();
     $('.ome').textContent = t('online.you', 'You are {name}', { name: state.me.name });
+    watchStats(); renderStats();
 
     // challenges in and out
     const parts = [];
@@ -348,6 +410,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (a === 'resign-no') { confirmResign = false; render(); return; }
     if (a === 'resign-yes') { confirmResign = false; const g = myGame(); if (g) await act('/resign', { game: g.id }); render(); return; }
     if (a === 'finish') { const g = myGame(); if (g) await act('/finish-stale', { game: g.id }); return; }
+    if (a === 'stats') { if (statWith === n) { statWith = null; renderStats(); } else openStats(n); return; }
+    if (a === 'stats-x') { statWith = null; renderStats(); return; }
     if (a === 'chat') { openChat(n); return; }
     if (a === 'chat-to') { cs('to', n); render(); if (!phone) $c('.osend input').focus({ preventScroll: true }); return; }
     if (a === 'chat-min') { cs('min'); render(); return; }
@@ -356,6 +420,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (a === 'chat-close') closeChat();
   };
   root.addEventListener('click', onClick);
+  det.addEventListener('click', onClick);
   ch.addEventListener('click', onClick);
   pill.addEventListener('click', onClick);
   const onBubClick = (e) => {
@@ -463,6 +528,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   }
   if (login) start(login); else render();
   if (preview && (scene === 'chat' || scene === 'min')) { chatWith = 'Nina'; chatShown = true; chatMin = scene === 'min'; }
+  if (preview && scene === 'card') openStats('Nina');
 
   // the countdown in an open Details box, the 3 day finish appearing on time
   setInterval(() => { if ((detailsOpen || lockDetails) && status === 'unreachable') renderDetails(); else if (lockDetails) renderDetails(); }, 1000);
@@ -474,7 +540,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const hook = {
     get state() { return state; }, get status() { return status; }, get match() { return match; }, get api() { return api; },
     get login() { return login ? { server: login.server, name: login.name } : null },
-    render, openChat, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; },
+    render, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; },
   };
   window.__chessOnline = hook;
   return hook;

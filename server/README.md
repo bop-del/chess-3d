@@ -65,6 +65,7 @@ JSON, `Authorization: Bearer <key>` except `/up` and `/login-code`. An unknown k
 | `POST /chat` | `{ to, text, cid }` | at most 200 characters |
 | `POST /chat/read` | `{ with }` | marks that conversation read |
 
+| `GET /player/<name>` | | The numbers of that player (CHE-290), derived from the finished games: `{ name, own, games, wins, losses, draws, streak: { current: { type, n }, best: { wins, losses, draws } }, perOpponent: [{ name, games, wins, losses, draws }], details: { avgMoves, avgMinutes, longestGameMoves, shortestWinMoves, openings: [{ eco, name, n }] }, headToHead }`. `headToHead` is from the asking player's side (`wins` are the asker's) and `null` on the own card. Running games do not count; a resign is a loss, a stale finish a win. Unknown, revoked or deleted name: 404 |
 | `POST /events` | `{ events: [{ kind, device, ... }] }` | `202 { ok, n }`. Usage events (CHE-291, ADR 0010), only with a player key. Kinds: `error` { message, where }, `feature` { name }, `perf` { tier: high, mid, low; loadMs }, `session` { length }; `device` { ua, touch, w, h, gpu }. One bad event refuses the batch (400) |
 | `GET /stats`, `POST /stats` | secret | The stats dashboard (HTML), only with `ONLINE_ADMIN_SECRET`: `Authorization: Bearer <secret>` or the form on the page (a POST body, never a URL). 401 without it, 404 when no secret is set |
 

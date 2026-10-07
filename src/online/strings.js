@@ -29,6 +29,12 @@ addDE({
   'online.chatFailed': 'Nachricht nicht gesendet.', 'online.bubbleMsg': '💬 {name}: {text} ›', 'online.bubbleOne': '💬 {name}: {text}{more} ›',
   'online.bubbleMany': '💬 {n} neue Nachrichten von {names} ›', 'online.and': 'und', 'online.gameLine': 'Online gegen {name} · {turn}', 'online.gameBubble': '♟ Partie gegen {name}: {turn} ›', 'online.movedBubble': '♟ {name} hat gezogen: {turn} ›', 'online.bubbleHide': 'Ausblenden', 'online.close': 'Schließen',
   'online.monitoredShort': 'mitgelesen', 'online.minimize': 'Verkleinern', 'online.noGameYet': 'noch keine Partie', 'online.waitingShort': 'Warte auf {name}', 'online.asked': 'Gefragt', 'online.you2': 'Du',
+  'online.st.title': 'Zahlen von {name}', 'online.st.own': 'Deine Zahlen', 'online.st.games': 'Partien', 'online.st.wins': 'Siege', 'online.st.losses': 'Niederlagen', 'online.st.draws': 'Remis', 'online.st.streak': 'Serie',
+  'online.st.none': 'noch keine Partie', 'online.st.loading': 'Lade Zahlen...', 'online.st.failed': 'Die Zahlen sind gerade nicht da.', 'online.st.open': 'Zahlen von {name}',
+  'online.st.h2h': 'Gegeneinander', 'online.st.h2hLine': 'Du {score} {name}', 'online.st.h2hNone': 'Noch nie gegeneinander gespielt',
+  'online.st.s.win1': '1 Sieg', 'online.st.s.winN': '{n} Siege in Folge', 'online.st.s.loss1': '1 Niederlage', 'online.st.s.lossN': '{n} Niederlagen in Folge', 'online.st.s.draw1': '1 Remis', 'online.st.s.drawN': '{n} Remis in Folge',
+  'online.st.nowStreak': 'Jetzt', 'online.st.bestStreak': 'Beste Siegesserie', 'online.st.bestN': '{n} Siege',
+  'online.st.avgLen': 'Länge im Schnitt', 'online.st.lenN': '{n} Züge', 'online.st.avgTime': 'Dauer im Schnitt', 'online.st.timeN': '{n} Min.', 'online.st.openings': 'Lieblingseröffnungen',
   'banner.resign': 'Aufgegeben', 'banner.stale': 'Partie beendet',
   'reason.resign': 'Aufgegeben', 'reason.stale': '3 Tage kein Zug',
 });

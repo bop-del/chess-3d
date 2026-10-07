@@ -376,6 +376,43 @@ try {
   if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await D2.screenshot({ path: join(SHOTS, 'phone-pill.png') }); }
   await D2.close();
 
+  // ------------------------------------------------------------ CHE-290 player card on the fake fixture (?onlinepv=stats|card)
+  const overflowFree = (page) => ev(page, () => { const w = document.documentElement.clientWidth; return document.documentElement.scrollWidth <= w + 1 && [...document.querySelectorAll('.ostat, .opd')].filter((e) => e.getClientRects().length).every((e) => { const r = e.getBoundingClientRect(); return r.left >= -0.5 && r.right <= w + 0.5 && e.scrollWidth <= e.clientWidth + 1; }); });
+  for (const [tag, size] of [['phone 360', [360, 740, true]], ['phone 390', PHONE], ['desktop', DESK]]) {
+    const S = await open(ctxA, `${BASE}/?${PVQ}stats&open=online`, size);
+    R.expect(`${tag}: your numbers at the top (games, wins, losses, draws, streak), above the players`, await until(S, () => { const o = document.querySelector('.ostat.own'); return o && !o.hidden && o.querySelectorAll('.ostc').length === 5 && o.querySelector('.ostc.games b').textContent === '14' && o.querySelector('.ostc.wins b').textContent === '8' && /3 Siege in Folge/.test(o.querySelector('.ostc.streak').textContent) && o.getBoundingClientRect().bottom <= document.querySelector('.oplayers').getBoundingClientRect().top; }));
+    R.expect(`${tag}: your numbers fit, no overflow`, await overflowFree(S));
+    await click(S, '.opc [data-a=stats][data-n="Nina"].oav');
+    await new Promise((r) => setTimeout(r, 500));   // the sheet slides in
+    R.expect(`${tag}: tapping the avatar opens Nina's card with the numbers, the bar, the head to head and the openings`, await until(S, () => { const d = document.querySelector('.opd'); return d && !d.hidden && /Nina/.test(d.querySelector('.opd-name').textContent) && d.querySelectorAll('.ostats4 .ostc').length === 4 && !!d.querySelector('.obar') && /Du 3 : 2 Nina/.test(d.querySelector('.oh2h b').textContent) && /Italian Game/.test(d.textContent) && /2 Niederlagen in Folge/.test(d.textContent) && /27 Züge/.test(d.textContent) && /13 Min\./.test(d.textContent); }));
+    R.expect(`${tag}: the card fits, no layout overflow, close button at least 44 px`, await overflowFree(S) && await ev(S, () => { const x = document.querySelector('.opd-x').getBoundingClientRect(), d = document.querySelector('.opd').getBoundingClientRect(); return x.width >= 43.5 && x.height >= 43.5 && d.bottom <= innerHeight + 1 && d.top >= 0; }));
+    if (size === PHONE) R.expect('phone: the card is a sheet over the sheet and sits above the bar', await ev(S, () => { const d = document.querySelector('.opd').getBoundingClientRect(), b = document.querySelector('nav.pbar').getBoundingClientRect(); return getComputedStyle(document.querySelector('.opd')).position === 'fixed' && d.bottom <= b.top + 1; }));
+    if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await S.screenshot({ path: join(SHOTS, `stats-card-${tag.replace(' ', '-')}.png`) }); }
+    await click(S, '.opd-x');
+    R.expect(`${tag}: the close button closes the card`, await until(S, () => document.querySelector('.opd').hidden));
+    await click(S, '.opc [data-a=stats][data-n="Felix"].obody');
+    R.expect(`${tag}: tapping the name opens Felix's card (draw streak, no game against you yet)`, await until(S, () => /Felix/.test(document.querySelector('.opd-name').textContent) && /Noch nie gegeneinander gespielt/.test(document.querySelector('.oh2h').textContent) && /1 Remis/.test(document.querySelector('.opd').textContent) && /<1 Min|< ?1|<1/.test(document.querySelector('.opd').textContent)));
+    await click(S, '.ostat.own');
+    R.expect(`${tag}: your own card has no head to head`, await until(S, () => /Deine Zahlen/.test(document.querySelector('.opd-name').textContent) && !document.querySelector('.oh2h')));
+    await click(S, '.opc [data-a=stats][data-n="Maximiliane-Charlotte"].obody');
+    R.expect(`${tag}: a long name and zero games: "noch keine Partie", fits`, await until(S, () => /noch keine Partie/.test(document.querySelector('.opd').textContent) && /Maximiliane-Charlotte/.test(document.querySelector('.opd-name').textContent)) && await overflowFree(S));
+    if (args.includes('--shots') && size === PHONE) await S.screenshot({ path: join(SHOTS, 'stats-card-phone-long-name-zero.png') });
+    await S.close();
+  }
+  const SC = await open(ctxA, `${BASE}/?${PVQ}card&open=online`, PHONE);
+  R.expect('onlinepv=card opens the detail card of Nina at once', await until(SC, () => !document.querySelector('.opd').hidden && /Nina/.test(document.querySelector('.opd-name').textContent) && !!document.querySelector('.obar')));
+  R.expect('phone: the card hides with the Online sheet, so it never covers the board or bubbles', await (async () => { await ev(SC, () => document.querySelector('.psheet.ponline')?.classList.remove('open')); return until(SC, () => getComputedStyle(document.querySelector('.opd')).display === 'none'); })());
+  await SC.close();
+  const SD = await open(ctxA, `${BASE}/?${PVQ}card&open=online`, WIDE);
+  R.expect('desktop: the card is a section in the panel (not fixed)', await until(SD, () => { const d = document.querySelector('.opd'); return !d.hidden && getComputedStyle(d).position !== 'fixed' && !!d.closest('#online-host'); }));
+  if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await SD.screenshot({ path: join(SHOTS, 'stats-card-desktop-wide.png') }); }
+  await SD.close();
+  // the real route: Mia and Felix have no finished game here yet, so the real card shows "noch keine Partie"; the route is the contract
+  const SR = await open(ctxA, `${BASE}/?${Q}&${flag}&open=online`, DESK);
+  await until(SR, () => window.__chessOnline?.status === 'connected');
+  R.expect('real server: your own numbers load, the card of another player opens', await (async () => { await until(SR, () => !document.querySelector('.ostat.own')?.hidden); await ev(SR, () => window.__chessOnline.openStats(window.__chessOnline.state.players[0].name)); return until(SR, () => !document.querySelector('.opd').hidden && !!document.querySelector('.opd .ostx, .opd .ostats4')); })());
+  await SR.close();
+
   if (args.includes('--shots')) {
     mkdirSync(SHOTS, { recursive: true });
     for (const theme of ['classic', 'pixel']) {
