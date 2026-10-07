@@ -22,8 +22,8 @@ export const CORE = [
 /** [path pattern, groups it affects]. Group names are families: 'fixes' stands for both halves. */
 export const MAP = [
   [/^src\/battle\//, ['battle']],
-  [/^src\/music\//, ['music']],
-  [/^src\/audio\.js$/, ['music', 'battle', 'core']],
+  [/^src\/music\//, ['music', 'music render']],
+  [/^src\/audio\.js$/, ['music', 'music render', 'battle', 'core']],
   [/^src\/themes\//, ['themes', 'textures', 'views', 'pixel chars', 'pixel look', 'pixel sky', 'shared fixes', 'cloud mask', 'living']],
   [/^src\/(textures|texture-gen|texture-worker|loader-board)\.js$/, ['textures', 'themes', 'intro']],
   [/^src\/learn\//, ['learn', 'fixes']],
@@ -46,7 +46,7 @@ export const MAP = [
   [/^server\//, []],
   // test scripts: the group that runs the script
   [/^test\/(battle)\.mjs$/, ['battle']],
-  [/^test\/music-page\.mjs$/, ['music']],
+  [/^test\/music-page\.mjs$/, ['music', 'music render']],
   [/^test\/(themes|textures|intro|views|play|drill|explain|learn|learnbar|review|puzzles|goodmove|fixes)\.mjs$/, null],   // null: the group named like the file, see below
   [/^test\/trays-page\.mjs$/, ['trays']],
   [/^test\/shared-fixes-page\.mjs$/, ['shared fixes']],
