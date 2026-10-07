@@ -113,17 +113,29 @@ try {
     const same = Math.abs(c1.yaw - c0.yaw) < 1e-6 && Math.abs(c1.pitch - c0.pitch) < 1e-6;
     R.expect(`${id} orbit ${locked ? 'locked' : 'free'}`, same === locked, `yaw and pitch ${same ? 'unchanged' : 'changed'} by a drag`);
   }
-  // Symbols turn with the camera (v1.8.0 release test, CHE-245 taken back): orbiting changes the holder yaw, so they read upright for the viewer
+  // Symbols keep their reading direction (CHE-245): the yaw comes from the side at the bottom, never from the camera
   if (mine()) {
     await open(page, SIZES[0], '&symbols=1');
     const hy = () => page.evaluate(() => { const c = window.__chess; const g = c.game.root.children.find((o) => o.userData.piece && o.userData.sym); return g.userData.sym.rotation.y; });
+    const y0 = await hy();
     const ys = [];
-    for (const yaw of [0.7, 1.9, -2.4]) {
-      await page.evaluate((yaw) => { const c = window.__chess; c.controls.glideTo({ yaw, pitch: 0.5, dur: 0.1 }); c.step(0.5); c.draw(); c.step(0.1); }, yaw);
+    for (const yaw of [0.7, 1.9, -2.4, 3.0]) {
+      await page.evaluate((yaw) => { const c = window.__chess; c.controls.glideTo({ yaw, pitch: 0.5, dur: 0.1 }); c.step(0.5); c.draw(); }, yaw);
       ys.push(await hy());
     }
-    const d = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-    R.expect('symbols: orbiting the camera turns the holder yaw with it', d(ys[0], ys[1]) > 0.5 && d(ys[1], ys[2]) > 0.5, JSON.stringify(ys));
+    R.expect('symbols: orbiting the camera leaves the holder yaw alone', ys.every((y) => Math.abs(y - y0) < 1e-6), JSON.stringify({ y0, ys }));
+    await page.evaluate(() => { window.__chess.controls.setPreset('White view'); window.__chess.step(1.5); });
+    const w0 = await hy();
+    await page.evaluate(() => { window.__chess.controls.flip(); window.__chess.step(1.5); window.__chess.draw(); });
+    const w1 = await hy();
+    R.expect('symbols: a flip turns the holder yaw once by half a turn', Math.abs(Math.abs(w1 - w0) - Math.PI) < 1e-6, JSON.stringify({ w0, w1 }));
+    await page.evaluate(() => { window.__chess.controls.setPreset('White view'); window.__chess.step(1.5); });
+    const w2 = await hy();
+    await page.evaluate(() => { window.__chess.controls.setPreset('Black view'); window.__chess.step(1.5); });
+    const w3 = await hy();
+    R.expect('symbols: the White and Black view differ by half a turn, Isometric keeps the side', Math.abs(Math.abs(w3 - w2) - Math.PI) < 1e-6, JSON.stringify({ w2, w3 }));
+    await page.evaluate(() => { window.__chess.controls.setPreset('Isometric'); window.__chess.step(1.5); });
+    R.expect('symbols: a view preset other than White or Black keeps the side', Math.abs((await hy()) - w3) < 1e-6, String(await hy()));
   }
   // Symbols is a switch over every view (CHE-227): a flat symbol on every piece, the 3D bodies hidden, a plain board; the view and the camera stay
   if (mine()) for (const size of [SIZES[0], SIZES[1]]) {
