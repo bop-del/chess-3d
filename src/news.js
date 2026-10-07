@@ -3,19 +3,26 @@
 //   { open, close, isOpen, autoOpen, line }. autoOpen() is called once when the game is ready: it opens the News after an update that
 //   changes the first or second number, never on a first visit (only the version is remembered), never for a patch, never in ?manual=1.
 //   The last seen version is kept in localStorage chess3d.newsSeen (every access in try/catch).
+//   CHE-333: a visible News entry in Options with a dot while the newest News are unread (variant a row, b pill, c card, ?variant=), and
+//   the first visit to the new address opens the News once (marker chess3d.newsFirst, host check here, injectable as `host`).
 import './news.css';
 import { addDE, t, onLanguage, i18n, translateTree } from './i18n.js';
 import { LABEL, VERSION } from './version.js';
 import { NEWS } from './news-data.js';
-import { shouldAutoOpen, releaseUrl } from './news-rules.js';
+import { decide, isUnread, pickVariant, releaseUrl } from './news-rules.js';
 
-const STORE = 'chess3d.newsSeen';
-addDE({ 'news.title': 'Neuigkeiten', 'news.close': 'Schließen', 'news.versionTitle': 'Neuigkeiten dieser Version zeigen', 'news.details': 'Alle Details' });
+const STORE = 'chess3d.newsSeen', FIRST = 'chess3d.newsFirst';
+export const NEW_HOST = 'chess3d.borisdiebold.com';
+addDE({ 'news.title': 'Neuigkeiten', 'news.close': 'Schließen', 'news.versionTitle': 'Neuigkeiten dieser Version zeigen', 'news.details': 'Alle Details', 'news.entry': 'Neuigkeiten', 'news.entryNew': 'Neu' });
 
 const read = () => { try { return localStorage.getItem(STORE); } catch (e) { return null; } };
 const write = (v) => { try { localStorage.setItem(STORE, v); } catch (e) { /* storage blocked: the News may show again next time */ } };
 
-export function mountNews({ ui, manual = false, flag = null } = {}) {
+const readFirst = () => { try { return localStorage.getItem(FIRST) === '1'; } catch (e) { return false; } };
+const writeFirst = () => { try { localStorage.setItem(FIRST, '1'); } catch (e) { /* storage blocked */ } };
+
+export function mountNews({ ui, manual = false, flag = null, variant = null, host = window.__newsHost ?? location.hostname } = {}) {
+  variant = pickVariant(variant);
   const el = (tag, cls, html) => { const d = document.createElement(tag); if (cls) d.className = cls; if (html != null) d.innerHTML = html; return d; };
 
   // the version line: a button of at least 44 px, small and grey
@@ -26,6 +33,26 @@ export function mountNews({ ui, manual = false, flag = null } = {}) {
   line.dataset.i18nTitle = 'news.versionTitle';
   line.setAttribute('title', 'Show what is new');
   ui.mountFooter?.(line);
+
+  // the entry (CHE-333): a row (a), a pill (b) or a card with the newest headline (c); a dot while the newest News are unread
+  const entry = el('button', `newsentry newsentry-${variant}`);
+  entry.type = 'button';
+  entry.id = 'news-entry';
+  entry.dataset.variant = variant;
+  const refreshEntry = () => {
+    const de = i18n.language === 'de', n = NEWS[0];
+    const label = de ? 'Neuigkeiten' : 'News';
+    entry.innerHTML = `<span class="ne-label">${label}</span><i class="ne-dot" aria-hidden="true"></i>`
+      + (variant === 'c' ? '<small class="ne-tease"></small>' : '') + (variant === 'a' ? '<b class="ne-go" aria-hidden="true">&rsaquo;</b>' : '');
+    const tease = entry.querySelector('.ne-tease');
+    if (tease) tease.textContent = `v${n.version}: ${(de ? n.de : n.en)[0]}`;
+    entry.setAttribute('aria-label', unread() ? `${label} (${de ? 'neu' : 'new'})` : label);
+  };
+  let seenNow = read();
+  const unread = () => isUnread(seenNow, NEWS[0].version);
+  const syncDot = () => { entry.classList.toggle('unread', unread()); ui.setNewsDot?.(unread()); refreshEntry(); };
+  const mounted = ui.mountNewsEntry?.(entry, variant === 'b' ? 'head' : 'top');
+  if (!mounted) entry.hidden = true;
 
   // the window
   const ov = el('div', 'newsov');
@@ -58,13 +85,15 @@ export function mountNews({ ui, manual = false, flag = null } = {}) {
   fill();
   translateTree(ov);
   translateTree(line);
-  onLanguage(() => { fill(); translateTree(ov); translateTree(line); });
+  syncDot();
+  onLanguage(() => { fill(); translateTree(ov); translateTree(line); refreshEntry(); });
 
   let from = null;
   function open() {
     if (!ov.hidden) return;
     from = document.activeElement;
     ov.hidden = false;
+    write(NEWS[0].version); seenNow = NEWS[0].version; syncDot();   // opening the News clears the dot
     body.scrollTop = 0;
     closeBtn.focus();
   }
@@ -74,6 +103,7 @@ export function mountNews({ ui, manual = false, flag = null } = {}) {
     try { from?.focus?.(); } catch (e) { /* element gone */ }
   }
   line.addEventListener('click', () => { ui.closeSheets?.(); open(); });
+  entry.addEventListener('click', () => { ui.closeSheets?.(); open(); });
   closeBtn.addEventListener('click', close);
   ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
   ov.addEventListener('keydown', (e) => {
@@ -86,13 +116,12 @@ export function mountNews({ ui, manual = false, flag = null } = {}) {
     if (flag === '1') { open(); return 'flag'; }                 // ?news=1: on purpose
     if (manual) return 'manual';                                  // tests never auto open, nor touch the stored version
     const last = read();
-    if (last == null) { write(VERSION); return 'first visit'; }   // a first visit: only remember
-    if (last === VERSION) return 'same';
-    const go = shouldAutoOpen(last, VERSION);
-    write(VERSION);
-    if (go) { open(); return 'opened'; }
-    return 'patch';
+    const d = decide({ last, current: VERSION, newHost: host === NEW_HOST, first: readFirst() });
+    if (d.mark) writeFirst();
+    if (d.write) { write(VERSION); if (!d.open) { seenNow = VERSION; syncDot(); } }
+    if (d.open) { open(); return 'opened'; }
+    return d.why;
   }
 
-  return { open, close, isOpen: () => !ov.hidden, autoOpen, line, root: ov, version: VERSION, label: LABEL };
+  return { open, close, isOpen: () => !ov.hidden, autoOpen, line, entry, root: ov, variant, unread, version: VERSION, label: LABEL };
 }

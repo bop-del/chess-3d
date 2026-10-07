@@ -246,7 +246,7 @@ async function boot() {
   mountTraysSetting({ ui, game, controls, flag: params.get('trays') });   // Captured pieces at the side, below Battle scenes
   const clock = createGameClock({ game, preset: initialPreset(params.get('clock')) });   // the chess clock: off unless chosen (or ?clock=5+0)
   clockUi = mountClock({ ui, game, clock });
-  news = (await import('./news.js')).mountNews({ ui, manual, flag: params.get('news') });   // the version line at the bottom of Options and the News window (CHE-235)
+  news = (await import('./news.js')).mountNews({ ui, manual, flag: params.get('news'), variant: params.get('variant') });   // the version line at the bottom of Options and the News window (CHE-235)
   audio.mountMute(ui);     // the mute switch, right below the Battle scenes setting
   const [{ createMusic }, { mountMusicSettings }] = await Promise.all([import('./music/player.js'), import('./music/settings.js')]);
   const music = createMusic({ audio });    // background piano, starts after the first tap or key

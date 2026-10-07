@@ -46,9 +46,9 @@ const stored = (page) => ev(page, () => { try { return localStorage.getItem('che
 const newsOpen = (page) => ev(page, () => !!window.__chess.news?.isOpen());
 
 // seed: the remembered version before the page script runs (null: a clean first visit); lang: 'en' or 'de'
-async function load(page, [, w, h, phone], { seed = null, query = '', manual = false, lang = 'en' } = {}) {
+async function load(page, [, w, h, phone], { seed = null, query = '', manual = false, lang = 'en', host = null } = {}) {
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
-  await page.evaluateOnNewDocument((s, l) => { try { localStorage.clear(); localStorage.setItem('chess3d.lang', l); if (s) localStorage.setItem('chess3d.newsSeen', s); } catch (e) { /* blocked */ } }, seed, lang);
+  await page.evaluateOnNewDocument((s, l, hst) => { try { localStorage.clear(); localStorage.setItem('chess3d.lang', l); if (s) localStorage.setItem('chess3d.newsSeen', s); } catch (e) { /* blocked */ } if (hst) window.__newsHost = hst; else delete window.__newsHost; }, seed, lang, host);
   await page.goto(`${server.base}?quality=low&ai=0&intro=0${manual ? '&manual=1' : ''}${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   const err = await ev(page, () => window.__chessError || null);
@@ -131,6 +131,67 @@ try {
   R.expect('?news=1: opens on purpose, also with ?manual=1', await newsOpen(page));
   await load(page, PHONE, { seed: VERSION, query: '&news=1' });
   R.expect('?news=1 on a phone: opens', await newsOpen(page));
+
+  // CHE-333: the News entry, the dot, the three variants, the first visit to the new address
+  const olderSeed = MIN > 0 ? older : `${MAJ - 1}.0.0`;
+  const topOf = (page, sel) => ev(page, (s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { top: r.top, h: r.height, w: r.width }; }, sel);
+  const entryState = (page) => ev(page, () => { const e = document.querySelector('#news-entry'); const cs = e && getComputedStyle(e.querySelector('.ne-dot')); return e ? { variant: e.dataset.variant, dot: cs.display !== 'none', unread: e.classList.contains('unread'), tabDot: !!document.querySelector('#tab-settings.odot, .tb[data-act=options].odot'), text: e.textContent } : null; });
+  const EV = [['phone portrait', 390, 844, true], DESK];
+  for (const size of EV) {
+    const tag = size[0];
+    for (const v of ['a', 'b', 'c']) {
+      await load(page, size, { seed: olderSeed, manual: true, query: `&variant=${v}` });
+      await showOptions(page, size);
+      const st = await entryState(page);
+      R.expect(`${tag} variant ${v}: the entry is there with the dot and the Options button has one`, !!st && st.variant === v && st.dot && st.unread && st.tabDot, 'dot', JSON.stringify(st));
+      const inView = await ev(page, () => { const e = document.querySelector('#news-entry'); e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return r.width > 2 && r.top >= 0 && r.bottom <= innerHeight; });
+      R.expect(`${tag} variant ${v}: the entry is on screen`, inView && await shown(page, '#news-entry'));
+      const box = await topOf(page, '#news-entry');
+      R.expect(`${tag} variant ${v}: the entry is a ${size[3] ? 44 : 32} px target`, !!box && box.h >= (size[3] ? 43.5 : 31.5), '>= min', JSON.stringify(box));
+      if (v === 'c') R.expect(`${tag} variant c: the card names the newest headline`, st.text.includes(`v${VERSION}`), VERSION, st.text);
+      if (args.includes('--shots')) { await ev(page, () => { document.querySelector('#news-entry').scrollIntoView({ block: 'center' }); for (const e of document.querySelectorAll('.psheet-body, .pbody, #tp-settings')) e.scrollTop = 0; }); await settleUi(page); await page.screenshot({ path: `${SHOTS}/entry-${v}-${tag.replace(/ /g, '-')}.png` }); }
+      if (v === 'a') {
+        await ev(page, () => document.querySelector('#news-entry').click());
+        await settleUi(page);
+        R.expect(`${tag}: tapping the entry opens the News`, await newsOpen(page));
+        R.expect(`${tag}: opening writes the version`, (await stored(page)) === VERSION, VERSION, await stored(page));
+        const after = await entryState(page);
+        R.expect(`${tag}: the dot is gone after opening`, !after.dot && !after.unread && !after.tabDot, 'no dot', JSON.stringify(after));
+        await ev(page, () => document.querySelector('#news-close').click());
+      }
+    }
+    // no dot for someone who is up to date; the default (no flag) is a
+    await load(page, size, { seed: VERSION, manual: true });
+    await showOptions(page, size);
+    const cur = await entryState(page);
+    R.expect(`${tag}: up to date, no dot; no flag shows variant a`, !!cur && cur.variant === 'a' && !cur.dot && !cur.tabDot, 'a, no dot', JSON.stringify(cur));
+  }
+  // Options without a dot must not shift for returning users: the entry is a row of its own, the rest only moves down by it (the sheet scrolls)
+  // first visit to the new address: opens once, then not
+  {
+    const p2 = await browser.newPage();
+    await p2.setViewport({ width: 1280, height: 720 });
+    await p2.evaluateOnNewDocument(() => { window.__newsHost = 'chess3d.borisdiebold.com'; try { if (!sessionStorage.getItem('seeded')) { localStorage.clear(); sessionStorage.setItem('seeded', '1'); } } catch (e) { /* blocked */ } });
+    p2.on('pageerror', (e) => R.fail('page error', String(e).slice(0, 200)));
+    const go = async () => { await p2.goto(`${server.base}?quality=low&ai=0&intro=0`, { waitUntil: 'load', timeout: 60000 }); await p2.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 }); await settleUi(p2); };
+    await go();
+    R.expect('new address, true first visit: the News open by themselves', await newsOpen(p2));
+    R.expect('new address: the marker is set', (await ev(p2, () => localStorage.getItem('chess3d.newsFirst'))) === '1');
+    await go();
+    R.expect('new address, second load: closed', !(await newsOpen(p2)));
+    await p2.close();
+    const p3 = await browser.newPage();
+    await p3.setViewport({ width: 1280, height: 720 });
+    await p3.evaluateOnNewDocument((v) => { window.__newsHost = 'chess3d.borisdiebold.com'; try { localStorage.clear(); localStorage.setItem('chess3d.newsSeen', v); } catch (e) { /* blocked */ } }, VERSION);
+    await p3.goto(`${server.base}?quality=low&ai=0&intro=0`, { waitUntil: 'load', timeout: 60000 });
+    await p3.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
+    await settleUi(p3);
+    R.expect('new address, current version already remembered: closed', !(await newsOpen(p3)));
+    await p3.close();
+    await load(page, DESK, {});
+    R.expect('other address (localhost), true first visit: closed as before', !(await newsOpen(page)));
+  }
+
   // blocked storage must not break the page
   await page.setViewport({ width: 1280, height: 720 });
   await page.evaluateOnNewDocument(() => { Object.defineProperty(window, 'localStorage', { get() { throw new Error('blocked'); } }); });

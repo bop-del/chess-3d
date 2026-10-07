@@ -11,6 +11,7 @@
     { "flag": "menu", "item": "CHE-223", "status": "open", "question": "remove ?menu=old once Menu A has shipped for one release" },
     { "flag": "rqueen", "status": "open", "question": "pick the Blocks red queen look a, b or c (a is the default; the Blocks theme is hidden)" },
     { "flag": "musicset", "status": "open", "question": "pick the background music set a or b (a is the default)" },
+    { "flag": "variant", "item": "CHE-333", "status": "open", "question": "pick the News entry look a (row), b (pill) or c (card with the newest headline) (a is the default)" },
     { "flag": "introstyle", "item": "CHE-288", "status": "open", "question": "pick the Learn intro layout a, b or c (a is the default)" }
   ],
   "normal": [

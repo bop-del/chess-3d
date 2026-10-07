@@ -899,6 +899,26 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     return host ? element : null;
   }
 
+  // The News entry (src/news.js, CHE-333). 'top': the first row of Options (desktop Settings tab, phone Options sheet); 'head': a pill in the
+  // panel header (desktop) or the head of the Options sheet (phone). Null when there is no Options here (the old phone menu).
+  function mountNewsEntry(element, where = 'top') {
+    const sheet = menuA && phoneUI ? phoneUI.sheets?.options : null;
+    if (where === 'head') {
+      const host = dsk ? hud.querySelector('.phead .hbtns') : sheet?.el.querySelector('.psheet-head');
+      if (!host) return null;
+      if (dsk) host.prepend(element); else host.insertBefore(element, host.querySelector('.psheet-x'));
+      return element;
+    }
+    const host = dsk ? hud.querySelector('#tp-settings') : sheet?.body;
+    host?.prepend(element);
+    return host ? element : null;
+  }
+  // the dot on the Options tab (desktop) or the Options button of the bar (phone) while the News are unread
+  function setNewsDot(on) {
+    if (dsk) dsk.setDot('settings', on);
+    else phoneUI?.btn.options?.classList.toggle('odot', !!on);
+  }
+
   // The daily puzzle card (src/puzzles/daily-card.js): the top of the Play tab on desktop, the top of the Game section on a phone.
   function mountDaily(element) {
     const host = dsk ? hud.querySelector('#tp-play') : hud.querySelector('.card[data-card="game"] .body');
@@ -990,5 +1010,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     on: (fn) => { hostFns.push(fn); },
   };
 
-  return { menuA, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  return { menuA, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountNewsEntry, setNewsDot, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }
