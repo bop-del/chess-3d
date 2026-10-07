@@ -128,7 +128,7 @@ try {
   await ev(B, (c) => { const i = document.querySelector('.ocode input'); i.value = c; document.querySelector('.ocode').requestSubmit(); }, mia.code);
   R.expect('code login: connected as Mia', await until(B, () => window.__chessOnline?.status === 'connected' && window.__chessOnline.state?.me.name === 'Mia'));
   R.expect('presence: Felix sees Mia online (green dot)', await until(A, () => !!document.querySelector('.op .pres.on')));
-  R.expect('score: a dash before the first game', (await ev(A, () => document.querySelector('.op .oscore')?.textContent)) === '-');
+  R.expect('score: noch keine Partie before the first game', (await ev(A, () => document.querySelector('.op .oscore')?.textContent)) === 'noch keine Partie');
 
   // ------------------------------------------------------------ challenge, accept
   await click(A, '[data-a=challenge][data-n="Mia"]');
@@ -159,7 +159,7 @@ try {
   // ------------------------------------------------------------ chat, one message each way
   await click(A, '[data-a=chat][data-n="Mia"]');
   await ev(A, () => { const i = document.querySelector('.osend input'); i.value = 'Hallo Mia, viel Glück!'; document.querySelector('.osend').requestSubmit(); });
-  R.expect('the chat says it is monitored', (await ev(A, () => document.querySelector('.omon').textContent)) === 'Chat wird mitgelesen' && await shown(A, '.omon'));
+  R.expect('the chat head says mitgelesen with the eye icon', (await ev(A, () => document.querySelector('.omon').textContent.trim())) === 'mitgelesen' && await ev(A, () => !!document.querySelector('.omon svg')) && await shown(A, '.omon'));
   R.expect('Mia gets the message: the count 1 on the Chat button and on the Online tab', await until(B, () => document.querySelector('.op .ochatbtn .ocnt')?.textContent === '1' && document.querySelector('#tab-online')?.dataset.n === '1'));
   R.expect('the chat of Felix is closed on her side: a bubble over the board, "💬 Felix: text ›"', await until(B, () => !document.querySelector('.obub').hidden && document.querySelector('.obub-main').textContent === '💬 Felix: Hallo Mia, viel Glück! ›'), await ev(B, () => document.querySelector('.obub-main').textContent));
   R.expect('the game card has a Chat button with the count too', (await ev(B, () => document.querySelector('.ogamecard .ochatbtn .ocnt')?.textContent)) === '1');
@@ -294,8 +294,8 @@ try {
     // the player rows: no horizontal scroll, the Chat buttons 44 px
     await click(M, '.tb[data-act=online]');
     await until(M, () => document.querySelector('.psheet.ponline')?.classList.contains('open'));
-    const rows = await ev(M, () => { const sh = document.querySelector('.psheet-body') && document.querySelector('.ponline .psheet-body'); return { rows: [...document.querySelectorAll('.ponline .op')].map((r) => { const b = r.querySelector('.ochatbtn').getBoundingClientRect(), rr = r.getBoundingClientRect(), n = r.querySelector('.oname').getBoundingClientRect(), sc = r.querySelector('.oscore').getBoundingClientRect(); return { bh: b.height, bw: b.width, out: rr.right > innerWidth + 0.5, sameLine: Math.abs(n.top - sc.top) < 8 }; }), over: sh ? sh.scrollWidth > sh.clientWidth : false }; });
-    R.expect(`phone ${tag}: player rows: Chat button 44 px, name and score on one line, no horizontal scroll`, rows.rows.length >= 2 && rows.rows.every((r) => r.bh >= 43.5 && r.bw >= 43.5 && !r.out && r.sameLine) && !rows.over, JSON.stringify(rows));
+    const rows = await ev(M, () => { const sh = document.querySelector('.psheet-body') && document.querySelector('.ponline .psheet-body'); return { rows: [...document.querySelectorAll('.ponline .op')].map((r) => { const b = r.querySelector('.ochatbtn').getBoundingClientRect(), rr = r.getBoundingClientRect(), n = r.querySelector('.oname').getBoundingClientRect(), sc = r.querySelector('.oscore').getBoundingClientRect(), b2 = r.querySelectorAll('.oacts2 .obtn')[1].getBoundingClientRect(); return { bh: b.height, bw: b.width, out: rr.right > innerWidth + 0.5, sameLine: n.bottom <= sc.top + 1 && Math.abs(b.width - b2.width) < 1 && Math.abs(b.top - b2.top) < 1 && b2.height >= 43.5, left: Math.round(b.left) }; }), over: sh ? sh.scrollWidth > sh.clientWidth : false }; });
+    R.expect(`phone ${tag}: player cards: Chat and the second button equal and side by side on every card, 44 px, name above score, no horizontal scroll`, rows.rows.length >= 2 && rows.rows.every((r) => r.bh >= 43.5 && r.bw >= 43.5 && !r.out && r.sameLine && r.left === rows.rows[0].left) && !rows.over, JSON.stringify(rows));
     if (args.includes('--shots')) await M.screenshot({ path: join(SHOTS, `phone-${tag}-rows.png`) });
     await click(A, '[data-a=chat-close]');
     await M.close();
@@ -349,6 +349,32 @@ try {
   await click(Y3, '.obub[data-k=chat] .obub-main');
   R.expect('tap on the chat bubble opens the chat, the game bubble stays', await until(Y3, () => !document.querySelector('.ochat').hidden && !document.querySelector('.obub[data-k=game]').hidden));
   await Y3.close();
+
+  // ------------------------------------------------------------ CHE-301 looks on the fake fixture (?onlinepv): waiting line, floating chat, collapsed chat, phone
+  const PVQ = `${Q}&online=http%3A%2F%2Fpreview.invalid&onlinepv=`;
+  const D1 = await open(ctxA, `${BASE}/?${PVQ}wait&open=online`, WIDE);
+  R.expect('waiting is a status line with dots and Abbrechen, no card that looks like an input', await until(D1, () => !!document.querySelector('.owait .odots') && /Warte auf Nina/.test(document.querySelector('.owtxt')?.textContent || '') && document.querySelector('.owait [data-a=cancel-out]')?.textContent === 'Abbrechen' && !document.querySelector('.owait input')));
+  await click(D1, '[data-a=cancel-out]');
+  R.expect('Abbrechen takes the waiting line away', await until(D1, () => !document.querySelector('.owait')));
+  R.expect('every card: score or noch keine Partie, Chat and Herausfordern in two equal columns', await ev(D1, () => [...document.querySelectorAll('.op')].every((r) => { const a = r.querySelectorAll('.oacts2 .obtn'), sc = r.querySelector('.oscore').textContent; return a.length === 2 && Math.abs(a[0].getBoundingClientRect().width - a[1].getBoundingClientRect().width) < 1 && (/^\d+ : \d+/.test(sc) || sc === 'noch keine Partie'); })));
+  await click(D1, '[data-a=chat][data-n="Nina"]');
+  R.expect('desktop: the chat floats at the bottom right over the board with the switcher and the eye', await until(D1, () => { const c = document.querySelector('.ochat').getBoundingClientRect(); return !document.querySelector('.ochat').hidden && c.bottom > innerHeight - 40 && c.right < innerWidth - 300 && document.querySelectorAll('.oswitch .osw').length === 4 && !!document.querySelector('.omon svg'); }));
+  R.expect('the switcher shows an unread dot for Felix', await ev(D1, () => !!document.querySelector('.osw[data-n="Felix"] .oud')));
+  await click(D1, '[data-a=chat-min]');
+  R.expect('minimise turns the window into the pill with the name', await until(D1, () => document.querySelector('.ochat').hidden && !document.querySelector('.ochpill').hidden && /Nina/.test(document.querySelector('.ochpill').textContent)));
+  await click(D1, '.ochpill');
+  R.expect('the pill expands the chat again', await until(D1, () => !document.querySelector('.ochat').hidden && document.querySelector('.ochpill').hidden));
+  await D1.close();
+  const D2 = await open(ctxA, `${BASE}/?${PVQ}min&open=online`, PHONE);
+  await settleUi(D2);
+  R.expect('phone: the pill hides while the Online sheet is open, so it never covers a card button', await until(D2, () => document.querySelector('.psheet.ponline')?.classList.contains('open') && getComputedStyle(document.querySelector('.ochpill')).display === 'none'));
+  await click(D2, '[data-a=chat][data-n="Mia"]');
+  await settleUi(D2);
+  R.expect('phone: opening a chat closes the Online sheet, the chat is a half sheet', await until(D2, () => !document.querySelector('.psheet.ponline')?.classList.contains('open') && !document.querySelector('.ochat').hidden && /Mia/.test(document.querySelector('.osw.on')?.textContent || '')));
+  await click(D2, '[data-a=chat-min]');
+  R.expect('phone: the pill sits above the bar, inside the screen', await until(D2, () => { const r = document.querySelector('.ochpill').getBoundingClientRect(), b = document.querySelector('nav.pbar').getBoundingClientRect(); return r.width > 0 && r.bottom <= b.top + 1 && r.right <= innerWidth && r.left >= 0; }));
+  if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await D2.screenshot({ path: join(SHOTS, 'phone-pill.png') }); }
+  await D2.close();
 
   if (args.includes('--shots')) {
     mkdirSync(SHOTS, { recursive: true });

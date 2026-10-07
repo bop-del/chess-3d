@@ -28,6 +28,7 @@ addDE({
   'online.monitored': 'Chat wird mitgelesen', 'online.muted': 'Du kannst gerade nicht schreiben.', 'online.noMessages': 'Noch keine Nachrichten.',
   'online.chatFailed': 'Nachricht nicht gesendet.', 'online.bubbleMsg': '💬 {name}: {text} ›', 'online.bubbleOne': '💬 {name}: {text}{more} ›',
   'online.bubbleMany': '💬 {n} neue Nachrichten von {names} ›', 'online.and': 'und', 'online.gameLine': 'Online gegen {name} · {turn}', 'online.gameBubble': '♟ Partie gegen {name}: {turn} ›', 'online.movedBubble': '♟ {name} hat gezogen: {turn} ›', 'online.bubbleHide': 'Ausblenden', 'online.close': 'Schließen',
+  'online.monitoredShort': 'mitgelesen', 'online.minimize': 'Verkleinern', 'online.noGameYet': 'noch keine Partie', 'online.waitingShort': 'Warte auf {name}', 'online.asked': 'Gefragt', 'online.you2': 'Du',
   'banner.resign': 'Aufgegeben', 'banner.stale': 'Partie beendet',
   'reason.resign': 'Aufgegeben', 'reason.stale': '3 Tage kein Zug',
 });

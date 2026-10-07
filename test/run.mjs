@@ -101,6 +101,7 @@ if (tier === 'fast' || tier === 'all') {
   run('game review core: classification, accuracy, engine (test/review-core.mjs)', 'test/review-core.mjs');
   run('training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs');
   run('online play server: invite, login, challenge, moves, chat, admin (test/online-server.mjs)', 'test/online-server.mjs');
+  run('online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs');
   run('own stats: events, limits, roll up, cleanup, /stats auth, sender (test/online-stats.mjs)', 'test/online-stats.mjs');
 }
 if ((tier === 'smoke' || tier === 'all') && (tier === 'smoke' || results.every((r) => r.ok))) {

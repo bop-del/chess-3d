@@ -10,6 +10,8 @@ import { loginFor, writeLogin } from './store.js';
 import { createApi, loginWithCode } from './api.js';
 import { createMatch } from './match.js';
 import { detailsText } from './details.js';
+import { secondAction, scoreOf, chatStep } from './cards.js';
+import { previewOn, previewScene, createPreviewApi } from './preview.js';
 import { startStats } from './stats.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,7 +23,9 @@ const seenGet = () => { try { return JSON.parse(localStorage.getItem(SEEN) || '{
 const seenSet = (v) => { try { localStorage.setItem(SEEN, JSON.stringify(v)); } catch (e) { /* blocked: for this page only */ } };
 
 export function mountOnline({ server, host, hud, game, controls, toast = () => {}, setDot = () => {}, isVisible = () => true, closeSheets = () => {}, setBoard = () => {}, onShown, phone = false, showTab = () => {} }) {
-  let login = loginFor(server);
+  const preview = previewOn(), scene = previewScene();   // test aid: ?onlinepv=list|wait|chat|min runs the tab on fake players, no server
+  let login = loginFor(server) || (preview ? { server, key: 'preview', name: 'Boris' } : null);
+  let chatMin = false;
   let api = null, match = null, state = null, status = 'connecting', receivedAt = 0;
   let chatWith = null, chatShown = false, bub = null, bubTimer = 0, bubDone = false, gbub = null, gTimer = 0, confirmResign = false, detailsOpen = false, lockDetails = false, codeErr = '';
   const seen = seenGet();   // { game: last finished game id acknowledged, out: last declined challenge id acknowledged }
@@ -43,10 +47,10 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       <h4 data-i18n="online.players">Players</h4>
       <ul class="oplayers"></ul>
       <section class="ochat" hidden>
-        <header><i class="grip"></i><b class="owith"></b><button class="ochat-x" type="button" data-a="chat-close" data-i18n-aria="online.close" aria-label="Close">×</button></header>
+        <header><i class="grip"></i><b class="owith"></b><span class="omon" title=""><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><em data-i18n="online.monitoredShort">mitgelesen</em></span><button class="ochat-min" type="button" data-a="chat-min" data-i18n-aria="online.minimize" aria-label="Minimize">–</button><button class="ochat-x" type="button" data-a="chat-close" data-i18n-aria="online.close" aria-label="Close">×</button></header>
+        <nav class="oswitch"></nav>
         <ol class="omsgs"></ol>
         <form class="osend" autocomplete="off"><input name="text" type="text" maxlength="200" enterkeyhint="send" data-i18n-aria="online.message" aria-label="Message"><button class="obtn gold" type="submit" data-i18n="online.send">Send</button></form>
-        <small class="omon" data-i18n="online.monitored">Chat monitored</small>
         <p class="oerr" hidden></p>
       </section>
     </div>`;
@@ -56,8 +60,12 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   // Online sheet would be fixed to that sheet), lifted by the keyboard through visualViewport
   const ch = $('.ochat');
   const $c = (s) => ch.querySelector(s);
-  if (phone) { ch.classList.add('ochs'); hud.append(ch); }
-  const chatVisible = () => !!chatWith && (phone ? chatShown : isVisible());
+  ch.classList.add('ochf'); if (phone) ch.classList.add('ochs'); hud.append(ch);   // the chat floats over the board (CHE-301)
+  // the collapsed chat: the former CHE-281 bubble, a pill bottom right with the name and the unread count
+  const pill = document.createElement('button');
+  pill.className = 'ochpill'; pill.type = 'button'; pill.hidden = true; pill.dataset.a = 'chat-open';
+  hud.append(pill);
+  const chatVisible = () => !!chatWith && (chatShown && !chatMin);
 
   // the bubble over the board: a new message of a closed chat, or the summary after a load with unread messages
   // two slots, game on top (column-reverse) and chat below, each tappable and closable on its own
@@ -70,8 +78,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     return d;
   };
   const bubEl = mkBubEl('chat'), gameBubEl = mkBubEl('game');
-  bubsEl.append(bubEl, gameBubEl);
-  hud.append(bubsEl);
+  bubsEl.append(gameBubEl);
+  hud.append(bubEl, bubsEl);   // the chat bubble sits with the collapsed chat pill (bottom right), the game bubble stays on top
   // the game line over the board while the online game is attached
   const gline = document.createElement('div');
   gline.className = 'ogline';
@@ -135,6 +143,19 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   }
 
   const chatBtn = (name, n) => `<button class="obtn ochatbtn" type="button" data-a="chat" data-n="${esc(name)}" aria-label="${esc(t('online.chatWith', 'Chat with {name}', { name }) + (n ? ` (${n})` : ''))}">💬 ${esc(t('online.chat', 'Chat'))}${n ? ` <b class="ocnt">${n}</b>` : ''}</button>`;
+  const PIECES = ['♞', '♜', '♝', '♛', '♚', '♟'];
+  const hashN = (name) => Math.max(0, (state?.players || []).findIndex((p) => p.name === name));   // one piece and colour per player, in list order
+  const avatarOf = (name) => `<b class="oglyph" data-c="${hashN(name) % 6}">${PIECES[hashN(name) % PIECES.length]}</b>`;
+  const scoreLine = (s) => scoreOf(s) || t('online.noGameYet', 'no game yet');
+  // one player card: dot, name, score or "noch keine Partie"; Chat and Challenge sit the same on every card
+  function playerCard(p, active, outTo) {
+    const n = p.unread || 0;
+    const kind = secondAction(p, { active: !!active, outTo });
+    const second = kind === 'challenge' ? `<button class="obtn gold" type="button" data-a="challenge" data-n="${esc(p.name)}">${esc(t('online.challenge', 'Challenge'))}</button>`
+      : `<button class="obtn" type="button" disabled>${esc(kind === 'playing' ? t('online.playing', 'playing') : kind === 'asked' ? t('online.asked', 'Asked') : t('online.challenge', 'Challenge'))}</button>`;
+    const chat = `<button class="obtn ochatbtn" type="button" data-a="chat" data-n="${esc(p.name)}" aria-label="${esc(t('online.chatWith', 'Chat with {name}', { name: p.name }) + (n ? ` (${n})` : ''))}">${esc(t('online.chat', 'Chat'))}${n ? ` <b class="ocnt">${n}</b>` : ''}</button>`;
+    return `<li class="op opc${chatWith === p.name ? ' on' : ''}${n ? ' unread' : ''}"><span class="oav">${avatarOf(p.name)}<i class="pres${p.online ? ' on' : ''}" title="${esc(p.online ? t('online.online', 'online') : t('online.offline', 'away'))}"></i></span><div class="obody"><span class="oname">${esc(p.name)}</span><span class="oscore">${esc(scoreLine(p.score))}</span></div><div class="oacts2">${chat}${second}</div></li>`;
+  }
   function renderMain() {
     const logged = !!login && !!state;
     const needCode = !login || (status === 'unreachable' && api?.details().cause === 'invite');
@@ -151,7 +172,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       parts.push(`<div class="ocard"><p>${esc(t('online.challengesYou', '{name} challenges you', { name: c.from }))}</p><div class="orow"><button class="obtn gold" type="button" data-a="accept" data-id="${c.id}">${esc(t('online.accept', 'Accept'))}</button><button class="obtn" type="button" data-a="decline" data-id="${c.id}">${esc(t('online.decline', 'No thanks'))}</button></div></div>`);
     }
     for (const c of state.challenges.out) {
-      if (c.status === 'open') parts.push(`<div class="ocard"><p>${esc(t('online.waiting', 'Waiting for {name}...', { name: c.to }))}</p></div>`);
+      if (c.status === 'open') parts.push(`<div class="owait" role="status"><span class="odots"><i></i><i></i><i></i></span><span class="owtxt">${esc(t('online.waitingShort', 'Waiting for {name}', { name: c.to }))}</span><button class="obtn small" type="button" data-a="cancel-out" data-id="${c.id}">${esc(t('online.cancel', 'Cancel'))}</button></div>`);
       else if (c.status === 'declined' && seen.out !== c.id) parts.push(`<div class="ocard"><p>${esc(t('online.declined', '{name} declined', { name: c.to }))}</p><div class="orow"><button class="obtn" type="button" data-a="seen-out" data-id="${c.id}">${esc(t('online.ok', 'OK'))}</button></div></div>`);
     }
     $('.ochal').innerHTML = parts.join('');
@@ -175,16 +196,23 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     // the players
     const outTo = state.challenges.out.find((c) => c.status === 'open')?.to;
     $('.oplayers').innerHTML = state.players.length ? state.players.map((p) => {
-      let act = '';
-      if (p.playing) act = `<span class="oplay">${esc(t('online.playing', 'playing'))}</span>`;
-      else if (!active && !p.withMe && outTo !== p.name) act = `<button class="obtn" type="button" data-a="challenge" data-n="${esc(p.name)}">${esc(t('online.challenge', 'Challenge'))}</button>`;
-      return `<li class="op${chatWith === p.name ? ' on' : ''}"><div class="ohead"><i class="pres${p.online ? ' on' : ''}" title="${esc(p.online ? t('online.online', 'online') : t('online.offline', 'away'))}"></i><span class="oname">${esc(p.name)}</span><span class="oscore">${esc(scoreText(p.score))}</span></div><div class="oacts">${chatBtn(p.name, p.unread)}${act}</div></li>`;
+      return playerCard(p, active, outTo);
     }).join('') : `<li class="oempty">${esc(t('online.noPlayers', 'Nobody else is invited yet.'))}</li>`;
 
     // the chat with one opponent
-    ch.hidden = !chatWith || !state.players.some((p) => p.name === chatWith) || (phone && !chatShown);
+    const open = !!chatWith && state.players.some((p) => p.name === chatWith) && chatShown;
+    ch.hidden = !open || chatMin;
+    document.body.classList.toggle('ochat-open', !ch.hidden);   // the chat bubble of another player then sits above the window
+    pill.hidden = !(open && chatMin);
+    if (!pill.hidden) {
+      const n = state.unread?.[chatWith] || 0;
+      pill.innerHTML = `<span class="oav">${avatarOf(chatWith)}</span><b>${esc(chatWith)}</b>${n ? `<span class="ocnt">${n}</span>` : ''}`;
+      pill.setAttribute('aria-label', t('online.chatWith', 'Chat with {name}', { name: chatWith }) + (n ? ` (${n})` : ''));
+    }
     if (!ch.hidden) {
       $c('.owith').textContent = t('online.chatWith', 'Chat with {name}', { name: chatWith });
+      const sw = $c('.oswitch');
+      sw.innerHTML = state.players.map((p) => `<button type="button" class="osw${p.name === chatWith ? ' on' : ''}" data-a="chat-to" data-n="${esc(p.name)}"><span class="oav">${avatarOf(p.name)}</span><span>${esc(p.name)}</span>${state.unread?.[p.name] ? '<i class="oud"></i>' : ''}</button>`).join('');
       const list = state.chats[chatWith] || [];
       const ol = $c('.omsgs');
       const key = list.map((m) => m.id).join(',') + i18n();
@@ -260,13 +288,14 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     else if (first && unreadTotal() && !bubDone) showBub({ kind: 'sum', name: Object.keys(state.unread).length === 1 ? Object.keys(state.unread)[0] : '' });
   }
 
+  const cs = (action, name) => ({ with: chatWith, shown: chatShown, min: chatMin } = chatStep({ with: chatWith, shown: chatShown, min: chatMin }, action, name));
   function openChat(name) {
-    chatWith = name;
-    if (phone) { closeSheets(); chatShown = true; } else showTab();
+    if (phone) closeSheets();   // the sheet gives way, the chat floats over the board
+    cs('open', name);
     render();
     if (!phone) $c('.osend input').focus({ preventScroll: true });
   }
-  function closeChat() { chatWith = null; chatShown = false; render(); }
+  function closeChat() { cs('close'); render(); }
   // the keyboard: on a phone the sheet sits on top of it and keeps at most 55 % of the visible height
   function viewport(kb, vh) {
     const bot = kb > 0 ? `${Math.round(kb)}px` : 'calc(var(--sb, 0px) + var(--bar, 56px) + var(--gap, 8px))';
@@ -320,11 +349,16 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (a === 'resign-yes') { confirmResign = false; const g = myGame(); if (g) await act('/resign', { game: g.id }); render(); return; }
     if (a === 'finish') { const g = myGame(); if (g) await act('/finish-stale', { game: g.id }); return; }
     if (a === 'chat') { openChat(n); return; }
+    if (a === 'chat-to') { cs('to', n); render(); if (!phone) $c('.osend input').focus({ preventScroll: true }); return; }
+    if (a === 'chat-min') { cs('min'); render(); return; }
+    if (a === 'chat-open') { cs('expand'); render(); return; }
+    if (a === 'cancel-out') { await act('/challenge/cancel', { id }, { quiet: true }); return; }   // a server without the route (404) fails quietly
     if (a === 'chat-close') closeChat();
   };
   root.addEventListener('click', onClick);
   ch.addEventListener('click', onClick);
-  bubsEl.addEventListener('click', (e) => {
+  pill.addEventListener('click', onClick);
+  const onBubClick = (e) => {
     const b = e.target.closest('[data-a]');
     if (!b) return;
     if (b.closest('.obub').dataset.k === 'game') {
@@ -338,7 +372,9 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     bub = null; bubDone = true; clearTimeout(bubTimer);
     if (b.dataset.a === 'bub' && cur) { if (cur.name) openChat(cur.name); else showTab(); }
     render();
-  });
+  };
+  bubsEl.addEventListener('click', onBubClick);
+  bubEl.addEventListener('click', onBubClick);
   // a bar button opens its own sheet: the chat sheet gives way
   hud.addEventListener('click', (e) => { if (phone && chatShown && e.target.closest('.pbar .tb')) closeChat(); });
   // swipe down on the chat header closes it
@@ -393,16 +429,17 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   // ------------------------------------------------------------ start with a login
   let lastIn = new Set(), lastGameId = 0;
   function start(l) {
-    login = l; writeLogin(l);
-    startStats({ server, key: l.key });   // CHE-291: our own stats, logged in players only
+    login = l; if (!preview) writeLogin(l);
+    if (!preview) startStats({ server, key: l.key });   // CHE-291: our own stats, logged in players only
     api?.stop(); match?.stop();
-    api = createApi({
+    const mkApi = preview ? (o) => createPreviewApi({ scene, ...o }) : createApi;
+    api = mkApi({
       server, key: l.key, version: VERSION,
       onStatus: (s) => { status = s; if (s === 'connected') match?.retrySend(); render(); },
       onState: (s) => {
         const first = !state, prevG = state?.game || null;
         state = s; receivedAt = Date.now();
-        if (login.name !== s.me.name) { login = { ...login, name: s.me.name }; writeLogin(login); }
+        if (login.name !== s.me.name) { login = { ...login, name: s.me.name }; if (!preview) writeLogin(login); }
         // a new challenge to you, a new game
         const ins = new Set(s.challenges.in.map((c) => c.id));
         if (!first) for (const c of s.challenges.in) if (!lastIn.has(c.id)) toast(t('online.challengesYou', '{name} challenges you', { name: c.from }), 'info', 3200);
@@ -425,6 +462,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     render();
   }
   if (login) start(login); else render();
+  if (preview && (scene === 'chat' || scene === 'min')) { chatWith = 'Nina'; chatShown = true; chatMin = scene === 'min'; }
 
   // the countdown in an open Details box, the 3 day finish appearing on time
   setInterval(() => { if ((detailsOpen || lockDetails) && status === 'unreachable') renderDetails(); else if (lockDetails) renderDetails(); }, 1000);
