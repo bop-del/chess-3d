@@ -21,7 +21,7 @@ try {
   const page = await browser.newPage();
   const w = await watchPage(page);
   await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 2 });
-  await page.goto(`${URL0}/?theme=pixel&quality=high&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(`${URL0}/?theme=pixel&island=oak&quality=high&manual=1&ai=0&hud=0&intro=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
   // helpers inside the page (a function, so the island variants below can set it up again after each load)
   const SETUP = () => {

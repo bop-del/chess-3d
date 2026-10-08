@@ -6,7 +6,7 @@ import { Mesher } from '../blocks/mesher.js';
 import { buildAvoid, approach } from '../blocks/island.js';
 import { makePixelKit } from './kit.js';
 import { createSkyLayer } from './sky.js';
-import { ISLANDS, islandFlag } from './islands.js';
+import { ISLANDS, OAK, islandChoice } from './islands.js';
 
 const rnd = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
@@ -137,9 +137,8 @@ export function createPixelWorld({ track, view, light } = {}) {
   const kit = makePixelKit(track);
   const group = new THREE.Group();
   group.name = 'pixel-world';
-  // CHE-106: ?island=a|b|c|d|e swaps the island body, its decoration and the trees; no flag or another value is today's island
-  const id = islandFlag(), pick = id && ISLANDS[id];
-  const v = pick ? pick(ISLAND_CTX, kit, { light: !!light }) : null;
+  // CHE-106 / CHE-357: the island body, its decoration and the trees come from the chosen variant (menu, ?island=, default d)
+  const id = islandChoice(), v = id === OAK ? null : ISLANDS[id](ISLAND_CTX, kit, { light: !!light });   // OAK: the old island, ?island=oak for the tests
   group.add(v ? v.island : buildTerrain(kit));
   if (v) for (const x of v.extras) group.add(x);
   const tree = v ? v.tree || { group: new THREE.Group(), cells: [], feet: [] } : buildTree(kit);

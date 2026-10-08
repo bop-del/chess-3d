@@ -161,7 +161,7 @@ export function createBirds({ kit, parent, tree }) {
 
 /** Hooks the birds into a Pixelwelt world: the group joins the world group, update and dispose are wrapped, world.birds is the API. */
 export function withBirds(world) {
-  const tree = world.group.children.find((o) => o.name === 'tree-foot') || world.group;
+  const tree = world.group.getObjectByName('tree-foot') || world.group;
   const birds = createBirds({ kit: world.kit, parent: world.group, tree });
   const update = world.update, dispose = world.dispose;
   world.update = (dt) => { update(dt); birds.update(dt); };

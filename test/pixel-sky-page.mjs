@@ -96,6 +96,35 @@ try {
   R.expect('a reload brings the picks back', s.sky === 'night' && s.backdrop === 'none', `${s.sky} ${s.backdrop}`);
   await page.close();
 
+  // the Island row (CHE-357): five tiles, d is the default, a click rebuilds the world without a reload and without leaks, the pick is remembered
+  {
+    ({ page, w } = await open('theme=pixel'));
+    const isl = (pg) => pg.evaluate(() => {
+      const C = window.__chess, wd = C.themes.world, r = document.querySelector('[data-pixlook="island"]'), mem = C.stage.renderer.info.memory;
+      return { n: r?.querySelectorAll('.swatch').length, on: r?.querySelector('.swatch.on')?.dataset.value, hidden: r?.hidden, group: wd?.group.uuid, boxes: wd?.group.getObjectByName('island')?.userData.boxes.length, geo: mem.geometries, tex: mem.textures, stored: localStorage.getItem('chess3d.pixisland'), reloads: window.__islandMark === 1 };
+    });
+    const pickIsland = (pg, v) => pg.evaluate(async (id) => { document.querySelector(`[data-pixlook="island"] .swatch[data-value="${id}"]`).click(); const C = window.__chess; await new Promise((r) => setTimeout(r, 400)); for (let i = 0; i < 3; i++) { C.step(0.2); C.stage.render(0.2); } C.draw(); }, v);
+    await page.evaluate(() => { window.__islandMark = 1; });
+    s = await isl(page);
+    R.expect('Island row: 5 tiles, shown with Pixelwelt, d (floating islands) is marked by default', s.n === 5 && !s.hidden && s.on === 'd' && s.stored === null, JSON.stringify(s));
+    const first = s;
+    const boxes = {};
+    for (const id of ['a', 'b', 'c', 'e', 'd']) { await pickIsland(page, id); s = await isl(page); boxes[id] = s.boxes; R.expect(`Island ${id}: the click rebuilds the world (new group, no reload), marks the tile and stores it`, s.on === id && s.stored === id && s.group !== first.group && s.reloads && s.boxes > 300, JSON.stringify(s)); }
+    R.expect('the five islands differ from each other', new Set(Object.values(boxes)).size >= 4, JSON.stringify(boxes));
+    R.expect('a full cycle ends where it began: no leaked geometries or textures (renderer.info)', s.geo === first.geo && s.tex === first.tex, `geometries ${first.geo} to ${s.geo}, textures ${first.tex} to ${s.tex}`);
+    await pickIsland(page, 'b');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+    s = await isl(page);
+    R.expect('a reload keeps the island pick (b)', s.on === 'b', JSON.stringify(s));
+    await page.close();
+    ({ page, w } = await open('theme=pixel&island=e'));
+    s = await isl(page);
+    R.expect('?island=e beats the stored b for this visit and stores nothing new', s.on === 'e' && s.stored === 'b', JSON.stringify(s));
+    R.expect('no console error or warning (island row)', !w.errs.length && !w.warns.length, 'none', [...w.errs, ...w.warns].slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // a phone
   ({ page, w } = await open('theme=pixel&touch=1', { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, UA));
   s = await state(page);
@@ -126,10 +155,10 @@ try {
       const sheet = tiles.length ? tiles[0].closest('.swatches').getBoundingClientRect() : null;
       return { heads, n: tiles.length, cut, small, on, dressed: [...new Set(dressed)].join(''), bad, urls: urls.length, scrollX: document.documentElement.scrollWidth > document.documentElement.clientWidth };
     });
-    const want = lang === 'de' ? ['Thema', 'Welt', 'Himmel', 'Hintergrund'] : ['Theme', 'World', 'Sky', 'Backdrop'];
+    const want = lang === 'de' ? ['Thema', 'Welt', 'Himmel', 'Hintergrund', 'Insel'] : ['Theme', 'World', 'Sky', 'Backdrop', 'Island'];
     R.expect(`${tag}: headings ${want.join(', ')}`, JSON.stringify(r.heads) === JSON.stringify(want), JSON.stringify(r.heads));
-    R.expect(`${tag}: ${r.n} tiles, no label cut off (scrollWidth <= clientWidth)`, r.n === 6 + 3 + 5 + 3 && !r.cut.length, `${r.n} tiles`, r.cut.join(' | ') || `${r.n} tiles`);
-    R.expect(`${tag}: tap targets at least 44 px, one selected mark per row`, !r.small.length && r.on.every((n) => n === 1) && r.on.length === 4, 'ok', JSON.stringify({ small: r.small, on: r.on }));
+    R.expect(`${tag}: ${r.n} tiles, no label cut off (scrollWidth <= clientWidth)`, r.n === 6 + 3 + 5 + 3 + 5 && !r.cut.length, `${r.n} tiles`, r.cut.join(' | ') || `${r.n} tiles`);
+    R.expect(`${tag}: tap targets at least 44 px, one selected mark per row`, !r.small.length && r.on.every((n) => n === 1) && r.on.length === 5, 'ok', JSON.stringify({ small: r.small, on: r.on }));
     R.expect(`${tag}: the 17 tile pictures load`, r.dressed === 'a' && !r.bad.length && r.urls === 17, r.dressed, JSON.stringify({ dressed: r.dressed, bad: r.bad, urls: r.urls }));
     R.expect(`${tag}: no console error or warning`, !ww.errs.length && !ww.warns.length, 'none', [...ww.errs, ...ww.warns].slice(0, 3).join(' | '));
     await pg.close();

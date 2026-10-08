@@ -135,6 +135,8 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
       return chain;
     },
     on(fn) { listeners.push(fn); },
+    /** build the current theme's world (and the rest) again, e.g. after the Pixelwelt island changed; the old one is disposed in show() */
+    rebuild() { if (current === 'classic' || current === '') return chain; const id = current; chain = chain.then(() => { want = id; current = ''; return run(id, false); }).catch(() => {}); return chain; },
     /** the game was created after the theme was turned on: tell it the ground */
     attachGame(g) { game = g; game.setGround(groundY); },
     /** per frame: the theme's own scene (water, clouds) */

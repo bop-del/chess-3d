@@ -1,5 +1,5 @@
-// Pixelwelt island variants (CHE-106): five different surroundings for the board, picked by the URL flag ?island=a|b|c|d|e (this load
-// only, no Options entry, no flag or an unknown value keeps today's island of world.js). Only the island body, its rim, the trays'
+// Pixelwelt island variants (CHE-106): five different surroundings for the board, picked in the Options row Insel (CHE-357, stored in chess3d.pixisland, default d) or by the URL flag
+// ?island=a|b|c|d|e (this visit only, beats the stored pick). Only the island body, its rim, the trays'
 // surroundings and the decoration change: the board squares, the tray slabs (SLABS), PIXEL_EDGE and the coordinates stay.
 //   a Wiese        grass all round, flowers and tufts, two small trees, the edge steps down through dirt and stone
 //   b Strandinsel  grass, a sand beach, water to the edge, a small waterfall off the back, two palms
@@ -14,12 +14,39 @@ import * as THREE from 'three';
 
 export const ISLAND_IDS = ['a', 'b', 'c', 'd', 'e'];
 
-/** The variant the URL names (?island=b), or null: no flag and any other value mean today's island. */
+export const DEFAULT_ISLAND = 'd';
+export const OAK = 'oak';
+export const ISLAND_NAMES = {
+  a: { en: 'Meadow', de: 'Wiese', swatch: ['#62a83c', '#8fd06a'] },
+  b: { en: 'Beach', de: 'Strand', swatch: ['#e3d49a', '#3f8fd6'] },
+  c: { en: 'Village', de: 'Dorf', swatch: ['#9a8f7c', '#62a83c'] },
+  d: { en: 'Floating', de: 'Schwebende', swatch: ['#62a83c', '#a9c8f0'] },
+  e: { en: 'Volcano', de: 'Vulkan', swatch: ['#2a2a30', '#ff6a1f'] },
+};
+const KEY = 'chess3d.pixisland';
+const readStored = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
+let picked = null;   // what the player clicked on this page
+const listeners = [];
+
+/** The variant the URL names (?island=b), or null. 'oak' is the island from before CHE-106 (the tests still check its tree); no menu entry, never stored. */
 export function islandFlag() {
   if (typeof location === 'undefined') return null;
   const v = new URLSearchParams(location.search).get('island');
-  return ISLAND_IDS.includes(v) ? v : null;
+  return ISLAND_IDS.includes(v) || v === OAK ? v : null;
 }
+
+/** The island in use: a click on this page > ?island= (this visit only) > stored > d. */
+export function islandChoice() { return [picked, islandFlag(), readStored()].find((v) => ISLAND_IDS.includes(v) || (v === OAK && v === islandFlag())) || DEFAULT_ISLAND; }
+
+/** A click in Options: remembered per browser, the listeners (the world rebuild) hear it. */
+export function setIsland(id) {
+  if (!ISLAND_IDS.includes(id) || id === islandChoice()) return;
+  picked = id;
+  try { localStorage.setItem(KEY, id); } catch (e) { /* storage blocked */ }
+  listeners.forEach((fn) => fn(id));
+}
+export function onIsland(fn) { listeners.push(fn); }
+export function resetIsland() { picked = null; listeners.length = 0; }
 
 const EXTRA_KINDS = {
   gravel: { top: 'gravel', side: 'gravel', bottom: 'dirt' },

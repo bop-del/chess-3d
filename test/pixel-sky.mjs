@@ -139,7 +139,7 @@ const track = (set) => { for (const g of set) if (!g.userData.__watched) { g.use
   r = probe('?sky=night'); check('night: stars and a moon, no weather', !!r.layer.getObjectByName('stars') && !!r.layer.getObjectByName('moon') && !r.layer.getObjectByName('weather') && r.w.group.getObjectByName('sun').visible === false);
   r.w.dispose();
   {   // treefade (CHE-299): the camera at the oak shrinks it softly, a far camera brings it back
-    reset(); at('');
+    reset(); at('?island=a');
     const cam = new THREE.PerspectiveCamera(); cam.position.set(-8.5, 3, -8.5); cam.updateMatrixWorld(true);
     const w = createPixelWorld({ view: () => ({ camera: cam }) }), tree = w.group.getObjectByName('tree-foot');
     w.update(0.1); const mid = tree.scale.x; for (let i = 0; i < 10; i++) w.update(0.1);

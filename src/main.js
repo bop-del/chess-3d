@@ -4,6 +4,7 @@ import { device } from './device.js';
 import { createThemes, isTheme, storedTheme } from './themes/registry.js';
 import { mountSwatches } from './themes/swatches.js';
 import { mountLookSetting } from './themes/pixel/look-setting.js';
+import { mountIslandSetting } from './themes/pixel/island-setting.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
 import { createLiving } from './living.js';
@@ -310,6 +311,7 @@ async function boot() {
   const review = (await import('./review/review.js')).mountReview({ game, gimbal, createHint, onInset: (px) => ui.setBottomInset(px), onMoves: (v) => ui.setReviewMoves(v), host: ui.reviewHost });   // the game over card gets its Review the game button
   mountSwatches({ themes, ui });
   mountLookSetting({ themes, ui, stage });   // CHE-239: Sky and Backdrop rows under the swatches, shown with Pixelwelt
+  mountIslandSetting({ themes, ui });   // CHE-357: Island row below Backdrop, shown with Pixelwelt
 
   // touch: rotation and the browser toolbar fire bursts of resize events. The camera follows at once, the render targets
   // are reallocated once the burst has ended. Desktop reallocates on every event as before.
