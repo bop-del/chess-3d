@@ -6,7 +6,6 @@ export function board({ base }) {
     squaresLight: { ...base.maple, color: '#ffe3b4', metalness: 0, roughness: 1, normalScale: 0.4, clearcoat: 0.35, clearcoatRoughness: 0.25, vertexColors: true },
     squaresDark: { ...base.walnut, color: '#c9a98f', metalness: 0, roughness: 1, metalnessMap: null, normalScale: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.25, vertexColors: true },
     gold: { map: null, normalMap: null, roughnessMap: null, metalness: 0, roughness: 0.5, color: '#4a2e18' },
-    tray: { color: '#3a2212', metalness: 0, roughness: 0.45, clearcoat: 0.3 },
   };
 }
 

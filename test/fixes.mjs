@@ -179,8 +179,8 @@ async function pickMove(page, baseUrl, log) {
   return out;
 }
 
-// ---------------------------------------------------------------- (c) trays vs HUD
-// Projects the two capture tray volumes (slab footprint, tall enough for the captured pieces) to the screen and
+// ---------------------------------------------------------------- (c) captured pieces vs HUD
+// Projects the two captured piece areas (the side footprint of src/trays.js SLAB, tall enough for the captured pieces, down to the floor) to the screen and
 // compares the bounding rectangles against every visible HUD card and the viewport.
 const TRAY_SIZES = [[1280, 720], [1280, 800], [1400, 788], [1600, 900], [1920, 1080]];
 async function checkTrays(page, baseUrl, log, [width, height]) {
@@ -192,11 +192,8 @@ async function checkTrays(page, baseUrl, log, [width, height]) {
       const { THREE, stage, gimbal } = window.__chess;
       stage.scene.updateMatrixWorld(true);
       stage.camera.updateMatrixWorld(true);
-      const slabs = [];
-      gimbal.traverse((o) => { if (o.name === 'tray-slab') slabs.push(o); });
-      const trays = slabs.map((s) => {
-        const b = new THREE.Box3().setFromObject(s);
-        b.max.y = 1.4; // captured pieces stand on the slab (scaled to 0.62, king about 1.4 tall at most)
+      const trays = [-1, 1].map((sg) => {
+        const b = new THREE.Box3(new THREE.Vector3(sg * 5.75 - 0.725, -1.2, 0.96 - 2.45), new THREE.Vector3(sg * 5.75 + 0.725, 1.4, 0.96 + 2.45));   // pieces stand up to 1.4 tall at most (scaled to 0.62), on the floor at -1.2
         let l = Infinity, t = Infinity, rr = -Infinity, bt = -Infinity;
         for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
           const p = new THREE.Vector3(x, y, z).project(stage.camera);
@@ -220,7 +217,7 @@ async function checkTrays(page, baseUrl, log, [width, height]) {
     }
     const pass = r.trays.length === 2 && r.cards.length > 0 && problems.length === 0;
     const gaps = r.trays.map((t) => `${t.side} ${Math.round(t.side === 'left' ? t.l - Math.max(...r.cards.filter((c) => c.l < r.vw / 2).map((c) => c.r)) : Math.min(...r.cards.filter((c) => c.l >= r.vw / 2).map((c) => c.l)) - t.r)}px`).join(', ');
-    out.push({ name: `trays clear of HUD at ${width}x${height}`, pass, detail: pass ? `no overlap, clearance to HUD: ${gaps}` : problems.join('; ') || 'tray or card not found' });
+    out.push({ name: `captured pieces clear of HUD at ${width}x${height}`, pass, detail: pass ? `no overlap, clearance to HUD: ${gaps}` : problems.join('; ') || 'tray or card not found' });
     log?.(`trays ${width}x${height}: ${pass ? 'ok' : 'FAIL'}`);
   }
   return out;

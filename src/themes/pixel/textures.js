@@ -38,13 +38,6 @@ function drawPlanks(g) {
   }
 }
 
-/** The planks texture tiled to a w x d slab (one tile = one block), for the tray floor. Caller disposes (or passes track). */
-export function trayPlanks(w, d, track = (t) => t) {
-  const t = make(6, drawPlanks, 16, true);
-  t.repeat.set(w, d);
-  return track(t);
-}
-
 /** The coordinate labels for the grass (CHE-236): the atlas layout of board.js (8 x 2 cells of 128 px, files then ranks), cream with a dark outline. */
 export function labelAtlas(track = (t) => t) {
   const c = document.createElement('canvas');

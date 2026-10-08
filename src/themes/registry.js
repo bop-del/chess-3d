@@ -1,6 +1,6 @@
 // Themes: one bundle of board, frame, inlay, pieces and lighting. A theme module (src/themes/<id>.js, loaded on first use)
 // exports { board(ctx), pieces(ctx), light(ctx) }:
-//   board(ctx)  -> { squaresLight, squaresDark, frame, inlay, gold, plinth, labels, tray } property specs (themes/apply.js)
+//   board(ctx)  -> { squaresLight, squaresDark, frame, inlay, gold, plinth, labels } property specs (themes/apply.js)
 //   pieces(ctx) -> { white: { body, accent }, black: { body, accent }, dark } property specs, or null for the classic pieces
 //   world(ctx)  -> { group, update(dt), dispose() } an optional scene of its own (the Blocks island), added to the gimbal
 //   pieceStyle(ctx) -> a piece style for pieceSet.setStyle (block characters), or absent
@@ -9,7 +9,7 @@
 // is left, so ten switches leave no textures behind. Classic is today's look: no module, nothing built.
 import * as THREE from 'three';
 import { addDE } from '../i18n.js';
-import { createSkin } from './apply.js';
+import { FLOOR_Y } from '../scene.js';
 import { setHintStyle } from '../openings/arrow.js';
 
 export const THEMES = [
@@ -48,24 +48,11 @@ export function storedTheme() {
 // game may be null at first (the start sequence turns the theme on before the game exists): attachGame(game) follows.
 export function createThemes({ stage, board, pieceSet, materials, game = null }) {
   const pieceSkin = materials;   // materials.apply(spec | null), see materials.js
-  let trayMats = null;
-  let trayRoot = null;
-  let traySpec = null;
-  const trayMaterial = () => {
-    if (!game) return null;
-    if (!trayMats) {
-      let slab = null;
-      game.root.traverse((o) => { if (!slab && o.name === 'tray-slab') slab = o.material; });
-      trayMats = { tray: slab };
-      trayRoot = createSkin(trayMats);
-    }
-    return trayRoot;
-  };
-
   // what a theme's own scene needs to keep out of the way: the camera, the canvas size and the UI controls floating over it
   const OVER = '.pstatus, .pgood, .pbar, .viewbar';
   const screenView = () => ({ camera: stage.camera, w: innerWidth, h: innerHeight, rects: [...document.querySelectorAll(OVER)].filter((e) => e.offsetWidth).map((e) => e.getBoundingClientRect()) });
 
+  let groundY = FLOOR_Y;
   let current = 'classic';
   let world = null;   // the theme's own scene (Blocks island), in the gimbal
   let tracked = [];
@@ -108,8 +95,8 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
     world = built.world;
     if (world) { board.group.parent?.add(world.group); world.settle?.(); }
     stage.setFloorHidden?.(!!built.light?.noFloor);
-    traySpec = built.board?.tray ? { tray: built.board.tray } : null;
-    trayMaterial()?.apply(traySpec);
+    groundY = built.light?.ground ?? (built.light?.noFloor ? 0 : FLOOR_Y);   // island themes: the grass at y = 0, else the stage floor
+    game?.setGround(groundY);
     stage.setThemeLight(built.light);
     for (const tex of old) tex.dispose();
     current = id;
@@ -148,8 +135,8 @@ export function createThemes({ stage, board, pieceSet, materials, game = null })
       return chain;
     },
     on(fn) { listeners.push(fn); },
-    /** the game was created after the theme was turned on: give its trays the theme too */
-    attachGame(g) { game = g; if (traySpec) trayMaterial()?.apply(traySpec); },
+    /** the game was created after the theme was turned on: tell it the ground */
+    attachGame(g) { game = g; game.setGround(groundY); },
     /** per frame: the theme's own scene (water, clouds) */
     update(dt) { world?.update(dt); },
     /** the theme's own scene, for the tests */

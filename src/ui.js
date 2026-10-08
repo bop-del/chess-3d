@@ -617,7 +617,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     const sl = $('#sliders');
     sl.classList.remove('body');
     if (!menuA) {
-      // Menu sheet: the existing cards move here. Gimbal sliders join the View card, captured pieces stay in the 3D trays.
+      // Menu sheet: the existing cards move here. Gimbal sliders join the View card, captured pieces stand beside the 3D board.
       const m = mkSheet('', 'phone.menu', 'Menu', 'Menu', 'phone.closeMenu', 'Close menu');
       sheet = m.el; sheetBody = m.body;
       viewC.querySelector('h2').dataset.i18n = 'phone.viewGimbal';

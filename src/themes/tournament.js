@@ -11,7 +11,6 @@ export function board({ base }) {
     inlay: { color: '#b88a55' },
     gold: { map: null, normalMap: null, roughnessMap: null, metalness: 0, roughness: 0.45, color: '#3a2a1a' },
     plinth: { color: '#6a4a2e' },
-    tray: { color: '#3b2a1a', metalness: 0, roughness: 0.5, clearcoat: 0.1 },
   };
 }
 

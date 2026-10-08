@@ -14,7 +14,6 @@ export function board() {
     // green grass squares: the move ring is cream with a dark outline, the hint is a cream arrow with a dark outline over orange squares
     marks: { move: { ring: [1.0, 0.96, 0.78], dot: [1.0, 1.0, 0.92], edge: 0.7 } },
     hint: { from: 0xffb02e, to: 0xffa01a, arrow: 0xfff3c4, outline: 0.7, fromOp: 0.4, toOp: 0.7, arrowOp: 0.97 },
-    tray: { color: '#b9854f', roughness: 1, metalness: 0, clearcoat: 0, clearcoatRoughness: 1 },
   };
 }
 
@@ -33,5 +32,6 @@ export function light() {
     bg: { top: '#5b86d6', bottom: '#ffd6a8', glow: '#ffe2bd', glowAmount: 0.25 },
     post: { bloom: 0.05, vignette: 0.2, tint: '#fff0e0' },
     noFloor: true,
+    ground: -0.07,   // the island surface (TOP in blocks/island.js): captured pieces stand on it
   };
 }

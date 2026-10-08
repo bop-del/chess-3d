@@ -35,13 +35,12 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
 
   // --------------------------------------------------------------- apply to scene
   // Pull the camera back until the board fits the width (narrow screens), and, on desktop layouts, until the
-  // capture trays (outer edge at x = 6.5, near edge about 3.2 units closer to the camera) clear the HUD columns.
+  // captured pieces (outer edge at x = 6.5, near edge about 3.2 units closer to the camera) clear the HUD columns.
   const TRAY_EDGE = 6.6, TRAY_NEAR = 3.2, TAN_V = Math.tan(17.5 * DEG), HUD_GAP = 14;
   let size = { w: 1500, h: 1000 }, hudW = 268;
-  let traysOn = true;                           // capture trays shown: the fit leaves room for them (the Captured pieces setting, game.setTrays)
   function fit() {
     let f = (11.5 / (0.63 * aspect)) / HOME.dist;
-    if (size.w > 900 && traysOn) {
+    if (size.w > 900) {
       const free = size.w / 2 - (hudW + 2 * HUD_GAP);          // pixels from screen centre to the HUD edge
       const depth = (size.h / 2) * TRAY_EDGE / (TAN_V * Math.max(60, free));
       f = Math.max(f, (depth + TRAY_NEAR) / HOME.dist);
@@ -49,7 +48,7 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     return Math.max(1, f);
   }
   // Phone framing (M3): the HUD tells the camera which part of the canvas is free, as insets in CSS px. The camera fits the
-  // board with its pieces (up to y 2.0, a king is 1.85) and both capture trays (x to +-6.5, pieces up to y 1.2) into that rectangle: it picks the distance at which the projected board just fits
+  // board with its pieces (up to y 2.0, a king is 1.85) and both captured piece areas (x to +-6.5, pieces up to y 1.2) into that rectangle: it picks the distance at which the projected board just fits
   // and slides its target sideways in the view plane so the board sits in the middle of the free area. Zero insets (desktop,
   // tablets) keep the old fit() untouched. cam.dist stays the user's zoom: FRAME_REF is the neutral value (presets are 19 to 20).
   let frame = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -57,7 +56,8 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
   const FRAME_REF = 19, FRAME_MARGIN = 0.03, PORTRAIT_MARGIN = 0.04, EDGE_MARGIN = 0.01, BOARD_CORNERS = 8, TAN_HALF = Math.tan(17.5 * DEG);
   const corners = [];
   for (const x of [-4, 4]) for (const z of [-4, 4]) for (const y of [-0.3, 2.0]) corners.push(new THREE.Vector3(y < 0 ? x * 1.16 : x, y, y < 0 ? z * 1.16 : z));   // the frame foot reaches 4.65
-  for (const x of [-6.5, 6.5]) for (const z of [-1.5, 3.45]) for (const y of [-0.3, 1.2]) corners.push(new THREE.Vector3(x, y, z));
+  for (const x of [-6.5, 6.5]) for (const z of [-1.5, 3.45]) for (const y of [-1.3, 1.2]) corners.push(new THREE.Vector3(x, y, z));   // 8 to 15: the side areas
+  for (const x of [-4, 4]) for (const z of [-6.0, 6.0]) for (const y of [-1.3, 1.2]) corners.push(new THREE.Vector3(x, y, z));   // 16 to 23: the portrait rows (the near end of either side)
   const fTarget = new THREE.Vector3();
   const cFwd = new THREE.Vector3(), cRight = new THREE.Vector3(), cUp = new THREE.Vector3(), cLook = new THREE.Vector3(), cBlend = new THREE.Vector3();
   let cine = null;                              // battle close-up: { yaw, pitch, dist, target, k, tw }
@@ -74,9 +74,9 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     fUp.crossVectors(fRight, fFwd);                                             // right x forward = up
     if (fUp.y < 0) fUp.negate();
     gq.setFromEuler(gEuler.set(gim.x, gim.y, gim.z, 'YXZ'));
-    // portrait: the board with its pieces fills the free width, the capture trays may run off screen; landscape keeps the trays in
-    const portrait = size.h > size.w, n = portrait || !traysOn ? BOARD_CORNERS : corners.length;
-    for (let i = 0; i < n; i++) pts[i].copy(corners[i]).applyQuaternion(gq).sub(target);
+    // portrait: the board with its pieces fills the free width, the captured pieces may run off screen; landscape keeps them in
+    const portrait = size.h > size.w, n = portrait ? BOARD_CORNERS + 8 : 16;
+    for (let i = 0; i < n; i++) pts[i].copy(corners[portrait && i >= BOARD_CORNERS ? i + 8 : i]).applyQuaternion(gq).sub(target);
     const freeW = Math.max(40, size.w - frame.left - frame.right) * (1 - (portrait ? (edgeToEdge ? EDGE_MARGIN : PORTRAIT_MARGIN) : FRAME_MARGIN));
     const freeH = Math.max(40, size.h - frame.top - frame.bottom) * (1 - FRAME_MARGIN);
     const P = (size.h / 2) / TAN_HALF;                                          // px per unit at depth 1
@@ -217,7 +217,6 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
     notify();
   }
   function setEdgeToEdge(v) { edgeToEdge = !!v; apply(); }
-  function setTrays(v) { v = !!v; if (v === traysOn) return; traysOn = v; apply(); }
   function setOrbitLock(v) { orbitLocked = !!v; if (orbitLocked) { vel.yaw = vel.pitch = 0; spin = false; } notify(); }
   function setCamera(v) { tw = null; Object.assign(cam, v); if (v.yaw != null) side = Math.cos(v.yaw) < 0 ? 'b' : 'w'; apply(); }
 
@@ -469,10 +468,9 @@ export function createControls({ stage, gimbal, canvas, onPick, onHover }) {
 
   return {
     cinematic, restore,
-    glideTo, setFocus, setOrbitLock, setEdgeToEdge, setTrays,
+    glideTo, setFocus, setOrbitLock, setEdgeToEdge,
     update, apply, setPreset, reset, levelBoard, flip, topDown, toggleSpin, setGimbal, nudgeZoom, setCamera, onResize, setFrame, setLocked, retarget,
     get side() { return side; },
-    get trays() { return traysOn; },
     get locked() { return locked; },
     get frame() { return { ...frame }; },
     presets: Object.keys(PRESETS),

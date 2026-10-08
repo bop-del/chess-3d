@@ -33,7 +33,7 @@ export const MAP = [
   [/^src\/progress\//, ['open', 'puzzles', 'learn', 'fixes']],
   [/^src\/review\//, ['review', 'fixes', 'shared fixes']],
   [/^src\/views\//, ['views', 'play', 'fixes']],
-  [/^src\/(trays|trays-setting)\.js$/, ['trays', 'fixes', 'shared fixes']],
+  [/^src\/trays\.js$/, ['trays', 'fixes', 'shared fixes']],
   [/^src\/(living|living-state)\.js$/, ['living', 'fixes']],
   [/^test\/living-page\.mjs$/, ['living']],
   [/^src\/goodmove\.js$/, ['goodmove']],

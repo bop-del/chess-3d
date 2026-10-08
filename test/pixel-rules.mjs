@@ -1,11 +1,10 @@
 // Pixelwelt rules (S61, CHE-166), fast tier, no browser: the world is built in node (a stub canvas stands in for the texture canvases)
-// and four rules are checked, so the rendering artifacts of the pond, posts, dirt edge and trays cannot come back.
+// and four rules are checked, so the rendering artifacts of the pond, posts and dirt edge cannot come back.
 //   1 Translucent surfaces only over closed ground: every mesh with opacity under 1 gets rays from its surface in a fan of directions
 //     below the horizon; a ray that leaves into open sky or void (hits nothing) is an open gap under it.
 //   2 No coplanar overlapping faces: boxes that draw a face on the same plane, the same way round, over an area and look different.
 //   3 One tile textures clamp: every Pixelwelt texture and its wrap mode against an allow list (Repeat only where it tiles on purpose).
-//   4 One material set: every mesh of the theme uses the flat unlit material (MeshBasicMaterial) with a pixel texture, the tray floor
-//     is the planks texture, fully emissive (no lit part).
+//   4 One material set: every mesh of the theme uses the flat unlit material (MeshBasicMaterial) with a pixel texture.
 // Run: node test/pixel-rules.mjs    Exit 0 pass, 1 on any failed check.
 import * as THREE from 'three';
 
@@ -80,10 +79,6 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
   const untextured = [...new Set(meshes.filter((m) => !m.material.map && m.material !== world.kit.mats.flat).map((m) => m.parent?.name))];
   check('every mesh of the world is unlit (MeshBasicMaterial)', bad.length === 0, `${meshes.length} meshes${bad.length ? ', lit: ' + bad.slice(0, 3).join(', ') : ''}`);
   check('every mesh of the world has a pixel texture (only the flat colour blocks are plain)', untextured.length === 0, untextured.join(', '));
-  const t = board({ track: (x) => x }).tray;
-  const ok = t && t.emissiveMap?.isTexture && t.color === '#000000' && t.emissive === '#ffffff' && t.specularIntensity === 0 && t.clearcoat === 0 && t.envMapIntensity === 0 && !t.map
-    && t.emissiveMap.wrapS === THREE.RepeatWrapping;
-  check('tray floor: planks texture, fully emissive (no lit part)', !!ok);
 }
 
 // 5 no cloud through the tree (CHE-184): every cloud swept over the full drift span (x from -35 to 35) and the full lift range

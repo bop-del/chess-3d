@@ -1,4 +1,4 @@
-// Applies a plain property spec onto shared materials, and puts the original values back. Used for the board, the tray slabs and
+// Applies a plain property spec onto shared materials, and puts the original values back. Used for the board, and
 // (through the same spec format) the pieces. A spec is { name: { prop: value } }: scalars as they are, colours as '#hex',
 // normalScale as a number, maps as THREE.Texture, null clears a map.
 const SCALARS = ['roughness', 'metalness', 'clearcoat', 'clearcoatRoughness', 'sheen', 'sheenRoughness', 'specularIntensity', 'ior',

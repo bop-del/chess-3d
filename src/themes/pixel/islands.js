@@ -3,7 +3,7 @@
 // surroundings and the decoration change: the board squares, the tray slabs (SLABS), PIXEL_EDGE and the coordinates stay.
 //   a Wiese        grass all round, flowers and tufts, two small trees, the edge steps down through dirt and stone
 //   b Strandinsel  grass, a sand beach, water to the edge, a small waterfall off the back, two palms
-//   c Dorf         gravel paths, fences, lanterns, the trays as small farm fields, a hut in a corner
+//   c Dorf         gravel paths, fences, lanterns, farm fields at the sides, a hut in a corner
 //   d Schwebende   a round main island and three small floating islands (tree, ore, a pond with a fall)
 //   e Vulkan       a basalt island with a smoking volcano, a lava river and a lava fall
 // Each builder returns { island, extras, tree, update } with the contract of buildTerrain in world.js: island is a group named 'island'
@@ -33,12 +33,12 @@ const CORE = rect(0, 0, 6.8, 4.1);   // the board and both trays
 const dCore = (x, z) => dist(x, z, CORE);
 const nearBoard = (x, z) => Math.abs(x) < 5 && Math.abs(z) < 5;   // the coordinate labels lie on this ring: keep it clear
 
-/** Faces of a cell that touch a neighbour are not drawn (the bed of a tray is lower, so its neighbours keep their side). */
+/** Faces of a cell that touch a neighbour are not drawn . */
 function emitCells(m, ctx, KX, grid, K) {
   for (const c of grid.values()) {
     const keys = KX[c.kind], skip = new Set();
-    for (const [f, dx, dy, dz] of ctx.DIRS) { const nb = grid.get(K(c.ix + dx, c.iy + dy, c.iz + dz)); if (nb && !(nb.bed && !c.bed && dy === 0)) skip.add(f); }
-    m.box('grassTop', c.ix, c.iy, c.iz, 1, c.bed ? 1 - ctx.BED_DROP : 1, 1, { keys, skip, color: c.color ?? (c.kind === 'boardL' ? 0xd6c8a2 : 0xffffff) });
+    for (const [f, dx, dy, dz] of ctx.DIRS) { const nb = grid.get(K(c.ix + dx, c.iy + dy, c.iz + dz)); if (nb) skip.add(f); }
+    m.box('grassTop', c.ix, c.iy, c.iz, 1, 1, 1, { keys, skip, color: c.color ?? (c.kind === 'boardL' ? 0xd6c8a2 : 0xffffff) });
   }
 }
 const K = (ix, iy, iz) => ((ix + 256) * 512 + (iy + 256)) * 512 + (iz + 256);
@@ -54,7 +54,7 @@ function terrain(ctx, kit, spec) {
   const grid = new Map(), liquids = [], tops = new Map();
   const [x0, x1, z0, z1] = spec.box, margin = spec.trayMargin ?? 0.3;
   for (let ix = x0; ix < x1; ix++) for (let iz = z0; iz < z1; iz++) {
-    const x = ix + 0.5, z = iz + 0.5, tray = ctx.inTray(x, z, margin), board = ctx.inBoard(x, z), bed = tray && !board;
+    const x = ix + 0.5, z = iz + 0.5, tray = ctx.inTray(x, z, margin), board = ctx.inBoard(x, z);
     const col = spec.column({ ix, iz, x, z, tray, board, NZ });
     if (!col) { if (board || tray) throw new Error('island variant: no ground under the board or a tray'); continue; }
     const flat = board || tray, drop = flat ? 0 : col.drop || 0, rise = flat ? 0 : col.rise || 0, n = Math.max(2, col.n);
@@ -67,8 +67,8 @@ function terrain(ctx, kit, spec) {
       if (first) { tops.set(`${ix},${iz}`, { y: rise > 0 ? rise : -drop, kind, rise, drop, liquid: col.liquid && iy === col.liquidY ? col.liquid : null }); first = false; }
       if (col.liquid && iy === col.liquidY) { liquids.push({ ix, iy, iz, key: col.liquid }); continue; }
       let kd = kind;
-      if (k === 0 && iy === -1) { if (board) kd = (ix + 4 + (3 - iz)) % 2 === 0 ? 'boardD' : 'boardL'; else if (bed) kd = spec.bedKind || 'bed'; }
-      grid.set(K(ix, iy, iz), { ix, iy, iz, kind: kd, color: board || bed ? undefined : color, bed: bed && k === 0 && iy === -1 });
+      if (k === 0 && iy === -1) { if (board) kd = (ix + 4 + (3 - iz)) % 2 === 0 ? 'boardD' : 'boardL'; }
+      grid.set(K(ix, iy, iz), { ix, iy, iz, kind: kd, color: board ? undefined : color });
     }
   }
   emitCells(m, ctx, KX, grid, K);
@@ -152,7 +152,6 @@ function meadow(ctx, kit, { light }) {
     else if (r < (light ? 0.3 : 0.75)) tuft(T.m, x, 0, z, 0.22 + R() * 0.16);
   }
   for (const [bx, bz, s] of [[-9.6, 3.4, 0.7], [9.4, 4.7, 0.5]]) if (topOf(T, bx, bz)?.y === 0) put(T.m, 'cobble', bx, 0, bz, s, s * 0.75, s);
-  ctx.addCrates(T.m);
   return { island: ctx.toGroup(T.m, kit, { name: 'island' }), extras: [], tree: trees(ctx, kit, [{ tx: -8, tz: -6, trunk: 3, rad: 1 }, { tx: 7, tz: -6, trunk: 3, rad: 1 }], 23) };
 }
 
@@ -179,7 +178,7 @@ function beach(ctx, kit, { light }) {
   for (const [c, t] of T.tops) {
     if (t.kind !== 'sand' || t.liquid || shells >= (light ? 6 : 16) || R() > 0.16) continue;
     const [ix, iz] = c.split(',').map(Number);
-    if (ctx.inTray(ix + 0.5, iz + 0.5, 0.6)) continue;
+    if (ctx.inTray(ix + 0.5, iz + 0.5, 0.6) || (ix >= 4 && ix <= 6 && iz >= 6 && iz <= 7)) continue;   // none under the sand castle (cx 5, cz 6.5)
     flat(T.m, ix + 0.25 + R() * 0.4, 0, iz + 0.25 + R() * 0.4, 0.2, 0.06, 0.2, R() < 0.5 ? 0xfff3ea : 0xf2a3b8); shells++;
   }
   const cx = 5, cz = 6.5;
@@ -188,7 +187,6 @@ function beach(ctx, kit, { light }) {
     for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) put(T.m, 'sand', cx + dx * 0.95, 0, cz + dz * 0.95, 0.35, 0.7, 0.35);
     put(T.m, 'sand', cx + 0.4, 0.35, cz + 0.4, 0.5, 0.5, 0.5);
   }
-  ctx.addCrates(T.m);
   return { island: ctx.toGroup(T.m, kit, { name: 'island' }), extras: [], tree: trees(ctx, kit, [{ tx: -10, tz: -6, trunk: 4, palm: true }, { tx: 9, tz: -5, trunk: 3, palm: true }], 24) };
 }
 
@@ -198,7 +196,7 @@ function village(ctx, kit, { light }) {
   const gravel = (ix, iz) => (iz === 5 && ix >= -10 && ix <= 8) || (ix === -10 && iz >= -4 && iz <= 5) || (ix === -8 && iz >= -5 && iz <= -3) || (iz === -3 && ix >= -10 && ix <= -8);
   const field = (ix, iz) => iz >= -2 && iz <= 3 && ((ix >= 7 && ix <= 8) || (ix >= -9 && ix <= -8));
   const T = terrain(ctx, kit, {
-    seed: 14, box: [-13, 13, -12, 10], bedKind: 'soil',
+    seed: 14, box: [-13, 13, -12, 10],
     column: ({ ix, iz, x, z, board, tray, NZ }) => {
       const d = dist(x, z, ISL) + (NZ(x * 1.7, z * 1.7) - 0.5) * 1.0;
       if (!board && !tray && d > 1.9) return null;
@@ -223,10 +221,8 @@ function village(ctx, kit, { light }) {
   }
   flat(T.m, 7.9, 0, 0.6, 0.1, 1.3, 0.1, 0x6b4a2e); flat(T.m, 7.45, 0.95, 0.62, 1.0, 0.08, 0.06, 0x6b4a2e);
   flat(T.m, 7.75, 1.3, 0.5, 0.4, 0.35, 0.34, 0xe08a2c); flat(T.m, 7.7, 1.62, 0.45, 0.5, 0.08, 0.44, 0x4a3a2a); flat(T.m, 7.8, 1.68, 0.5, 0.3, 0.18, 0.34, 0x4a3a2a);
-  // fences round the fields, the trays' soil beds and along the front path
+  // fences round the fields and along the front path
   for (const sg of [1, -1]) {
-    const cx = sg * ctx.SLABS.cx, xa = cx - ctx.SLABS.w / 2 - 0.1, xb = cx + ctx.SLABS.w / 2 + 0.1, za = ctx.SLABS.cz - ctx.SLABS.len / 2 - 0.1, zb = ctx.SLABS.cz + ctx.SLABS.len / 2 + 0.1;
-    fence(T.m, xa, za, xb, za, -0.3, 0.6); fence(T.m, xa, zb, xb, zb, -0.3, 0.6); fence(T.m, xa, za, xa, zb, -0.3, 0.6); fence(T.m, xb, za, xb, zb, -0.3, 0.6);
     const ox = sg * 9.1, ix0 = sg * 6.95;
     fence(T.m, ix0, -2.05, ox, -2.05); fence(T.m, ix0, 4.05, ox, 4.05); fence(T.m, ox, -2.05, ox, 4.05);
   }
@@ -294,7 +290,6 @@ function floating(ctx, kit, { light }) {
     const x = ix + 0.2 + R() * 0.6, z = iz + 0.2 + R() * 0.6;
     if (R() < 0.5) flower(T.m, x, 0, z, FLOWERS[Math.floor(R() * FLOWERS.length)]); else tuft(T.m, x, 0, z, 0.22 + R() * 0.14);
   }
-  ctx.addCrates(T.m);
   // three small floating islands: a tree, ore, a pond with a fall
   const m2 = new ctx.Mesher({ shade: true });
   const A = islet(ctx, kit, KX, m2, { cx: -13, cy: -2, cz: -4, r: 3, top: 'grass', seed: 5 });
@@ -350,7 +345,6 @@ function volcano(ctx, kit, { light }) {
     const h = 0.4 + Math.floor(R() * 3) * 0.5;
     put(T.m, 'basalt', ix + 0.15, 0, iz + 0.15, 0.7, h, 0.7); rocks++;
   }
-  ctx.addCrates(T.m);
   // smoke: grey blocks rise from the crater and shrink away
   const puffs = light ? 2 : 4, smoke = new THREE.Group(), puffGroups = [];
   smoke.name = 'smoke';

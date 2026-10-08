@@ -132,8 +132,8 @@
 /* the computer is off and moves are refused during a review: the room goes to the move list */
 body.reviewing #tp-play > .dailycard, body.reviewing #tp-play > .sec:not(.grow):not(.cap-sec), body.reviewing #tp-play > #btn-good { display: none; }
 
-/* moves and captured. With the 3D capture trays on (body[data-trays-shown=on], set by trays-setting.js) the text list is redundant: hidden, still in the DOM */
-body[data-trays-shown="on"] .cap-sec { display: none; }
+/* moves and captured. The captured pieces stand beside the board in 3D, so the text list is redundant: hidden, still in the DOM */
+.cap-sec { display: none; }
 .panel .moves { background: var(--p-well); border-radius: 9px; padding: 6px; }
 .panel .moves li:nth-child(odd) { background: none; }
 .panel .moves li .n { color: var(--dim); }

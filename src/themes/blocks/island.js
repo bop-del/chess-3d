@@ -13,18 +13,18 @@ const BLOCK = {
   dirt: { keys: { top: 'dirt', side: 'dirt', bottom: 'dirt' } },
   stone: { keys: { top: 'stone', side: 'stone', bottom: 'stone' } },
   plinth: { keys: { top: 'stone', side: 'stone', bottom: 'stone' }, tint: 0.4 },     // the dark grout under the board squares
-  bed: { keys: { top: 'stone', side: 'stone', bottom: 'stone' } },
 };
 const DIRS = [['px', 1, 0, 0], ['nx', -1, 0, 0], ['py', 0, 1, 0], ['ny', 0, -1, 0], ['pz', 0, 0, 1], ['nz', 0, 0, -1]];
 const TOP = -0.07;                                          // terrain surface; the board square tops are at y = 0
 export const ISLAND = { rx: 7.3, rz: 5.0, n: 2.8 };           // half sizes and squareness of the island outline (a superellipse)
-const SLABS = { cx: 5.75, cz: 0.96, w: 1.45, len: 4.9 };    // the tray slab (src/trays.js SLAB): the crates are built around it
-const BED_DROP = 0.25;                                      // the crate beds are cut this much lower than the grass
+const ROW_CZ = 5.2;
+const SLABS = { cx: 5.75, cz: 0.96, w: 1.45, len: 4.9 };    // the captured pieces area (src/trays.js SLAB): flat grass
 const POOL = { x0: 5, x1: 7, z0: -4, z1: -2 };
 const FALL_B = -5.2;                                        // bottom of the waterfall
 const FRAME = 0.55;                                         // the plank frame is a little over half a square wide
 export const EDGE = 4 + FRAME;                              // half size of the board and its frame
-const inTray = (x, z, m = 0.3) => Math.abs(Math.abs(x) - SLABS.cx) < SLABS.w / 2 + m && Math.abs(z - SLABS.cz) < SLABS.len / 2 + m;
+const inTray = (x, z, m = 0.3) => (Math.abs(Math.abs(x) - SLABS.cx) < SLABS.w / 2 + m && Math.abs(z - SLABS.cz) < SLABS.len / 2 + m)
+  || (Math.abs(x) < 4 + m && Math.abs(Math.abs(z) - ROW_CZ) < SLABS.w / 2 + m);   // the side areas and the portrait rows at either end (src/trays.js SLAB, ROWS)
 const inBoard = (x, z) => Math.abs(x) < 4.7 && Math.abs(z) < 4.7;
 const inPool = (x, z) => x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1;
 
@@ -56,18 +56,17 @@ function buildIsland(kit) {
     if (tray) n = Math.max(n, 2);
     colTop.add(`${ix},${iz}`);
     if (!board && !tray && !pool) onGrass.add(`${ix},${iz}`);
-    const bed = tray && !board;
     for (let k = 0; k < n; k++) {
       if (pool && k < rl) continue;
-      const kind = bed && k === 0 ? 'bed' : board && k === 0 ? 'plinth' : k === 0 ? 'grass' : 'stone';
-      grid.set(K(ix, -1 - k, iz), { ix, iy: -1 - k, iz, kind, low: bed && k === 0 ? BED_DROP : 0, bed: bed && k === 0 });
+      const kind = board && k === 0 ? 'plinth' : k === 0 ? 'grass' : 'stone';
+      grid.set(K(ix, -1 - k, iz), { ix, iy: -1 - k, iz, kind });
     }
   }
   for (const c of grid.values()) {
     const def = BLOCK[c.kind], tint = (def.tint ?? 1) * (0.93 + R() * 0.1);
     const skip = new Set();
-    for (const [f, dx, dy, dz] of DIRS) { const nb = grid.get(K(c.ix + dx, c.iy + dy, c.iz + dz)); if (nb && !(nb.bed && !c.bed && dy === 0)) skip.add(f); }   // a bed is lower: its neighbours keep the side face
-    m.box('grassTop', c.ix, TOP + c.iy, c.iz, 1, 1 - c.low, 1, { keys: def.keys, skip, color: new THREE.Color(tint, tint, tint) });
+    for (const [f, dx, dy, dz] of DIRS) { const nb = grid.get(K(c.ix + dx, c.iy + dy, c.iz + dz)); if (nb) skip.add(f); }
+    m.box('grassTop', c.ix, TOP + c.iy, c.iz, 1, 1, 1, { keys: def.keys, skip, color: new THREE.Color(tint, tint, tint) });
   }
   // the spring pool at the back right edge, water a little below the grass, and the waterfall over the edge
   const floor = TOP - rl;
@@ -83,20 +82,7 @@ function buildIsland(kit) {
   m.box('plank', -4 - FRAME, TOP, -4 - FRAME, 8 + 2 * FRAME, fh, FRAME); m.box('plank', -4 - FRAME, TOP, 4, 8 + 2 * FRAME, fh, FRAME);
   m.box('plank', -4 - FRAME, TOP, -4, FRAME, fh, 8); m.box('plank', 4, TOP, -4, FRAME, fh, 8);
   for (const [px, pz] of [[-4 - FRAME, -4 - FRAME], [4, -4 - FRAME], [-4 - FRAME, 4], [4, 4]]) m.box('bark', px, TOP, pz, FRAME, 0.42 - TOP, FRAME, { keys: { top: 'barkTop' } });
-  // the capture trays are wooden crates around the slabs: two boards high, corner posts, cleats on the outer long side
-  for (const sg of [1, -1]) {
-    const cx = sg * SLABS.cx, x0 = cx - SLABS.w / 2 - 0.03, x1 = cx + SLABS.w / 2 + 0.03, z0 = SLABS.cz - SLABS.len / 2 - 0.03, z1 = SLABS.cz + SLABS.len / 2 + 0.03, t = 0.13;
-    for (const [yb, yt] of [[-0.31, -0.03], [-0.01, 0.28]]) {
-      const h = yt - yb;
-      m.box('crate', x0, yb, z0, x1 - x0, h, t); m.box('crate', x0, yb, z1 - t, x1 - x0, h, t);
-      m.box('crate', x0, yb, z0 + t, t, h, z1 - z0 - 2 * t); m.box('crate', x1 - t, yb, z0 + t, t, h, z1 - z0 - 2 * t);
-    }
-    for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) m.box('crate', px - 0.04 + (px === x1 ? -0.14 : 0), -0.31, pz - 0.04 + (pz === z1 ? -0.14 : 0), 0.2, 0.69, 0.2, { color: 0xa8a8a8, keys: { top: 'plank' } });
-    const ox = sg > 0 ? x1 : x0 - 0.03;
-    for (const zz of [z0 + 0.9, SLABS.cz - 0.06, z1 - 1.02]) m.box('crate', ox, -0.31, zz, 0.03, 0.57, 0.13, { color: 0xc4c4c4 });
-    for (const zz of [z0 - 0.03, z1]) m.box('crate', cx - 0.1, -0.31, zz, 0.2, 0.57, 0.03, { color: 0xc4c4c4 });
-  }
-  // flowers and rocks on the grass strips around the frame and crates
+  // flowers and rocks on the grass strips around the frame
   const flowers = [[-3.2, 4.8, 0xff5c7a], [2.4, 4.85, 0xffe36a], [0.2, -4.85, 0xffffff], [-2.5, -4.8, 0xff9bb5], [3.6, 4.8, 0xffffff], [5.4, 4.4, 0xffe36a], [-5.4, 4.2, 0xff5c7a], [-6.2, -2.3, 0xffe36a], [4.4, -4.8, 0xff9bb5], [-1.0, 4.85, 0xffffff]];
   for (const [fx, fz, c] of flowers) if (onGrass.has(`${Math.floor(fx)},${Math.floor(fz)}`)) {
     m.box('flat', fx, TOP, fz, 0.1, 0.25 + 0.07, 0.1, { color: 0x3f8f2f }); m.box('flat', fx - 0.06, 0.25, fz - 0.06, 0.22, 0.2, 0.22, { color: c });

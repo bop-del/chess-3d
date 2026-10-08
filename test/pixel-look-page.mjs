@@ -4,7 +4,6 @@
 //   posts     no plank ring and no corner posts (CHE-236), no surfaces at equal depth where the grass meets the board corners
 //   hairline  orbit sweep (yaw 0 to 3 degrees, 0.1 steps, pitch 14, dist 16): no row of green pixels along the bottom edge of the
 //             grass blocks, where a wrapped texture sample draws the green top row of the side texture
-//   tray      the tray floor does not change with the lights off (unlit), and shows planks colours
 // Exit codes: 0 pass, 1 a check failed.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
@@ -93,10 +92,10 @@ try {
       H.view(yaw, 14, 16);
       const img = H.snap(), W = window.__chess.stage.renderer.domElement.width;
       let worst = 0, samples = 0;
-      const pts = [];
+      const pts = [];   // samples off screen are not valid: they would read the wrapped pixel of the next row
       for (const [a, b] of edges) {
         const [ax, ay] = H.screen(a), [bx, by] = H.screen(b);
-        for (let s = 0; s <= 24; s++) { const t = s / 24, x = Math.round(ax + (bx - ax) * t), y = Math.round(ay + (by - ay) * t), h = H.hit(x, y + 6); pts.push([x, y, !!h && (h.object.name === 'grassSide' || h.object.name === 'dirt') && h.point.z > 3]); }
+        for (let s = 0; s <= 24; s++) { const t = s / 24, x = Math.round(ax + (bx - ax) * t), y = Math.round(ay + (by - ay) * t), h = H.hit(x, y + 6); pts.push([x, y, x >= 0 && x < W && y >= 8 && y < img.length / 4 / W - 8 && !!h && (h.object.name === 'grassSide' || h.object.name === 'dirt') && h.point.z > 3]); }
       }
       for (let e = 0; e < edges.length; e++) for (let dy = -8; dy <= 8; dy++) {
         let ok = 0, green = 0;
@@ -115,18 +114,6 @@ try {
   for (let i = 0; i <= 30; i++) frames.push(await page.evaluate((y) => window.__H.hairFrame(y), +(i * 0.1).toFixed(1)));
   const seen = frames.reduce((s, f) => s + f[1], 0), bad = frames.filter((f) => f[2] > 0);
   R.expect('hairline: no green row along the bottom of the grass blocks while orbiting', seen > 1000 && bad.length === 0, `${seen} samples in 31 frames`, `${seen} samples, frames with a green row (yaw, samples, share): ${JSON.stringify(bad)}`);
-  // tray
-  const tray = await page.evaluate(() => {
-    const H = window.__H, C = window.__chess;
-    H.view(0, 55, 13);
-    const slabs = H.world.meshes.filter((m) => m.name === 'tray-slab'), regions = slabs.map((m) => H.box(m)), top = (h) => h.object.name === 'tray-slab' && h.face.normal.y > 0.9;
-    const r = H.compare(slabs[0], top, () => C.stage.setDim(0), () => C.stage.setDim(1), 2, regions);
-    const img = H.snap(), W = C.stage.renderer.domElement.width; let planks = 0, n = 0;
-    for (const [x0, y0, x1, y1] of regions) for (let y = Math.max(0, y0); y < Math.min(img.length / 4 / W, y1); y += 2) for (let x = Math.max(0, x0); x < Math.min(W, x1); x += 2) { const h = H.hit(x, y); if (!h || !top(h)) continue; n++; const k = (y * W + x) * 4; if (img[k] > img[k + 2] + 30 && img[k] > 90) planks++; }
-    return { ...r, planks, n };
-  });
-  R.expect('tray: the floor does not change with the lights off', tray.n > 300 && tray.share < 0.04, `${tray.n} pixels, largest difference ${tray.max}`, JSON.stringify(tray));
-  R.expect('tray: the floor shows planks colours (warm brown)', tray.n > 300 && tray.planks / tray.n > 0.9, `${tray.planks} of ${tray.n}`);
   // CHE-220/222: the tree never vanishes and never scales. Yaw 0 to 330 times pitch 2 to 89 times distance 6, 19, 40: visible at
   // scale 1 and drawn (the pixels differ from a frame with the tree hidden) in most cameras that look at it; `treeCovers` counts the
   // cameras where its screen hull meets the board hull (CHE-222: 92 of 216 before the move to the far corner)

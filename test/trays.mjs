@@ -1,4 +1,4 @@
-// Capture tray layout, headless. Real piece footprints and heights (measured from the built geometry) go through
+// Captured pieces layout (the side areas and the portrait rows), headless. Real piece footprints and heights (measured from the built geometry) go through
 // src/trays.js: a full tray (15), every size up to it, and the worst cases (all queens, mixed) stay inside the slab margin,
 // never overlap, and come out ordered by value. Run: node test/trays.mjs   Exit 0 pass, 1 on a failed check.
 import * as THREE from 'three';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createPieceMaterials } from '../src/materials.js';
 import { buildPawn, buildRook, buildKnight } from '../src/pieces/setA.js';
 import { buildBishop, buildQueen } from '../src/pieces/setB.js';
-import { layoutTray, checkLayout, VALUE_ORDER } from '../src/trays.js';
+import { layoutTray, checkLayout, rowSlots, ROWS, ROW_X, VALUE_ORDER } from '../src/trays.js';
 
 export function runTrayChecks() {
   const out = [];
@@ -42,6 +42,16 @@ export function runTrayChecks() {
   // a full tray keeps (nearly) the normal piece size
   const full = layoutTray(mk('pppppppp' + 'nnbbrrq'));
   out.push({ name: 'tray layout: a full tray keeps the pieces at least 0.5 scale', pass: full.scale >= 0.5, detail: `scale ${full.scale.toFixed(2)}` });
+  // the portrait rows (a shorter area at the near end of the board): every fill level and the worst cases fit, no overlap, scale at least 0.4
+  for (const [name, str] of [...Object.entries(cases), ['every level', null]]) {
+    const strs = str ? [str] : Array.from({ length: 15 }, (_, n) => seq.slice(0, n + 1));
+    const bads = strs.flatMap((x) => { const items = mk(x); return checkLayout(items, layoutTray(items, ROWS), ROWS); });
+    out.push({ name: `portrait rows layout: ${name}`, pass: bads.length === 0, detail: bads.slice(0, 3).join('; ') || 'inside the margin, no overlap' });
+  }
+  const ritems = mk('pppppppp' + 'nnbbrrq'), rl = layoutTray(ritems, ROWS), w = rowSlots(rl, true, 1), l = rowSlots(rl, false, 1), f = rowSlots(rl, false, -1);
+  out.push({ name: 'portrait rows: black right, white left, both inside x 0.2 to 3.9 on their side, the near end follows the sign',
+    pass: w.every((p) => p.x >= ROW_X - 1.85 - 1e-6 && p.x <= ROW_X + 1.85 + 1e-6 && p.z > 4.2) && l.every((p) => p.x < 0 && p.z > 4.2) && f.every((p) => p.z < -4.2),
+    detail: `black x ${Math.min(...w.map((p) => p.x)).toFixed(2)} to ${Math.max(...w.map((p) => p.x)).toFixed(2)}, scale ${rl.scale.toFixed(2)}` });
   return out;
 }
 

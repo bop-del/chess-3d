@@ -11,7 +11,7 @@ import { FXAAPass } from 'three/addons/postprocessing/FXAAPass.js';
 import { TAARenderPass } from 'three/addons/postprocessing/TAARenderPass.js';
 import { createStillness } from './still.js';
 
-const FLOOR_Y = -1.2;
+export const FLOOR_Y = -1.2;
 const LIGHT_DIST = 22;
 const SHADOW_EXTENT = 9;
 const TRANSITION_SECONDS = 0.9;

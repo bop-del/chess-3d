@@ -6,8 +6,7 @@ import { createPixelWorld } from './pixel/world.js';
 import { buildPixelVox } from './pixel/figures.js';
 import { withBirds } from './pixel/birds.js';
 import { createPieceStyle } from './blocks/rig.js';
-import { trayPlanks, labelAtlas } from './pixel/textures.js';
-import { SLAB } from '../trays.js';
+import { labelAtlas } from './pixel/textures.js';
 import { SKIES, look, onLook, skyLight, WARM as WARM_LOOK } from './pixel/look.js';
 
 /** Board spec: classic squares hidden, the labels lie on the grass ring around the board (no frame): cream with a dark outline. */
@@ -16,9 +15,6 @@ export function board({ track } = {}) {
     hide: true,
     labelLift: -0.04,   // board.js puts labels at y 0.0615, so they lie 0.02 above the grass top (y = 0)
     labels: { map: labelAtlas(track), color: '#ffffff', metalness: 0, roughness: 1, envMapIntensity: 0 },
-    // the tray floor: the planks texture, unlit like the world. The slab is a lit physical material shared by every theme, so it is
-    // switched to "all emissive": black diffuse, no specular, no clearcoat, the texture as the emission.
-    tray: { color: '#000000', emissive: '#ffffff', emissiveMap: trayPlanks(SLAB.w, SLAB.len, track), emissiveIntensity: 1, roughness: 1, metalness: 0, clearcoat: 0, clearcoatRoughness: 1, specularIntensity: 0, envMapIntensity: 0 },
   };
 }
 

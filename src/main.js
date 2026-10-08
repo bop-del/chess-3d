@@ -6,7 +6,6 @@ import { mountSwatches } from './themes/swatches.js';
 import { mountLookSetting } from './themes/pixel/look-setting.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
-import { mountTraysSetting } from './trays-setting.js';
 import { createLiving } from './living.js';
 import { createGameClock } from './clock.js';
 import { initialPreset, mountClock } from './clock-ui.js';
@@ -213,6 +212,9 @@ async function boot() {
   await tick();
 
   game = createGame({ gimbal, board, pieceSet, materials });
+  const captureRows = () => game.setCaptureRows(window.innerHeight > window.innerWidth, controls.side);   // portrait: the captured pieces stand at the near end of the board
+  captureRows();
+  controls.onChange(captureRows);
   applyGameParams({ game });   // ?fen, ?moves, ?select, ?ai: before the sequence takes the pieces
   intro?.attachGame(game);
   themes.attachGame(game);
@@ -243,7 +245,6 @@ async function boot() {
   battle = createDirector({ game, controls, stage, ui, themes, symbols, gore: params.get('gore') });
   sfx.hook(game);          // move, capture and check sounds; arms the audio unlock (no context before a gesture)
   living = createLiving({ game, themes, views, ui, manual, flags: { living: params.get('living'), sig: params.get('sig') } });   // signature moves of idle pieces (CHE-238)
-  mountTraysSetting({ ui, game, controls, flag: params.get('trays') });   // Captured pieces at the side, below Battle scenes
   const clock = createGameClock({ game, preset: initialPreset(params.get('clock')) });   // the chess clock: off unless chosen (or ?clock=5+0)
   clockUi = mountClock({ ui, game, clock });
   news = (await import('./news.js')).mountNews({ ui, manual, flag: params.get('news') });   // the version line at the bottom of Options and the News window (CHE-235)
@@ -314,6 +315,7 @@ async function boot() {
   // are reallocated once the burst has ended. Desktop reallocates on every event as before.
   let resizeT = 0;
   const onResize = () => {
+    captureRows();
     if (!device.touch) { resize(); return; }
     const w = window.innerWidth, h = window.innerHeight;
     stage.setAspect(w, h);

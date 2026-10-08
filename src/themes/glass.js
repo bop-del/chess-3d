@@ -11,7 +11,6 @@ export function board() {
     inlay: { ...none, color: '#f4fbff', roughness: 0.4 },
     gold: { ...none, color: '#cfe4ff', metalness: 0, roughness: 0.3, emissive: '#6faeea', emissiveIntensity: 0.5 },
     plinth: { color: '#7e93a8', metalness: 0 },
-    tray: { color: '#52667c', metalness: 0, roughness: 0.4, clearcoat: 0.8 },
   };
 }
 

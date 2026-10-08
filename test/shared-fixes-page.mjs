@@ -1,5 +1,5 @@
 // Shared UI fixes in the real page (these checks lived in the Blocks fixes page): node test/shared-fixes-page.mjs [--port=5353] [--base=<server>] [--shots=<dir>]
-// The Captured text list of the desktop Play tab is hidden while the 3D trays are on and back with trays=0 or the switch off, and the
+// The Captured text list of the desktop Play tab is always hidden (the captured pieces stand beside the board in 3D), and the
 // game review strip leaves the lower board frame free (1440x900, three views).
 // ai=0, manual=1, quality=low: time by __chess.step()/draw(). Exit codes: 0 pass, 1 a check failed.
 import { mkdirSync } from 'node:fs';
@@ -30,16 +30,8 @@ try {
   // ---- the Captured list (CHE-95a)
   const capVisible = () => page.evaluate(() => { const e = document.querySelector('.cap-sec'); return !!e && e.offsetParent !== null; });
   await load(DESK, '&theme=pixel');
-  R.expect('desktop Play tab: trays on, no Captured text list', !(await capVisible()) && (await page.evaluate(() => document.body.dataset.traysShown)) === 'on', 'hidden');
-  await page.evaluate(() => { document.querySelector('[data-tp="play"]') || 0; });
-  await load(DESK, '&theme=pixel&trays=0');
-  R.expect('desktop Play tab: trays=0 shows the Captured list again', (await capVisible()) && (await page.evaluate(() => document.body.dataset.traysShown)) === 'off', 'visible');
-  await page.evaluate(() => { document.querySelector('[data-trays]').click(); });
-  R.expect('the switch back on hides it again', !(await capVisible()), 'hidden');
-  await page.evaluate(() => { document.querySelector('[data-trays]').click(); });
-  R.expect('and off shows it (stored per device)', await capVisible(), 'visible');
-  await page.evaluate(() => localStorage.clear());
-  if (SHOTS) { await load(DESK, '&theme=pixel'); await settle(1); await page.screenshot({ path: `${SHOTS}/captured-trays-on.png` }); await load(DESK, '&theme=pixel&trays=0'); await settle(1); await page.screenshot({ path: `${SHOTS}/captured-trays-off.png` }); }
+  R.expect('desktop Play tab: the captured pieces stand beside the board, no Captured text list', !(await capVisible()), 'hidden');
+  if (SHOTS) { await settle(1); await page.screenshot({ path: `${SHOTS}/captured-beside-board.png` }); }
 
   // ---- the review strip (CHE-95b): the lowest corner of the frame on screen is above the strip
   for (const [theme, view] of [['classic', 'white'], ['pixel', 'black'], ['pixel', 'iso']]) {

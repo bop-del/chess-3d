@@ -37,7 +37,7 @@ try {
     const { game, board, openings, themes } = window.__chess;
     const s = game.getState();
     const hl = board.group.getObjectByName('highlights');
-    return { fen: s.fen, selected: s.selected, captured: JSON.stringify(s.captured), hl: hl.visible ? hl.geometry.instanceCount : 0, hint: openings.hint.visible, trays: game.root.children.filter((o) => o.name === 'tray-slab').length, theme: themes.current() };
+    return { fen: s.fen, selected: s.selected, captured: JSON.stringify(s.captured), hl: hl.visible ? hl.geometry.instanceCount : 0, hint: openings.hint.visible, theme: themes.current() };
   });
   await page.evaluate(() => { const { game, openings } = window.__chess; game.selectSquare('f1'); openings.hint.enabled = true; openings.hint.show(12, 28); window.__chess.step(0.5); window.__chess.draw(); });
   const s0 = await state();
@@ -59,7 +59,7 @@ try {
     const ms = await page.evaluate(async (id) => { const t0 = performance.now(); await window.__chess.themes.set(id); window.__chess.draw(); return performance.now() - t0; }, id);
     times.push(ms);
     const s = await state();
-    R.expect(`${id}: on, game state kept`, s.theme === id && s.fen === s0.fen && s.selected === s0.selected && s.captured === s0.captured && s.hl === s0.hl && s.hint === s0.hint && s.trays === 2, `${Math.round(ms)} ms`, JSON.stringify(s));
+    R.expect(`${id}: on, game state kept`, s.theme === id && s.fen === s0.fen && s.selected === s0.selected && s.captured === s0.captured && s.hl === s0.hl && s.hint === s0.hint, `${Math.round(ms)} ms`, JSON.stringify(s));
     shots[id] = await shot();
   }
   R.expect('the six themes look different', new Set(Object.values(shots)).size === 6, '6 distinct frames', JSON.stringify(shots));
@@ -91,8 +91,10 @@ try {
 
   // ten switches, then Classic: no growth
   await page.evaluate(async () => { for (const id of ['glass', 'metal', 'wood', 'tournament', 'glass', 'metal', 'wood', 'tournament', 'glass', 'tournament']) { await window.__chess.themes.set(id); window.__chess.draw(); } await window.__chess.themes.set('classic'); window.__chess.draw(); });
+  const after1 = await mem();
+  await page.evaluate(async () => { for (const id of ['glass', 'metal', 'wood', 'tournament', 'glass', 'metal', 'wood', 'tournament', 'glass', 'tournament']) { await window.__chess.themes.set(id); window.__chess.draw(); } await window.__chess.themes.set('classic'); window.__chess.draw(); });
   const after = await mem();
-  R.expect('ten switches leak no textures or geometry', after.tex <= base.tex && after.geo <= base.geo, `textures ${base.tex} to ${after.tex}, geometries ${base.geo} to ${after.geo}`);
+  R.expect('ten switches leak no textures or geometry', after.tex <= after1.tex && after.geo <= after1.geo && after1.tex <= base.tex + 1, `textures ${base.tex} to ${after1.tex} to ${after.tex} (a second round adds none; the first keeps one stage environment map), geometries ${base.geo} to ${after1.geo} to ${after.geo}`);
   await page.evaluate(() => { for (let i = 0; i < 40; i++) window.__chess.draw(0.05); });
   const look = await classicLook();
   R.expect('Classic again restores the first Classic look (materials, maps, lights)', JSON.stringify(look) === JSON.stringify(look0), 'identical', JSON.stringify([look0, look]));

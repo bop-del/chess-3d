@@ -60,7 +60,7 @@ try {
   await page.setViewport({ width: SIZE, height: SIZE, deviceScaleFactor: 1 });
   for (const sp of specs.filter((x) => ONLY.includes(x.kind))) {
     const fen = encodeURIComponent('7k/8/8/8/8/8/1N6/7K w - - 0 1');
-    await page.goto(`${server.base}?${sp.q}&quality=high&manual=1&ai=0&hud=0&intro=0&music=0&sound=0&trays=0&fen=${fen}`, { waitUntil: 'load', timeout: 120000 });
+    await page.goto(`${server.base}?${sp.q}&quality=high&manual=1&ai=0&hud=0&intro=0&music=0&sound=0&fen=${fen}`, { waitUntil: 'load', timeout: 120000 });
     await page.waitForFunction('window.__chessReady === true || !!window.__chessError', { timeout: 180000 });
     const err = await page.evaluate(() => window.__chessError);
     if (err) throw new Error(`${sp.kind} ${sp.id}: page reported ${err}`);

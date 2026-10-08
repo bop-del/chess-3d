@@ -29,7 +29,7 @@ Modules mount into the panel through the existing contract: `ui.mountPanel(id, e
 
 **One place per job.** Playing, learning and tuning each get a tab, and nothing needs scrolling past something unrelated. The rail gives the board the whole screen when the player wants it.
 
-**Free area instead of symmetric columns.** The camera already had a framing mode for phones (insets in CSS px). Reusing it means the board and both capture trays fit the area beside the panel, whatever the panel's width, with no second fitting code.
+**Free area instead of symmetric columns.** The camera already had a framing mode for phones (insets in CSS px). Reusing it means the board and both captured piece areas fit the area beside the panel, whatever the panel's width, with no second fitting code.
 
 **Same ids, two markups.** The phone layout is the one that has been through real devices. Leaving it alone is cheaper and safer than sharing markup, and the shared ids keep one copy of the game wiring.
 

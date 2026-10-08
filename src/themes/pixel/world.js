@@ -11,8 +11,8 @@ import { ISLANDS, islandFlag } from './islands.js';
 const rnd = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
 const ISLAND = { rx: 7.2, rz: 5.7, n: 3 };                 // half sizes and squareness of the outline (a superellipse)
-const SLABS = { cx: 5.75, cz: 0.96, w: 1.45, len: 4.9 };   // the tray slab (src/trays.js SLAB): the crates are built around it
-const BED_DROP = 0.3;                                      // the crate beds sit this much lower than the grass
+const ROW_CZ = 5.2;
+const SLABS = { cx: 5.75, cz: 0.96, w: 1.45, len: 4.9 };   // the captured pieces area (src/trays.js SLAB): flat grass, pieces stand on it
 const POOL = { x0: 4, x1: 6, z0: -5, z1: -3 };             // the pond, in whole blocks
 const FALL_B = -5.5, FALL_T = 0.3;                         // bottom and thickness of the waterfall sheet
 export const PIXEL_EDGE = 4;                               // half size of the board: the grass reaches the squares (CHE-236, no frame)
@@ -24,10 +24,10 @@ const KINDS = {
   sand: { top: 'sand', side: 'sand', bottom: 'sand' },
   boardL: { top: 'sand', side: 'sand', bottom: 'dirt' },
   boardD: { top: 'cobble', side: 'cobble', bottom: 'dirt' },
-  bed: { top: 'stone', side: 'stone', bottom: 'stone' },
 };
 const DIRS = [['px', 1, 0, 0], ['nx', -1, 0, 0], ['py', 0, 1, 0], ['ny', 0, -1, 0], ['pz', 0, 0, 1], ['nz', 0, 0, -1]];
-const inTray = (x, z, m = 0.3) => Math.abs(Math.abs(x) - SLABS.cx) < SLABS.w / 2 + m && Math.abs(z - SLABS.cz) < SLABS.len / 2 + m;
+const inTray = (x, z, m = 0.3) => (Math.abs(Math.abs(x) - SLABS.cx) < SLABS.w / 2 + m && Math.abs(z - SLABS.cz) < SLABS.len / 2 + m)
+  || (Math.abs(x) < 4 + m && Math.abs(Math.abs(z) - ROW_CZ) < SLABS.w / 2 + m);   // the side areas and the portrait rows at either end (src/trays.js SLAB, ROWS)
 const inBoard = (x, z) => Math.abs(x) < 4 && Math.abs(z) < 4;
 const inPool = (ix, iz) => ix >= POOL.x0 && ix < POOL.x1 && iz >= POOL.z0 && iz < POOL.z1;
 
@@ -55,19 +55,6 @@ function noise2(seed) {
   };
 }
 
-// two crates for the captured pieces: boards two high with corner posts, built around the tray slab (top at y = 0, bottom -0.26)
-function addCrates(m) {
-  for (const sg of [1, -1]) {
-    const cx = sg * SLABS.cx, x0 = cx - SLABS.w / 2 - 0.03, x1 = cx + SLABS.w / 2 + 0.03, z0 = SLABS.cz - SLABS.len / 2 - 0.03, z1 = SLABS.cz + SLABS.len / 2 + 0.03, t = 0.13;
-    for (const [yb, yt] of [[-0.3, -0.01], [0, 0.29]]) {
-      const h = yt - yb;
-      m.box('crate', x0, yb, z0, x1 - x0, h, t); m.box('crate', x0, yb, z1 - t, x1 - x0, h, t);
-      m.box('crate', x0, yb, z0 + t, t, h, z1 - z0 - 2 * t); m.box('crate', x1 - t, yb, z0 + t, t, h, z1 - z0 - 2 * t);
-    }
-    for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) m.box('crate', px - 0.04 + (px === x1 ? -0.14 : 0), -0.3, pz - 0.04 + (pz === z1 ? -0.14 : 0), 0.2, 0.62, 0.2);
-  }
-}
-
 function buildTerrain(kit) {
   const R = rnd(31), m = new Mesher({ shade: true }), grid = new Map(), NZ = noise2(9);
   const K = (ix, iy, iz) => ((ix + 256) * 512 + (iy + 256)) * 512 + (iz + 256);
@@ -80,28 +67,25 @@ function buildTerrain(kit) {
     const depth = 2 + Math.round(3 * Math.pow(Math.max(0, 1 - sq), 0.7) + (NZ(x + 40, z + 9) - 0.5) * 1.4);
     const n = Math.max(2, depth);
     const beach = sq > 0.86 && !tray && !board && !tree;
-    const bed = tray && !board;
     if (!board && !tray && !pool && !beach) onGrass.add(`${ix},${iz}`);
     for (let k = 0; k < n; k++) {
       if (pool && k === 0) continue;
       let kind = k === 0 ? 'grass' : k < 3 ? 'dirt' : 'stone';
       if (board && k === 0) kind = (ix + 4 + (3 - iz)) % 2 === 0 ? 'boardD' : 'boardL';   // file f = ix + 4, rank r = 3 - iz: a1 is dark
-      else if (bed && k === 0) kind = 'bed';
       else if (beach && k < 2) kind = 'sand';
       else if (pool && k === 1) kind = 'sand';
-      grid.set(K(ix, -1 - k, iz), { ix, iy: -1 - k, iz, kind, bed: bed && k === 0 });
+      grid.set(K(ix, -1 - k, iz), { ix, iy: -1 - k, iz, kind });
     }
   }
   for (const c of grid.values()) {
     const keys = KINDS[c.kind], skip = new Set();
-    for (const [f, dx, dy, dz] of DIRS) { const nb = grid.get(K(c.ix + dx, c.iy + dy, c.iz + dz)); if (nb && !(nb.bed && !c.bed && dy === 0)) skip.add(f); }
-    m.box('grassTop', c.ix, c.iy, c.iz, 1, c.bed ? 1 - BED_DROP : 1, 1, { keys, skip, color: c.kind === 'boardL' ? 0xd6c8a2 : 0xffffff });
+    for (const [f, dx, dy, dz] of DIRS) { const nb = grid.get(K(c.ix + dx, c.iy + dy, c.iz + dz)); if (nb) skip.add(f); }
+    m.box('grassTop', c.ix, c.iy, c.iz, 1, 1, 1, { keys, skip, color: c.kind === 'boardL' ? 0xd6c8a2 : 0xffffff });
   }
   // the pond: water blocks a little below the grass (two blocks wide and deep, only the surface is drawn)
   m.box('water', POOL.x0, -1, POOL.z0, POOL.x1 - POOL.x0, 1 - 0.12, POOL.z1 - POOL.z0, { skip: new Set(['px', 'nx', 'pz', 'nz', 'ny']), color: 0xffffff });
   // the waterfall (CHE-222): a sheet of water over the back edge of the pond, down past the island; the pond lip and the sheet meet at its top
   m.box('fall', POOL.x0 + 0.25, FALL_B, POOL.z0 - FALL_T, POOL.x1 - POOL.x0 - 0.5, -0.12 - FALL_B, FALL_T, { skip: new Set(['pz', 'ny']) });
-  addCrates(m);
   // a few flowers (single colour blocks on a green stalk) and a boulder on the grass
   const flowers = [[-3.2, 4.75, 0xe0364f], [2.4, 4.8, 0xf2d13a], [0.2, -4.85, 0xffffff], [-2.5, -4.8, 0xe0364f], [3.6, 4.75, 0xf2d13a], [5.4, 4.4, 0xe0364f], [-5.4, 4.2, 0xf2d13a], [-6.2, -2.3, 0xe0364f], [-1.0, 4.8, 0xffffff]];
   for (const [fx, fz, c] of flowers) if (onGrass.has(`${Math.floor(fx)},${Math.floor(fz)}`)) {
@@ -146,7 +130,7 @@ function addClouds(parent, kit) {
 }
 
 // what the island variants (islands.js) share with this file
-const ISLAND_CTX = { Mesher, rnd, noise2, toGroup, DIRS, KINDS, BED_DROP, SLABS, inTray, inBoard, addCrates };
+const ISLAND_CTX = { Mesher, rnd, noise2, toGroup, DIRS, KINDS, SLABS, inTray, inBoard };
 
 /** The whole Pixelwelt world: { group, update(dt), settle(), dispose(), avoid }. light: fewer weather particles (phone, quality low). */
 export function createPixelWorld({ track, view, light } = {}) {

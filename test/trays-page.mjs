@@ -1,10 +1,10 @@
-// Capture trays in the real page: node test/trays-page.mjs [--port=5247] [--base=<server>] [--shots=<dir>]
-// A 79 move game with 15 black and 10 white pieces captured (generated from the rules engine, seed 13): the full tray lies inside
-// the slab with no overlap (game.audit covers position, scale and the layout contract), ordered by value; the Captured pieces
-// switch (Scene card, stored per device, ?trays=0|1 beats it), trays off hides slabs and pieces but keeps the HUD row, the camera
-// fit ignores the tray space, switching mid game and back puts every captured piece in the trays, undo keeps working, an animated
-// capture with trays off fades the victim out. ai=0, manual=1, quality=low: time by __chess.step()/draw().
-// Screenshots (full tray desktop and phone landscape, trays off, two themes) and a contact sheet go to --shots (default .tmp/trays).
+// Captured pieces beside the board in the real page (CHE-358, no trays): node test/trays-page.mjs [--port=5247] [--base=<server>] [--shots=<dir>]
+// A 79 move game with 15 black and 10 white pieces captured (generated from the rules engine, seed 13): the full set stands in its
+// area at each side of the board (game.audit covers position, scale and the layout contract), ordered by value, on the ground of the
+// theme (the floor in Classic and the other studio themes, the grass at y = 0 in Pixelwelt, with closed ground under every piece).
+// No slab, no switch, `?trays=` is ignored. Portrait: the pieces stand in two rows at the near end of the board (the end follows
+// the view), in front of it, never over it. An animated capture, undo and a theme change keep the audit clean. ai=0, manual=1, quality=low.
+// Screenshots (full set, desktop and phone portrait and landscape, two themes) and a contact sheet go to --shots (default .tmp/trays).
 // Exit codes: 0 pass, 1 a check failed.
 import { mkdirSync } from 'node:fs';
 import { reporter, launchBrowser, watchPage, startServer, build, settleUi } from '../tools/_lib.mjs';
@@ -32,96 +32,99 @@ try {
     await settle();
   };
   const settle = (secs = 3) => page.evaluate((n) => { const c = window.__chess; c.game.finishAnimations(); for (let i = 0; i < 20; i++) c.step(n / 20); c.draw(); }, secs);
+  // the state of the captured pieces: the audit, the ground height they stand on, the screen box of each one against the board
   const info = () => page.evaluate(() => {
-    const c = window.__chess, s = c.game.getState();
-    const slabs = []; c.game.root.traverse((o) => { if (o.name === 'tray-slab') slabs.push(o.visible); });
-    return { audit: c.game.audit(), cap: { w: s.captured.w.length, b: s.captured.b.length }, trays: s.trays, slabs, ctrl: c.controls.trays, dist: c.stage.camera.position.length(),
-      hudRow: { w: document.querySelectorAll('#cap-w i').length, b: document.querySelectorAll('#cap-b i').length }, box: !!document.querySelector('[data-trays]'), checked: document.querySelector('[data-trays]')?.checked, stored: localStorage.getItem('chess3d.trays'), over: window.__chess.game.root.children.filter((o) => o.visible && o.userData.piece).length };
+    const c = window.__chess, { THREE } = c, s = c.game.getState(), cam = c.stage.camera;
+    const slabs = []; c.game.root.traverse((o) => { if (o.name === 'tray-slab') slabs.push(o); });
+    const caps = [];
+    c.game.root.children.forEach((o) => { if (o.userData.piece && o.visible && Math.abs(o.position.x) + Math.abs(o.position.z) > 0 && (Math.abs(o.position.x) > 4.2 || Math.abs(o.position.z) > 4.2)) caps.push(o); });
+    // closed ground: a ray straight down from just above each captured piece hits a mesh at the piece's height (within 0.1) or the floor
+    const rc = new THREE.Raycaster(), world = c.themes.world, under = [];
+    for (const o of caps) {
+      const wp = o.getWorldPosition(new THREE.Vector3());
+      rc.set(new THREE.Vector3(wp.x, wp.y + 0.3, wp.z), new THREE.Vector3(0, -1, 0));
+      const hit = world ? rc.intersectObject(world.group, true)[0] : null;
+      under.push({ y: o.position.y, hitY: hit ? hit.point.y : null });
+    }
+    // the screen rectangle of the 8 x 8 board against the one of each captured piece (bounding boxes projected)
+    cam.updateMatrixWorld(true);
+    const rect = (box) => { let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity; for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) { const p = new THREE.Vector3(x, y, z).applyMatrix4(c.gimbal.matrixWorld).project(cam); const sx = (p.x + 1) / 2 * innerWidth, sy = (1 - p.y) / 2 * innerHeight; l = Math.min(l, sx); r = Math.max(r, sx); t = Math.min(t, sy); b = Math.max(b, sy); } return { l, t, r, b }; };
+    const bd = rect(new THREE.Box3(new THREE.Vector3(-4, -0.05, -4), new THREE.Vector3(4, 0.05, 4)));
+    const onScreen = caps.filter((o) => { const q = rect(new THREE.Box3().setFromObject(o).applyMatrix4(c.gimbal.matrixWorld.clone().invert())); return q.l >= 0 && q.r <= innerWidth && q.t >= 0 && q.b <= innerHeight; }).length;
+    const overBoard = caps.filter((o) => { const q = rect(new THREE.Box3().setFromObject(o).applyMatrix4(c.gimbal.matrixWorld.clone().invert())); const mx = (q.l + q.r) / 2, my = (q.t + q.b) / 2; return mx > bd.l && mx < bd.r && my > bd.t && my < bd.b; }).length;
+    return { audit: c.game.audit(), cap: { w: s.captured.w.length, b: s.captured.b.length }, slabs: slabs.length, ground: c.game.ground, ys: [...new Set(caps.map((o) => +o.position.y.toFixed(2)))], n: caps.length, under, onScreen, overBoard,
+      box: !!document.querySelector('[data-trays]'), dist: cam.position.length(), hudRow: { w: document.querySelectorAll('#cap-w i').length, b: document.querySelectorAll('#cap-b i').length } };
   });
   const shot = async (name) => { await settleUi(page); await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
   const theme = async (id) => { await page.evaluate((t) => window.__chess.themes.set(t), id); await settle(1); };
 
-  // ---- trays on, full tray
+  // ---- classic, full set, desktop
   await load(`&moves=${GAME}`);
-  await page.evaluate(() => localStorage.clear());
   let r = await info();
-  R.expect('full tray: 15 black and 10 white captured, audit clean (inside the margin, no overlap, scale)', r.cap.b === 15 && r.cap.w === 10 && r.audit.length === 0 && r.trays && r.slabs.length === 2 && r.slabs.every(Boolean), `${JSON.stringify(r.cap)}`, `${JSON.stringify(r)}`);
-  R.expect('the switch is in the Scene card, on by default', r.box && r.checked === true, 'on', JSON.stringify(r));
-  await shot('desktop-classic-full-tray');
-  await theme('wood'); await shot('desktop-wood-full-tray'); await theme('classic');
-  const distOn = r.dist;
+  R.expect('full set: 15 black and 10 white captured, audit clean (inside the area, no overlap, scale), all 25 stand beside the board', r.cap.b === 15 && r.cap.w === 25 - 15 && r.audit.length === 0 && r.n === 25, `${JSON.stringify(r.cap)} ${r.n} pieces`, JSON.stringify(r));
+  R.expect('no slab, no tray switch in the UI', r.slabs === 0 && !r.box, 'none', JSON.stringify({ slabs: r.slabs, box: r.box }));
+  R.expect('classic: the pieces stand on the floor (y -1.2), none floats', r.ground === -1.2 && r.ys.length === 1 && r.ys[0] === -1.2, `y ${r.ys}`, JSON.stringify(r.ys));
+  await shot('desktop-classic-full-set');
+  await theme('wood'); r = await info();
+  R.expect('wood: the same ground, audit clean', r.ys.length === 1 && r.ys[0] === -1.2 && r.audit.length === 0, `y ${r.ys}`, JSON.stringify(r));
+  await shot('desktop-wood-full-set');
+  await theme('pixel'); r = await info();
+  R.expect('pixel: the pieces step up onto the grass (y 0), closed ground under every one', r.ground === 0 && r.ys.length === 1 && r.ys[0] === 0 && r.under.length === 25 && r.under.every((u) => u.hitY !== null && Math.abs(u.hitY - u.y) < 0.1) && r.audit.length === 0, `y ${r.ys}, ground under ${r.under.filter((u) => u.hitY !== null).length} of ${r.under.length}`, JSON.stringify(r.under.filter((u) => u.hitY === null || Math.abs(u.hitY - u.y) >= 0.1).slice(0, 3)));
+  await shot('desktop-pixel-full-set');
+  await theme('classic'); r = await info();
+  R.expect('back to classic: the pieces return to the floor', r.ys.length === 1 && r.ys[0] === -1.2 && r.audit.length === 0, `y ${r.ys}`, JSON.stringify(r));
 
-  // ---- the switch in the UI, stored, off
-  await page.evaluate(() => document.querySelector('[data-trays]').click());
-  await settle();
-  r = await info();
-  R.expect('switch off: slabs hidden, every captured piece hidden, HUD row kept (15 and 10), audit clean', !r.trays && !r.ctrl && r.slabs.every((v) => !v) && r.hudRow.b === 15 && r.hudRow.w === 10 && r.audit.length === 0 && r.stored === '0', `HUD ${JSON.stringify(r.hudRow)}`, JSON.stringify(r));
-  await shot('desktop-classic-trays-off');
-  await theme('wood'); await shot('desktop-wood-trays-off'); await theme('classic');
-  await page.evaluate(() => document.querySelector('[data-trays]').click());
-  await settle();
-  r = await info();
-  R.expect('switch on again: every piece captured so far is back in the trays', r.trays && r.cap.b === 15 && r.audit.length === 0 && r.slabs.every(Boolean) && r.stored === '1', 'back', JSON.stringify(r));
-
-  // ---- URL flag beats the stored value; stored value is used without it
+  // ---- the old flag and the old stored setting do nothing
   await page.evaluate(() => localStorage.setItem('chess3d.trays', '0'));
-  await load('&trays=1&moves=e2e4,d7d5,e4d5');
-  r = await info();
-  R.expect('?trays=1 beats a stored off, and does not overwrite it', r.trays && r.checked === true && r.stored === '0', 'on, stored 0', JSON.stringify(r));
-  await load('&moves=e2e4,d7d5,e4d5');
-  r = await info();
-  R.expect('stored off is used without the flag; the captured pawn is hidden, the HUD row has it', !r.trays && r.checked === false && r.cap.b === 1 && r.hudRow.b === 1 && r.audit.length === 0, 'off', JSON.stringify(r));
-  await page.evaluate(() => localStorage.setItem('chess3d.trays', '1'));
   await load('&trays=0&moves=e2e4,d7d5,e4d5');
   r = await info();
-  R.expect('?trays=0 beats a stored on', !r.trays && r.slabs.every((v) => !v) && r.stored === '1', 'off, stored 1', JSON.stringify(r));
+  R.expect('?trays=0 and a stored off are ignored: the captured pawn stands beside the board, the HUD row has it', r.cap.b === 1 && r.n === 1 && r.hudRow.b === 1 && r.audit.length === 0, '1 pawn', JSON.stringify(r));
+  await page.evaluate(() => localStorage.clear());
 
-  // ---- animated capture and undo with trays off, then on
-  await load('&trays=0&moves=e2e4,d7d5');
-  const fade = await page.evaluate(() => {
-    const c = window.__chess; c.game.move('e4', 'd5');
-    const seen = { mid: false };
-    for (let i = 0; i < 40; i++) {
-      c.step(0.05);
-      c.game.root.traverse((o) => { if (o.isMesh && o.material.transparent && o.material.opacity < 0.95 && o.material.opacity > 0.02) seen.mid = true; });
-    }
-    c.draw();
-    return { ...seen, busy: c.game.busy, audit: c.game.audit() };
-  });
-  r = await info();
-  R.expect('trays off: an animated capture fades the victim out, nothing is left half transparent', fade.mid && !fade.busy && r.audit.length === 0 && r.cap.b === 1, 'faded', JSON.stringify({ fade, r }));
-  const opaque = await page.evaluate(() => { let bad = 0; window.__chess.game.root.traverse((o) => { if (o.isMesh && o.material.transparent && o.material.opacity < 1 && o.visible) bad++; }); return bad; });
-  R.expect('no visible piece keeps a faded material', opaque === 0, 'none', `${opaque}`);
-  await page.evaluate(() => window.__chess.game.undo());
-  await settle();
-  r = await info();
-  R.expect('undo of the faded capture brings the pawn back on d5', r.cap.b === 0 && r.audit.length === 0, 'restored', JSON.stringify(r));
-  await page.evaluate(() => { window.__chess.game.move('e4', 'd5'); window.__chess.game.setTrays(true); });
-  await settle();
-  r = await info();
-  R.expect('capture while off, switch on: the pawn flies into the tray', r.trays && r.cap.b === 1 && r.audit.length === 0, 'in the tray', JSON.stringify(r));
-  await page.evaluate(() => { window.__chess.game.setTrays(false); window.__chess.game.undo(); window.__chess.game.setTrays(true); });
-  await settle();
-  r = await info();
-  R.expect('off, undo, on again: tray empty, board right', r.trays && r.cap.b === 0 && r.audit.length === 0, 'ok', JSON.stringify(r));
-
-  // ---- camera fit: phone landscape and desktop
-  for (const size of ['landscape', 'squarish', 'desktop']) {
-    await load(`&moves=${GAME}`, size);
-    await page.evaluate(() => localStorage.setItem('chess3d.trays', '1'));
-    await load(`&trays=1&moves=${GAME}`, size);
-    const on = await info();
-    if (size === 'landscape') { await shot('landscape-classic-full-tray'); await theme('glass'); await shot('landscape-glass-full-tray'); await theme('classic'); }
-    await load(`&trays=0&moves=${GAME}`, size);
-    const off = await info();
-    if (size === 'landscape') await shot('landscape-classic-trays-off');
-    R.expect(`${size}: the camera fit ignores the tray space with trays off (camera not farther; closer where the width limits)`, off.dist <= on.dist + 0.02 && (size !== 'squarish' || off.dist < on.dist - 0.2), `${on.dist.toFixed(2)} on, ${off.dist.toFixed(2)} off`);
-    R.expect(`${size}: audit clean in both states`, on.audit.length === 0 && off.audit.length === 0, 'clean', JSON.stringify([on.audit, off.audit]));
+  // ---- animated capture, undo, capture again, in two themes
+  for (const th of ['classic', 'pixel']) {
+    await load(`&theme=${th}&moves=e2e4,d7d5`);
+    await page.evaluate(() => window.__chess.game.move('e4', 'd5'));
+    await settle();
+    r = await info();
+    R.expect(`${th}: an animated capture ends with the pawn standing beside the board, audit clean`, r.cap.b === 1 && r.n === 1 && r.audit.length === 0 && r.ys[0] === r.ground, `y ${r.ys}`, JSON.stringify(r));
+    await page.evaluate(() => window.__chess.game.undo());
+    await settle();
+    r = await info();
+    R.expect(`${th}: undo brings the pawn back on d5, nothing stands beside the board`, r.cap.b === 0 && r.n === 0 && r.audit.length === 0, 'restored', JSON.stringify(r));
   }
-  await load(`&trays=1&moves=${GAME}`, 'portrait');
-  await shot('portrait-classic-full-tray');
+
+  // ---- landscape and a squarish window: the side areas fit the view
+  for (const size of ['landscape', 'squarish']) {
+    await load(`&moves=${GAME}`, size);
+    r = await info();
+    R.expect(`${size}: all 25 pieces on screen, none over the board, audit clean`, r.onScreen === 25 && r.overBoard === 0 && r.audit.length === 0, `${r.onScreen} on screen, ${r.overBoard} over the board`, JSON.stringify(r));
+    if (size === 'landscape') { await shot('landscape-classic-full-set'); await theme('pixel'); await shot('landscape-pixel-full-set'); }
+  }
+
+  // ---- portrait: two rows at the near end of the board, black ones right, white ones left, the end follows the view
+  const zs = () => page.evaluate(() => { const g = window.__chess.game, out = { pos: 0, neg: 0, right: 0, left: 0 }; g.root.children.forEach((o) => { if (!o.userData.piece || (Math.abs(o.position.z) < 4.2 && Math.abs(o.position.x) < 4.2)) return; out[o.position.z > 0 ? 'pos' : 'neg']++; out[o.position.x > 0 ? 'right' : 'left']++; }); return out; });
+  for (const th of ['classic', 'pixel']) {
+    await load(`&theme=${th}&moves=${GAME}`, 'portrait');
+    r = await info();
+    const z = await zs();
+    R.expect(`portrait ${th}: all 25 stand in two rows at the near end (black 15 right, white 10 left), on screen, none over the board, audit clean`, r.n === 25 && z.pos === 25 && z.right === 15 && z.left === 10 && r.onScreen === 25 && r.overBoard === 0 && r.audit.length === 0, `${r.onScreen} on screen, ${r.overBoard} over the board`, JSON.stringify({ r, z }));
+    await shot(`portrait-${th}-full-set`);
+    if (th === 'pixel') {
+      R.expect('portrait pixel: closed ground under every piece', r.under.length === 25 && r.under.every((u) => u.hitY !== null && Math.abs(u.hitY - u.y) < 0.1), `${r.under.filter((u) => u.hitY !== null).length} of 25`, JSON.stringify(r.under.filter((u) => u.hitY === null || Math.abs(u.hitY - u.y) >= 0.1).slice(0, 3)));
+      await page.evaluate(() => window.__chess.controls.flip());
+      await settle(4);
+      const b = await info(), zb = await zs();
+      R.expect('portrait pixel, Black view: the rows moved to the other end (the near end again), on ground, audit clean', zb.neg === 25 && b.onScreen === 25 && b.overBoard === 0 && b.audit.length === 0 && b.under.every((u) => u.hitY !== null && Math.abs(u.hitY - u.y) < 0.1), JSON.stringify(zb), JSON.stringify({ b, zb }));
+      await shot('portrait-pixel-black-view');
+    }
+  }
+  // rotating the phone moves the pieces between the rows and the sides
+  await page.setViewport({ ...SIZES.landscape, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await new Promise((ok) => setTimeout(ok, 500));   // the resize event of a touch device is handled at once, the render targets 160 ms later
+  await settle();
   r = await info();
-  R.expect('portrait: full tray audit clean (trays may sit off screen)', r.audit.length === 0, 'clean', JSON.stringify(r.audit));
+  R.expect('portrait to landscape: the pieces move to the sides again, audit clean', r.n === 25 && r.onScreen === 25 && r.audit.length === 0, 'at the sides', JSON.stringify(r));
 
   R.expect('no console error or warning', !w.errs.length && !w.warns.length, 'none', [...w.errs, ...w.warns].slice(0, 5).join(' | '));
   await contactSheets(browser, SHOTS, { cols: 3, width: 640 });

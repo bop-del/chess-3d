@@ -10,7 +10,6 @@ export function board({ base }) {
     frame: { map: null, normalMap: null, roughnessMap: null, color: '#34373e', metalness: 0.85, roughness: 0.32, clearcoat: 0.3 },
     inlay: { map: null, normalMap: null, roughnessMap: null, color: '#1b1d22', metalness: 0.7, roughness: 0.3 },
     plinth: { color: '#2a2c32', metalness: 0.6 },
-    tray: { color: '#2a2c32', metalness: 0.8, roughness: 0.35 },
   };
 }
 
