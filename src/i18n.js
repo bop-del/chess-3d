@@ -116,6 +116,9 @@ export const DE = {
   'lines.go': 'Los', 'lines.next': 'Zeig nächsten Zug', 'lines.cont': 'Weiter', 'lines.hint': 'Hinweis', 'lines.again': 'Nochmal', 'lines.end': 'Beenden',
   'lines.drillMiss': 'Nicht ganz. Versuch es nochmal.',
 
+  // offline cache (CHE-304)
+  'update.banner': 'Neue Version, neu laden',
+
   // loader and notices
   'loader.sub': 'Brett und Figuren werden gebildet', 'loader.start': 'Start',
   'loader.error': 'Beim Laden ist etwas schiefgegangen',

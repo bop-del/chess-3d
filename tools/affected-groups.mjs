@@ -65,6 +65,7 @@ export const MAP = [
   [/^src\/menu-a\.css$/, ['menu a', 'open', 'fixes', 'core']],
   [/^test\/clock-page\.mjs$/, ['clock']],
   [/^test\/adapt-page\.mjs$/, ['adapt']],
+  [/^(src\/update-banner\.js|test\/offline-page\.mjs)$/, ['offline']],
   [/^test\/adapt\.mjs$/, []],
   [/^test\/daily-page\.mjs$/, ['puzzles']],
 ];

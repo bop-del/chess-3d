@@ -10,6 +10,7 @@ import { LEVELS } from './ai.js';
 import { createLiving } from './living.js';
 import { createGameClock } from './clock.js';
 import { initialPreset, mountClock } from './clock-ui.js';
+import { swWanted, createUpdates } from './update-banner.js';
 import { createAdapter } from './adapt.js';
 import { LABEL as VERSION_LABEL } from './version.js';
 
@@ -346,6 +347,7 @@ async function boot() {
 
   window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, living, clock, train: { store, drill, sweep, learn } };
   window.__chess.clockUi = clockUi;
+  if (swWanted()) { const updates = createUpdates(); window.__chess.update = updates; updates.start(); }   // CHE-304: offline cache + new version banner
   window.__chess.news = news;
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));

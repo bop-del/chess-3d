@@ -264,3 +264,8 @@ body.puzzling .lcard[data-card="openings"], body.drilling .lcard[data-card="open
 .lcard .xrow .btn { flex: 1 1 40%; min-height: 40px; }
 .lcard .xclose { align-self: flex-start; }
 body.touch:not(.phone) .panel .turn b { white-space: normal; line-height: 1.2; }
+
+/* CHE-304: "New version, reload" banner. A thin bar on top; a tap on it reloads, nothing reloads on its own. */
+#update-banner { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 45; pointer-events: auto; }
+#update-banner .btn { min-height: 44px; padding: 8px 18px; background: var(--gold, #d8b468); color: #1a1408; font-weight: 600; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); }
+@media (max-width: 600px) { #update-banner { top: calc(max(10px, env(safe-area-inset-top)) + 54px); } }   /* below the status line */
