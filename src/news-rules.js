@@ -30,8 +30,5 @@ export function isUnread(seen, newest) {
   return b[0] > a[0] || (b[0] === a[0] && (b[1] > a[1] || (b[1] === a[1] && b[2] > a[2])));
 }
 
-export const VARIANTS = ['a', 'b', 'c'];
-export const DEFAULT_VARIANT = 'a';
-export const pickVariant = (v) => (VARIANTS.includes(v) ? v : DEFAULT_VARIANT);
 
 export const releaseUrl = (version) => `https://github.com/bop-del/chess-3d/releases/tag/v${version}`;

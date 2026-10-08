@@ -899,16 +899,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     return host ? element : null;
   }
 
-  // The News entry (src/news.js, CHE-333). 'top': the first row of Options (desktop Settings tab, phone Options sheet); 'head': a pill in the
-  // panel header (desktop) or the head of the Options sheet (phone). Null when there is no Options here (the old phone menu).
-  function mountNewsEntry(element, where = 'top') {
+  // The News entry (src/news.js, CHE-333): the first row of Options (desktop Settings tab, phone Options sheet). Null when there is no Options here (the old phone menu).
+  function mountNewsEntry(element) {
     const sheet = menuA && phoneUI ? phoneUI.sheets?.options : null;
-    if (where === 'head') {
-      const host = dsk ? hud.querySelector('.phead .hbtns') : sheet?.el.querySelector('.psheet-head');
-      if (!host) return null;
-      if (dsk) host.prepend(element); else host.insertBefore(element, host.querySelector('.psheet-x'));
-      return element;
-    }
     const host = dsk ? hud.querySelector('#tp-settings') : sheet?.body;
     host?.prepend(element);
     return host ? element : null;

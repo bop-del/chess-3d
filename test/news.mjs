@@ -1,5 +1,5 @@
 // News rules and data (CHE-235), fast tier, no browser: node test/news.mjs   Exit 0 when every case holds, 1 otherwise.
-import { shouldAutoOpen, parse, releaseUrl, decide, isUnread, pickVariant } from '../src/news-rules.js';
+import { shouldAutoOpen, parse, releaseUrl, decide, isUnread } from '../src/news-rules.js';
 import { NEWS } from '../src/news-data.js';
 import { readFileSync } from 'node:fs';
 
@@ -14,7 +14,7 @@ check('nothing remembered (first visit) does not open', !shouldAutoOpen(null, '1
 check('a broken stored value does not open', !shouldAutoOpen('abc', '1.6.0') && parse('x') === null);
 check('release link', releaseUrl('1.6.0') === 'https://github.com/bop-del/chess-3d/releases/tag/v1.6.0');
 
-// CHE-333: the first visit to the new address, the dot, the variant
+// CHE-333: the first visit to the new address, the dot
 const on = (o) => decide({ current: '1.10.1', newHost: true, ...o });
 const off = (o) => decide({ current: '1.10.1', newHost: false, ...o });
 check('new host, true first visit (nothing remembered): opens, remembers, marks', (() => { const d = on({ last: null, first: false }); return d.open && d.write && d.mark; })());
@@ -26,7 +26,6 @@ check('other host, first visit stays silent as before', (() => { const d = off({
 check('other host: patch silent, minor opens, same silent', !off({ last: '1.10.0' }).open && off({ last: '1.9.0' }).open && !off({ last: '1.10.1' }).open && !off({ last: '1.10.1' }).write);
 check('the dot: unread while the remembered version is older', isUnread('1.9.0', '1.10.1') && isUnread('1.10.0', '1.10.1'));
 check('the dot: gone when current or newer, none for nothing remembered or junk', !isUnread('1.10.1', '1.10.1') && !isUnread('2.0.0', '1.10.1') && !isUnread(null, '1.10.1') && !isUnread('x', '1.10.1'));
-check('variant: a, b, c pass; anything else is the default a', ['a', 'b', 'c'].every((v) => pickVariant(v) === v) && pickVariant('z') === 'a' && pickVariant(null) === 'a');
 { // storage blocked: reading the rules never touches storage; the mount wraps access in try/catch (page test covers it)
   const src = readFileSync(new URL('../src/news.js', import.meta.url), 'utf8');
   check('every localStorage access in news.js sits in try/catch', (src.match(/localStorage\./g) || []).length === (src.match(/try \{[^}]*localStorage\./g) || []).length);

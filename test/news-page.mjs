@@ -132,25 +132,24 @@ try {
   await load(page, PHONE, { seed: VERSION, query: '&news=1' });
   R.expect('?news=1 on a phone: opens', await newsOpen(page));
 
-  // CHE-333: the News entry, the dot, the three variants, the first visit to the new address
+  // CHE-333: the News entry, the dot, the one row, the first visit to the new address
   const olderSeed = MIN > 0 ? older : `${MAJ - 1}.0.0`;
   const topOf = (page, sel) => ev(page, (s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { top: r.top, h: r.height, w: r.width }; }, sel);
-  const entryState = (page) => ev(page, () => { const e = document.querySelector('#news-entry'); const cs = e && getComputedStyle(e.querySelector('.ne-dot')); return e ? { variant: e.dataset.variant, dot: cs.display !== 'none', unread: e.classList.contains('unread'), tabDot: !!document.querySelector('#tab-settings.odot, .tb[data-act=options].odot'), text: e.textContent } : null; });
+  const entryState = (page) => ev(page, () => { const e = document.querySelector('#news-entry'); const cs = e && getComputedStyle(e.querySelector('.ne-dot')); return e ? { cls: e.className, dot: cs.display !== 'none', unread: e.classList.contains('unread'), tabDot: !!document.querySelector('#tab-settings.odot, .tb[data-act=options].odot'), text: e.textContent } : null; });
   const EV = [['phone portrait', 390, 844, true], DESK];
   for (const size of EV) {
     const tag = size[0];
-    for (const v of ['a', 'b', 'c']) {
-      await load(page, size, { seed: olderSeed, manual: true, query: `&variant=${v}` });
+    {
+      await load(page, size, { seed: olderSeed, manual: true, query: '&variant=c' });   // the old look flag changes nothing
       await showOptions(page, size);
       const st = await entryState(page);
-      R.expect(`${tag} variant ${v}: the entry is there with the dot and the Options button has one`, !!st && st.variant === v && st.dot && st.unread && st.tabDot, 'dot', JSON.stringify(st));
+      R.expect(`${tag}: the entry is there with the dot and the Options button has one`, !!st && st.cls === 'newsentry unread' && st.dot && st.unread && st.tabDot, 'dot', JSON.stringify(st));
       const inView = await ev(page, () => { const e = document.querySelector('#news-entry'); e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return r.width > 2 && r.top >= 0 && r.bottom <= innerHeight; });
-      R.expect(`${tag} variant ${v}: the entry is on screen`, inView && await shown(page, '#news-entry'));
+      R.expect(`${tag}: the entry is on screen`, inView && await shown(page, '#news-entry'));
       const box = await topOf(page, '#news-entry');
-      R.expect(`${tag} variant ${v}: the entry is a ${size[3] ? 44 : 32} px target`, !!box && box.h >= (size[3] ? 43.5 : 31.5), '>= min', JSON.stringify(box));
-      if (v === 'c') R.expect(`${tag} variant c: the card names the newest headline`, st.text.includes(`v${VERSION}`), VERSION, st.text);
-      if (args.includes('--shots')) { await ev(page, () => { document.querySelector('#news-entry').scrollIntoView({ block: 'center' }); for (const e of document.querySelectorAll('.psheet-body, .pbody, #tp-settings')) e.scrollTop = 0; }); await settleUi(page); await page.screenshot({ path: `${SHOTS}/entry-${v}-${tag.replace(/ /g, '-')}.png` }); }
-      if (v === 'a') {
+      R.expect(`${tag}: the entry is a ${size[3] ? 44 : 32} px target`, !!box && box.h >= (size[3] ? 43.5 : 31.5), '>= min', JSON.stringify(box));
+      if (args.includes('--shots')) { await ev(page, () => { document.querySelector('#news-entry').scrollIntoView({ block: 'center' }); for (const e of document.querySelectorAll('.psheet-body, .pbody, #tp-settings')) e.scrollTop = 0; }); await settleUi(page); await page.screenshot({ path: `${SHOTS}/entry-${tag.replace(/ /g, '-')}.png` }); }
+      {
         await ev(page, () => document.querySelector('#news-entry').click());
         await settleUi(page);
         R.expect(`${tag}: tapping the entry opens the News`, await newsOpen(page));
@@ -160,11 +159,11 @@ try {
         await ev(page, () => document.querySelector('#news-close').click());
       }
     }
-    // no dot for someone who is up to date; the default (no flag) is a
+    // no dot for someone who is up to date
     await load(page, size, { seed: VERSION, manual: true });
     await showOptions(page, size);
     const cur = await entryState(page);
-    R.expect(`${tag}: up to date, no dot; no flag shows variant a`, !!cur && cur.variant === 'a' && !cur.dot && !cur.tabDot, 'a, no dot', JSON.stringify(cur));
+    R.expect(`${tag}: up to date, no dot`, !!cur && !cur.dot && !cur.tabDot, 'no dot', JSON.stringify(cur));
   }
   // Options without a dot must not shift for returning users: the entry is a row of its own, the rest only moves down by it (the sheet scrolls)
   // first visit to the new address: opens once, then not
