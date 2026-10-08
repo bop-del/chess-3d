@@ -16,6 +16,7 @@ The tiles in Options showed two colour dots (CHE-265). Three styles were tried b
 - `test/tiles.mjs` (fast tier) fails when an id in the Options rows has no file or a file has no id, and prints the regenerate command.
 - The styles with pixel and line icons and the `?tiles=` flag are removed. Light keeps its tiles.
 - README and CLAUDE.md state the exception in one line each.
+- The pictures preload in idle time once the board takes input (CHE-345, `preloadAllTiles` in `src/themes/tiles.js`, skipped on Save-Data or a 2g connection), so Options shows them at once; the service worker keeps them.
 
 ## Rationale
 

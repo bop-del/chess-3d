@@ -86,6 +86,44 @@ try {
     R.expect('desktop: plays out within half a second of loading being done', tail <= allowed, `${Math.round(tail)} ms (slowest frame ${Math.round(r.boot.frameMs || 0)} ms)`, `${Math.round(tail)} ms > ${Math.round(allowed)} ms`);
     R.expect('desktop: ends as the finished game', !f.bad.length && f.view === 'white' && f.loaderDone && !f.introClass && f.lights === 3, `view ${f.view}, 3 lights`, JSON.stringify(f));
     R.expect('desktop: no console error or foreign request', clean(watch), '', dirty(watch));
+    // CHE-345: the sequence lasts at least about a second, the first picture is the static one, the board takes a tap at once, the tiles preload
+    const playMs = r.boot.ready - r.boot.script;
+    R.expect('start: the sequence plays for at least about a second', playMs >= 1000, `${Math.round(playMs)} ms from script to ready`, `${Math.round(playMs)} ms`);
+    const fp = await page.evaluate(() => Math.round(performance.getEntriesByType('paint').find((e) => e.name === 'first-contentful-paint')?.startTime || 0));
+    const pic = await page.evaluate(() => !!document.querySelector('#loader .start-pic svg path'));
+    R.expect('start: the start picture is in the page itself (first paint before the script ran)', pic && fp > 0 && fp <= r.boot.script + 50, `first paint ${fp} ms, script ${Math.round(r.boot.script)} ms, ready ${Math.round(r.boot.ready)} ms`, `paint ${fp} script ${Math.round(r.boot.script)}`);
+    const tap = await page.evaluate(async () => {
+      const c = window.__chess, v = new c.THREE.Vector3(-0.5, 0.3, 2.5).applyMatrix4(c.gimbal.matrixWorld).project(c.stage.camera);   // e2
+      const x = (v.x + 1) / 2 * innerWidth, y = (1 - v.y) / 2 * innerHeight, a = performance.now();
+      const cv = document.getElementById('stage');
+      for (const type of ['pointerdown', 'pointerup']) cv.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', button: 0, buttons: type === 'pointerdown' ? 1 : 0, bubbles: true }));
+      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      return { ms: Math.round(performance.now() - a), sel: c.game.getState().selected ?? null };
+    });
+    R.expect('start: the first tap after the board shows is answered within 3 s (software GL)', tap.ms < 3000, `${tap.ms} ms (interactive at ${Math.round(r.boot.interactive)} ms)`, `${tap.ms} ms`);
+    const tiles = await page.evaluate(async () => { await new Promise((res) => setTimeout(res, 1500)); return window.__tilesPreloaded ? await window.__tilesPreloaded : -1; });
+    R.expect('start: the Options tile pictures preload in idle time', tiles >= 17, `${tiles} decoded`, `${tiles}`);
+    await page.close();
+  }
+
+  // ---------------------------------------------------------------- CHE-345: links with a state skip the start picture and the sequence
+  for (const q of ['fen=8/8/8/4k3/8/8/4P3/4K3_w_-_-_0_1&ai=0', 'moves=e2e4,e7e5&ai=0', 'view=black&ai=0', 'open=settings&ai=0']) {
+    const { page, watch } = await open(browser, { prep: (p) => p.evaluateOnNewDocument(() => {
+      window.__direct = { intro: false, picShown: false };
+      const poll = () => {
+        if (document.body?.classList.contains('intro') && getComputedStyle(document.body).opacity !== undefined && document.getElementById('loader')?.classList.contains('live')) window.__direct.intro = true;
+        const pic = document.querySelector('.start-pic');
+        if (pic && getComputedStyle(pic).display !== 'none' && getComputedStyle(pic).opacity !== '0') window.__direct.picShown = true;
+        if (!window.__chessReady) requestAnimationFrame(poll);
+      };
+      requestAnimationFrame(poll);
+    }) });
+    const t0 = Date.now();
+    await page.goto(url('quality=low&' + q), { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await ready(page);
+    const d = await page.evaluate(() => ({ ...window.__direct, direct: document.documentElement.classList.contains('direct'), noIntro: !window.__intro, boot: window.__chessBoot }));
+    R.expect(`direct link ?${q.split('&')[0]}: no start picture, no sequence`, d.direct && !d.picShown && !d.intro && d.noIntro, `target state at ${Math.round(d.boot.ready)} ms`, JSON.stringify(d));
+    R.expect(`direct link ?${q.split('&')[0]}: no console error`, clean(watch), '', dirty(watch));
     await page.close();
   }
 

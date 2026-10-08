@@ -65,7 +65,11 @@ window.addEventListener('unhandledrejection', (e) => fail(e.reason));
 // ?manual=1 (tests step the clock themselves; ?intro=1 forces it on, then the test drives window.__intro.tick).
 const manual = params.get('manual') === '1';
 const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const wantIntro = params.get('intro') === '1' || (params.get('intro') !== '0' && !manual && !reduced);
+// CHE-345: a link that sets a state (position, view, panel ...) opens straight in it: no start picture, no sequence. The list is the
+// same as in index.html, which hides the start picture from the first frame; ?intro=1 plays the sequence anyway.
+const DIRECT_FLAGS = ['fen', 'moves', 'open', 'select', 'view', 'promo', 'line', 'preset', 'yaw', 'pitch', 'dist', 'gx', 'gy', 'gz', 'symbols', 'help', 'hud', 'spin', 'light', 'theme'];
+const direct = DIRECT_FLAGS.some((k) => params.has(k));
+const wantIntro = params.get('intro') === '1' || (params.get('intro') !== '0' && !manual && !reduced && !direct);
 
 async function boot() {
   if (!wantIntro) document.body.classList.remove('intro');   // index.html starts with it: the HUD stays hidden from the first paint while the sequence plays
@@ -220,6 +224,9 @@ async function boot() {
   applyGameParams({ game });   // ?fen, ?moves, ?select, ?ai: before the sequence takes the pieces
   intro?.attachGame(game);
   themes.attachGame(game);
+  // CHE-345: the first selection makes one more shader program (the select mark). Show one now, while the sequence still plays,
+  // so the first tap on the finished board does not compile it (a clean start only: a link with a position keeps its own state)
+  if (!direct) { try { game.selectSquare('e2'); stage.render(0); game.clickSquare(game.nameSq('e2')); } catch (e) { /* the first tap compiles it instead */ } }
   compile();
   await tick();
   // the HUD is built now, not last: on a phone it tells the camera which part of the canvas is free, and the sequence ends in
@@ -378,6 +385,8 @@ async function boot() {
     await new Promise((res) => { if (window.__loader) window.__loader.finish(res); else res(); });
   }
   boot.ready = performance.now();
+  boot.interactive = boot.ready;   // the board takes a tap from here (the HUD and the input are live); tests measure the first tap after it
+  try { performance.mark('chess:ready'); } catch (e) { /* no User Timing */ }
   adapter.arm();   // the start sequence is over: the adapter's warm up starts now
   // test hook: the same code paths as the start flags ?view (and ?symbols, ?preset, ?yaw ...) and ?open, on the running page. An open
   // value first closes a sheet that a call before it left open, so every call starts from a closed panel.
@@ -390,7 +399,22 @@ async function boot() {
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
   window.__chessReady = true;
+  preloadTiles();
   if (device.ios && !device.standalone) import('./install-hint.js').then((m) => m.mountInstallHint()).catch(() => {});   // iPhone Safari only
+}
+
+// CHE-345: the 17 Options tile pictures load in idle time once the board takes input, so Options shows them at once (ADR 0011).
+// The service worker (CHE-304) keeps them; a metered or saving connection skips it.
+function preloadTiles() {
+  const c = navigator.connection;
+  if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ''))) return;
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 400));
+  idle(async () => {
+    try {
+      const { preloadAllTiles } = await import('./themes/tiles.js');
+      window.__tilesPreloaded = preloadAllTiles();
+    } catch (e) { /* the tiles load when Options opens, as before */ }
+  }, { timeout: 4000 });
 }
 
 // the one calm toast of the adaptive governor (outside boot(): a local `t` there is the game clock)

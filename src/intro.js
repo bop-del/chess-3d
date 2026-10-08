@@ -17,6 +17,7 @@ import { dropT, easeOutBackT, DROP_SPAN } from './board.js';
 
 const MIN_BUILD = 1.2;     // seconds from 0 to 1 at the fastest
 const BUDGET = 0.45;       // seconds the sequence may take after loading is done
+const MIN_TOTAL = 1.0;     // CHE-345: and it never ends sooner than this after its first frame, also on a fast phone
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const seg = (p, a, b) => clamp((p - a) / (b - a));
 const sstep = (a, b, x) => { const t = seg(x, a, b); return t * t * (3 - 2 * t); };
@@ -69,7 +70,7 @@ export function createIntro({ stage, gimbal, pieceSet, phone = false, darkEl = n
   // ---- state
   let board = null, game = null, boardReady = false;
   let pieces = [], trays = [], frameParts = [], goldInlay = null;
-  let target = 0, shown = 0, doneAt = 0, finishing = false, ended = false, disposed = false, onEnd = null;
+  let target = 0, shown = 0, doneAt = 0, startAt = null, finishing = false, ended = false, disposed = false, onEnd = null;
   let clock = 0;
   let first = true, cap = 1;
   const camEnd = new THREE.Vector3(), lookEnd = new THREE.Vector3(), fwd = new THREE.Vector3();
@@ -134,13 +135,14 @@ export function createIntro({ stage, gimbal, pieceSet, phone = false, darkEl = n
   function update(dt) {
     if (disposed || ended) return;
     clock += dt;
+    if (startAt === null) startAt = now();
     readEnd(dt);
     // shown follows target at the base speed; after loading is done it must be at 1 within BUDGET of the wall clock
     const lim = limit(), goal = Math.min(target, lim);
     if (shown < goal) {
       let rate = 1 / MIN_BUILD;
       if (finishing) {
-        const left = Math.max(0.02, BUDGET - (now() - doneAt) - dt);   // dt: this frame's length, so a slow frame does not overshoot
+        const left = Math.max(0.02, Math.max(doneAt + BUDGET, startAt + MIN_TOTAL) - now() - dt);   // dt: this frame's length, so a slow frame does not overshoot
         rate = Math.max(rate, (1 - shown) / left);
       }
       shown = Math.min(goal, shown + rate * dt);
