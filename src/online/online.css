@@ -265,3 +265,6 @@ body.phone:has(.psheet.ponline.open) .ochpill, body.phone:has(.psheet.ponline.op
 body.phone .opd.opds { pointer-events: auto; position: fixed; z-index: 18; left: var(--sl, 0px); right: var(--sr, 0px); bottom: calc(var(--sb, 0px) + var(--bar, 56px) + var(--gap, 8px)); max-width: 520px; margin-inline: auto; max-height: min(68vh, calc(100vh - 140px)); overflow-y: auto; border-radius: 18px 18px 0 0; box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.35); animation: ochsin 0.28s ease; }
 body.phone .opd.opds[hidden] { display: none; }
 body.phone:not(:has(.psheet.ponline.open)) .opd.opds { display: none; }
+
+/* CHE-343: the bot tag next to the name of the bot */
+.obot { display: inline-block; padding: 1px 6px; border-radius: 999px; background: var(--chip, rgba(255, 255, 255, 0.14)); color: var(--dim); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }

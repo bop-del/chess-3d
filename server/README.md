@@ -30,6 +30,7 @@ Invite players (the command prints the link and the code):
 | `ONLINE_PUBLIC_URL` | `http://localhost:<port>` | This server as the browser reaches it, put into the link as `?online=` (admin only) |
 | `ONLINE_VAPID_FILE` | none | CHE-272: the web push key file (JSON, mode 600, made once by `node server/admin.mjs push-keys`). Without it push is off and `/push/*` answers 404. A secret like `ONLINE_ADMIN_SECRET`: back it up, losing it invalidates every subscription |
 | `ONLINE_VAPID_SUBJECT` | none | `mailto:` (or `https:`) contact sent to the push services; push stays off without it |
+| `ONLINE_BOT` | off | CHE-343: `1` turns the bot on (a player row `Bot`, marked as a bot in the player list, always online, no key and no code). Test and production differ only in this env file. `ONLINE_BOT_NAME` changes the name. |
 | `ONLINE_GAME_URL` | `http://localhost:5173/` | (also read by the server) the page a tap on a push opens, for example `https://chess.example.com/` |
 | `AUTH_SPIKE_CLIENT_ID` | none | CHE-341 spike: the Google OAuth client id. Without it `/auth-spike` answers 404 (the route does not exist). The only server dependency is `jose` (`server/package.json`, `npm ci --omit=dev` in `server/`) |
 | `AUTH_SPIKE_RETURN` | none | CHE-341 spike: the page `POST /auth-spike` sends the browser back to (303, marker in the fragment), for example `https://chess3d.borisdiebold.com/auth-spike.html`. Must be on the game origin, in `ONLINE_ORIGINS` or a local preview origin, else 400 |
@@ -45,7 +46,8 @@ Nothing secret lives in the repo: keys and codes are stored only as sha256 hashe
     node server/admin.mjs delete <name>         # all of the player's data gone
     node server/admin.mjs chat <name>           # print all of that player's conversations
     node server/admin.mjs mute <name>           # cannot write chat messages (unmute <name> undoes it)
-    node server/admin.mjs list                  # the players
+    node server/admin.mjs admin <name>          # CHE-343: may make the bot challenge them (unadmin <name> undoes it)
+    node server/admin.mjs list                  # the players (marks admin and bot)
     ONLINE_VAPID_FILE=/path/vapid.json node server/admin.mjs push-keys   # the push key pair, once (refuses to overwrite)
 
 The link is `<game>?online=<server>&open=online#online=<key>`: the key travels in the fragment, which the browser never sends to a
@@ -78,6 +80,7 @@ JSON, `Authorization: Bearer <key>` except `/up` and `/login-code`. An unknown k
 | `GET /push/key` | | `{ key }` the VAPID public key (base64url). CHE-272. 404 for all three push routes when push is off |
 | `POST /push/subscribe` | `{ endpoint, keys: { p256dh, auth } }` | `{ ok }` (the browser's `PushSubscription.toJSON()`; one row per endpoint, at most 10 per player; an endpoint must be https) |
 | `POST /push/unsubscribe` | `{ endpoint }` | `{ ok }` |
+| `POST /bot/challenge` | `{}` | `{ ok, id }`. CHE-343: the bot challenges the calling admin (403 `admin-only` for others, 404 when the bot is off). The bot accepts a challenge to it at once, moves 2 to 5 s after the human with the easy AI of the client (`src/ai.js`, search in slices, capped at 2 s, then a random legal move), answers chat with a canned German line and triggers the same pushes as a human. Code: `server/bot.mjs`. |
 | `POST /auth-spike` | none | CHE-341 spike only, with `AUTH_SPIKE_CLIENT_ID`: Google sign-in redirect flow. Form body `credential` and `g_csrf_token` (must equal the `g_csrf_token` cookie); verifies the ID token (jose, Google's keys, issuer, audience, expiry), answers 303 to `AUTH_SPIKE_RETURN#spike=redirect&sub=<sub>`, else 400 with a short text. Stores and logs nothing |
 | `GET /stats`, `POST /stats` | secret | The stats dashboard (HTML), only with `ONLINE_ADMIN_SECRET`: `Authorization: Bearer <secret>` or the form on the page (a POST body, never a URL). 401 without it, 404 when no secret is set |
 

@@ -6,6 +6,7 @@
 //   node server/admin.mjs delete <name>         all data of the player gone (games, chat)
 //   node server/admin.mjs chat <name>           prints all of that player's conversations
 //   node server/admin.mjs mute <name> | unmute <name>   cannot write chat messages, or can again
+//   node server/admin.mjs admin <name> | unadmin <name>   may make the bot challenge them (the bot itself runs with ONLINE_BOT=1)
 //   node server/admin.mjs push-keys             creates the VAPID key pair once into ONLINE_VAPID_FILE (mode 600, never overwritten)
 //   node server/admin.mjs list                  the players
 // Env: ONLINE_DB (default .tmp/online/online.db), ONLINE_GAME_URL (the game page, default http://localhost:5173/), ONLINE_PUBLIC_URL
@@ -57,9 +58,11 @@ export function runAdmin(argv, { env = loadEnv(), out = console.log } = {}) {
         }
         return all;
       }
-      case 'list': for (const p of ops.list()) out(`${p.name}${p.revoked ? ' (revoked)' : ''}${p.muted ? ' (muted)' : ''}`); return true;
+      case 'admin': out(`${ops.setAdmin(name, true)} is an admin`); return true;
+      case 'unadmin': out(`${ops.setAdmin(name, false)} is no admin`); return true;
+      case 'list': for (const p of ops.list()) out(`${p.name}${p.revoked ? ' (revoked)' : ''}${p.muted ? ' (muted)' : ''}${p.admin ? ' (admin)' : ''}${p.bot ? ' (bot)' : ''}`); return true;
       default:
-        out('usage: node server/admin.mjs invite <name> [--new] | push-keys | revoke <name> | delete <name> | chat <name> | mute <name> | unmute <name> | list');
+        out('usage: node server/admin.mjs invite <name> [--new] | push-keys | revoke <name> | delete <name> | chat <name> | mute <name> | unmute <name> | admin <name> | unadmin <name> | list');
         return false;
     }
   } finally { db.close(); }

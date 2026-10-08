@@ -104,6 +104,7 @@ const FAST = [
   ['game review core: classification, accuracy, engine (test/review-core.mjs)', 'test/review-core.mjs'],
   ['training core: ladder, store, planner (test/train.mjs)', 'test/train.mjs'],
   ['online play server: invite, login, challenge, moves, chat, admin (test/online-server.mjs)', 'test/online-server.mjs', true],
+  ['online bot: listing, accept, moves, chat, pushes, admin button, capped search (test/online-bot.mjs)', 'test/online-bot.mjs', true],
   ['several online games and challenges at once (test/online-multi.mjs)', 'test/online-multi.mjs', true],
   ['web push: RFC 8291 vector, VAPID, routes, fake push service (test/online-push.mjs)', 'test/online-push.mjs', true],
   ['online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs'],

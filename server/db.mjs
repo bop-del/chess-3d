@@ -20,7 +20,7 @@ export function normCode(s) {
 }
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, code_hash TEXT, revoked INTEGER NOT NULL DEFAULT 0, muted INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, code_hash TEXT, revoked INTEGER NOT NULL DEFAULT 0, muted INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, bot INTEGER NOT NULL DEFAULT 0, admin INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS keys (key_hash TEXT PRIMARY KEY, player_id INTEGER NOT NULL, created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS challenges (id INTEGER PRIMARY KEY, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, status TEXT NOT NULL, created INTEGER NOT NULL, answered INTEGER);
 CREATE TABLE IF NOT EXISTS games (id INTEGER PRIMARY KEY, white_id INTEGER NOT NULL, black_id INTEGER NOT NULL, status TEXT NOT NULL, result TEXT, reason TEXT, winner_id INTEGER, created INTEGER NOT NULL, last_move_at INTEGER NOT NULL, ended INTEGER);
@@ -43,6 +43,8 @@ export function openDb(file) {
   const db = new DatabaseSync(file);
   if (file !== ':memory:') db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 3000;');
   db.exec(SCHEMA);
+  const cols = db.prepare('PRAGMA table_info(players)').all().map((c) => c.name);   // CHE-343: a database from before the bot gets its two columns
+  for (const c of ['bot', 'admin']) if (!cols.includes(c)) db.exec(`ALTER TABLE players ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);
   return db;
 }
 
@@ -106,6 +108,13 @@ export function adminOps(db, now = () => Date.now()) {
       }
       return [...by].map(([w, messages]) => ({ with: w, messages }));
     },
-    list() { return db.prepare('SELECT name, revoked, muted, created FROM players ORDER BY name').all(); },
+    /** CHE-343: the admin flag of a player (the bot challenge button is for admins only) */
+    setAdmin(name, on = true) {
+      const p = byName(name); if (!p) throw new Error(`no player ${name}`);
+      if (p.bot) throw new Error(`${p.name} is the bot`);
+      db.prepare('UPDATE players SET admin = ? WHERE id = ?').run(on ? 1 : 0, p.id);
+      return p.name;
+    },
+    list() { return db.prepare('SELECT name, revoked, muted, admin, bot, created FROM players ORDER BY name').all(); },
   };
 }

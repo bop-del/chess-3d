@@ -15,6 +15,7 @@ addDE({
   'online.codeLabel': 'Einladungscode eingeben', 'online.codeGo': 'Anmelden',
   'online.codeWrong': 'Dieser Code passt nicht.', 'online.codeSlow': 'Zu viele Versuche. Bitte warte ein paar Minuten.', 'online.codeNet': 'Keine Verbindung zum Server.',
   'online.you': 'Du bist {name}', 'online.players': 'Spieler', 'online.noPlayers': 'Noch niemand sonst ist eingeladen.',
+  'online.botTag': 'Bot', 'online.botChallenge': 'Bot fordert mich heraus',
   'online.challenge': 'Herausfordern', 'online.playing': 'spielt', 'online.online': 'online', 'online.offline': 'nicht da',
   'online.challengesYou': '{name} fordert dich heraus', 'online.accept': 'Annehmen', 'online.decline': 'Nein danke',
   'online.waiting': 'Warte auf {name}...', 'online.declined': '{name} hat abgelehnt', 'online.ok': 'OK',

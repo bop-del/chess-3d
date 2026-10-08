@@ -12,6 +12,7 @@ import { createLive } from './live.mjs';
 import { createHealth, healthVerdict, serverSection, systemProbe, SAMPLE_MS } from './health.mjs';
 import { createPush, overLine, vapidLoad } from './push.mjs';
 import { statsFor } from './playerstats.mjs';
+import { createBot, BOT_NAME } from './bot.mjs';
 import { createAuthSpike } from './auth-spike.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
@@ -31,7 +32,7 @@ export function originAllowed(origin, list) {
   } catch (e) { return false; }
 }
 
-export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', authSpike = {}, pushFetch, log = () => {}, random = Math.random } = {}) {
+export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', authSpike = {}, pushFetch, log = () => {}, random = Math.random, bot: botOpts = null } = {}) {
   const admin = adminOps(db, now);
   const spike = createAuthSpike({ origins, originOk: (o) => originAllowed(o, origins), ...authSpike });   // CHE-341: a spike, off without a client id
   const stats = createStats(db, { now });
@@ -105,7 +106,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     const players = q('SELECT * FROM players WHERE id != ? AND revoked = 0 ORDER BY name COLLATE NOCASE').all(pid).map((p) => {
       const s = score.get(p.id) || { w: 0, l: 0, d: 0 };
       return {
-        name: p.name, online: live.online(p.id),
+        name: p.name, online: live.online(p.id) || !!p.bot, ...(p.bot ? { bot: true } : {}),   // CHE-343: the bot is always there
         playing: activeGames(p.id).some((x) => x.white_id !== pid && x.black_id !== pid),   // deprecated for the v1.10 client: in a game with someone else, blocks nothing now
         withMe: !!activeGameWith(pid, p.id),
         score: s, played: s.w + s.l + s.d,
@@ -130,7 +131,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       if (p.unread) unread[p.name] = p.unread;
     }
     return {
-      me: { name: me.name, muted: !!me.muted }, now: now(), players, challenges: { in: cin, out },
+      me: { name: me.name, muted: !!me.muted, ...(me.admin ? { admin: true } : {}) }, now: now(), players, challenges: { in: cin, out },
       games, game: g ? gameJson(g, pid) : null,   // game: deprecated, the newest active game else the last one (the v1.10 client reads it)
       chats, unread,
     };
@@ -154,7 +155,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         to(pid, 'over', { from, line: overLine(from, row.winner_id === pid, !row.winner_id), tag: `over:${row.id}`, query: '?open=online', data: { with: from, game: row.id } });
       }
     };
-    if (name === 'challenge' && !out.again) {
+    if (name === 'bot/challenge' && !out.again) {   // CHE-343: the bot asks the admin
+      to(me.id, 'challenge', { from: botName, tag: `challenge:${botName}`, query: '?open=online', data: { with: botName } });
+    } else if (name === 'challenge' && !out.again) {
       const other = playerByName(body.to);
       to(other.id, 'challenge', { from: me.name, tag: `challenge:${me.name}`, query: '?open=online', data: { with: me.name } });
     } else if (name === 'challenge/answer' && out.game) {
@@ -201,6 +204,15 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       const open = q("SELECT id FROM challenges WHERE from_id = ? AND to_id = ? AND status = 'open'").get(me.id, other.id);
       if (open) return { id: open.id, again: true };   // already asked: the same challenge, no second push
       const r = q("INSERT INTO challenges (from_id, to_id, status, created) VALUES (?, ?, 'open', ?)").run(me.id, other.id, now());
+      return { id: Number(r.lastInsertRowid) };
+    },
+    'bot/challenge'(me) {   // CHE-343: the bot challenges the calling admin (a button in the Online tab)
+      if (!me.admin) fail(403, 'admin-only');
+      const b = playerById(bot.id);
+      if (activeGameWith(me.id, b.id)) fail(409, 'you-are-playing');
+      const open = q("SELECT id FROM challenges WHERE from_id = ? AND to_id = ? AND status = 'open'").get(b.id, me.id);
+      if (open) return { id: open.id, again: true };
+      const r = q("INSERT INTO challenges (from_id, to_id, status, created) VALUES (?, ?, 'open', ?)").run(b.id, me.id, now());
       return { id: Number(r.lastInsertRowid) };
     },
     'challenge/answer'(me, { id, accept }) {
@@ -269,6 +281,25 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     },
   };
 
+  /** one action in one transaction (a retried POST with the same cid is answered above, before this) */
+  function runAction(name, me, body, cid) {
+    let out;
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      out = { ok: true, ...ACTIONS[name](me, body) };
+      if (cid) q('INSERT INTO actions (player_id, cid, response, at) VALUES (?, ?, ?, ?)').run(me.id, cid, JSON.stringify(out), now());
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
+    return out;
+  }
+  /** after the commit: the live update, the web push, the bot's turn to react */
+  function settle(name, me, body, out) {
+    health.touch();
+    broadcast();
+    try { pushAfter(name, me, body, out); } catch (e) { console.error(e); }
+    try { bot?.after(name, me, body, out); } catch (e) { console.error(e); }
+  }
+
   // ------------------------------------------------------------ http
   function cors(req) {
     const o = req.headers.origin;
@@ -328,7 +359,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       }
       const auth = String(req.headers.authorization || '');
       const me = authKey(auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
-      const known = ['/state', '/events', '/my-code', ...Object.keys(ACTIONS).map((a) => '/' + a), ...(push.enabled ? ['/push/key', '/push/subscribe', '/push/unsubscribe'] : [])];   // push off: its routes do not exist (404)
+      const known = ['/state', '/events', '/my-code', ...Object.keys(ACTIONS).filter((a) => bot || a !== 'bot/challenge').map((a) => '/' + a), ...(push.enabled ? ['/push/key', '/push/subscribe', '/push/unsubscribe'] : [])];   // push off: its routes do not exist (404)
       const playerPath = req.method === 'GET' && path.startsWith('/player/');   // CHE-290
       if (!known.includes(path) && !playerPath) { status = 404; return send(req, res, 404); }
       if (!me) { status = 401; return send(req, res, 401); }   // an unknown key gets 401 and nothing else
@@ -372,17 +403,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         const done = q('SELECT response FROM actions WHERE player_id = ? AND cid = ?').get(me.id, cid);
         if (done) return send(req, res, 200, JSON.parse(done.response));   // a retried POST is applied once
       }
-      let out;
-      db.exec('BEGIN IMMEDIATE');
-      try {
-        out = { ok: true, ...ACTIONS[name](me, body) };
-        if (cid) q('INSERT INTO actions (player_id, cid, response, at) VALUES (?, ?, ?, ?)').run(me.id, cid, JSON.stringify(out), now());
-        db.exec('COMMIT');
-      } catch (e) { db.exec('ROLLBACK'); throw e; }
+      const out = runAction(name, me, body, cid);
       send(req, res, 200, out);
-      health.touch();
-      broadcast();
-      try { pushAfter(name, me, body, out); } catch (e) { console.error(e); }
+      settle(name, me, body, out);
     } catch (e) {
       if (e instanceof Fail) { status = e.status; if (!res.headersSent) send(req, res, e.status, { error: e.code }); }
       else { status = 500; console.error(e); if (!res.headersSent) send(req, res, 500, { error: 'server' }); }
@@ -392,12 +415,21 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     }
   }
 
+  // CHE-343: the bot acts through the server's own path, as a player row without a key
+  const botName = botOpts?.name || BOT_NAME;
+  const bot = botOpts ? createBot(db, { now, log, random: botOpts.random || Math.random, ...botOpts, name: botName, act: (name, body) => {
+    const me = db.prepare('SELECT * FROM players WHERE name = ?').get(botName), out = runAction(name, me, body, null);
+    settle(name, me, body, out);
+    return out;
+  } }) : null;
+  bot?.resume();
+
   const server = createServer((req, res) => { handle(req, res); });
   server.keepAliveTimeout = 65000;
   return {
-    server, db, admin, live, stats, health, push, stateFor, broadcast,
+    server, db, admin, live, stats, health, push, bot, stateFor, broadcast,
     listen: (port, host) => new Promise((ok) => server.listen(port, host, () => ok(server.address().port))),
-    close: () => new Promise((ok) => { push.flush().catch(() => {}); clearInterval(statsTimer); clearInterval(sampleTimer); clearTimeout(firstTimer); health.stop(); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
+    close: () => new Promise((ok) => { push.flush().catch(() => {}); bot?.close(); clearInterval(statsTimer); clearInterval(sampleTimer); clearTimeout(firstTimer); health.stop(); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
   };
 }
 
@@ -416,6 +448,7 @@ export function loadEnv() {
     vapidFile: process.env.ONLINE_VAPID_FILE || '',   // CHE-272: no file, no push
     vapidSubject: process.env.ONLINE_VAPID_SUBJECT || '',
     gameUrl: process.env.ONLINE_GAME_URL || '',
+    bot: process.env.ONLINE_BOT === '1' ? { name: process.env.ONLINE_BOT_NAME || BOT_NAME } : null,   // CHE-343: the bot, on in the env file of the test and the production server
     authSpike: { clientId: process.env.AUTH_SPIKE_CLIENT_ID || '', returnUrl: process.env.AUTH_SPIKE_RETURN || '' },   // CHE-341
   };
 }
@@ -423,7 +456,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const env = loadEnv();
   const vapid = vapidLoad(env.vapidFile);
   if (!vapid || !/^(mailto:|https:)/.test(env.vapidSubject)) console.log(`push is off (${vapid ? 'ONLINE_VAPID_SUBJECT is not a mailto: or https: address' : 'no ONLINE_VAPID_FILE'})`);
-  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, authSpike: env.authSpike, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
+  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, authSpike: env.authSpike, bot: env.bot, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
   const port = await app.listen(env.port, env.host);
   console.log(`online server on http://${env.host}:${port} (db ${env.db})`);
   const stop = () => { app.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 2000).unref(); };

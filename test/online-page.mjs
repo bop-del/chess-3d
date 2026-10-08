@@ -6,7 +6,8 @@
 // (green, unlocked, the move goes through), resign, both see the result and the new score. Also: without ?online= there is no Online
 // tab; with it and no invite the sentence and the code field show; the 7 button phone bar keeps 44 px targets. Music and sound off
 // (?sound=0). The server is stopped in finally. --shots writes the Online tab at 390 px portrait, a landscape phone and 1440 px desktop,
-// in the Classic and the Pixelwelt look, to .tmp/online-shots.
+// in the Classic and the Pixelwelt look, to .tmp/online-shots. Last (CHE-343): a second server
+// with ONLINE_BOT=1: an admin makes the Bot challenge them, a player challenges it, it accepts, plays and chats.
 // Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -23,9 +24,9 @@ const SERVER = `http://127.0.0.1:${SPORT}`;
 const DB = join(ROOT, `.tmp/online/smoke-${process.pid}.db`);
 let server = null, browser = null, online = null;
 
-function startOnline() {
+function startOnline(extra = {}) {
   return new Promise((ok, bad) => {
-    const c = spawn(process.execPath, [join(ROOT, 'server/index.mjs')], { cwd: ROOT, env: { ...process.env, ONLINE_PORT: String(SPORT), ONLINE_HOST: '127.0.0.1', ONLINE_DB: DB }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const c = spawn(process.execPath, [join(ROOT, 'server/index.mjs')], { cwd: ROOT, env: { ...process.env, ONLINE_PORT: String(SPORT), ONLINE_HOST: '127.0.0.1', ONLINE_DB: DB, ...extra }, stdio: ['ignore', 'pipe', 'pipe'] });
     let log = '';
     const done = (fn, v) => { clearTimeout(timer); fn(v); };
     const timer = setTimeout(() => done(bad, new Error('online server did not start: ' + log.slice(-300))), 10000);
@@ -470,6 +471,43 @@ try {
     }
     R.pass('screenshots', SHOTS);
   }
+
+  // ------------------------------------------------------------ CHE-343 the bot: a second server with ONLINE_BOT=1 and its own database
+  await stopOnline();
+  for (const f of [DB, DB + '-wal', DB + '-shm']) rmSync(f, { force: true });
+  online = await startOnline({ ONLINE_BOT: '1' });
+  process.env.ONLINE_DB = DB;
+  const fb = runAdmin(['invite', 'Felix'], quiet), mb = runAdmin(['invite', 'Mia'], quiet);
+  runAdmin(['admin', 'Felix'], quiet);
+  const botLink = (key) => inviteLink({ game: `${BASE}/?${Q}`, server: SERVER, key });
+  const ctxF = await browser.createBrowserContext(), ctxM = await browser.createBrowserContext();
+  const F = await open(ctxF, botLink(fb.key));
+  R.expect('bot: connected, and the Bot card is listed, marked Bot, online', await until(F, () => window.__chessOnline?.status === 'connected' && !!document.querySelector('.op .obot')) && (await ev(F, () => document.querySelector('.op .obot').textContent.trim())) === 'Bot' && await ev(F, () => !!document.querySelector('.op .oname .obot') && !!document.querySelector('.op .pres.on')));
+  R.expect('bot admin: Felix (admin) has the button "Bot fordert mich heraus"', await shown(F, '[data-a=bot-challenge]'));
+  await click(F, '[data-a=bot-challenge]');
+  R.expect('bot admin: the bot challenge arrives (Annehmen) and a push-less open challenge is listed', await until(F, () => !!document.querySelector('.ochal [data-a=accept]') && /Bot fordert dich heraus/.test(document.querySelector('.ochal')?.textContent || '')));
+  await click(F, '[data-a=accept]');
+  R.expect('bot admin: accepted, the game against Bot is on the board', await until(F, () => window.__chessOnline?.match?.attached && window.__chessOnline.state.game?.status === 'active' && window.__chessOnline.state.game.opponent === 'Bot'));
+  const fc = await ev(F, () => window.__chessOnline.state.game.color);
+  const tBot = Date.now();
+  if (fc === 'w') await moveOn(F, 'e2e4');
+  R.expect('bot play: the bot answers with a move within 2 to 6 s', await until(F, () => window.__chessOnline.state.game.moves.length === (window.__chessOnline.state.game.color === 'w' ? 2 : 1), null, 12000), `${Date.now() - tBot} ms`);
+  const dt = Date.now() - tBot;
+  R.expect('bot play: the move did not come at once (2 s delay at least, 1.5 s with slack)', dt >= 1500, `${dt} ms`);
+  R.expect('bot play: board and server agree', await until(F, () => window.__chess.game.getState().moves.length === window.__chessOnline.state.game.moves.length && !window.__chess.game.busy, null, 5000));
+  if (fc === 'b') { await moveOn(F, 'e7e5'); }
+  else await moveOn(F, 'g1f3');
+  R.expect('bot play: after the second human move the bot moves again', await until(F, () => window.__chessOnline.state.game.moves.length === (window.__chessOnline.state.game.color === 'w' ? 4 : 3), null, 12000));
+  await click(F, '[data-a=chat][data-n="Bot"]');
+  await ev(F, () => { const i = document.querySelector('.osend input'); i.value = 'Hallo Bot'; document.querySelector('.osend').requestSubmit(); });
+  R.expect('bot chat: a canned German line comes back', await until(F, () => [...document.querySelectorAll('.omsgs li:not(.mine) span')].some((x) => x.textContent.length > 3), null, 9000));
+  await ev(F, () => document.querySelector('[data-a=resign]')?.click());
+  await ev(F, () => document.querySelector('[data-a=resign-yes]')?.click());
+  const PM = await open(ctxM, botLink(mb.key));
+  R.expect('bot: a normal player has the Bot card but no admin button', await until(PM, () => !!document.querySelector('.op .obot')) && !(await ev(PM, () => !!document.querySelector('[data-a=bot-challenge]'))));
+  await click(PM, '[data-a=challenge][data-n="Bot"]');
+  R.expect('bot challenge by a player: accepted at once, no human involved', await until(PM, () => window.__chessOnline?.state?.games?.some((g) => g.opponent === 'Bot' && g.status === 'active'), null, 8000));
+  await F.close(); await PM.close();
 } catch (e) {
   R.fail('online run', String(e && e.stack || e).slice(0, 400));
 }
