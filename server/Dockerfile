@@ -1,5 +1,5 @@
 # The online play server (CHE-271) for the VPS (Kamal 2 with kamal-proxy). Build context: the repo root. The image holds only server/
-# and the rules engine it imports (src/rules.js), nothing else of the game. No build step, one dependency (jose, CHE-341 spike, server/package.json only), runs as a non root user,
+# and the engine files it imports (src/rules.js, src/ai.js for the bot), nothing else of the game. No build step, one dependency (jose, CHE-341 spike, server/package.json only), runs as a non root user,
 # the database under /data (a Kamal volume). The app listens on PORT (3000); GET /up is the health check.
 FROM node:24-slim
 LABEL service="chess-online"
@@ -9,6 +9,7 @@ COPY server/package.json server/package-lock.json ./server/
 RUN cd server && npm ci --omit=dev
 COPY server/ ./server/
 COPY src/rules.js ./src/rules.js
+COPY src/ai.js ./src/ai.js
 RUN printf '{"type":"module","private":true}\n' > package.json && mkdir -p /data && chown -R node:node /data
 USER node
 EXPOSE 3000
