@@ -44,7 +44,7 @@ html,body{margin:0;background:#07080c}
   (function () {
     var q = new URLSearchParams(location.search), on = q.get('intro') === '1';
     if (on) return;
-    var f = ['fen', 'moves', 'open', 'select', 'view', 'promo', 'line', 'preset', 'yaw', 'pitch', 'dist', 'gx', 'gy', 'gz', 'symbols', 'help', 'hud', 'spin', 'light', 'theme'];
+    var f = ['fen', 'moves', 'open', 'select', 'view', 'promo', 'line', 'preset', 'yaw', 'pitch', 'dist', 'gx', 'gy', 'gz', 'symbols', 'help', 'hud', 'spin', 'light', 'theme', 'showcase'];
     for (var i = 0; i < f.length; i++) if (q.has(f[i])) { document.documentElement.className += ' direct'; return; }
   })();
 </script>

@@ -77,6 +77,8 @@ export const MAP = [
   [/^(src\/update-banner\.js|test\/offline-page\.mjs)$/, ['offline']],
   [/^test\/adapt\.mjs$/, []],
   [/^test\/daily-page\.mjs$/, ['puzzles']],
+  [/^(src\/showcase\/|test\/showcase-page\.mjs$)/, ['showcase']],
+  [/^test\/showcase-(data|shots)\.mjs$/, []],
 ];
 
 // test files that belong to a group of another name

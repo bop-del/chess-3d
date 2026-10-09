@@ -1,0 +1,13 @@
+/* the Showcase entry (CHE-374): under the daily puzzle card, same family of look */
+.showcase-entry {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; margin-bottom: 12px; border-radius: 14px; flex: none;
+  border: 1px solid var(--line); background: radial-gradient(120% 90% at 50% 0%, rgba(216, 180, 104, 0.08), transparent 70%), rgba(255, 255, 255, 0.03);
+}
+.showcase-entry[hidden] { display: none; }
+.sce-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sce-title { font-size: 15px; color: var(--gold); font-weight: 600; white-space: nowrap; }
+.sce-pick { min-width: 0; max-width: 62%; min-height: 44px; }
+.sce-text { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.35; }
+.sce-row { display: flex; gap: 8px; }
+.sce-row .btn { flex: 1; min-height: 44px; font-size: 15px; }
+body.phone .showcase-entry { margin-bottom: 10px; }
