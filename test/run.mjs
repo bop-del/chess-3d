@@ -74,6 +74,7 @@ const FAST = [
   ['Pixelwelt figures contract (test/pixel-chars.mjs)', 'test/pixel-chars.mjs'],
   ['Pixelwelt rules: closed ground, no coplanar faces, clamped textures, one material set (test/pixel-rules.mjs)', 'test/pixel-rules.mjs'],
   ['Pixelwelt island choice: precedence, store, build and dispose (test/pixel-island.mjs)', 'test/pixel-island.mjs'],
+  ['Backdrop world choice: precedence, store, listeners (test/world-choice.mjs)', 'test/world-choice.mjs'],
   ['Pixelwelt skies, backdrops, sets: choice, build and dispose, weather (test/pixel-sky.mjs)', 'test/pixel-sky.mjs'],
   ['living pieces: signature moves and Pixelwelt birds (test/living.mjs)', 'test/living.mjs'],
   ['option tiles: a picture per choice, no orphans (test/tiles.mjs)', 'test/tiles.mjs'],

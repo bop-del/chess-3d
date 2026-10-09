@@ -4,6 +4,8 @@ import { device } from './device.js';
 import { createThemes, isTheme, storedTheme } from './themes/registry.js';
 import { mountSwatches } from './themes/swatches.js';
 import { mountLookSetting } from './themes/pixel/look-setting.js';
+import { worldChoice, onWorld } from './worlds/choice.js';
+import { mountWorldSetting } from './worlds/setting.js';
 import { mountIslandSetting } from './themes/pixel/island-setting.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
@@ -210,6 +212,18 @@ async function boot() {
     if (flagTheme && isTheme(flagTheme)) await themes.set(flagTheme, { persist: false });   // this load only
     else await themes.set(storedTheme(), { persist: false });
   } catch (e) { console.warn('theme not applied, Classic stays', e); }   // a theme must never stop the boot
+  // CHE-370: a backdrop world around the board for the lit themes (src/worlds/): the Options row World or ?world=hall|space|zen|lava.
+  // None (the default) loads nothing of it; the first pick imports worlds/index.js, later picks rebuild without a reload
+  let world = null;
+  const applyWorld = async (id) => {
+    if (!world && id === 'none') return;
+    try {
+      if (!world) world = (await import('./worlds/index.js')).mountWorld({ id, stage, gimbal, themes, phone: device.phone });
+      else await world.setId(id);
+      window.__chess && (window.__chess.world = world);
+    } catch (e) { console.warn('world not built', e); }
+  };
+  await applyWorld(worldChoice());
   loaderEl.dataset.world = themes.current();   // the step line gets a calm backing over a theme with a busy world (Blocks), see style.css
 
   await pieceSet.buildAll((f, msg) => progress(0.4 + f * 0.52, msg));
@@ -247,7 +261,7 @@ async function boot() {
   };
   let t = 0;
   // the frame loop runs the whole game from here on (the modules that follow are optional in it until they exist)
-  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(dt); themes.update(dt); living?.tick(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(dt); themes.update(dt); world?.update(dt); living?.tick(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
   advance(0.001);   // the Play view's first focus and the HUD measure land in the camera now
   intro?.boardGo();
   intro?.setTarget(0.95);
@@ -320,6 +334,8 @@ async function boot() {
   mountSwatches({ themes, ui });
   mountLookSetting({ themes, ui, stage });   // CHE-239: Sky and Backdrop rows under the swatches, shown with Pixelwelt
   mountIslandSetting({ themes, ui });   // CHE-357: Island row below Backdrop, shown with Pixelwelt
+  mountWorldSetting({ themes, ui });   // CHE-370: World row for the lit themes
+  onWorld(applyWorld);
 
   // touch: rotation and the browser toolbar fire bursts of resize events. The camera follows at once, the render targets
   // are reallocated once the burst has ended. Desktop reallocates on every event as before.
@@ -354,6 +370,7 @@ async function boot() {
 
   window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, living, clock, train: { store, drill, sweep, learn } };
   window.__chess.clockUi = clockUi;
+  window.__chess.world = world;
   if (swWanted()) { const updates = createUpdates(); window.__chess.update = updates; updates.start(); }   // CHE-304: offline cache + new version banner
   window.__chess.news = news;
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise

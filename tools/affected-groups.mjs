@@ -55,6 +55,8 @@ export const MAP = [
   [/^test\/pixel-sky-page\.mjs$/, ['pixel sky']],
   [/^test\/pixel-sky\.mjs$/, []],
   [/^test\/cloud-mask-page\.mjs$/, ['cloud mask']],
+  [/^src\/worlds\//, ['worlds']],
+  [/^test\/worlds-page\.mjs$/, ['worlds']],
   [/^test\/open-flag\.mjs$/, ['open']],
   [/^test\/menu-a\.mjs$/, ['menu a']],
   [/^src\/(news|news-data|news-rules|version)\.js$/, ['news']],

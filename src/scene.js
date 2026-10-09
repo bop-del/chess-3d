@@ -615,8 +615,12 @@ export function createStage(canvas, opts = {}) {
     syncPostUniforms();
     paintBackdrop(cur);
     if (scene.fog) scene.fog.color.copy(cur.bg.bottom).lerp(cur.bg.glow, 0.25);
+    if (worldLook) scene.fog.color.set(worldLook.fog);   // a world backdrop (src/worlds/, CHE-370) brings its own fog colour
     stillExtra++;
   }
+  // CHE-370: a world backdrop around the board sets its fog colour and distances and says it moves (no TAA accumulation); null is the default
+  let worldLook = null;
+  function setWorldLook(look) { worldLook = look || null; applyState(); }
 
   applyState();
   rebuildEnvironment(cfg.pmrem);
@@ -779,11 +783,11 @@ export function createStage(canvas, opts = {}) {
     if (gradePass) gradePass.uniforms.time.value = time;
     if (scene.fog) {   // relative to the camera (it sits further back on a phone): the board itself stays clear, only the far world fades
       const d = camera.position.length();
-      scene.fog.near = d + 1.5; scene.fog.far = d + 34;
+      scene.fog.near = d + (worldLook?.near ?? 1.5); scene.fog.far = d + (worldLook?.far ?? 34);
     }
     if (taaPass) {
       // accumulate only while the whole picture stands still, SMAA while it moves (no ghosts behind moving pieces)
-      const still = stillness.check(stillExtra) && transT >= 1;
+      const still = stillness.check(stillExtra) && transT >= 1 && !worldLook?.moving;
       taaPass.accumulate = still;
       if (smaaPass) smaaPass.enabled = !still;
     }
@@ -818,7 +822,7 @@ export function createStage(canvas, opts = {}) {
     get camera() { return camera; },
     lights: { key, fill, rim },
     lightingPresets,
-    setLightingPreset, setThemeLight, setFloorHidden, setDim, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, compile, dispose,
+    setLightingPreset, setThemeLight, setWorldLook, setFloorHidden, setDim, onQuality: (fn) => { qualityListeners.push(fn); }, setFloorVisibility, setQuality, setAspect, resize, render, compile, dispose,
     // extras (beyond the contract, harmless)
     get quality() { return quality; },
     get lightingPreset() { return currentName; },
