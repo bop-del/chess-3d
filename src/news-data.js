@@ -3,6 +3,19 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.12.0', date: '2026-10-09',
+    de: [
+      'Pixelwelt: Beim Schlagen kämpft jede Figur jetzt auf mehrere Arten, immer abwechselnd.',
+      'Schachmatt in der Pixelwelt: Der Turm des Verlierers fällt um, Feuerwerk, und die Sieger jubeln.',
+      'Ein Tipp überspringt das Matt-Feuerwerk.',
+    ],
+    en: [
+      'Pixelwelt: every piece now captures in several ways, taking turns.',
+      'Checkmate in Pixelwelt: the loser\'s tower falls, fireworks, and the winners cheer.',
+      'A tap skips the checkmate fireworks.',
+    ],
+  },
+  {
     version: '1.11.0', date: '2026-10-09',
     de: [
       'Pixelwelt: Such dir in den Optionen eine von fünf Inseln aus.',
