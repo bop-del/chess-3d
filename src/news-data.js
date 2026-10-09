@@ -6,17 +6,17 @@ export const NEWS = [
     version: '1.12.0', date: '2026-10-09',
     de: [
       'Pixelwelt: Beim Schlagen kämpft jede Figur jetzt auf mehrere Arten, immer abwechselnd.',
-      'Schachmatt in der Pixelwelt: Der Turm des Verlierers fällt um, Feuerwerk, und die Sieger jubeln.',
-      'Ein Tipp überspringt das Matt-Feuerwerk.',
+      'Schachmatt in der Pixelwelt: Der Turm des Verlierers fällt um, Feuerwerk, und die Sieger jubeln. Ein Tipp überspringt es.',
       'Neue Teams in den Optionen: Ritter, Drachen, Zauberer und Piraten.',
       'Die Inseln leben: Tiere weiden, Dorfbewohner gehen übers Feld, Vögel kreisen.',
+      'Berühmte Partie: Das Spiel spielt die Unsterbliche Partie, die Königsjagd oder Réti als Trailer oder ganz. Ein Tipp beendet es, deine Partie geht weiter.',
     ],
     en: [
       'Pixelwelt: every piece now captures in several ways, taking turns.',
-      'Checkmate in Pixelwelt: the loser\'s tower falls, fireworks, and the winners cheer.',
-      'A tap skips the checkmate fireworks.',
+      'Checkmate in Pixelwelt: the loser\'s tower falls, fireworks, and the winners cheer. A tap skips it.',
       'New teams in Options: Knights, Dragons, Wizards and Pirates.',
       'The islands are alive: animals graze, villagers walk around, birds circle.',
+      'Famous game: the game plays the Immortal Game, the King Hunt or Réti as a trailer or in full. A tap ends it and your game continues.',
     ],
   },
   {
