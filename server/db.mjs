@@ -19,6 +19,7 @@ export function normCode(s) {
   return m ? `${m[1]}-${m[2]}` : c;
 }
 
+// CHE-406: writer_lease is the one row that says which server runs the background work (server/lease.mjs)
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, code_hash TEXT, revoked INTEGER NOT NULL DEFAULT 0, muted INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, bot INTEGER NOT NULL DEFAULT 0, admin INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS keys (key_hash TEXT PRIMARY KEY, player_id INTEGER NOT NULL, created INTEGER NOT NULL);
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, 
 CREATE TABLE IF NOT EXISTS stats_daily (day TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, device TEXT NOT NULL, n INTEGER NOT NULL, v INTEGER NOT NULL, PRIMARY KEY (day, kind, name, device));
 CREATE TABLE IF NOT EXISTS server_health (at INTEGER PRIMARY KEY, started INTEGER NOT NULL, uptime_s INTEGER NOT NULL, present_max INTEGER NOT NULL, streams_max INTEGER NOT NULL, games_max INTEGER NOT NULL, loop_max_ms REAL NOT NULL, rss_max INTEGER NOT NULL, req INTEGER NOT NULL, r4xx INTEGER NOT NULL, r5xx INTEGER NOT NULL, load1 REAL NOT NULL, load5 REAL NOT NULL, load15 REAL NOT NULL, mem_free INTEGER NOT NULL, mem_total INTEGER NOT NULL, disk_free INTEGER, disk_total INTEGER, db_bytes INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS push_subs (player INTEGER NOT NULL, endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS writer_lease (id INTEGER PRIMARY KEY CHECK (id = 1), owner TEXT NOT NULL, beat INTEGER NOT NULL, since INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, player TEXT NOT NULL, text TEXT NOT NULL, picture TEXT, context TEXT);
 CREATE INDEX IF NOT EXISTS push_subs_player ON push_subs (player);
 CREATE INDEX IF NOT EXISTS events_day ON events (day);

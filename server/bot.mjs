@@ -27,7 +27,7 @@ export function botReply(text, random = Math.random) {
 export function ensureBot(db, name, now = Date.now()) {
   const p = db.prepare('SELECT * FROM players WHERE name = ?').get(name);
   if (p && !p.bot) throw new Error(`the name ${name} belongs to a player, not the bot`);
-  if (!p) db.prepare('INSERT INTO players (name, created, bot) VALUES (?, ?, 1)').run(name, now);
+  if (!p) db.prepare('INSERT OR IGNORE INTO players (name, created, bot) VALUES (?, ?, 1)').run(name, now);
   return db.prepare('SELECT * FROM players WHERE name = ?').get(name);
 }
 
@@ -61,9 +61,9 @@ export function createBot(db, { name = BOT_NAME, now = () => Date.now(), random 
   const row = ensureBot(db, name, now());
   const q = (sql) => db.prepare(sql);
   const timers = new Set(), thinking = new Set();
-  let closed = false;
+  let closed = false, paused = false;   // CHE-406: paused while another server holds the writer lease
   const later = (ms, fn) => {
-    const t = setTimeout(() => { timers.delete(t); if (!closed) Promise.resolve().then(fn).catch((e) => log(`bot error ${e.message}`)); }, ms);
+    const t = setTimeout(() => { timers.delete(t); if (!closed && !paused) Promise.resolve().then(fn).catch((e) => log(`bot error ${e.message}`)); }, ms);
     t.unref?.(); timers.add(t);
   };
   const movesOf = (gid) => q('SELECT uci FROM moves WHERE game_id = ? ORDER BY ply').all(gid).map((m) => m.uci);
@@ -78,7 +78,7 @@ export function createBot(db, { name = BOT_NAME, now = () => Date.now(), random 
     const c = replay(gid);
     if (c.turn !== (g.white_id === row.id ? 'w' : 'b')) return;
     const { uci } = await chooseMove(c.fen(), { random, capMs });
-    if (!uci || closed) return;
+    if (!uci || closed || paused) return;
     const again = q("SELECT status FROM games WHERE id = ?").get(gid);   // the game may have ended while the bot was thinking
     if (again?.status !== 'active' || movesOf(gid).length !== c.history.length) return;
     act('move', { game: gid, uci });
@@ -98,7 +98,7 @@ export function createBot(db, { name = BOT_NAME, now = () => Date.now(), random 
     id: row.id, name: row.name, enabled: true,
     /** after any action of a human or of the bot (called by the server once it is committed) */
     after(action, me, body, out) {
-      if (closed) return;
+      if (closed || paused) return;
       if (action === 'challenge' && me.id !== row.id && String(body.to).toLowerCase() === row.name.toLowerCase()) later(0, answerOpen);
       else if (action === 'challenge/answer' && out.game) scheduleMove(out.game);   // checked in move(): only when it is the bot's turn
       else if (action === 'move' && me.id !== row.id) scheduleMove(Number(body.game));
@@ -107,7 +107,9 @@ export function createBot(db, { name = BOT_NAME, now = () => Date.now(), random 
       }
     },
     /** after a start: open challenges and games where the bot owes a move */
-    resume() { answerOpen(); owedMoves(); },
+    resume() { paused = false; answerOpen(); owedMoves(); },
+    /** the writer lease went to another server: no timers, no reactions */
+    pause() { paused = true; for (const t of timers) clearTimeout(t); timers.clear(); thinking.clear(); },
     close() { closed = true; for (const t of timers) clearTimeout(t); timers.clear(); },
   };
 }

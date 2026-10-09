@@ -15,6 +15,7 @@ import { createPush, overLine, vapidLoad } from './push.mjs';
 import { statsFor } from './playerstats.mjs';
 import { createBot, BOT_NAME } from './bot.mjs';
 import { createAuthSpike } from './auth-spike.mjs';
+import { createLease } from './lease.mjs';
 import { createFeedback, cleanFeedback, BODY_MAX as FEEDBACK_BODY_MAX } from './feedback.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
@@ -34,7 +35,7 @@ export function originAllowed(origin, list) {
   } catch (e) { return false; }
 }
 
-export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', authSpike = {}, pushFetch, log = () => {}, random = Math.random, bot: botOpts = null } = {}) {
+export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', authSpike = {}, pushFetch, log = () => {}, random = Math.random, bot: botOpts = null, lease: leaseOpts = null } = {}) {
   const admin = adminOps(db, now);
   const spike = createAuthSpike({ origins, originOk: (o) => originAllowed(o, origins), ...authSpike });   // CHE-341: a spike, off without a client id
   const stats = createStats(db, { now });
@@ -42,12 +43,23 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   const health = createHealth(db, { now, probe: probe || systemProbe({ dbFile: dbFile || ':memory:' }), gauges: {
     present: () => live.ids().length, streams: () => live.streamCount(), games: () => q("SELECT COUNT(*) AS n FROM games WHERE status = 'active'").get().n,
   } });   // CHE-306: the server history; the gauges read live, which is created below
-  stats.maintain(); health.prune();   // CHE-291: roll up and clean on start, then once a day
-  const statsTimer = setInterval(() => { try { stats.maintain(); health.prune(); } catch (e) { console.error(e); } }, 24 * 3600 * 1000);
-  statsTimer.unref();
+  // CHE-406: the background work (daily roll up, health samples, bot, web push) belongs to the holder of the writer lease. Without
+  // `lease` (the tests) this server is the only one and always the writer. Requests are answered either way.
+  let statsTimer = null, sampleTimer = null, firstTimer = null;
   const sampleSafe = () => { try { health.sample(); } catch (e) { console.error(e); } };
-  const sampleTimer = setInterval(sampleSafe, sampleMs), firstTimer = setTimeout(sampleSafe, firstSampleMs);   // CHE-306: one row per 5 minutes, one soon after start
-  sampleTimer.unref(); firstTimer.unref();
+  function startDuties() {
+    stats.maintain(); health.prune();   // CHE-291: roll up and clean on start, then once a day
+    statsTimer = setInterval(() => { try { stats.maintain(); health.prune(); } catch (e) { console.error(e); } }, 24 * 3600 * 1000);
+    sampleTimer = setInterval(sampleSafe, sampleMs); firstTimer = setTimeout(sampleSafe, firstSampleMs);   // CHE-306: one row per 5 minutes, one soon after start
+    statsTimer.unref(); sampleTimer.unref(); firstTimer.unref();
+    bot?.resume();
+  }
+  function stopDuties() {
+    clearInterval(statsTimer); clearInterval(sampleTimer); clearTimeout(firstTimer); statsTimer = sampleTimer = firstTimer = null;
+    bot?.pause();
+  }
+  const lease = leaseOpts ? createLease(db, { now, log, ...leaseOpts, onAcquire: () => startDuties(), onLose: () => stopDuties() }) : null;
+  const isWriter = () => !lease || lease.held();
   const q = (sql) => db.prepare(sql);
   const push = createPush(db, { vapid, subject: vapidSubject, gameUrl, now, log, ...(pushFetch ? { fetchFn: pushFetch } : {}) });   // CHE-272: off without a VAPID key
   const playerById = (id) => q('SELECT * FROM players WHERE id = ?').get(id);
@@ -149,7 +161,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   });
   /** CHE-272: the web push of one action, after it is committed. Never a chat text, only the sender name. A live stream suppresses it. */
   function pushAfter(name, me, body, out) {
-    if (!push.enabled) return;
+    if (!push.enabled || !isWriter()) return;   // CHE-406: only the writer sends pushes
     const to = (pid, kind, o) => push.notify(pid, kind, { streamOpen: live.online(pid), ...o });
     const overTo = (g) => {
       const row = q('SELECT * FROM games WHERE id = ?').get(g.id);
@@ -447,14 +459,14 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     settle(name, me, body, out);
     return out;
   } }) : null;
-  bot?.resume();
+  if (lease) { bot?.pause(); lease.start(); } else startDuties();   // CHE-406: with a lease the duties start once it is ours
 
   const server = createServer((req, res) => { handle(req, res); });
   server.keepAliveTimeout = 65000;
   return {
-    server, db, admin, live, stats, feedback, health, push, bot, stateFor, broadcast,
+    server, db, admin, live, stats, feedback, health, push, bot, lease, stateFor, broadcast,
     listen: (port, host) => new Promise((ok) => server.listen(port, host, () => ok(server.address().port))),
-    close: () => new Promise((ok) => { push.flush().catch(() => {}); bot?.close(); clearInterval(statsTimer); clearInterval(sampleTimer); clearTimeout(firstTimer); health.stop(); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
+    close: () => new Promise((ok) => { push.flush().catch(() => {}); bot?.close(); stopDuties(); lease?.close(); health.stop(); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
   };
 }
 
@@ -474,6 +486,7 @@ export function loadEnv() {
     vapidSubject: process.env.ONLINE_VAPID_SUBJECT || '',
     gameUrl: process.env.ONLINE_GAME_URL || '',
     bot: process.env.ONLINE_BOT === '1' ? { name: process.env.ONLINE_BOT_NAME || BOT_NAME } : null,   // CHE-343: the bot, on in the env file of the test and the production server
+    leaseGraceMs: Number(process.env.ONLINE_LEASE_GRACE_MS || 0),   // CHE-406
     authSpike: { clientId: process.env.AUTH_SPIKE_CLIENT_ID || '', returnUrl: process.env.AUTH_SPIKE_RETURN || '' },   // CHE-341
   };
 }
@@ -481,7 +494,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const env = loadEnv();
   const vapid = vapidLoad(env.vapidFile);
   if (!vapid || !/^(mailto:|https:)/.test(env.vapidSubject)) console.log(`push is off (${vapid ? 'ONLINE_VAPID_SUBJECT is not a mailto: or https: address' : 'no ONLINE_VAPID_FILE'})`);
-  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, authSpike: env.authSpike, bot: env.bot, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
+  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, authSpike: env.authSpike, bot: env.bot, lease: { graceMs: env.leaseGraceMs }, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
   const port = await app.listen(env.port, env.host);
   console.log(`online server on http://${env.host}:${port} (db ${env.db})`);
   const stop = () => { app.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 2000).unref(); };

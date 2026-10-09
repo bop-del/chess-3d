@@ -1,0 +1,120 @@
+{
+ "actions": {
+  "player_id": "INTEGER",
+  "cid": "TEXT",
+  "response": "TEXT",
+  "at": "INTEGER"
+ },
+ "challenges": {
+  "id": "INTEGER",
+  "from_id": "INTEGER",
+  "to_id": "INTEGER",
+  "status": "TEXT",
+  "created": "INTEGER",
+  "answered": "INTEGER"
+ },
+ "events": {
+  "id": "INTEGER",
+  "at": "INTEGER",
+  "day": "TEXT",
+  "kind": "TEXT",
+  "name": "TEXT",
+  "device": "TEXT",
+  "value": "INTEGER",
+  "data": "TEXT"
+ },
+ "games": {
+  "id": "INTEGER",
+  "white_id": "INTEGER",
+  "black_id": "INTEGER",
+  "status": "TEXT",
+  "result": "TEXT",
+  "reason": "TEXT",
+  "winner_id": "INTEGER",
+  "created": "INTEGER",
+  "last_move_at": "INTEGER",
+  "ended": "INTEGER"
+ },
+ "keys": {
+  "key_hash": "TEXT",
+  "player_id": "INTEGER",
+  "created": "INTEGER"
+ },
+ "messages": {
+  "id": "INTEGER",
+  "from_id": "INTEGER",
+  "to_id": "INTEGER",
+  "text": "TEXT",
+  "at": "INTEGER",
+  "read": "INTEGER"
+ },
+ "moves": {
+  "game_id": "INTEGER",
+  "ply": "INTEGER",
+  "uci": "TEXT",
+  "san": "TEXT",
+  "at": "INTEGER"
+ },
+ "players": {
+  "id": "INTEGER",
+  "name": "TEXT",
+  "code_hash": "TEXT",
+  "revoked": "INTEGER",
+  "muted": "INTEGER",
+  "created": "INTEGER",
+  "bot": "INTEGER",
+  "admin": "INTEGER"
+ },
+ "push_subs": {
+  "player": "INTEGER",
+  "endpoint": "TEXT",
+  "p256dh": "TEXT",
+  "auth": "TEXT",
+  "created": "INTEGER"
+ },
+ "server_health": {
+  "at": "INTEGER",
+  "started": "INTEGER",
+  "uptime_s": "INTEGER",
+  "present_max": "INTEGER",
+  "streams_max": "INTEGER",
+  "games_max": "INTEGER",
+  "loop_max_ms": "REAL",
+  "rss_max": "INTEGER",
+  "req": "INTEGER",
+  "r4xx": "INTEGER",
+  "r5xx": "INTEGER",
+  "load1": "REAL",
+  "load5": "REAL",
+  "load15": "REAL",
+  "mem_free": "INTEGER",
+  "mem_total": "INTEGER",
+  "disk_free": "INTEGER",
+  "disk_total": "INTEGER",
+  "db_bytes": "INTEGER"
+ },
+ "stats_daily": {
+  "day": "TEXT",
+  "kind": "TEXT",
+  "name": "TEXT",
+  "device": "TEXT",
+  "n": "INTEGER",
+  "v": "INTEGER"
+ },
+ "writer_lease": {
+  "id": "INTEGER",
+  "owner": "TEXT",
+  "beat": "INTEGER",
+  "since": "INTEGER"
+ },
+ "feedback": {
+  "id": "INTEGER",
+  "at": "INTEGER",
+  "kind": "TEXT",
+  "name": "TEXT",
+  "player": "TEXT",
+  "text": "TEXT",
+  "picture": "TEXT",
+  "context": "TEXT"
+ }
+}

@@ -26,6 +26,7 @@ Invite players (the command prints the link and the code):
 | `ONLINE_ORIGINS` | the local preview origins | Comma separated list of game origins allowed by CORS, for example `https://chess3d.borisdiebold.com,https://bop-del.github.io` (both while the old address is still around, ADR 0012). Without it: `http://localhost:*`, `http://127.0.0.1:*`, the Tailscale address range (CGNAT, carrier grade NAT block) and `*.ts.net` |
 | `ONLINE_TRUST_PROXY` | off | `1` takes the client IP from `X-Forwarded-For` (behind kamal-proxy), for the wrong code throttle |
 | `ONLINE_ADMIN_SECRET` | none | The secret for the `/stats` dashboard. Without it `/stats` answers 404 (the page does not exist). Keep it in the `ONLINE_ENV` file, never in the repo |
+| `ONLINE_LEASE_GRACE_MS` | `0` | CHE-406: how long a server waits before it claims a free writer lease (a server from before the lease never wrote the row; the wait covers kamal's drain time). Production sets `35000` in `config/deploy.yml`; local runs and tests keep 0 so the bot answers at once |
 | `ONLINE_GAME_URL` | `http://localhost:5173/` | The game page the invite link points to (admin only) |
 | `ONLINE_PUBLIC_URL` | `http://localhost:<port>` | This server as the browser reaches it, put into the link as `?online=` (admin only) |
 | `ONLINE_VAPID_FILE` | none | CHE-272: the web push key file (JSON, mode 600, made once by `node server/admin.mjs push-keys`). Without it push is off and `/push/*` answers 404. A secret like `ONLINE_ADMIN_SECRET`: back it up, losing it invalidates every subscription |
@@ -104,6 +105,19 @@ user, the database under `/data`, `LABEL service="chess-online"`, listening on `
 stream sends `Cache-Control: no-cache` and `X-Accel-Buffering: no` and a heartbeat every 20 s, so it passes kamal-proxy. The Kamal
 config is written with the owner in the VPS step.
 
+## Server update without loss (CHE-406)
+
+While a server is replaced, the old and the new one run on the same database for a moment. Both answer requests; only the holder of
+the **writer lease** runs the background work: the bot (and the moves it owes), the daily roll up, the 5 minute health samples and the
+web push. The lease is one row in `writer_lease` (`owner`, `beat`, `since`): the holder renews `beat` every 5 s; a stopped server deletes
+its row (the other takes over at its next beat, `SIGTERM` runs `close()`); a crashed one is taken over when `beat` is older than 20 s. A
+free lease is claimed only 35 s after the start in production (`ONLINE_LEASE_GRACE_MS`, 0 locally), because a server from before the lease cannot be seen in the
+table. A non writer that handles a challenge to the bot leaves it open; the new writer answers it when it takes over (`bot.resume()`).
+The schema only grows: `test/online-schema.mjs` refuses DROP, RENAME and any ALTER but ADD COLUMN in `server/*.mjs` and compares
+`openDb()` with `server/schema.snapshot.json` (a removed column fails; `node test/online-schema.mjs --update` only adds). Code:
+`server/lease.mjs`. Test: `test/online-lease.mjs` (two servers on one temp database file). The deploy script (backup, counts,
+rollback) is private.
+
 ## Server history (CHE-306)
 
 Every 5 minutes (and once 10 s after start) the server writes one row into `server_health`: the chess server group (maxima over the interval of Present players, Live streams and running games, event loop delay in ms, RSS; requests, 4xx and 5xx; uptime; server start time) and the machine group (load 1/5/15, free and total memory, free and total disk of the volume the database lives on, database size incl. WAL). Maxima are kept between samples (`health.touch()` on every presence, stream and game change), so a visit shorter than 5 minutes still shows. Counts only: no player id, no IP. Rows older than 90 days go in the daily maintain step. `/stats` starts with a "Server" section: live values (red: disk over 85 percent used, free memory under 10 percent, event loop delay over 200 ms), then charts for 24 hours and 7 days as inline SVG (no script). A new server start time is a vertical marker, a missing slot is a gap. Code: `server/health.mjs`. Test: `test/online-health.mjs`.
@@ -112,7 +126,7 @@ Every 5 minutes (and once 10 s after start) the server writes one row into `serv
 
 `GET /health` (public, no secret, `Cache-Control: no-store`, text/plain; `HEAD` gives the same status without a body) answers `200 ok` or `503` with one short reason, derived from the `server_health` rows of the last 15 minutes so a single bad sample does not alarm. Reasons: `error rate N% over 15 min` (5xx over 5 percent of the requests, at least 3 samples and 20 requests in the window, so an idle server never alarms), `disk N% used` (over 85 percent in every sample of the window), `db unreachable` (`SELECT 1` throws). Fewer than 3 samples (fresh start) is ok. Memory and event loop delay are display only. The body holds no player, name, count or path. `/health` is not counted in the request counters (a monitor cannot move the error rate) and not throttled. `/up` stays the Kamal health check and does not depend on `/health`. Code: `healthVerdict()` in `server/health.mjs`; limits in `LIMITS`. The monitor setup (UptimeRobot) is in the private deploy notes.
 
-Tests: `test/online-server.mjs`, `test/online-stats.mjs`, `test/online-health.mjs` (fast tier) and `test/online-page.mjs` (smoke group `online`).
+Tests: `test/online-server.mjs`, `test/online-stats.mjs`, `test/online-health.mjs`, `test/online-lease.mjs`, `test/online-schema.mjs` (fast tier) and `test/online-page.mjs` (smoke group `online`).
 
 ## API version (CHE-405)
 
