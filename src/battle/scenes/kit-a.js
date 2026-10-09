@@ -2,6 +2,7 @@
 // two pieces from plain state numbers (distance along the aim, lift, tip, spin, squash), props that follow the
 // attacker's hand, and a lit bolt. Timing, skip and cleanup belong to the director and fx, not to this file.
 import * as THREE from 'three';
+import { noAO } from '../fx.js';
 
 export const SIZE = { p: 0.9, r: 1.0, n: 1.2, b: 1.35, q: 1.6, k: 1.85 };
 export const RADIUS = { p: 0.28, r: 0.34, n: 0.3, b: 0.31, q: 0.34, k: 0.36 };
@@ -72,6 +73,7 @@ export function beam(fx, from, to, { dur = 0.25, radius = 0.035, color = '#fff2b
   const mat = fx.own(new THREE.MeshBasicMaterial({ color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
   const m = new THREE.Mesh(geo, mat);
   m.frustumCulled = false;
+  noAO(m);
   const d = new THREE.Vector3().subVectors(to, from);
   const len = Math.max(0.001, d.length());
   m.position.copy(from).addScaledVector(d, 0.5);

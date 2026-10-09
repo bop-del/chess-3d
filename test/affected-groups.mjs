@@ -14,11 +14,11 @@ const check = (name, ok) => cases.push({ name, ok: !!ok });
 const g = (files) => { const r = affectedGroups(files); return r.all ? 'ALL' : r.groups.join(','); };
 
 check('docs only: no group', g(['README.md', 'docs/ARCHITECTURE.md', 'bin/lane', 'test/perft.mjs']) === '');
-check('battle code: the battle group only', g(['src/battle/fx.js']) === 'battle');
+check('battle code: the two battle groups only', g(['src/battle/fx.js']) === 'battle,battle lit');
 check('theme code: the groups that draw themes', g(['src/themes/blocks/rig.js']) === 'views,themes,textures,living,pixel chars,pixel look,pixel sky,shared fixes,cloud mask');
 check('music code: music', g(['src/music/player.js']) === 'music,music render');
 check('puzzles code: puzzles and the layout fixes', g(['src/puzzles/panel.js']) === 'fixes,puzzles');
-check('several files union their groups, in group order', g(['src/battle/fx.js', 'src/music/score.js']) === 'battle,music,music render');
+check('several files union their groups, in group order', g(['src/battle/fx.js', 'src/music/score.js']) === 'battle,battle lit,music,music render');
 check('rules engine: everything', g(['src/rules.js']) === 'ALL');
 check('rendering core: everything', ['src/scene.js', 'src/board.js', 'src/materials.js', 'src/main.js', 'src/style.css', 'index.html'].every((f) => g([f]) === 'ALL'));
 check('piece builders: everything', g(['src/pieces/setA.js']) === 'ALL');

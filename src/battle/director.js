@@ -18,6 +18,8 @@ import { viewsAllowBattle } from '../views/registry.js';
 const SCENES = import.meta.glob('./scenes/*.js');
 const FX = import.meta.glob('./fx.js');
 const SFX = import.meta.glob('./sfx.js');
+const LIT = import.meta.glob('./scenes/lit/index.js');   // CHE-369: the Wild capture scenes of the lit themes, plus a checkmate finale (Options Scene row, ?capture=wild)
+const captureFlag = () => { try { return new URLSearchParams(location.search).get('capture'); } catch (e) { return null; } };
 const NAMES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
 const SHORT_SPEED = 3;
 const MAX_SCENE = 6;              // seconds of scene time; a scene that runs longer is skipped
@@ -65,13 +67,14 @@ function restore(snap, { keepHidden = false } = {}) {
 }
 
 export function createDirector({ game, controls, stage, ui, themes, symbols, gore }) {
-  const settings = createSettings({ ui, themes, gore });
+  const settings = createSettings({ ui, themes, gore, capture: captureFlag() });
   let active = null;                       // the run in progress
   let fxModule, sfxModule;                 // loaded on first use
   const sceneCache = new Map();
 
   // ------------------------------------------------------------ loading
   async function loadScene(type, style) {
+    if (settings.capture === 'wild' && !style) { try { return (await LIT['./scenes/lit/index.js']()).scene('wild', type); } catch (e) { console.warn('lit scenes failed to load', e); } }
     const name = style === 'pixel' ? 'pixel-gore' : style === 'blocks' ? 'blocks' : NAMES[type];     // Blocks: the victim falls into cubes; Pixelwelt: pixel gore
     if (sceneCache.has(name)) return sceneCache.get(name);
     const load = SCENES[`./scenes/${name}.js`];
@@ -94,14 +97,14 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
     return lenient(sfxModule ? (sfxModule.default || sfxModule.sfx || sfxModule) : null);
   }
   const preload = () => { Object.values(SCENES).forEach((l) => l().catch(noop)); FX['./fx.js']?.().catch(noop); SFX['./sfx.js']?.().catch(noop); };
-  const ready = () => Promise.all([...Object.values(SCENES).map((l) => l().catch(noop)), FX['./fx.js']?.().catch(noop), SFX['./sfx.js']?.().catch(noop)]);
+  const ready = () => Promise.all([...Object.values(SCENES).map((l) => l().catch(noop)), FX['./fx.js']?.().catch(noop), SFX['./sfx.js']?.().catch(noop), settings.capture === 'wild' && LIT['./scenes/lit/index.js']().catch(noop)]);
   setTimeout(preload, 2000);
 
   // ------------------------------------------------------------ the scene clock
   function update(dt) {
     const r = active;
     if (!r || !r.playing || r.dead) return;
-    const d = dt * r.speed;
+    const d = dt * r.speed * r.slow;
     r.time += d;
     for (const w of r.timers.filter((x) => r.time >= x.at)) { r.timers.splice(r.timers.indexOf(w), 1); w.resolve(); }
     for (const a of [...r.tweens]) {
@@ -122,7 +125,7 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
     if (mode === 'off' || info.signal?.aborted || active || !viewsAllowBattle()) return;   // the easy views skip every scene
     const short = mode === 'short', speed = short ? SHORT_SPEED : 1;
     const r = active = {
-      info, short, speed, time: 0, playing: false, dead: false, ac: new AbortController(),
+      info, short, speed, slow: 1, time: 0, playing: false, dead: false, ac: new AbortController(),
       timers: [], tweens: [], frames: new Set(), fx: null, sfx: null,
       snaps: [snapshot(info.attackerObj), snapshot(info.victimObj)], cleanup: [],
     };
@@ -214,7 +217,8 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
       stage, attackerObj: info.attackerObj, victimObj: info.victimObj, square: info.square,
       attacker: info.attacker, victim: info.victim, attackerColor: info.attackerColor, victimColor: info.victimColor,
       short, gore: settings.gore, fx: r.fx, sfx: r.sfx, signal, dir: info.dir.clone(), center, root: game.root, gimbal: game.root.parent,
-      ease: EASE,
+      ease: EASE, theme: themes?.current?.(), quality: stage.quality, controls,
+      slow: (k) => { r.slow = Math.max(0.05, Math.min(1, k)); },      // slow motion: the scene clock runs at k
       time: () => r.time,
       wait: guard((sec) => new Promise((resolve) => { r.timers.push({ at: r.time + sec, resolve }); })),
       tween: guard(({ dur, delay = 0, ease = (u) => u, step }) => new Promise((resolve) => { r.tweens.push({ t: -delay, dur: Math.max(1e-4, dur), ease, step, resolve }); })),
@@ -245,8 +249,20 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
     },
   };
 
+  let finale = null, finaleLoading = false;
+  // the finale comes with Wild: loaded when Wild is first on (at start or by a pick), it checks Wild itself before it plays
+  const ensureFinale = () => {
+    if (finale || finaleLoading || settings.capture !== 'wild') return;
+    finaleLoading = true;
+    LIT['./scenes/lit/index.js']().then((m) => { finale = m.createFinale({ game, controls, stage, themes, allowed: () => settings.capture === 'wild' && settings.mode !== 'off' && viewsAllowBattle(), short: () => settings.mode === 'short', busy: () => !!active }); }).catch((e) => { finaleLoading = false; console.warn('lit finale failed to load', e); });
+  };
+  settings.onChange(ensureFinale);
+  ensureFinale();
+
   const api = {
-    settings, update, handler, ready, lastCtx: null,
+    settings, update: (dt) => { update(dt); finale?.update(dt); }, handler, ready, lastCtx: null,
+    get capture() { return settings.capture === 'wild' ? 'wild' : null; },
+    get finale() { return finale; },
     get active() { return !!active; },
     skip() { active?.ac.abort(); },
   };

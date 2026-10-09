@@ -15,7 +15,7 @@
     { "flag": "introstyle", "item": "CHE-288", "status": "open", "question": "pick the Learn intro layout a, b or c (a is the default)" }
   ],
   "normal": [
-    "adapt", "ai", "backdrop", "birds", "clock", "daily", "diag", "fen", "gore", "help", "hud", "intro", "island", "light", "line",
+    "adapt", "ai", "backdrop", "birds", "capture", "clock", "daily", "diag", "fen", "gore", "help", "hud", "intro", "island", "light", "line",
     "living", "manual", "moves", "news", "online", "onlinepv", "open", "pieces", "preset", "promo", "quality", "select", "set", "sw",
     "sig", "sky", "sound", "spin", "symbols", "theme", "touch", "view", "with", "world"
   ]

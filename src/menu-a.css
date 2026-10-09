@@ -66,3 +66,4 @@ body.menu-a.phone:not(.portrait) .psheet.pplay .row.start { grid-column: 1 / -1;
 body.menu-a .lcard.bfold > header { display: flex; min-height: 40px; align-items: center; justify-content: space-between; cursor: pointer; }
 body.menu-a .lcard.bfold > header h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--dim); }
 body.menu-a .lcard.bfold > header .chev { display: block; }
+.battle-settings .battle-capture > label.field { margin-top: 10px; }

@@ -39,6 +39,14 @@ export const MAGIC = ['#ff6bd6', '#9b6bff', '#6be0ff', '#fff2a8'];
 export const CONFETTI = ['#ff5d73', '#ffd23f', '#3bceac', '#4d9de0', '#e15fed'];
 
 const UP = new THREE.Vector3(0, 1, 0);
+// Glows, sparks and flares are light, not surfaces: the ambient occlusion pass draws the scene with an override material, which
+// turned them into dark blobs and streaks. This hides an object from every pass that draws it with another material than its own.
+// The object needs a geometry of its own (the draw range is set on it before each draw).
+export function noAO(obj, camera = null) {
+  // with a camera given, also hidden from every other camera (a mirror pass)
+  obj.onBeforeRender = (r, sc, cam, geo, mat) => { geo.setDrawRange(0, mat === obj.material && (!camera || cam === camera) ? Infinity : 0); };
+  return obj;
+}
 const rand = (a, b) => a + Math.random() * (b - a);
 const range = (v) => (Array.isArray(v) ? rand(v[0], v[1]) : v);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -402,6 +410,7 @@ export function createFx({ stage, parent, signal } = {}) {
       ? new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
       : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: o.rough ?? 0.25, metalness: 0 }));
     const mesh = new THREE.InstancedMesh(geo, mat, count);
+    noAO(mesh);   // the blob geometry is shared by all bursts: each sets its draw range before its own draw
     mesh.frustumCulled = false;
     mesh.castShadow = false; mesh.receiveShadow = false;
     const colors = o.colors || BLOOD;
@@ -421,6 +430,10 @@ export function createFx({ stage, parent, signal } = {}) {
       mesh.setColorAt(i, col.set(pick(colors)));
     }
     mesh.instanceColor.needsUpdate = true;
+    // zero scale until the first step places them: a frame drawn before it would show unit spheres at the origin
+    _mat.makeScale(0, 0, 0);
+    for (let i = 0; i < count; i++) mesh.setMatrixAt(i, _mat);
+    mesh.instanceMatrix.needsUpdate = true;
     add(mesh);
     const b = { mesh, ps, o, g: o.gravity ?? -12, drag: o.drag ?? 0, grow: o.grow ?? 0, stain: o.stain ?? true, resolve: null, floor: o.floor ?? 0.01 };
     b.done = new Promise((r) => { b.resolve = r; });
@@ -466,6 +479,7 @@ export function createFx({ stage, parent, signal } = {}) {
       cached('flashball', () => new THREE.SphereGeometry(1, 20, 14)),
       own(new THREE.MeshBasicMaterial({ color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })));
     ball.position.copy(point); ball.frustumCulled = false;
+    noAO(ball);
     add(ball);
     let rg = null;
     if (ring) {
