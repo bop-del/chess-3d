@@ -3,6 +3,23 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.11.0', date: '2026-10-09',
+    de: [
+      'Neue Figuren in den Optionen: Fantasy, Tiere, Kristall und Mech.',
+      'Pixelwelt: Such dir in den Optionen eine von fünf Inseln aus.',
+      'Geschlagene Figuren stehen jetzt neben dem Brett im Gras oder auf dem Boden.',
+      'Das Spiel geht auch ohne Internet, und es sagt dir, wenn es eine neue Version gibt.',
+      'Online kannst du mehrere Spiele gleichzeitig spielen, eins pro Gegner.',
+    ],
+    en: [
+      'New pieces in Options: Fantasy, Animals, Crystal and Mech.',
+      'Pixelwelt: pick one of five islands in Options.',
+      'Captured pieces now stand beside the board on the grass or the floor.',
+      'The game works without internet and tells you when a new version is out.',
+      'Online you can play several games at once, one per opponent.',
+    ],
+  },
+  {
     version: '1.10.1', date: '2026-10-08',
     de: [
       'Online spielen ist jetzt für alle Eingeladenen gleich auf der Seite da.',
