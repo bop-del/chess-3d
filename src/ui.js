@@ -401,6 +401,17 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   let lastMovesKey = null;
   let lastSt = null;
   let revMoves = null;   // while the game review is open: { sans, kinds, cur, pick(n) }, shown instead of the game's own history
+  // ------------------------------------------------------------ toast
+  const toastEl = document.getElementById('toast');
+  let toastT = 0;
+  function toast(msg, kind, ms = 1600) {
+    toastEl.textContent = msg;
+    toastEl.classList.toggle('info', kind === 'info');
+    toastEl.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => toastEl.classList.remove('show'), ms);
+  }
+
   let lastCheck = false;
   const sideName = (w) => (w === 'w' ? t('side.white', 'White') : t('side.black', 'Black'));
   function render(st) {
@@ -501,17 +512,6 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   });
   game.on('newgame', hideBanner);
   game.on('promotioncancel', () => { promoEl.hidden = true; promoCancel = null; });   // the clock ran out with the chooser open
-
-  // ------------------------------------------------------------ toast
-  const toastEl = document.getElementById('toast');
-  let toastT = 0;
-  function toast(msg, kind, ms = 1600) {
-    toastEl.textContent = msg;
-    toastEl.classList.toggle('info', kind === 'info');
-    toastEl.classList.add('show');
-    clearTimeout(toastT);
-    toastT = setTimeout(() => toastEl.classList.remove('show'), ms);
-  }
 
   // ------------------------------------------------------------ a lesson starts: Learn takes the panel
   // Explain, Drill and Puzzles set a class on <body> while they run (the phone layout uses the same classes). The moment one

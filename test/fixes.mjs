@@ -109,6 +109,27 @@ async function position(page, baseUrl, fen, first) {
   await page.evaluate(PICK_HELPERS);
 }
 
+// CHE-376: a start position where the side to move is in check booted into a temporal dead zone error (toast before its element)
+async function checkBootInCheck(page, baseUrl, log) {
+  const out = [];
+  for (const [side, fen] of [['white', '4k3/8/8/8/8/8/4r3/4K3 w - - 0 1'], ['black', '4k3/4R3/8/8/8/8/8/4K3 b - - 0 1']]) {
+    const errs = [];
+    const onErr = (e) => errs.push(String(e.message).slice(0, 160));
+    page.on('pageerror', onErr);
+    try {
+      await page.setViewport({ width: 1400, height: 800 });
+      await page.goto(`${baseUrl}/?${FLAGS}&fen=${encodeURIComponent(fen)}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+      await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 20000, polling: 100 });   // short: a crashed boot never gets ready
+      await page.evaluate(() => { window.__chess.step(2); window.__chess.draw(); });
+      const r = await page.evaluate(() => { const st = window.__chess.game.getState(); return { check: st.check, meshes: window.__chess.gimbal.children.length, toast: document.getElementById('toast').textContent }; });
+      out.push({ name: `boot: ${side} to move in check starts without a page error`, pass: errs.length === 0 && r.check && r.meshes > 0 && r.toast === 'Check', detail: `errors ${errs.length ? errs.join(' | ') : 'none'}, ${JSON.stringify(r)}` });
+    } catch (e) {
+      out.push({ name: `boot: ${side} to move in check starts without a page error`, pass: false, detail: `${e.message.slice(0, 120)} ${errs.join(' | ')}` });
+    } finally { page.off('pageerror', onErr); }
+  }
+  return out;
+}
+
 async function checkPicking(page, baseUrl, log) {
   return [...(await pickFront(page, baseUrl, log)), ...(await pickCapture(page, baseUrl, log)), ...(await pickMove(page, baseUrl, log))];
 }
@@ -330,6 +351,7 @@ async function checkPhoneHelp(page, baseUrl, log) {
 const UNITS = [
   ['labels', checkLabels],
   ['picking', checkPicking],
+  ['boot', checkBootInCheck],
   ...TRAY_SIZES.map((a) => ['trays', checkTrays, a]),
   ...DEVICE_CASES.map((a) => ['device', checkDevice, a]),
   ['device', checkContextLoss],
