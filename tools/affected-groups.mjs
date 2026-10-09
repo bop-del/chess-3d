@@ -45,6 +45,7 @@ export const MAP = [
   [/^src\/dev\//, ['core']],
   // server/ is no page code: the fast tier (test/online-*.mjs) covers it. Only the two files the online page talks to also run the online page group.
   [/^server\/(index|live)\.mjs$/, ['online']],
+  [/^(server\/feedback\.mjs|src\/feedback\/|test\/feedback-page\.mjs)/, ['feedback']],   // CHE-404
   [/^server\//, []],
   // test scripts: the group that runs the script
   [/^test\/(battle)\.mjs$/, ['battle']],

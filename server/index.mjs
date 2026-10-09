@@ -14,6 +14,7 @@ import { createPush, overLine, vapidLoad } from './push.mjs';
 import { statsFor } from './playerstats.mjs';
 import { createBot, BOT_NAME } from './bot.mjs';
 import { createAuthSpike } from './auth-spike.mjs';
+import { createFeedback, cleanFeedback, BODY_MAX as FEEDBACK_BODY_MAX } from './feedback.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
 export const STALE_MS = 3 * 24 * 3600 * 1000;   // a game with no move for 3 days: the waiting player may end it as a win
@@ -36,6 +37,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   const admin = adminOps(db, now);
   const spike = createAuthSpike({ origins, originOk: (o) => originAllowed(o, origins), ...authSpike });   // CHE-341: a spike, off without a client id
   const stats = createStats(db, { now });
+  const feedback = createFeedback(db, { now });   // CHE-404
   const health = createHealth(db, { now, probe: probe || systemProbe({ dbFile: dbFile || ':memory:' }), gauges: {
     present: () => live.ids().length, streams: () => live.streamCount(), games: () => q("SELECT COUNT(*) AS n FROM games WHERE status = 'active'").get().n,
   } });   // CHE-306: the server history; the gauges read live, which is created below
@@ -357,6 +359,27 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         if (!secretOk(given, adminSecret)) { loginFailed(ip); status = 401; return html(401, loginPage(true)); }
         return html(200, dashboardPage(stats.report(7), stats.report(30), serverSection(health, { now: now() })));
       }
+      if (path === '/feedback') {   // CHE-404: POST from anyone (no login needed), GET only with the admin secret
+        const ip = ipOf(req);
+        if (req.method === 'POST') {
+          const body = await readBody(req, FEEDBACK_BODY_MAX);
+          const dev = typeof body?.device === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(body.device) ? body.device : `ip:${ip}`;
+          const c = cleanFeedback(body);   // a refused body does not count against the limit
+          if (c.error) { status = c.status; return send(req, res, c.status, { error: c.error }); }
+          if (feedback.limited(dev, ip)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+          const h0 = String(req.headers.authorization || '');
+          const who = h0.startsWith('Bearer ') ? authKey(h0.slice(7).trim()) : null;
+          const id = feedback.add(c.row, who && !who.revoked ? who.name : '');
+          status = 201; return send(req, res, 201, { ok: true, id });
+        }
+        if (req.method !== 'GET') { status = 405; return send(req, res, 405); }
+        if (!adminSecret) { status = 404; return send(req, res, 404); }
+        if (loginBlocked(ip)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+        const h1 = String(req.headers.authorization || '');
+        const given = h1.startsWith('Bearer ') ? h1.slice(7).trim() : '';
+        if (!given || !secretOk(given, adminSecret)) { loginFailed(ip); status = 401; return send(req, res, 401); }
+        return send(req, res, 200, { items: feedback.since(new URL(req.url, 'http://x').searchParams.get('since')) });
+      }
       const auth = String(req.headers.authorization || '');
       const me = authKey(auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
       const known = ['/state', '/events', '/my-code', ...Object.keys(ACTIONS).filter((a) => bot || a !== 'bot/challenge').map((a) => '/' + a), ...(push.enabled ? ['/push/key', '/push/subscribe', '/push/unsubscribe'] : [])];   // push off: its routes do not exist (404)
@@ -427,7 +450,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   const server = createServer((req, res) => { handle(req, res); });
   server.keepAliveTimeout = 65000;
   return {
-    server, db, admin, live, stats, health, push, bot, stateFor, broadcast,
+    server, db, admin, live, stats, feedback, health, push, bot, stateFor, broadcast,
     listen: (port, host) => new Promise((ok) => server.listen(port, host, () => ok(server.address().port))),
     close: () => new Promise((ok) => { push.flush().catch(() => {}); bot?.close(); clearInterval(statsTimer); clearInterval(sampleTimer); clearTimeout(firstTimer); health.stop(); live.close(); server.closeAllConnections?.(); server.close(() => ok()); }),
   };

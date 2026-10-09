@@ -16,6 +16,7 @@ const PHONE_KEYS = [
   ['phone.views', 'Views', 'Cycle the camera views'],
 ];
 const ICON = {
+  feedback: '<path d="M4 5h16v11H11l-5 4v-4H4V5Z"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   new: '<path d="M12 5v14M5 12h14"/>',
   symbols: '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M12 8v1.5M10.5 9.5h3M10 16h4M10.7 11.5h2.6l.7 4.5h-4l.7-4.5Z"/>',
@@ -326,6 +327,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   // "Good move?" helper (src/goodmove.js, bound from main.js): the desktop button and the phone bulb do the same thing
   let goodMove = null, goodKey = '';
   const goodBtns = [$('#btn-good')];
+  const feedbackBtns = [...hud.querySelectorAll('#btn-feedback, #btn-feedback-rail')];   // CHE-404: the speech bubble in the header, the rail and (phone) beside the bulb
+  function bindFeedback(open) { for (const b of feedbackBtns) b.addEventListener('click', () => { closeSheetsAny(); open(); }); }
+  const closeSheetsAny = () => phoneUI?.close();
   function syncGood() {
     if (!goodMove) return;
     const think = goodMove.state() === 'thinking', can = goodMove.canAsk() && !onlineBoard;   // no helper in an online game
@@ -690,10 +694,16 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     bulb.dataset.i18nAria = 'good.title';
     bulb.setAttribute('aria-label', 'Show one good move');
     goodBtns.push(bulb);
+    // CHE-404: the feedback bubble, left of the bulb (always visible, a 44 px target)
+    const fbBtn = el('button', 'pfb', `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON.feedback}</svg>`);
+    fbBtn.dataset.i18nAria = 'fb.open';
+    fbBtn.setAttribute('aria-label', 'Send feedback');
+    fbBtn.id = 'btn-feedback-phone';
+    feedbackBtns.push(fbBtn);
     if (goodMove) bulb.addEventListener('click', () => goodMove.ask());
 
     const allSheets = menuA ? Object.values(sheetsA).map((x) => x.el) : [sheet, learnSheet];
-    hud.append(status, bulb, bar, lbar, probe, scrim, ...allSheets, confirmBox);
+    hud.append(status, bulb, fbBtn, bar, lbar, probe, scrim, ...allSheets, confirmBox);
 
     // sheet open and close; swipe down on the header closes it
     const isOpen = () => sheet.classList.contains('open');
@@ -1012,5 +1022,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     on: (fn) => { hostFns.push(fn); },
   };
 
-  return { menuA, setLeaveModes: (fn) => { leaveModes = fn; }, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountNewsEntry, setNewsDot, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  return { menuA, setLeaveModes: (fn) => { leaveModes = fn; }, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountNewsEntry, setNewsDot, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove, bindFeedback };
 }

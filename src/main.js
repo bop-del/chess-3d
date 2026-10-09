@@ -16,7 +16,8 @@ import { createGameClock } from './clock.js';
 import { initialPreset, mountClock } from './clock-ui.js';
 import { swWanted, createUpdates } from './update-banner.js';
 import { createAdapter } from './adapt.js';
-import { LABEL as VERSION_LABEL } from './version.js';
+import { LABEL as VERSION_LABEL, VERSION } from './version.js';
+import { onlineServer, loginFor } from './online/store.js';
 
 window.__chessBooted = true;   // tells the start-up guard in index.html that this script ran
 window.__chessBoot = { script: performance.now() };   // start timings for ?diag=1, ms since navigation (download ends here)
@@ -379,6 +380,14 @@ async function boot() {
   window.__chess.world = world;
   if (swWanted()) { const updates = createUpdates(); window.__chess.update = updates; updates.start(); }   // CHE-304: offline cache + new version banner
   window.__chess.news = news;
+  // CHE-404: the feedback bubble in the header; the dialog loads on the first tap (the console errors are collected from the start)
+  import('./feedback/core.js').then((m) => m.collectErrors()).catch(() => {});
+  {
+    let fb = null;
+    const mod = () => fb || (fb = import('./feedback/index.js').then((m) => { const server = onlineServer(); const login = server ? loginFor(server) : null; return window.__chess.feedback = m.mountFeedback({ ui, stage, game, themes, views, server, login, version: VERSION, toast: ui.toast }); }));
+    ui.bindFeedback(() => mod().then((f) => f.open()).catch((e) => console.warn('feedback failed to load', e)));
+    window.__chess.feedbackLoad = mod;
+  }
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise
   if (params.get('diag') === '1') import('./dev/diag.js').then((m) => { window.__chess.diag = m.initDiag({ stage }); }).catch((e) => console.warn('diag overlay failed', e));
 

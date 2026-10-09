@@ -1,0 +1,27 @@
+/* The feedback dialog (CHE-404). Same shell as the News window; the header bubble lives in panel.css and style.css (.pfb). */
+.fbov { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 12px; background: rgba(5, 6, 9, 0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); pointer-events: auto; }
+.fbov[hidden] { display: none; }
+.fbcard { width: min(480px, 100%); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); display: flex; flex-direction: column; border-radius: 16px; background: #12131a; border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); color: var(--text, #e8e8ec); }
+.fbcard header { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 0 20px; }
+.fbcard h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.fbx { appearance: none; border: 0; background: none; color: inherit; width: 44px; height: 44px; font-size: 28px; line-height: 1; cursor: pointer; border-radius: 10px; }
+.fbx:hover { background: rgba(255, 255, 255, 0.08); }
+.fbform { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+.fbkinds { display: flex; gap: 8px; }
+.fbkind { flex: 1; min-height: 44px; appearance: none; font: inherit; font-size: 14px; font-weight: 600; color: inherit; cursor: pointer; border-radius: 12px; border: 1px solid var(--line, rgba(255, 255, 255, 0.14)); background: rgba(255, 255, 255, 0.05); }
+.fbkind[aria-checked="true"] { border-color: var(--gold, #d8b468); background: rgba(216, 180, 104, 0.16); color: #f3dfa8; }
+.fbform label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--dim, #8a8f9c); }
+.fbform textarea, .fbform input[type="text"] { font: inherit; font-size: 16px; color: var(--text, #e8e8ec); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line, rgba(255, 255, 255, 0.14)); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; }
+.fbform textarea { min-height: 96px; resize: vertical; }
+.fbform textarea:focus-visible, .fbform input:focus-visible { outline: 2px solid var(--gold, #d8b468); outline-offset: 1px; }
+.fbcount { align-self: flex-end; font-size: 12px; color: var(--dim, #8a8f9c); font-variant-numeric: tabular-nums; }
+.fbpic { flex-direction: row !important; align-items: center; gap: 10px !important; min-height: 44px; font-size: 14px !important; color: var(--text, #e8e8ec) !important; cursor: pointer; }
+.fbpic input { width: 22px; height: 22px; flex: none; accent-color: #d8b468; }
+.fbnote { margin: 0; font-size: 12px; line-height: 1.4; color: var(--dim, #8a8f9c); }
+.fbmsg { margin: 0; min-height: 0; font-size: 13px; color: #ff9b8f; }
+.fbmsg:empty { display: none; }
+.fbactions { display: flex; gap: 8px; justify-content: flex-end; }
+.fbactions button { min-height: 44px; padding: 0 18px; appearance: none; font: inherit; font-size: 14px; font-weight: 600; color: inherit; cursor: pointer; border-radius: 12px; border: 1px solid var(--line, rgba(255, 255, 255, 0.14)); background: rgba(255, 255, 255, 0.05); }
+.fbactions .fbsend { background: var(--gold, #d8b468); color: #1d170b; border-color: transparent; }
+.fbactions button:disabled { opacity: 0.45; cursor: default; }
+@media (max-height: 460px) { .fbform { gap: 6px; } .fbform textarea { min-height: 56px; } .fbnote { display: none; } }

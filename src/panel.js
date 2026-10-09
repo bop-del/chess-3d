@@ -25,6 +25,7 @@ addDE({
 
 const SVG = (body, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${body}</svg>`;
 export const ICONS = {
+  feedback: SVG('<path d="M4 5h16v11H11l-5 4v-4H4V5Z"/>'),
   plus: SVG('<path d="M12 5v14M5 12h14"/>'),
   undo: SVG('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
   collapse: SVG('<path d="m13 17 5-5-5-5M6 17l5-5-5-5"/>'),
@@ -141,6 +142,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
       <div class="turn" id="turn"><i class="dot w"></i><div class="status"><b id="turn-main">White to move</b><small id="turn-sub">&nbsp;</small></div></div>
       <div class="hbtns">
 ${headBtns}
+        <button class="ib" id="btn-feedback" type="button" title="Send feedback" aria-label="Send feedback" data-i18n-title="fb.open" data-i18n-aria="fb.open">${ICONS.feedback}</button>
         <button class="ib" id="btn-rail" type="button" title="Fold the panel (H)" aria-label="Fold the panel" data-i18n-title="panel.collapse" data-i18n-aria="panel.collapse">${ICONS.collapse}</button>
       </div>
       <div class="pclock" id="pclock" hidden></div>
@@ -192,6 +194,7 @@ ${headBtns}
     </div>
     <div class="rail-icons" role="toolbar" aria-label="Panel" data-i18n-aria="panel.rail">
       <button class="ib" id="btn-rail-open" type="button" title="Unfold the panel (H)" aria-label="Unfold the panel" data-i18n-title="panel.expand" data-i18n-aria="panel.expand">${ICONS.expand}</button>
+      <button class="ib" id="btn-feedback-rail" type="button" title="Send feedback" aria-label="Send feedback" data-i18n-title="fb.open" data-i18n-aria="fb.open">${ICONS.feedback}</button>
       ${tabsDef.map(([id, label, icon]) => `<button class="ib" type="button" data-rtab="${id}" title="${label}" aria-label="${label}" data-i18n-title="panel.tab.${id}" data-i18n-aria="panel.tab.${id}">${icon}</button>`).join('')}
     </div>`;
 

@@ -310,6 +310,17 @@ body.phone .pgood {
   cursor: pointer; touch-action: manipulation; transition: opacity 0.35s ease;
 }
 body.phone .pgood svg { width: 22px; height: 22px; }
+/* CHE-404: the feedback bubble sits left of the bulb; the status line gives it room */
+.pfb { display: none; }
+body.phone .pfb {
+  position: fixed; z-index: 17; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
+  top: calc(var(--st) - 4px); right: calc(var(--sr) + 44px + var(--gap)); border-radius: 12px; border: 1px solid var(--line-strong); background: var(--glass); color: var(--text);
+  cursor: pointer; touch-action: manipulation; transition: opacity 0.35s ease;
+}
+body.phone .pfb svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+body.phone .pfb:active { transform: scale(0.96); }
+body.phone .pstatus { right: calc(var(--sr) + 88px + 2 * var(--gap)); }
+#hud.hidden > .pfb { opacity: 0; pointer-events: none !important; }
 body.phone .pgood:active { transform: scale(0.96); }
 body.phone .pgood:disabled { opacity: 0.35; }
 body.phone .pgood.on { background: var(--gold-soft); border-color: rgba(216, 180, 104, 0.6); color: #f3dfa8; }
@@ -434,7 +445,8 @@ body.phone .banner-card h2 { font-size: 26px; }
 body.phone .banner-card p { margin-bottom: 10px; font-size: 14px; }
 
 /* landscape: the thumb bar is a column on the right */
-body.phone:not(.portrait) .pstatus { right: calc(var(--sr) + var(--barw) + var(--gap) + 44px + var(--gap)); }
+body.phone:not(.portrait) .pstatus { right: calc(var(--sr) + var(--barw) + var(--gap) + 88px + 2 * var(--gap)); }
+body.phone:not(.portrait) .pfb { right: calc(var(--sr) + var(--barw) + var(--gap) + 44px + var(--gap)); }
 body.phone:not(.portrait) .pgood { right: calc(var(--sr) + var(--barw) + var(--gap)); }
 body.phone:not(.portrait) .pbar { left: auto; top: var(--st); width: var(--barw); height: auto; flex-direction: column; justify-content: center; }
 body.phone:not(.portrait) .tb { flex: 0 1 60px; }
