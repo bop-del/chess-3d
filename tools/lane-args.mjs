@@ -17,3 +17,11 @@ export function parseLaneFlags(args, spec) {
   if (out.model && !out.agent) throw new Error('usage');
   return out;
 }
+
+// CHE-401 (L22): keys passed by hand replace the key derived from the lane name, so a lane che-70-x opened with only --key CHE-71 would link
+// CHE-71 and lose CHE-70. A lane named che-<n>-words that gets --key must list CHE-<n> too. Returns the refusal text or ''.
+export function nameKeyProblem(branch, keys = []) {
+  const m = /^che-(\d+)-/.exec(String(branch || ''));
+  if (!m || !keys.length || keys.includes(`CHE-${m[1]}`)) return '';
+  return `lane ${branch} is named after CHE-${m[1]} but --key lists only ${keys.join(', ')}: keys passed by hand replace the one in the name. Add --key CHE-${m[1]} (one --key per issue the lane carries).`;
+}

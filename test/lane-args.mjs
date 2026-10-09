@@ -1,6 +1,6 @@
 // bin/lane open and close flag parsing (tools/lane-args.mjs, CHE-194). Fast tier, no Herdr.
 import assert from 'node:assert/strict';
-import { parseLaneFlags as P } from '../tools/lane-args.mjs';
+import { parseLaneFlags as P, nameKeyProblem as NK } from '../tools/lane-args.mjs';
 
 const open = { key: true, priv: true, agent: true }, close = { m: true, noLinear: true };
 const bad = (args, spec) => assert.throws(() => P(args, spec), /usage/);
@@ -14,4 +14,9 @@ bad(['che-1-x', '--model', 'opus'], open);                      // --model witho
 bad(['che-1-x', '--agent', 'builder', 'b.md', '--model'], open); // model value missing
 bad(['che-1-x', '--agent', 'a', 'b.md'], close);                // not a close flag
 assert.deepEqual(P(['che-1-x', '-m', 'msg', '--no-linear'], close), { pos: ['che-1-x'], key: [], m: 'msg', noLinear: true });
+// CHE-401 (L22): --key replaces the key of the lane name, so the name key must be listed too
+assert.equal(NK('che-70-two', []), '', 'no --key: the name resolves by itself');
+assert.equal(NK('che-70-two', ['CHE-70', 'CHE-71']), '');
+assert.equal(NK('s36-clock', ['CHE-5']), '', 'old item id names are not che-<n>');
+assert.match(NK('che-70-two', ['CHE-71']), /named after CHE-70 but --key lists only CHE-71.*Add --key CHE-70/);
 console.log('lane args tests ok');

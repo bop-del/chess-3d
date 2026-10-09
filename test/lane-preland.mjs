@@ -32,6 +32,9 @@ try {
   let r = run('true', 'true');
   assert.equal(r.ok, true); assert.match(r.line, /^preland green: main already in/); assert.match(r.line, /merge preview: no conflicts expected$/); assert.deepEqual(readStamp(lane).preview, { game: [] });
   assert.equal(stampOk(readStamp(lane), g(lane, 'rev-parse', 'HEAD')), true);
+  // CHE-401: the stamp carries the tested tree and the run count on it; the same tree again counts up, a new tree starts at 1
+  assert.equal(readStamp(lane).tree, g(lane, 'rev-parse', 'HEAD^{tree}')); assert.equal(readStamp(lane).runs, 1);
+  run('true', 'true'); assert.equal(readStamp(lane).runs, 2, 'same tree, second run');
   // --all and --no-cache reach the smoke command
   run('true', 'echo smoke', { all: true, noCache: true }); assert.deepEqual(calls, ['true', 'echo smoke --all --no-cache']);
 

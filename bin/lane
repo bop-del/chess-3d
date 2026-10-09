@@ -47,7 +47,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseLaneFlags } from '../tools/lane-args.mjs';
+import { parseLaneFlags, nameKeyProblem } from '../tools/lane-args.mjs';
 import { agentPrompt, agentId, MAX_AGENT_ID, MAX_ROLE } from '../tools/lane-identity.mjs';
 import { sendKickoff } from '../tools/kickoff.mjs';
 import { parsePrelandArgs, prelandRun, linkServerModules, SERVER_MODULES_HINT } from '../tools/lane-preland.mjs';
@@ -95,6 +95,7 @@ function laneKeys(branch, given) {
 function open(branch, given = [], withPrivate = false, withAgent = null, model = 'sonnet') {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(branch || '')) die(`branch names are lower case words joined by hyphens, best che-<n>-words\n${USAGE}`, 2);
   if (git('branch', '--list', branch)) die(`branch ${branch} exists already`);
+  { const nk = nameKeyProblem(branch, given); if (nk) die(`lane ${branch} not opened: ${nk}`, 2); }   // CHE-401 (L22)
   // owner, 2026-10-04: the Linear key is the only id. A lane named after an old item id (s73-..., n8-...) without --key is refused.
   if (!given.length && !releasePrep(branch) && /^[a-z]+\d+-/.test(branch) && linearHook()) die(`lane ${branch} not opened: it starts with an old item id. Name lanes che-<n>-words (the Linear key is the only id, for example che-177-private-worktrees), or pass --key CHE-n.`);
   if (withAgent && withAgent.name.length > MAX_ROLE) die(`lane ${branch} not opened: agent role "${withAgent.name}" is over ${MAX_ROLE} characters (the Herdr id is at most ${MAX_AGENT_ID})`, 2);
