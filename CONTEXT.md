@@ -275,6 +275,10 @@ _Avoid_: ticket, issue, support request
 How long ago the last move of a running online game was made. On the last day before the 3 day limit it also says how long is left.
 _Avoid_: clock, timer (an online game has no clock)
 
+**Context line**:
+One line that says what runs on the board and who moves, with names: an online game, a puzzle, a game against the computer. On a computer it heads the panel; on a phone it floats over the board.
+_Avoid_: status line, turn line, pill
+
 **Server update**:
 The moment the server is replaced by a newer one, and the time while the game and the server do not yet fit together. Online games, moves, chats and players survive it; the Online tab says it is happening instead of showing empty cards.
 _Avoid_: deploy (the tooling word), downtime, maintenance
