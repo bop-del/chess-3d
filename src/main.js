@@ -7,6 +7,7 @@ import { mountLookSetting } from './themes/pixel/look-setting.js';
 import { worldChoice, onWorld } from './worlds/choice.js';
 import { mountWorldSetting } from './worlds/setting.js';
 import { mountIslandSetting } from './themes/pixel/island-setting.js';
+import { mountPieceSetting, pieceChoice } from './piece-setting.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
 import { createLiving } from './living.js';
@@ -80,7 +81,7 @@ async function boot() {
   // the rest of the game starts loading at once; what the king needs (stage, materials, pieces, camera, the sequence) is awaited first
   const restP = Promise.all([import('./board.js'), import('./textures.js'), import('./game.js'), import('./ui.js'), import('./battle/director.js'), import('./battle/sfx.js'), import('./audio.js')]);
   restP.catch(() => {});   // a failure is reported where restP is awaited
-  const [{ createStage }, { createPieceMaterials }, { createPieceSet }, { createControls }, { createViews }, introMod] = await Promise.all([
+  const [{ createStage }, { createPieceMaterials }, { createPieceSet, loadPieceVariant }, { createControls }, { createViews }, introMod] = await Promise.all([
     import('./scene.js'), import('./materials.js'), import('./pieceset.js'), import('./controls.js'), import('./views/registry.js'),
     wantIntro ? import('./intro.js') : null,
   ]);
@@ -95,7 +96,7 @@ async function boot() {
   gimbal.name = 'gimbal';
   stage.scene.add(gimbal);
   const materials = createPieceMaterials();
-  const pieceSet = createPieceSet(materials);
+  const pieceSet = createPieceSet(materials, await loadPieceVariant(pieceChoice()));
 
   // camera and views come first: the sequence ends in whatever view the controls hold (the stored or ?view= view, the White
   // view on desktop, the Play view on a phone in portrait), so it reads that pose every frame
@@ -333,6 +334,7 @@ async function boot() {
   const review = (await import('./review/review.js')).mountReview({ game, gimbal, createHint, onInset: (px) => ui.setBottomInset(px), onMoves: (v) => ui.setReviewMoves(v), host: ui.reviewHost });   // the game over card gets its Review the game button
   mountSwatches({ themes, ui });
   mountLookSetting({ themes, ui, stage });   // CHE-239: Sky and Backdrop rows under the swatches, shown with Pixelwelt
+  mountPieceSetting({ themes, ui });   // CHE-367: Pieces row (Classic, Fantasy, Animals), hidden with Pixelwelt
   mountIslandSetting({ themes, ui });   // CHE-357: Island row below Backdrop, shown with Pixelwelt
   mountWorldSetting({ themes, ui });   // CHE-370: World row for the lit themes
   onWorld(applyWorld);

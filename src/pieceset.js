@@ -6,6 +6,12 @@ import { buildBishop, buildQueen, buildKing } from './pieces/setB.js';
 const BUILDERS = { p: buildPawn, r: buildRook, n: buildKnight, b: buildBishop, q: buildQueen, k: buildKing };
 const NAMES = { p: 'pawns', r: 'rooks', n: 'knights', b: 'bishops', q: 'queens', k: 'kings' };
 const TYPES = ['p', 'n', 'b', 'r', 'q', 'k'];
+// Preview piece sets for the lit themes (?pieces=<id>, CHE-367): each module exports BUILDERS { p, r, n, b, q, k } like the Staunton set.
+const VARIANTS = {
+  fantasy: () => import('./pieces/fantasy.js'),
+  animals: () => import('./pieces/animals.js'),
+};
+export const loadPieceVariant = (id) => (VARIANTS[id] ? VARIANTS[id]().then((m) => m.BUILDERS, () => null) : Promise.resolve(null));   // a failed chunk keeps Staunton
 
 // rAF never fires in a background tab, so race it with a timer. A hidden tab has nothing to repaint and clamps timers
 // to 1 s, so it does not wait at all.
@@ -16,7 +22,7 @@ const tick = () => document.hidden ? Promise.resolve() : new Promise((res) => {
   setTimeout(go, 50);
 });
 
-export function createPieceSet(materials) {
+export function createPieceSet(materials, builders = BUILDERS) {
   const protos = new Map();
   const heights = new Map();
   // A piece style (the Blocks theme) replaces the lathe pieces with its own: { make(type, color) -> inner group, height(type, color),
@@ -32,7 +38,7 @@ export function createPieceSet(materials) {
     let p = protos.get(key);
     if (!p) {
       if (color === 'w') {
-        p = BUILDERS[type](materials.white);
+        p = (builders || BUILDERS)[type](materials.white);
         p.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(p);
         heights.set(key, Math.max(0.6, box.max.y));

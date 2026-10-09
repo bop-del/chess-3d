@@ -70,6 +70,7 @@ const t0 = Date.now();
 const FAST = [
   ['rules: perft and game logic (test/perft.mjs)', 'test/perft.mjs'],
   ['piece geometry contract (test/geometry.mjs)', 'test/geometry.mjs'],
+  ['preview piece sets contract (test/piece-sets.mjs)', 'test/piece-sets.mjs'],
   ['capture tray layout (test/trays.mjs)', 'test/trays.mjs'],
   ['Pixelwelt figures contract (test/pixel-chars.mjs)', 'test/pixel-chars.mjs'],
   ['Pixelwelt rules: closed ground, no coplanar faces, clamped textures, one material set (test/pixel-rules.mjs)', 'test/pixel-rules.mjs'],

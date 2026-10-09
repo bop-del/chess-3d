@@ -344,6 +344,7 @@ body.phone.clock-on .pstatus .ps-last { display: none; }
 body.phone .clock-settings { margin-top: 12px; }
 body.phone .clock-settings .chip, body.phone .clock-hint .clock-now { min-height: 44px; }
 body.phone .clock-settings .chips { flex-wrap: nowrap; }
+body.phone .pieceset .chip { min-height: 44px; }
 
 body.phone .pbar {
   position: fixed; z-index: 16; left: var(--sl); right: var(--sr); bottom: var(--sb); height: var(--bar); gap: var(--gap);

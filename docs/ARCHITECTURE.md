@@ -16,6 +16,7 @@ Read only the section for the module you change. Sections are listed in file ord
   - [src/textures.js, src/materials.js](#srctexturesjs-srcmaterialsjs)
   - [src/board.js](#srcboardjs)
   - [src/pieces/setA.js, src/pieces/setB.js, src/pieceset.js](#srcpiecessetajs-srcpiecessetbjs-srcpiecesetjs)
+  - [Preview piece sets: src/pieces/kit.js, src/pieces/fantasy.js, src/pieces/animals.js (CHE-367)](#preview-piece-sets-srcpieceskitjs-srcpiecesfantasyjs-srcpiecesanimalsjs-che-367)
   - [src/rules.js](#srcrulesjs)
   - [src/ai.js](#srcaijs)
   - [src/goodmove.js](#srcgoodmovejs)
@@ -242,6 +243,14 @@ The group extends to about +-4.65 including the frame and down to y = -0.6. Squa
     }
 
 Each (type, color) is built once and cloned, so clones share geometry. Piece triangle counts: pawn 58k, rook 65.5k, knight 74.4k, bishop 79.0k, queen 69.7k, king 82.8k. Bases, rings and bands use the accent material, the rest uses the body material. Every mesh casts and receives shadows. Knights face sideways along their rank toward the board centre (files a to d look toward h, e to h toward a). The game sets the facing on every landing: moves, undo, new game and loaded positions.
+
+### Preview piece sets: `src/pieces/kit.js`, `src/pieces/fantasy.js`, `src/pieces/animals.js` (CHE-367)
+
+    loadPieceVariant(id) -> Promise<BUILDERS | null>     // pieceset.js; 'fantasy' | 'animals', anything else null (a failed chunk too)
+    createPieceSet(materials, builders = Staunton)       // main.js passes loadPieceVariant(?pieces) before the first piece is made
+    BUILDERS = { p, r, n, b, q, k }                      // each (mat) -> THREE.Group, the same contract as the Staunton builders
+
+`?pieces=fantasy|animals` swaps the builders of the lit set for this load. The Options row `Pieces` (`src/piece-setting.js`: `PIECE_SETS`, `pieceChoice()`, `mountPieceSetting({ themes, ui })`, a `.chips` radiogroup `[data-pieceset="row"]` mounted in the themes slot, hidden with Pixelwelt) stores the pick in `localStorage` `chess3d.pieces` and reloads (`main.js` reads `pieceChoice()` once at boot: flag > stored > classic); a new set adds one entry to `PIECE_SETS` and one to `VARIANTS`; each set is its own lazy chunk, one file per piece under `src/pieces/fantasy/` and `src/pieces/animals/`. The kit places parts with plain transforms (`parts().add(geo, slot, { p, r, s })`, `mirror`, `lathe`, `tube`, `slab`, `blob`, `foot`) and merges each slot into one mesh: at most three meshes per piece, `body` and `accent` (the side's materials, swapped for black like the Staunton set) and `dark` (one shared glossy material for eyes, which pieceset.js themes like the knight inlay). Heights keep today's ranking (`HEIGHT`, pawn 0.90 to king 1.85), front is -z, knights are turned by the game like the Staunton knight. `test/piece-sets.mjs` (fast) checks the contract (height within 5 %, footprint, centre, 6k to 40k triangles, three meshes, materials, dispose, no flag keeps Staunton); the smoke group `piece sets` (`test/piece-sets-page.mjs`) checks picking and the select mark per figure, a capture scene, no geometry growth and the start sequence. `node tools/clips-367.mjs stills|clips` renders the review stills and clips (`.tmp/clips367/index.json`).
 
 ### `src/rules.js`
 
