@@ -30,9 +30,13 @@ The Tournament theme (vinyl green and warm cream squares) and the Pixelwelt them
 
 ![Pixelwelt theme](docs/pixel.jpg)
 
-The Options tab with the tiles for Theme, World, Sky, Backdrop and Light.
+The Options tab with the tiles for Theme, World, Sky, Backdrop, Island and Light (Pixelwelt shown).
 
 ![Options tiles](docs/settings-tiles.jpg)
+
+The Pieces row (here Fantasy on the Wood theme) picks another set of figures for the Classic, Tournament, Wood, Metal and Glass themes.
+
+![Fantasy pieces and the Pieces row](docs/pieces.jpg)
 
 The chess clock (here 5+0, chosen in Options) with a face for each side, and the Badges card with the daily puzzle card on the Play tab.
 
