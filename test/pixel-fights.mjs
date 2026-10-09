@@ -27,5 +27,5 @@ for (const [t, name] of Object.entries(TYPES)) {
 }
 const dir = readFileSync(new URL('../src/battle/director.js', import.meta.url), 'utf8');
 check('director: Pixelwelt captures always load the fights (no flag)', /Object\.assign\(SCENES, import\.meta\.glob\('\.\/scenes\/pixel\/fights\.js'\)\)/.test(dir) && /style === 'pixel' \? 'pixel\/fights'/.test(dir) && !/PIXFIGHT/.test(dir));
-check('director: the finale plays on every Pixelwelt checkmate (no flag)', /game\.on\('gameover', \(st\) => \{ if \(st\.reason === 'checkmate' && themes\?\.current\?\.\(\) === 'pixel'\)/.test(dir) && !/params\.get\('finale'\)/.test(dir));
+check('director: the finale plays on every Pixelwelt checkmate (no flag)', /game\.on\('gameover', \(st\) => \{\s*if \(st\.reason !== 'checkmate' \|\| themes\?\.current\?\.\(\) !== 'pixel'\) return;/.test(dir) && /import\('\.\.\/themes\/pixel\/finale\.js'\)/.test(dir) && !/params\.get\('finale'\)/.test(dir));
 process.exitCode = failed ? 1 : 0;
