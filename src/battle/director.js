@@ -175,7 +175,14 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
   game.onCapture((info) => { if (symbols?.visible && themes?.current?.() === 'pixel' && !info.signal?.aborted) symbols.fadeOut(info.victimObj); });
 
   // CHE-371: the Pixelwelt checkmate finale (fireworks, the loser's tower falls, the winners cheer), ticked by update() below
-  game.on('gameover', (st) => { if (st.reason === 'checkmate' && themes?.current?.() === 'pixel') import('../themes/pixel/finale.js').then(async (m) => { pixFinale = m.playFinale({ game, controls, stage, ui, st, sfx: await loadSfx() }); }).catch((e) => console.warn('finale failed', e)); });
+  game.on('gameover', (st) => {
+    if (st.reason !== 'checkmate' || themes?.current?.() !== 'pixel') return;
+    // the banner waits for the finale (it shows it when done): hide it at once, after the other gameover listeners have shown it, so the
+    // card never flashes and its buttons (Review the game) cannot be hit while the finale module still loads and the camera is not ours yet
+    const banner = document.getElementById('banner');
+    queueMicrotask(() => { if (banner) banner.hidden = true; });
+    import('../themes/pixel/finale.js').then(async (m) => { pixFinale = m.playFinale({ game, controls, stage, ui, st, sfx: await loadSfx() }); }).catch((e) => { console.warn('finale failed', e); if (banner) banner.hidden = false; });
+  });
 
   const abortion = (r) => new Promise((res) => { if (r.ac.signal.aborted) res(); else r.ac.signal.addEventListener('abort', res, { once: true }); });
 
