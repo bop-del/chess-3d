@@ -1,0 +1,8 @@
+{
+  "key": "370",
+  "quality": "high",
+  "clips": [
+    { "id": "hall-classic", "scene": "hall", "q": "world=hall&theme=classic", "theme": "classic", "de": "Fackelhalle: eine Burghalle aus Stein mit Bannern und flackerndem warmem Fackellicht. Thema Klassisch, langsame Kamerafahrt." },
+    { "id": "space-classic", "scene": "space", "q": "world=space&theme=classic", "theme": "classic", "de": "Weltraum: das Brett auf einer Plattform im All, mit Planet, Sternen und Nebel. Thema Klassisch, langsame Kamerafahrt." }
+  ]
+}
