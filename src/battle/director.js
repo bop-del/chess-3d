@@ -16,6 +16,7 @@ import { createSettings } from './settings.js';
 import { viewsAllowBattle } from '../views/registry.js';
 
 const SCENES = import.meta.glob('./scenes/*.js');
+Object.assign(SCENES, import.meta.glob('./scenes/pixel/fights.js'));   // CHE-371: the Pixelwelt fights (scenes/pixel/), ?pixfight=old keeps pixel-gore
 const FX = import.meta.glob('./fx.js');
 const SFX = import.meta.glob('./sfx.js');
 const LIT = import.meta.glob('./scenes/lit/index.js');   // CHE-369: the Wild capture scenes of the lit themes, plus a checkmate finale (Options Scene row, ?capture=wild)
@@ -75,7 +76,7 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
   // ------------------------------------------------------------ loading
   async function loadScene(type, style) {
     if (settings.capture === 'wild' && !style) { try { return (await LIT['./scenes/lit/index.js']()).scene('wild', type); } catch (e) { console.warn('lit scenes failed to load', e); } }
-    const name = style === 'pixel' ? 'pixel-gore' : style === 'blocks' ? 'blocks' : NAMES[type];     // Blocks: the victim falls into cubes; Pixelwelt: pixel gore
+    const name = style === 'pixel' ? 'pixel/fights' : style === 'blocks' ? 'blocks' : NAMES[type];     // Blocks: the victim falls into cubes; Pixelwelt: the fights of the attacker take turns (CHE-371)
     if (sceneCache.has(name)) return sceneCache.get(name);
     const load = SCENES[`./scenes/${name}.js`];
     let mod = null;
@@ -101,7 +102,9 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
   setTimeout(preload, 2000);
 
   // ------------------------------------------------------------ the scene clock
+  let pixFinale = null;   // CHE-371
   function update(dt) {
+    if (pixFinale && pixFinale.update(dt) === false) pixFinale = null;
     const r = active;
     if (!r || !r.playing || r.dead) return;
     const d = dt * r.speed * r.slow;
@@ -147,7 +150,7 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
       r.fx = fx.fx; r.fxRaw = fx.raw; r.sfx = sfx;
       if (r.ac.signal.aborted) return;
       if (sfx) sfx.sceneActive = true;
-      const swoop = camera(info, mod.camFor?.(info.attacker) || mod.cam, short);
+      const swoop = camera(info, mod.camFor?.(info.attacker, info) || mod.cam, short);
       await Promise.race([swoop, abortion(r)]);
       if (!r.ac.signal.aborted) {
         r.playing = true;
@@ -170,6 +173,9 @@ export function createDirector({ game, controls, stage, ui, themes, symbols, gor
   game.onCapture(handler);
   // Symbols on: no scene (the handler above is disabled); in Pixelwelt the captured symbol fades out instead (CHE-227). A plain hook, always called.
   game.onCapture((info) => { if (symbols?.visible && themes?.current?.() === 'pixel' && !info.signal?.aborted) symbols.fadeOut(info.victimObj); });
+
+  // CHE-371: the Pixelwelt checkmate finale (fireworks, the loser's tower falls, the winners cheer), ticked by update() below
+  game.on('gameover', (st) => { if (st.reason === 'checkmate' && themes?.current?.() === 'pixel') import('../themes/pixel/finale.js').then(async (m) => { pixFinale = m.playFinale({ game, controls, stage, ui, st, sfx: await loadSfx() }); }).catch((e) => console.warn('finale failed', e)); });
 
   const abortion = (r) => new Promise((res) => { if (r.ac.signal.aborted) res(); else r.ac.signal.addEventListener('abort', res, { once: true }); });
 

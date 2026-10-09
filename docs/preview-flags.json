@@ -12,7 +12,9 @@
     { "flag": "rqueen", "status": "open", "question": "pick the Blocks red queen look a, b or c (a is the default; the Blocks theme is hidden)" },
     { "flag": "musicset", "status": "open", "question": "pick the background music set a or b (a is the default)" },
     { "flag": "variant", "item": "CHE-333", "status": "picked", "pickRef": "owner 2026-10-08, variant a (a row at the top of Options) is the only look; the flag and variants b and c were removed in CHE-356" },
-    { "flag": "introstyle", "item": "CHE-288", "status": "open", "question": "pick the Learn intro layout a, b or c (a is the default)" }
+    { "flag": "introstyle", "item": "CHE-288", "status": "open", "question": "pick the Learn intro layout a, b or c (a is the default)" },
+    { "flag": "pixfight", "item": "CHE-371", "status": "open", "question": "drop ?pixfight=old (the earlier pixel gore fight) and the forced ids once the rotating Pixelwelt fights have shipped for one release" },
+    { "flag": "finale", "item": "CHE-371", "status": "picked", "pickRef": "owner 2026-10-09 pick page: the checkmate finale is the Pixelwelt default, both sides; the flag was removed in CHE-371" }
   ],
   "normal": [
     "adapt", "ai", "backdrop", "birds", "capture", "clock", "daily", "diag", "fen", "gore", "help", "hud", "intro", "island", "light", "line",

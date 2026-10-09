@@ -21,7 +21,9 @@ export const CORE = [
 
 /** [path pattern, groups it affects]. Group names are families: 'fixes' stands for both halves. */
 export const MAP = [
+  [/^src\/battle\/(scenes\/pixel\/|scenes\/pixel-gore\.js$|director\.js$)/, ['battle', 'battle lit', 'pixel fights', 'pixel chars']],   // CHE-371: the Pixelwelt fights and their hook
   [/^src\/battle\//, ['battle', 'battle lit']],
+  [/^src\/themes\/pixel\/finale\.js$/, ['pixel fights']],
   [/^src\/music\//, ['music', 'music render']],
   [/^src\/audio\.js$/, ['music', 'music render', 'battle', 'battle lit', 'core']],
   [/^src\/themes\//, ['themes', 'textures', 'views', 'pixel chars', 'pixel look', 'pixel sky', 'shared fixes', 'cloud mask', 'living']],
@@ -54,6 +56,8 @@ export const MAP = [
   [/^test\/piece-sets-page\.mjs$/, ['piece sets']],
   [/^test\/shared-fixes-page\.mjs$/, ['shared fixes']],
   [/^test\/pixel-chars-page\.mjs$/, ['pixel chars']],
+  [/^test\/pixel-fights-page\.mjs$/, ['pixel fights']],
+  [/^test\/pixel-fights\.mjs$/, []],
   [/^test\/pixel-look-page\.mjs$/, ['pixel look']],
   [/^test\/pixel-sky-page\.mjs$/, ['pixel sky']],
   [/^test\/pixel-sky\.mjs$/, []],

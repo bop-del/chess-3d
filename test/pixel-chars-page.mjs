@@ -1,6 +1,6 @@
 // Pixelwelt figures in the real page: node test/pixel-chars-page.mjs [--port=5352] [--base=<server>]
 // The theme puts blocky figures on the board (rigs, a piece style), they idle (the head turns, the chest breathes), walk with
-// swinging legs while they move and stand still again, a knight gallops, a capture plays the pixel gore scene (Short and On) and
+// swinging legs while they move and stand still again, a knight gallops, a capture plays the earlier pixel gore scene (?pixfight=old, Short and On) and
 // ends with a clean board, every piece and tray piece changes with the theme in place, leaving the theme gives the lathe pieces back,
 // no console error or warning. Software or GPU GL, quality=low and ?manual=1 so the clock is simulated.
 import { reporter, launchBrowser, watchPage, startServer, build } from '../tools/_lib.mjs';
@@ -18,7 +18,8 @@ try {
   const w = await watchPage(page, undefined, { scenes: true });
   await page.evaluateOnNewDocument(() => { try { localStorage.setItem('chess3d.battle', '{"mode":"short","style":"gore"}'); } catch (e) { /* ignore */ } });
   await page.setViewport({ width: 1280, height: 720 });
-  await page.goto(`${URL0}/?quality=low&manual=1&ai=0&theme=pixel`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(`${URL0}/?quality=low&manual=1&ai=0&theme=pixel&pixfight=old`,   // the earlier pixel gore scene: its cube ranges are measured below (the new fights: test/pixel-fights-page.mjs)
+     { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
   const ev = (fn, arg) => page.evaluate(fn, arg);
 

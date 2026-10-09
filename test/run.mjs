@@ -77,6 +77,7 @@ const FAST = [
   ['Pixelwelt island choice: precedence, store, build and dispose (test/pixel-island.mjs)', 'test/pixel-island.mjs'],
   ['Backdrop world choice: precedence, store, listeners (test/world-choice.mjs)', 'test/world-choice.mjs'],
   ['Pixelwelt skies, backdrops, sets: choice, build and dispose, weather (test/pixel-sky.mjs)', 'test/pixel-sky.mjs'],
+  ['Pixelwelt fight variants: two per type, pick and rotation, flags (test/pixel-fights.mjs)', 'test/pixel-fights.mjs'],
   ['living pieces: signature moves and Pixelwelt birds (test/living.mjs)', 'test/living.mjs'],
   ['option tiles: a picture per choice, no orphans (test/tiles.mjs)', 'test/tiles.mjs'],
   ['preview piece sets: build, heights, dispose, the forced style hook (test/piecesets.mjs)', 'test/piecesets.mjs'],
