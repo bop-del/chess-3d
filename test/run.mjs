@@ -95,6 +95,8 @@ const FAST = [
   ['run lock and group retry classifier (test/run-lock.mjs)', 'test/run-lock.mjs', true],
   ['chrome registry and reaper (test/reap-chromes.mjs)', 'test/reap-chromes.mjs', true],
   ['opening lines are legal (test/openings.mjs)', 'test/openings.mjs'],
+  ['showcase camera shots: finite, above the board, no jumps (test/showcase-shots.mjs)', 'test/showcase-shots.mjs'],
+  ['showcase games are legal, captions and move names (test/showcase-data.mjs)', 'test/showcase-data.mjs'],
   ['goal screens: target position, marks, goal sentences (test/goal.mjs)', 'test/goal.mjs'],
   ['puzzle progress (test/puzzle-progress.mjs)', 'test/puzzle-progress.mjs'],
   ['puzzle controller (test/puzzle-controller.mjs)', 'test/puzzle-controller.mjs'],

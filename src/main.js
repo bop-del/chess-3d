@@ -71,7 +71,7 @@ const manual = params.get('manual') === '1';
 const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // CHE-345: a link that sets a state (position, view, panel ...) opens straight in it: no start picture, no sequence. The list is the
 // same as in index.html, which hides the start picture from the first frame; ?intro=1 plays the sequence anyway.
-const DIRECT_FLAGS = ['fen', 'moves', 'open', 'select', 'view', 'promo', 'line', 'preset', 'yaw', 'pitch', 'dist', 'gx', 'gy', 'gz', 'symbols', 'help', 'hud', 'spin', 'light', 'theme'];
+const DIRECT_FLAGS = ['fen', 'moves', 'open', 'select', 'view', 'promo', 'line', 'preset', 'yaw', 'pitch', 'dist', 'gx', 'gy', 'gz', 'symbols', 'help', 'hud', 'spin', 'light', 'theme', 'showcase'];
 const direct = DIRECT_FLAGS.some((k) => params.has(k));
 const wantIntro = params.get('intro') === '1' || (params.get('intro') !== '0' && !manual && !reduced && !direct);
 
@@ -101,7 +101,7 @@ async function boot() {
 
   // camera and views come first: the sequence ends in whatever view the controls hold (the stored or ?view= view, the White
   // view on desktop, the Play view on a phone in portrait), so it reads that pose every frame
-  let living = null, game = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null, news = null;
+  let showcase = null, living = null, game = null, symbols = null, battle = null, openings = null, drill = null, puzzles = null, sweep = null, clockUi = null, news = null;
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const pick = (cx, cy) => {
@@ -264,7 +264,7 @@ async function boot() {
   };
   let t = 0;
   // the frame loop runs the whole game from here on (the modules that follow are optional in it until they exist)
-  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(dt); themes.update(dt); world?.update(dt); living?.tick(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); orientLabels(); ui.sync(); };
+  advance = (dt) => { t += dt; controls.update(dt); views.update(dt); play.update(dt); game.update(dt); symbols.sync(dt); themes.update(dt); world?.update(dt); living?.tick(dt); battle?.update(dt); clockUi?.tick(dt); openings?.tick(dt); drill?.tick(dt); puzzles?.tick(dt); sweep?.tick?.(dt); board.update(dt, t); showcase?.update(dt); orientLabels(); ui.sync(); };
   advance(0.001);   // the Play view's first focus and the HUD measure land in the camera now
   intro?.boardGo();
   intro?.setTarget(0.95);
@@ -417,6 +417,19 @@ async function boot() {
     if (open !== undefined) { ui.closeSheets(); openFlag(open, { ui, learn, review }); }
   };
   applyLateParams({ game, ui, stage, controls, learn, review, openings });   // ?hud, ?help, ?light, ?spin, ?promo, ?open: on the finished board
+  // CHE-374: Showcase plays a famous game under a film camera; a tap ends it and the game on the board comes back. Started by
+  // the menu entry (src/showcase/entry.js, Play tab or Game section) or by ?showcase=1|trailer (?showgame=<id>)
+  const launchShowcase = async (mode, gameId) => {
+    if (showcase) return showcase;
+    try {
+      showcase = (await import('./showcase/showcase.js')).startShowcase({ game, controls, stage, gimbal, battle, ui, views, living, themes, mode, gameId, onEnd: () => { showcase = null; delete window.__chess.showcase; } });
+      window.__chess.showcase = showcase;
+    } catch (e) { console.warn('showcase failed to start', e); }
+    return showcase;
+  };
+  import('./showcase/entry.js').then((m) => { window.__chess.showcaseEntry = m.mountShowcaseEntry({ ui, game, start: launchShowcase }); }).catch((e) => console.warn('showcase entry failed', e));
+  const showFlag = params.get('showcase');
+  if (showFlag && showFlag !== '0') await launchShowcase(showFlag, params.get('showgame'));
   news?.autoOpen();   // the News, once after an update with a new first or second number (CHE-235)
   loaderEl.classList.add('done');
   document.body.classList.add('ready');
