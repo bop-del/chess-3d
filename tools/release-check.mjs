@@ -14,6 +14,7 @@
 //   5. docs: every URL flag, script, tool, file and relative link mentioned in README.md and docs/*.md exists in the code or the repo
 //      (skipped with a warning while there is no README.md)
 //   6. version: package.json version is printed and must differ from the last tag's version when commits exist since that tag
+//   7. the live online server (GET /version) has at least the API this build needs (src/online/version.js, tools/server-api.mjs); below it FAILS, no answer WARNS
 // --extra-audit runs one more shell command in the repo (for example a project specific word list check) and fails on a non zero exit.
 // --skip-install links the repo's node_modules into the fresh copy instead of running npm ci. --no-browser skips steps 3 and 4.
 // Before the first commit there is no HEAD: the working tree files (tracked plus untracked, not ignored) are copied instead and a warning is printed.
@@ -24,12 +25,13 @@ import { mkdtempSync, existsSync, readFileSync, readdirSync, statSync, symlinkSy
 import { tmpdir, userInfo } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { neededApi, liveApi, judge } from './server-api.mjs';
 import { ROOT, reporter, launchBrowser, watchPage, startServer, sleep, claimPort, waitReady, defaultGl, safeDecode, proveGpu, pageRenderer } from './_lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const a = args.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : dflt; };
 const flag = (name) => args.includes(`--${name}`);
-if (flag('help') || flag('h')) { console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 21).join('\n')); process.exit(0); }
+if (flag('help') || flag('h')) { console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 22).join('\n')); process.exit(0); }
 const PORT = opt('port', '') ? Number(opt('port', '')) : (await claimPort()).port;
 const SUB_PORT = opt('port', '') ? PORT + 1 : (await claimPort()).port;
 const sh = (cmd, cwd = ROOT, opts = {}) => execSync(cmd, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, ...opts });
@@ -294,6 +296,13 @@ if (built && !flag('no-browser')) {
   const commits = since && hasHead ? Number(sh(`git rev-list ${since}..HEAD --count`).trim()) : 0;
   if (tagged && commits > 0 && v === tagged) warn('package.json version was bumped since the last tag', `still ${v}`);
   else pass('package.json version', `${v} (last tag ${since || 'none'}${tagged ? ` had ${tagged}` : ''})`);
+}
+
+// ------------------------------------------------------------------ 7. online server API (CHE-405)
+{
+  const need = neededApi(readFileSync(join(ROOT, 'src/online/version.js'), 'utf8'));
+  const v = judge({ needed: need, live: await liveApi() });
+  v.state === 'ok' ? pass('live online server has the API this release needs', v.line) : v.state === 'red' ? fail('live online server has the API this release needs', v.line) : warn('live online server has the API this release needs', v.line);
 }
 
 // ------------------------------------------------------------------ done

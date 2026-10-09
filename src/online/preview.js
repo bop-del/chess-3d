@@ -1,10 +1,10 @@
-// Test aid for the Online tab (CHE-301, CHE-290, CHE-272): ?online=<any url>&onlinepv=list|wait|chat|min|stats|card|pushcard|bell|multi|running (running: four running games with waiting times, one on the last day each way; multi: two running games, an open challenge out, one in; stats: own numbers and a long
+// Test aid for the Online tab (CHE-301, CHE-290, CHE-272): ?online=<any url>&onlinepv=list|wait|chat|min|stats|card|pushcard|bell|multi|running|updating (updating: the Server update line instead of the cards, CHE-405; running: four running games with waiting times, one on the last day each way; multi: two running games, an open challenge out, one in; stats: own numbers and a long
 // name with no game; card: the detail card of Nina is open; pushcard and bell: the push permission card and the bell on a fake push).
 // A fake api with fake players and messages, no server. index.js uses it instead of createApi when the flag is set.
 export const previewOn = (search = typeof location !== 'undefined' ? location.search : '') => new URLSearchParams(search).has('onlinepv');
 export const previewScene = (search = typeof location !== 'undefined' ? location.search : '') => {
   const v = new URLSearchParams(search).get('onlinepv');
-  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell', 'multi', 'running'].includes(v) ? v : 'list';
+  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell', 'multi', 'running', 'updating'].includes(v) ? v : 'list';
 };
 
 const MIN = 60000;

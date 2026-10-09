@@ -269,6 +269,9 @@ body.phone:not(:has(.psheet.ponline.open)) .opd.opds { display: none; }
 /* CHE-343: the bot tag next to the name of the bot */
 .obot { display: inline-block; padding: 1px 6px; border-radius: 999px; background: var(--chip, rgba(255, 255, 255, 0.14)); color: var(--dim); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
 
+/* CHE-405: Server update, the Online tab shows one line instead of the cards; nothing else of online play shows over the board */
+.oupdate { margin: 8px 0; }
+body.online-updating .obubs, body.online-updating .obub, body.online-updating .ogline, body.online-updating .ochpill, body.online-updating .ochat { display: none !important; }
 /* ===== CHE-403: the running games block at the top of the tab, above Players ===== */
 .orun { display: flex; flex-direction: column; gap: 6px; }
 .orun[hidden] { display: none; }

@@ -10,6 +10,7 @@
 // with ONLINE_BOT=1: an admin makes the Bot challenge them, a player challenges it, it accepts, plays and chats.
 // Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { reporter, launchBrowser, startServer, build, settleUi, lanePorts, portAnswers, sleep, ROOT } from '../tools/_lib.mjs';
@@ -510,6 +511,34 @@ try {
   await click(PM, '[data-a=challenge][data-n="Bot"]');
   R.expect('bot challenge by a player: accepted at once, no human involved', await until(PM, () => window.__chessOnline?.state?.games?.some((g) => g.opponent === 'Bot' && g.status === 'active'), null, 8000));
   await F.close(); await PM.close();
+
+  // ------------------------------------------------------------ CHE-405 a server from before the games list: no /version (404 = API 0), /state without games
+  // The Online tab says Server update instead of the (empty) cards; when the server is replaced (here: /version answers) the next reconnect shows the cards again.
+  const OLD_PORT = SPORT + 1, OLD = `http://127.0.0.1:${OLD_PORT}`;
+  if (await portAnswers(OLD_PORT)) throw new Error(`the stub server port ${OLD_PORT} is in use`);
+  let upgraded = false; const streams = new Set();
+  const oldState = () => ({ now: Date.now(), me: { name: 'Felix', muted: false, admin: false }, players: [{ name: 'Nina', online: true, playing: false, withMe: false, unread: 0, score: null }], challenges: { in: [], out: [] }, chats: {}, unread: {}, game: null, ...(upgraded ? { games: [] } : {}) });
+  const stub = createServer((req, res) => {
+    const h = { 'Access-Control-Allow-Origin': req.headers.origin || '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Cache-Control': 'no-store' };
+    const path = new URL(req.url, 'http://x').pathname;
+    if (req.method === 'OPTIONS') { res.writeHead(204, h); return res.end(); }
+    if (path === '/version' && upgraded) { res.writeHead(200, { ...h, 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ api: 1, minClient: 1, commit: 'stub' })); }
+    if (path === '/events') { res.writeHead(200, { ...h, 'Content-Type': 'text/event-stream' }); res.write(`event: state\ndata: ${JSON.stringify(oldState())}\n\n`); streams.add(res); res.on('close', () => streams.delete(res)); return; }
+    res.writeHead(404, h); res.end();
+  });
+  await new Promise((ok) => stub.listen(OLD_PORT, '127.0.0.1', ok));
+  try {
+    const ctxO = await browser.createBrowserContext();
+    const O = await open(ctxO, inviteLink({ game: `${BASE}/?${Q}&touch=1`, server: OLD, key: 'OldServerStubKey0123456789abcdef' }), PHONE);
+    const oldOk = await until(O, () => window.__chessOnline?.status === 'connected' && window.__chessOnline.apiVerdict === 'server-old');
+    R.expect('old server: connected, /version missing reads as API 0', oldOk, oldOk ? '' : JSON.stringify(await ev(O, () => ({ s: window.__chessOnline?.status, v: window.__chessOnline?.apiVerdict, login: window.__chessOnline?.login, href: location.href.slice(0, 120) }))));
+    R.expect('old server: the Online tab says Der Server wird gerade aktualisiert, no cards, no player list', await ev(O, () => { const u = document.querySelector('.oupdate'); return !u.hidden && u.textContent.trim() === 'Der Server wird gerade aktualisiert. Deine Partien sind sicher, bitte später nochmal schauen.' && document.querySelector('.omain').hidden; }));
+    if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await settleUi(O); await O.screenshot({ path: join(SHOTS, 'phone-server-update.png') }); }
+    upgraded = true;
+    for (const r of streams) r.end();   // the server restarts: the stream drops, the client reconnects and reads /version again
+    R.expect('server replaced: after the reconnect the line goes and the cards come back', await until(O, () => window.__chessOnline.apiVerdict === 'ok' && document.querySelector('.oupdate').hidden && !document.querySelector('.omain').hidden, undefined, 30000));
+    await O.close();
+  } finally { for (const r of streams) r.end(); stub.close(); }
 } catch (e) {
   R.fail('online run', String(e && e.stack || e).slice(0, 400));
 }

@@ -14,6 +14,7 @@ import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, statView, spanO
 import { previewOn, previewScene, createPreviewApi, previewPushEnv } from './preview.js';
 import { createPush } from './push.js';
 import { startStats } from './stats.js';
+import { createVersionCheck } from './version.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SEEN = 'chess3d.onlineSeen';
@@ -28,7 +29,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   let login = loginFor(server) || (preview ? { server, key: 'preview', name: 'Boris' } : null);
   let chatMin = false;
   let push = null;
-  let api = null, match = null, state = null, status = 'connecting', receivedAt = 0;
+  let api = null, match = null, state = null, status = 'connecting', receivedAt = 0, apiVerdict = 'unknown';   // apiVerdict (CHE-405): ok | server-old | client-old | unknown
+  const vcheck = createVersionCheck({ server, onChange: (v) => { apiVerdict = v; if (v === 'client-old') window.__chess?.update?.show?.(); render(); } });   // the server too old hides the cards, the client too old asks for a reload (CHE-304 banner)
   let chatWith = null, chatShown = false, bub = null, bubTimer = 0, bubDone = false, gbub = null, gTimer = 0, confirmResign = 0, detailsOpen = false, lockDetails = false, codeErr = '';
   const seen = seenGet();   // { game: finished game ids up to this one are acknowledged, games: more acknowledged ids, out: older single declined challenge id, outs: acknowledged declined challenge ids }
   const ackGame = (id) => id <= (seen.game || 0) || (seen.games || []).includes(id);
@@ -45,6 +47,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       <form class="ocode" autocomplete="off"><label><span data-i18n="online.codeLabel">Enter code</span><input name="code" type="text" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="NAME-XXXX"></label><button class="obtn gold" type="submit" data-i18n="online.codeGo">Log in</button></form>
       <p class="oerr" hidden></p>
     </div>
+    <p class="oupdate ocard" role="status" data-i18n="online.serverUpdating" hidden>The server is being updated. Your games are safe, please check back later.</p>
     <div class="omain" hidden>
       <div class="omehead"><p class="ome"></p><button class="obell" type="button" data-a="bell" hidden></button></div>
       <div class="opushcard ocard" hidden><p data-i18n="online.pushAsk">Shall I tell you when it is your turn?</p><div class="orow"><button class="obtn gold" type="button" data-a="push-yes" data-i18n="online.pushYes">Yes please</button><button class="obtn" type="button" data-a="push-no" data-i18n="online.pushNo">No thanks</button></div></div>
@@ -284,8 +287,11 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     const needCode = !login || (status === 'unreachable' && api?.details().cause === 'invite');
     $('.ologin').hidden = !needCode;
     const err = $('.ologin .oerr'); err.hidden = !codeErr; err.textContent = codeErr;
-    $('.omain').hidden = !logged;
-    if (!logged) return;
+    const updating = apiVerdict === 'server-old';
+    $('.oupdate').hidden = !updating || !login;
+    document.body.classList.toggle('online-updating', updating);   // the bubbles over the board go too (online.css)
+    $('.omain').hidden = !logged || updating;
+    if (!logged || updating) return;
     $('.ome').textContent = t('online.you', 'You are {name}', { name: state.me.name });
     watchStats(); renderStats();
 
@@ -344,7 +350,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
 
   const unreadTotal = () => Object.values(state?.unread || {}).reduce((a, b) => a + b, 0);
   function renderDot() {
-    if (!state) { setDot(false, 0); return; }
+    if (!state || apiVerdict === 'server-old') { setDot(false, 0); return; }
     const n = unreadTotal() + myTurnCount(gamesOf());   // unread messages plus the games where it is your move
     setDot(n > 0 || state.challenges.in.length > 0, n);
   }
@@ -600,7 +606,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     const mkApi = preview ? (o) => createPreviewApi({ scene, ...o }) : createApi;
     api = mkApi({
       server, key: l.key, version: VERSION,
-      onStatus: (s) => { status = s; if (s === 'connected') match?.retrySend(); render(); },
+      onStatus: (s) => { status = s; if (s === 'connected') { match?.retrySend(); if (!preview) vcheck.run(); } render(); },
       onState: (s) => {
         const first = !state, prevGames = gamesOf();
         const asked = new Set((state?.challenges.out || []).filter((c) => c.status === 'open').map((c) => c.to));   // whom we had asked before this state
@@ -637,11 +643,13 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       },
     });
     match = createMatch({ game, controls, api, onChange: () => render(), setBoard });
+    if (!preview) vcheck.run();   // on login; every reconnect runs it again (onStatus)
     render();
   }
   if (login) start(login); else render();
   if (preview && (scene === 'chat' || scene === 'min')) { chatWith = 'Nina'; chatShown = true; chatMin = scene === 'min'; }
   if (preview && scene === 'card') openStats('Nina');
+  if (preview && scene === 'updating') { apiVerdict = 'server-old'; render(); }
 
   // the countdown in an open Details box, the 3 day finish appearing on time
   setInterval(() => { if ((detailsOpen || lockDetails) && status === 'unreachable') renderDetails(); else if (lockDetails) renderDetails(); }, 1000);
@@ -652,7 +660,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   onShown?.(() => { markRead(); renderMain(); });
 
   const hook = {
-    get state() { return state; }, get status() { return status; }, get match() { return match; }, get api() { return api; },
+    get state() { return state; }, get status() { return status; }, get match() { return match; }, get api() { return api; }, get apiVerdict() { return apiVerdict; },
     get login() { return login ? { server: login.server, name: login.name } : null },
     get push() { return push; }, render, tick, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; }, get boardGame() { return boardGame(); },
   };

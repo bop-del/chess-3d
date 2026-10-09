@@ -4,6 +4,7 @@ import { addDE } from '../i18n.js';
 addDE({
   'online.tab': 'Online',
   'online.conn.connected': 'Server verbunden', 'online.conn.connecting': 'verbinde...', 'online.conn.unreachable': 'Server nicht erreichbar',
+  'online.serverUpdating': 'Der Server wird gerade aktualisiert. Deine Partien sind sicher, bitte später nochmal schauen.',
   'online.details': 'Details', 'online.detailsTitle': 'Verbindung',
   'online.cause.offline': 'Dieses Gerät hat gerade kein Internet.', 'online.cause.noanswer': 'Der Server antwortet nicht.',
   'online.cause.server': 'Der Server hat einen Fehler.', 'online.cause.invite': 'Die Einladung gilt nicht mehr.',
