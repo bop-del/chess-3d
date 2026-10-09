@@ -21,7 +21,7 @@ const device = (n) => { const e = createECDH('prime256v1'); e.generateKeys(); re
 
 let coin = 0.2;   // random() < 0.5: the challenger plays white
 const db = openDb(':memory:');
-const app = createOnlineServer({ db, vapid: vapidGenerate(), vapidSubject: 'mailto:test@example.com', pushFetch, random: () => coin, bot: { moveDelay: () => 0, chatDelay: () => 0 } });
+const app = createOnlineServer({ db, vapid: vapidGenerate(), vapidSubject: 'mailto:test@localhost', pushFetch, random: () => coin, bot: { moveDelay: () => 0, chatDelay: () => 0 } });
 const port = await app.listen(0, '127.0.0.1');
 const call = async (path, { key, body } = {}) => {
   const r = await fetch(`http://127.0.0.1:${port}${path}`, { method: body ? 'POST' : 'GET', headers: { ...(key ? { Authorization: `Bearer ${key}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
