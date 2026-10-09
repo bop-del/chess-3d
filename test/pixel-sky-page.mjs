@@ -125,6 +125,42 @@ try {
     await page.close();
   }
 
+  // the Team row (CHE-372): knights (the default), dragons, wizards and pirates, a click restyles every figure without a reload and
+  // without leaks, the pick is remembered, ?pixteam= beats it for one visit
+  {
+    ({ page, w } = await open('theme=pixel'));
+    const team = (pg) => pg.evaluate(() => {
+      const C = window.__chess, r = document.querySelector('[data-pixlook="team"]'), mem = C.stage.renderer.info.memory;
+      let tris = 0; C.gimbal.traverse((o) => { if (o.isMesh && o.parent?.parent?.name === 'rig') tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+      return { n: r?.querySelectorAll('.swatch').length, on: r?.querySelector('.swatch.on')?.dataset.value, hidden: r?.hidden, tris: Math.round(tris), geo: mem.geometries, tex: mem.textures, stored: localStorage.getItem('chess3d.pixteam'), reloads: window.__teamMark === 1 };
+    });
+    const pickTeam = (pg, v) => pg.evaluate(async (id) => { document.querySelector(`[data-pixlook="team"] .swatch[data-value="${id}"]`).click(); const C = window.__chess; await new Promise((r) => setTimeout(r, 400)); for (let i = 0; i < 3; i++) { C.step(0.2); C.stage.render(0.2); } C.draw(); }, v);
+    await page.evaluate(() => { window.__teamMark = 1; });
+    s = await team(page);
+    R.expect('Team row: 4 tiles, shown with Pixelwelt, knights marked by default, nothing stored', s.n === 4 && !s.hidden && s.on === 'knights' && s.stored === null, JSON.stringify(s));
+    const first = s;
+    for (const id of ['dragons', 'wizards', 'pirates']) {
+      await pickTeam(page, id);
+      s = await team(page);
+      R.expect(`Team ${id}: the click restyles the figures (other triangle count, no reload), marks the tile and stores it`, s.on === id && s.stored === id && s.reloads && s.tris > 0 && s.tris !== first.tris, JSON.stringify({ before: first.tris, after: s.tris, on: s.on, stored: s.stored }));
+    }
+    await pickTeam(page, 'knights');
+    s = await team(page);
+    R.expect('back to knights: the same figures as before, no leaked geometries or textures (renderer.info)', s.on === 'knights' && s.tris === first.tris && s.geo === first.geo && s.tex === first.tex, `triangles ${first.tris} to ${s.tris}, geometries ${first.geo} to ${s.geo}, textures ${first.tex} to ${s.tex}`);
+    await pickTeam(page, 'dragons');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction('window.__chessReady === true && !!window.__chess.step', { timeout: 120000 });
+    s = await team(page);
+    R.expect('a reload keeps the team pick (dragons)', s.on === 'dragons', JSON.stringify(s));
+    await page.close();
+    ({ page, w } = await open('theme=pixel&pixteam=knights'));
+    s = await team(page);
+    R.expect('?pixteam=knights beats the stored dragons for this visit and stores nothing new', s.on === 'knights' && s.stored === 'dragons', JSON.stringify(s));
+    await page.evaluate(() => localStorage.removeItem('chess3d.pixteam'));
+    R.expect('no console error or warning (team row)', !w.errs.length && !w.warns.length, 'none', [...w.errs, ...w.warns].slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // a phone
   ({ page, w } = await open('theme=pixel&touch=1', { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, UA));
   s = await state(page);
@@ -155,10 +191,10 @@ try {
       const sheet = tiles.length ? tiles[0].closest('.swatches').getBoundingClientRect() : null;
       return { heads, n: tiles.length, cut, small, on, dressed: [...new Set(dressed)].join(''), bad, urls: urls.length, scrollX: document.documentElement.scrollWidth > document.documentElement.clientWidth };
     });
-    const want = lang === 'de' ? ['Thema', 'Welt', 'Himmel', 'Hintergrund', 'Insel'] : ['Theme', 'World', 'Sky', 'Backdrop', 'Island'];
+    const want = lang === 'de' ? ['Thema', 'Welt', 'Himmel', 'Hintergrund', 'Insel', 'Team'] : ['Theme', 'World', 'Sky', 'Backdrop', 'Island', 'Team'];
     R.expect(`${tag}: headings ${want.join(', ')}`, JSON.stringify(r.heads) === JSON.stringify(want), JSON.stringify(r.heads));
-    R.expect(`${tag}: ${r.n} tiles, no label cut off (scrollWidth <= clientWidth)`, r.n === 6 + 3 + 5 + 3 + 5 && !r.cut.length, `${r.n} tiles`, r.cut.join(' | ') || `${r.n} tiles`);
-    R.expect(`${tag}: tap targets at least 44 px, one selected mark per row`, !r.small.length && r.on.every((n) => n === 1) && r.on.length === 5, 'ok', JSON.stringify({ small: r.small, on: r.on }));
+    R.expect(`${tag}: ${r.n} tiles, no label cut off (scrollWidth <= clientWidth)`, r.n === 6 + 3 + 5 + 3 + 5 + 4 && !r.cut.length, `${r.n} tiles`, r.cut.join(' | ') || `${r.n} tiles`);
+    R.expect(`${tag}: tap targets at least 44 px, one selected mark per row`, !r.small.length && r.on.every((n) => n === 1) && r.on.length === 6, 'ok', JSON.stringify({ small: r.small, on: r.on }));
     R.expect(`${tag}: the 17 tile pictures load`, r.dressed === 'a' && !r.bad.length && r.urls === 17, r.dressed, JSON.stringify({ dressed: r.dressed, bad: r.bad, urls: r.urls }));
     R.expect(`${tag}: no console error or warning`, !ww.errs.length && !ww.warns.length, 'none', [...ww.errs, ...ww.warns].slice(0, 3).join(' | '));
     await pg.close();
