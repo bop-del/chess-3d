@@ -28,6 +28,9 @@ export function createPieceSet(materials, builders = BUILDERS) {
   // A piece style (the Blocks theme) replaces the lathe pieces with its own: { make(type, color) -> inner group, height(type, color),
   // warm(type, color), update(dt, root), dispose() }. null is the classic set, whose pieces only change materials per theme.
   let style = null;
+  let themed = null, forced = null;   // the theme's style, and a ?pieces= set (src/pieces/flag.js) that wins over it
+  const own = (x) => x && (x.id === 'pixel' || x.id === 'blocks');   // Pixelwelt and Blocks keep their own figures
+  const pick = () => (own(themed) ? themed : forced || themed);
   const innerTurn = (type, color) => (color === 'b' && type !== 'n' ? Math.PI : 0);
   const dias = new Map();       // base diameter (the wider of the two footprint sides), board units
 
@@ -83,7 +86,8 @@ export function createPieceSet(materials, builders = BUILDERS) {
     },
     height(type, color) { if (style) return style.height(type, color); proto(type, color); return heights.get(type + color); },
     get style() { return style; },
-    setStyle(next) { if (next === style) return; const old = style; style = next || null; old?.dispose?.(); },
+    setStyle(next) { next = next || null; if (next === themed) return; const old = themed; themed = next; style = pick(); old?.dispose?.(); },
+    force(next) { const old = forced; forced = next || null; style = pick(); if (old !== forced) old?.dispose?.(); },
     // The style changed under a piece that is already on the board: swap its inner group (keeps the turn), returns the new height.
     restyle(wrap) {
       const { type, color } = wrap.userData.piece;

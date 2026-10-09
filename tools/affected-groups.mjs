@@ -50,6 +50,7 @@ export const MAP = [
   [/^test\/music-page\.mjs$/, ['music', 'music render']],
   [/^test\/(themes|textures|intro|views|play|drill|explain|learn|learnbar|review|puzzles|goodmove|fixes)\.mjs$/, null],   // null: the group named like the file, see below
   [/^test\/trays-page\.mjs$/, ['trays']],
+  [/^test\/piecesets-page\.mjs$/, ['figure sets']],
   [/^test\/piece-sets-page\.mjs$/, ['piece sets']],
   [/^test\/shared-fixes-page\.mjs$/, ['shared fixes']],
   [/^test\/pixel-chars-page\.mjs$/, ['pixel chars']],

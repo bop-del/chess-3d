@@ -1,4 +1,4 @@
-// The "Pieces" row of Options (CHE-367): Classic, Fantasy, Animals (room for more sets, CHE-368). Shown for the lit themes, hidden with
+// The "Pieces" row of Options (CHE-367): Classic, Fantasy, Animals, Crystal, Mech (Crystal and Mech are piece styles from src/pieces/flag.js, CHE-368). Shown for the lit themes, hidden with
 // Pixelwelt (it keeps its own figures). The pick is stored per browser (chess3d.pieces, default classic); ?pieces= beats it for that visit.
 // The set is read once at boot (main.js), so a pick stores and reloads the page.
 import { t, onLanguage, addDE, translateTree } from './i18n.js';
@@ -7,6 +7,8 @@ export const PIECE_SETS = {
   classic: { en: 'Classic', de: 'Klassisch' },
   fantasy: { en: 'Fantasy', de: 'Fantasy' },
   animals: { en: 'Animals', de: 'Tiere' },
+  crystal: { en: 'Crystal', de: 'Kristall' },
+  mech: { en: 'Mech', de: 'Mech' },
 };
 const KEY = 'chess3d.pieces';
 const readStored = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };

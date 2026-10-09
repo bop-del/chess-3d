@@ -79,6 +79,7 @@ const FAST = [
   ['Pixelwelt skies, backdrops, sets: choice, build and dispose, weather (test/pixel-sky.mjs)', 'test/pixel-sky.mjs'],
   ['living pieces: signature moves and Pixelwelt birds (test/living.mjs)', 'test/living.mjs'],
   ['option tiles: a picture per choice, no orphans (test/tiles.mjs)', 'test/tiles.mjs'],
+  ['preview piece sets: build, heights, dispose, the forced style hook (test/piecesets.mjs)', 'test/piecesets.mjs'],
   ['preview flag registry (test/flags.mjs)', 'test/flags.mjs'],
   ['preview clip pipeline and critic verdict files (test/preview-clips.mjs)', 'test/preview-clips.mjs'],
   ['text lint (test/lint.mjs)', 'test/lint.mjs'],

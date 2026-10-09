@@ -42,6 +42,7 @@ Read only the section for the module you change. Sections are listed in file ord
   - [Menu structure A](#menu-structure-a-default-menuold-for-the-old-menu-che-223-che-226)
   - [src/living.js, themes/blocks/moves.js, themes/pixel/birds.js](#srclivingjs-themesblocksmovesjs-themespixelbirdsjs-living-pieces-che-238)
   - [Online play: server/, src/online/](#online-play-server-srconline-che-271-adr-0009)
+  - [Crystal and Mech figure sets (CHE-368)](#crystal-and-mech-figure-sets-srcpiecesframejs-flagjs-crystaljs-mechjs-che-368)
   - [Backdrop worlds: src/worlds/](#backdrop-worlds-srcworlds-che-370)
 - [Test tiers and the smoke runner](#test-tiers-and-the-smoke-runner)
 - [Test hooks](#test-hooks)
@@ -240,6 +241,7 @@ The group extends to about +-4.65 including the frame and down to y = -0.6. Squa
       make(type, color),            // type 'p' | 'n' | 'b' | 'r' | 'q' | 'k', color 'w' | 'b'
       buildAll(onProgress),         // builds every prototype with progress callbacks
       setStyle(style | null), restyle(wrap) -> height, update(dt, root), style   // a theme's own characters, see the Blocks theme
+      force(style | null)           // a ?pieces= preview set: wins over the theme's style until force(null) (the theme's style is still kept and disposed on change)
     }
 
 Each (type, color) is built once and cloned, so clones share geometry. Piece triangle counts: pawn 58k, rook 65.5k, knight 74.4k, bishop 79.0k, queen 69.7k, king 82.8k. Bases, rings and bands use the accent material, the rest uses the body material. Every mesh casts and receives shadows. Knights face sideways along their rank toward the board centre (files a to d look toward h, e to h toward a). The game sets the facing on every landing: moves, undo, new game and loaded positions.
@@ -555,11 +557,34 @@ The world in use is `worldChoice()` (`worlds/choice.js`, small and eager): a cli
 
 `test/run.mjs` runs the tiers (fast, smoke, phone, `all`). `test/smoke-groups.mjs` is the smoke entry: the groups are listed in `test/smoke-group-list.mjs` (name, script, args), `tools/affected-groups.mjs` maps changed paths to groups (pure `affectedGroups(files)`, `changedFiles()` for the diff against the merge base with main), `tools/result-cache.mjs` caches passed groups, `tools/_lib.mjs` owns the build cache, `lanePorts()`, `startServer()` (refuses a port that serves another build), `slotsFor()` and the Chrome slot locks. Flow: pick groups (`--affected` default in a lane, `--all`), compute the build hash, answer cache hits as CACHED, build and serve only when a group still has to run. Core paths run every group. The offline piano render of `test/music-page.mjs` is its own group `music render` (`--render-only`; `music` runs with `--skip-render`): it prints a row per piece when that piece finishes and a heartbeat every 15 s so the quiet limit never fires, and `MUSIC_RENDER_MS` (240000) is its deadline (CHE-305). The groups share one headless Chrome by default (CHE-171, default since CHE-186): `test/smoke-groups.mjs` starts it with `launchSharedHost()` (one slot for the whole run) and each group process gets a `BrowserContext` in it through `launchBrowser()`; `--own-chrome` or `CHESS_SHARED_CHROME=0` is the way back (one Chrome per group), and the phone tier and the release check always launch their own Chromes. Tests: `test/affected-groups.mjs` (fast tier). Details and options: tools/README.md.
 
+### Crystal and Mech figure sets: `src/pieces/frame.js`, `flag.js`, `crystal.js`, `mech.js` (CHE-368)
+
+Crystal and Mech are the fourth and fifth entry of the Pieces row of Options (`piece-setting.js` `PIECE_SETS`, CHE-367: stored in
+`chess3d.pieces`, a pick reloads) and `?pieces=crystal|mech` (this visit only, wins over the stored pick). Unlike Fantasy and Animals
+they are piece styles, not builders: `pieceChoice()` gives the id, `loadPieceVariant` knows nothing of it (Staunton is built first),
+and one line in `src/main.js` (after the theme, before the pieces are built) calls `flag.js` `applyPieceStyle`, which hands the style
+to `pieceSet.force()`: every piece on the board, in the capture rows and in a promotion wears it. A theme with its own figures
+(`pixel`, `blocks`) wins over the forced style (`pieceSet` `pick()`), so Pixelwelt keeps its own. Crystal is one gem pair, emerald
+against amethyst (owner pick 2026-10-09); Mech is the chunky armour look (look a).
+
+    createStyle({ quality }) -> createSetStyle({ id, build(type, color), materials, textures, tick(t, dt) })   // frame.js
+      -> { id, make(type, color), height(type, color), warm, update(dt, root), dispose() }   // what pieceSet.setStyle / force take
+
+A set builds each (type, color) once (base on y = 0, front to -z, heights near the classic ones: pawn 0.90, rook 1.00, knight 1.20,
+bishop 1.35, queen 1.60, king 1.85) and `make()` hands out clones that share geometry and materials. Parts tagged `anim(o, { kind })`
+(bob, spin, sway, pulse) move per piece in `update`, with a phase per piece; `tick` pulses the shared glow materials. Crystal uses real
+transmission on High only (Medium and Low: opaque faceted gems with an emissive tint, no extra pass). The capture scenes are the
+classic ones (the style id is neither `blocks` nor `pixel`). Tests: test/piecesets.mjs (fast: heights, footprint, triangles, dispose
+without leaks, the force hook), test/piecesets-page.mjs (smoke group `figure sets`: the flag, picking each entry in Options and the reload, the flag over the stored pick, Pixelwelt, a capture scene, the
+default unchanged). Clips and stills for the review: `node tools/clips-368.mjs` (writes .tmp/clips368/ and its index.json).
+
 ## Test hooks
 
 `window.__chess = { stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, themes, living, views, play, symbols, review, THREE, pick, openings, puzzles, puzzleProgress, daily, badges, reward, goodMove, train, news }`, plus `diag` when the page was opened with `?diag=1`. `openings` is `{ explain, hint, card, strip, tick }`, `puzzles` the controller, `puzzleProgress` its store, `daily` the daily puzzle store, `badges` `{ store, evaluate, earn(id) }`, `reward` the solve and chapter reward, `goodMove` the Good move helper, `train` is `{ store, drill, sweep, learn }`, `news` the News window (`open()`, `close()`, `isOpen()`, `autoOpen()`), `living` the Living pieces scheduler (`setAuto(true)` arms the shows in a `?manual=1` test, `play('knight')`, `fire()`, `log`, `state()`; the birds through `themes.world.birds`), `diag` the diagnostics box handle. With `?manual=1` it also has `step(seconds, hz = 30)`, which advances controls, game, battle and board by simulated time, `stepAsync(seconds, hz)` (the same, awaited, with an event loop turn per slice, for battle scenes), and `draw(dt)`, which renders the current state. This makes browser tests deterministic: no real time passes, so slow software rendering does not matter.
 
 `window.__chess.apply({ open, view, symbols, preset, yaw, pitch, dist, gx, gy, gz })` (CHE-218, test only, nothing visible for players) re-applies the URL flags on the running page, so a smoke group can reuse one page instead of reloading. Every key is optional and takes the value the URL flag takes. It calls the same functions as the start: `applyViewParams` in src/main.js (`?view`, `?symbols`, `?preset`, the gimbal and camera numbers) and `openFlag` (`?open`, an unknown value does nothing, quietly). An `open` value first closes a sheet an earlier call left open. It does not scroll a desktop panel back to the top (a reload does): reset scroll and wait 450 ms for the panel's own re-scroll when a check reads positions (test/open-flag.mjs `reopen`). Not covered: `?fen`, `?moves`, `?ai` (use `game.loadFen` and friends). Users: test/open-flag.mjs and the main loop of test/views.mjs.
+
+`window.__pieceStyle` (only with a known `?pieces=`): the forced preview piece style (`id`, `make`, `height`, `update`).
 
 `window.__chessOnline` (only with `?online=`): `{ state, status, match, api, login, render() }` (the login without its key).
 

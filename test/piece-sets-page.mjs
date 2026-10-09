@@ -45,7 +45,7 @@ try {
     const { page, watch } = await open('&intro=0');
     await ready(page);
     const rowOn = await page.evaluate(() => { const r = document.querySelector('[data-pieceset="row"]'); return !!r && !r.hidden && [...r.querySelectorAll('button')].map((b) => b.dataset.value).join(); });
-    R.expect('options: the Pieces row lists classic, fantasy, animals', rowOn === 'classic,fantasy,animals', rowOn, String(rowOn));
+    R.expect('options: the Pieces row lists classic, fantasy, animals, crystal, mech', rowOn === 'classic,fantasy,animals,crystal,mech', rowOn, String(rowOn));
     for (const set of SETS) {
       await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 120000 }), page.evaluate((v) => document.querySelector(`[data-pieceset="row"] [data-value="${v}"]`).click(), set)]);
       await ready(page);

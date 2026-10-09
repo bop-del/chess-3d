@@ -225,6 +225,7 @@ async function boot() {
     } catch (e) { console.warn('world not built', e); }
   };
   await applyWorld(worldChoice());
+  if (['crystal', 'mech'].includes(pieceChoice())) await import('./pieces/flag.js').then((m) => m.applyPieceStyle({ id: pieceChoice(), pieceSet, quality: stage.quality })).catch((e) => console.warn('piece set not applied', e));   // CHE-368: Crystal and Mech are styles, not builders
   loaderEl.dataset.world = themes.current();   // the step line gets a calm backing over a theme with a busy world (Blocks), see style.css
 
   await pieceSet.buildAll((f, msg) => progress(0.4 + f * 0.52, msg));
