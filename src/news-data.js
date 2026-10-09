@@ -8,11 +8,15 @@ export const NEWS = [
       'Pixelwelt: Beim Schlagen kämpft jede Figur jetzt auf mehrere Arten, immer abwechselnd.',
       'Schachmatt in der Pixelwelt: Der Turm des Verlierers fällt um, Feuerwerk, und die Sieger jubeln.',
       'Ein Tipp überspringt das Matt-Feuerwerk.',
+      'Neue Teams in den Optionen: Ritter, Drachen, Zauberer und Piraten.',
+      'Die Inseln leben: Tiere weiden, Dorfbewohner gehen übers Feld, Vögel kreisen.',
     ],
     en: [
       'Pixelwelt: every piece now captures in several ways, taking turns.',
       'Checkmate in Pixelwelt: the loser\'s tower falls, fireworks, and the winners cheer.',
       'A tap skips the checkmate fireworks.',
+      'New teams in Options: Knights, Dragons, Wizards and Pirates.',
+      'The islands are alive: animals graze, villagers walk around, birds circle.',
     ],
   },
   {
