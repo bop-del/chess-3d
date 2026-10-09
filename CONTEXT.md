@@ -266,3 +266,11 @@ _Avoid_: notification, toast (a toast is the short grey line without a tap)
 
 ### Unread
 A chat message the player has not seen with its chat open and visible. The count shows on the Online tab and on the phone bar button; only opening the chat clears it.
+
+**Feedback**:
+A bug report or a wish a visitor sends from the game, with its kind (bug or wish), a text and, unless switched off, a picture of the board and the context of the game. The owner decides whether it becomes an item; sending one creates nothing by itself.
+_Avoid_: ticket, issue, support request
+
+**Waiting time**:
+How long ago the last move of a running online game was made. On the last day before the 3 day limit it also says how long is left.
+_Avoid_: clock, timer (an online game has no clock)
