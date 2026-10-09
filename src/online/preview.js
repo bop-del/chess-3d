@@ -1,10 +1,10 @@
-// Test aid for the Online tab (CHE-301, CHE-290, CHE-272): ?online=<any url>&onlinepv=list|wait|chat|min|stats|card|pushcard|bell|multi (multi: two running games, an open challenge out, one in; stats: own numbers and a long
+// Test aid for the Online tab (CHE-301, CHE-290, CHE-272): ?online=<any url>&onlinepv=list|wait|chat|min|stats|card|pushcard|bell|multi|running (running: four running games with waiting times, one on the last day each way; multi: two running games, an open challenge out, one in; stats: own numbers and a long
 // name with no game; card: the detail card of Nina is open; pushcard and bell: the push permission card and the bell on a fake push).
 // A fake api with fake players and messages, no server. index.js uses it instead of createApi when the flag is set.
 export const previewOn = (search = typeof location !== 'undefined' ? location.search : '') => new URLSearchParams(search).has('onlinepv');
 export const previewScene = (search = typeof location !== 'undefined' ? location.search : '') => {
   const v = new URLSearchParams(search).get('onlinepv');
-  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell', 'multi'].includes(v) ? v : 'list';
+  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell', 'multi', 'running'].includes(v) ? v : 'list';
 };
 
 const MIN = 60000;
@@ -48,6 +48,16 @@ export function createPreviewApi({ scene, onState, onStatus }) {
     st.players.find((p) => p.name === 'Nina').withMe = true; st.players.find((p) => p.name === 'Mia').withMe = true;
     st.players.find((p) => p.name === 'Opa').playing = false;
     st.challenges = { in: [{ id: 9, from: 'Opa', at: now }], out: [{ id: 7, to: 'Felix', status: 'open', at: now }] };
+    st.game = st.games[0];
+  }
+  if (scene === 'running') {   // CHE-403: Nina (your move, 2 h), Felix (your move, 60 h: 12 h left, then he wins), Mia (her move, 12 min), Opa (his move, 67 h: 5 h left, then you can end it)
+    const ago = (m) => ({ lastMoveAt: now - m * MIN, staleAt: now - m * MIN + 72 * 60 * MIN });
+    st.games = [
+      { ...mk(14, 'Opa', ['e2e4', 'e7e5', 'g1f3'], 'w'), ...ago(66.5 * 60) }, { ...mk(13, 'Mia', ['d2d4'], 'w'), ...ago(12) },
+      { ...mk(12, 'Felix', ['e2e4', 'c7c5'], 'w'), ...ago(59.5 * 60) }, { ...mk(11, 'Nina', ['e2e4', 'e7e5'], 'w'), ...ago(120) },
+    ];
+    for (const n of ['Nina', 'Felix', 'Mia', 'Opa']) st.players.find((p) => p.name === n).withMe = true;
+    st.challenges = { in: [], out: [] };
     st.game = st.games[0];
   }
   setTimeout(() => { onStatus('connected'); onState(JSON.parse(JSON.stringify(st))); }, 0);

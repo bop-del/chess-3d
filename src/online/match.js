@@ -114,7 +114,10 @@ export function createMatch({ game, controls, api, onChange = () => {}, setBoard
     if (g.reason === 'resign' || g.reason === 'stale') game.end({ result: g.result, reason: g.reason, winner: g.winner });
   }
 
-  /** a new state from the server. The board never switches by itself, except for one case: no active online game is on it and exactly one is running */
+  /** a local game in progress (moves played, not over) that an online game must not replace by itself (CHE-403); the finished or empty board is free */
+  const localRunning = () => { if (attached) return false; const st = game.getState(); return st.moves.length > 0 && !st.over; };
+
+  /** a new state from the server. The board never switches by itself, except for one case: no active online game is on it, exactly one is running and no local game is in progress */
   function update(state) {
     games = state.games || (state.game ? [state.game] : []);
     if (g) {
@@ -124,7 +127,7 @@ export function createMatch({ game, controls, api, onChange = () => {}, setBoard
     }
     if (!attached || g?.status === 'over') {   // nothing running on the board
       const act = games.filter((x) => x.status === 'active');
-      if (act.length === 1 && act[0].id !== left && game.mode === 'play') attach(act[0].id);   // the page opened with one game, or a new one is your only one
+      if (act.length === 1 && act[0].id !== left && game.mode === 'play' && !localRunning()) attach(act[0].id);   // the page opened with one game, or a new one is your only one
     }
     if (!attached) return;
     // the board is attached: bring it to the server's moves

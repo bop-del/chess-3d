@@ -10,7 +10,7 @@ import { loginFor, writeLogin } from './store.js';
 import { createApi, loginWithCode } from './api.js';
 import { createMatch } from './match.js';
 import { detailsText } from './details.js';
-import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, statView } from './cards.js';
+import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, statView, spanOf, waitingMs, limitInfo, moveNo, runningGames } from './cards.js';
 import { previewOn, previewScene, createPreviewApi, previewPushEnv } from './preview.js';
 import { createPush } from './push.js';
 import { startStats } from './stats.js';
@@ -23,7 +23,7 @@ export const scoreText = (s) => (!s || !(s.w + s.l + s.d) ? '-' : `${s.w} : ${s.
 const seenGet = () => { try { return JSON.parse(localStorage.getItem(SEEN) || '{}'); } catch (e) { return {}; } };
 const seenSet = (v) => { try { localStorage.setItem(SEEN, JSON.stringify(v)); } catch (e) { /* blocked: for this page only */ } };
 
-export function mountOnline({ server, host, hud, game, controls, toast = () => {}, setDot = () => {}, isVisible = () => true, closeSheets = () => {}, setBoard = () => {}, onShown, phone = false, showTab = () => {} }) {
+export function mountOnline({ server, host, hud, game, controls, toast = () => {}, setDot = () => {}, isVisible = () => true, closeSheets = () => {}, setBoard = () => {}, setTurn = () => {}, leaveMode = () => {}, refreshTurn = () => {}, onShown, phone = false, showTab = () => {} }) {
   const preview = previewOn(), scene = previewScene();   // test aid: ?onlinepv=list|wait|chat|min|stats|card runs the tab on fake players, no server
   let login = loginFor(server) || (preview ? { server, key: 'preview', name: 'Boris' } : null);
   let chatMin = false;
@@ -53,6 +53,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       <section class="opd" hidden></section>
       <div class="ochal"></div>
       <div class="ogame"></div>
+      <section class="orun" hidden><h4 data-i18n="online.running">Running games</h4><ul class="orunl"></ul></section>
       <h4 data-i18n="online.players">Players</h4>
       <ul class="oplayers"></ul>
       <section class="ochat" hidden>
@@ -159,6 +160,28 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const boardGame = () => (match?.attached && match.game ? gameById(match.game.id) : null);   // the game on the board, as the server last saw it
   const scoreWith = (name) => state?.players.find((p) => p.name === name)?.score;
 
+  // ------------------------------------------------------------ Waiting time (CHE-403): coarse words from the server's lastMoveAt
+  const spanText = (sp) => (sp.unit === 'min' ? t('online.t.min', '{n} min', { n: sp.n }) : sp.unit === 'h' ? t('online.t.h', '{n} h', { n: sp.n }) : sp.n === 1 ? t('online.t.day', '{n} day', { n: sp.n }) : t('online.t.days', '{n} days', { n: sp.n }));
+  const sinceText = (g) => t('online.since', 'for {t}', { t: spanText(spanOf(waitingMs(g, nowServer()))) });
+  /** the last day line: "5 h left, then Felix wins" (your move) or "..., then you can end it" (their move); '' before the last day */
+  function limitText(g) {
+    const li = limitInfo(g, nowServer());
+    if (!li) return '';
+    if (li.over) return li.mine ? t('online.limitThemNow', '{name} can end the game now', { name: g.opponent }) : t('online.limitYouNow', 'You can end the game now');
+    const tt = spanText(li.left);
+    return li.mine ? t('online.limitThem', '{t} left, then {name} wins', { t: tt, name: g.opponent }) : t('online.limitYou', '{t} left, then you can end it', { t: tt });
+  }
+  /** the header line of the board while an online game is on it (ui.js asks, CHE-403): names instead of colours, null for every other game */
+  function headerTurn(turn) {
+    const g = boardGame();
+    if (!g || g.status !== 'active' || !match?.attached) return null;
+    const mine = turn === g.color;
+    return { main: mine ? t('online.hdrYou', 'Your move ({side})', { side: sideName(g.color) }) : t('online.theirTurnCard', '{name} to move', { name: g.opponent }), sub: g.turn === turn && !match.pending ? sinceText(g) : '' };
+  }
+  setTurn(headerTurn);
+  let hdrKey = '';
+  const syncHeader = () => { const o = headerTurn(game.getState().turn), k = o ? `${o.main}|${o.sub}` : ''; if (k !== hdrKey) { hdrKey = k; refreshTurn(); } };
+
   function renderConn() {
     const c = $('.oconn');
     c.hidden = !login;
@@ -201,6 +224,19 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     }
     if (!line && p.bot && state.me.admin && kind === 'challenge') line = `<div class="ostate"><button class="obtn small" type="button" data-a="bot-challenge">${esc(t('online.botChallenge', 'Bot challenges me'))}</button></div>`;   // CHE-343: admin only
     return `<li class="op opc${chatWith === p.name ? ' on' : ''}${n ? ' unread' : ''}${g ? ' ingame' : ''}"><span class="oav" data-a="stats" data-n="${esc(p.name)}" role="button" aria-label="${esc(t('online.st.open', 'Numbers of {name}', { name: p.name }))}">${avatarOf(p.name)}<i class="pres${p.online ? ' on' : ''}" title="${esc(p.online ? t('online.online', 'online') : t('online.offline', 'away'))}"></i></span><div class="obody" data-a="stats" data-n="${esc(p.name)}" role="button"><span class="oname">${esc(p.name)}${p.bot ? ` <small class="obot">${esc(t('online.botTag', 'Bot'))}</small>` : ''}</span><span class="oscore">${esc(scoreLine(p.score))}</span></div>${line ? `<div class="ostatew">${line}</div>` : ''}<div class="oacts2">${chat}${second}</div></li>`;
+  }
+  function renderRunning() {
+    const list = runningGames(gamesOf(), nowServer()), box = $('.orun');
+    box.hidden = !list.length;
+    $('.orunl').innerHTML = list.map((g) => {
+      const mine = gameLine(g) === 'mine', onBoard = match?.attached && match.game?.id === g.id;
+      const turn = mine ? t('online.yourTurnCard', 'Your move') : t('online.theirTurnCard', '{name} to move', { name: g.opponent });
+      const lim = limitText(g);
+      return `<li class="orc${mine ? ' mine' : ''}${onBoard ? ' onboard' : ''}" data-id="${g.id}"><span class="oav">${avatarOf(g.opponent)}</span>
+        <div class="orbody"><b class="oname">${esc(g.opponent)}</b><span class="orinfo">${esc(t('online.youPlay', 'You play {side}', { side: sideName(g.color) }))} · ${esc(t('online.moveNo', 'Move {n}', { n: moveNo(g) }))}</span></div>
+        <button class="obtn gold" type="button" data-a="board" data-id="${g.id}">${esc(t('online.toGame', 'To the game'))}</button>
+        <p class="orturn"><span class="orwho">${esc(turn)}</span> · <span class="orsince">${esc(sinceText(g))}</span></p>${lim ? `<p class="orlimit">${esc(lim)}</p>` : ''}</li>`;
+    }).join('');
   }
   const nums = (v) => ['games', 'wins', 'losses', 'draws'].map((k) => `<span class="ostc ${k}"><b>${v[k]}</b><small>${esc(t(`online.st.${k}`, { games: 'Games', wins: 'Wins', losses: 'Losses', draws: 'Draws' }[k]))}</small></span>`).join('');
   const STREAK_EN = { win1: '1 win', winN: '{n} wins in a row', loss1: '1 loss', lossN: '{n} losses in a row', draw1: '1 draw', drawN: '{n} draws in a row' };
@@ -269,6 +305,9 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       return `<div class="ocard oresult"><p><b>${esc(res)}</b> · ${esc(g.opponent)}<br><span class="oscoreline">${esc(t('online.scoreNow', 'Against {name} now {score}', { name: g.opponent, score: scoreText(scoreWith(g.opponent)) }))}</span></p><div class="orow"><button class="obtn" type="button" data-a="seen-game" data-id="${g.id}">${esc(t('online.ok', 'OK'))}</button></div></div>`;
     }).join('');
 
+    // the running games (CHE-403): one card per game, yours to move first, then by waiting time; hidden when none runs
+    renderRunning();
+
     // the players
     $('.oplayers').innerHTML = state.players.length ? state.players.map((p) => playerCard(p)).join('') : `<li class="oempty">${esc(t('online.noPlayers', 'Nobody else is invited yet.'))}</li>`;
 
@@ -325,9 +364,9 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const turnText = (g) => (g.turn === g.color ? t('online.yourTurn', 'Your move') : t('online.theirTurn', '{name} to move', { name: g.opponent }));
   function renderGame() {
     const g = boardGame(), bg = gbub ? gameById(gbub.id) : null;   // the game on the board names the top row; the bubble names the game it is about
-    if (gbub && (!bg || bg.status !== 'active' || (gbub.kind === 'moved' && match?.attached && match.game?.id === bg.id))) gbub = null;
+    if (gbub && (!bg || bg.status !== 'active' || (gbub.kind !== 'open' && match?.attached && match.game?.id === bg.id))) gbub = null;
     gameBubEl.hidden = !gbub;
-    if (gbub) $('.obub-main', gameBubEl).textContent = gbub.kind === 'moved' ? t('online.movedBubble', '♟ {name} moved: {turn} ›', { name: bg.opponent, turn: turnText(bg) }) : t('online.gameBubble', '♟ Game against {name}: {turn} ›', { name: bg.opponent, turn: turnText(bg) });
+    if (gbub) $('.obub-main', gameBubEl).textContent = gbub.kind === 'moved' ? t('online.movedBubble', '♟ {name} moved: {turn} ›', { name: bg.opponent, turn: turnText(bg) }) : gbub.kind === 'accepted' ? t('online.acceptedBubble', '♟ {name} accepted · To the game ›', { name: bg.opponent }) : t('online.gameBubble', '♟ Game against {name}: {turn} ›', { name: bg.opponent, turn: turnText(bg) });
     gline.hidden = !(g && g.status === 'active' && match?.attached) || !!match?.locked;   // the lock line takes the place when there is no connection
     if (!gline.hidden) gline.textContent = t('online.gameLine', 'Online against {name} · {turn}', { name: g.opponent, turn: turnText(g) });
   }
@@ -336,7 +375,30 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     gTimer = setTimeout(() => { if (gbub === b) { gbub = null; renderGame(); } }, 8000);
     renderGame();
   }
-  const attachGame = (id) => { if (match.attached && match.game?.id === id) return; if (game.mode !== 'play') game.setMode('play'); match.attach(id); };
+  // Zur Partie while a puzzle, a drill or a lesson runs asks first (CHE-403): yes ends it through its own controller, then the game opens; no keeps it
+  const askEl = document.createElement('div');
+  askEl.className = 'oask ocard'; askEl.hidden = true; askEl.setAttribute('role', 'alertdialog');
+  askEl.innerHTML = '<p></p><div class="orow"><button class="obtn gold" type="button" data-a="ask-yes"></button><button class="obtn" type="button" data-a="ask-no"></button></div>';
+  hud.append(askEl);
+  let askId = 0;
+  const ASK = { puzzle: ['online.askPuzzle', 'Cancel the puzzle and go to the game?'], drill: ['online.askDrill', 'Cancel the drill and go to the game?'], explain: ['online.askExplain', 'Cancel the lesson and go to the game?'] };
+  function attachNow(id) { if (game.mode !== 'play') leaveMode(); if (game.mode !== 'play') game.setMode('play'); match.attach(id); }
+  const attachGame = (id) => {
+    if (match.attached && match.game?.id === id) return;
+    if (game.mode === 'play') { attachNow(id); return; }
+    const [k, d] = ASK[game.mode] || ASK.explain;
+    askId = id; closeSheets();
+    $('p', askEl).textContent = t(k, d);
+    $('[data-a=ask-yes]', askEl).textContent = t('online.yes', 'Yes'); $('[data-a=ask-no]', askEl).textContent = t('online.no', 'No');
+    askEl.hidden = false;
+  };
+  askEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-a]');
+    if (!b) return;
+    askEl.hidden = true;
+    if (b.dataset.a === 'ask-yes' && gameById(askId)?.status === 'active') { attachNow(askId); closeSheets(); render(); }
+  });
+
   function renderBub() {
     if (bub && bub.kind === 'sum' && !unreadTotal()) bub = null;
     if (bub && bub.name && chatWith === bub.name && chatVisible()) bub = null;
@@ -393,7 +455,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     const n = $('.opushnote'); n.hidden = !pushNote; n.textContent = pushNote;
   }
   async function pushDo(p) { pushNote = ''; await p; pushNote = push.error === 'off-server' ? t('online.pushServerOff', 'The server is not sending notifications right now.') : push.error ? t('online.pushFailed', 'That did not work.') : ''; renderPush(); }
-  function render() { renderConn(); renderMain(); renderDot(); renderBub(); renderGame(); renderPush(); }
+  function render() { renderConn(); renderMain(); renderDot(); renderBub(); renderGame(); renderPush(); syncHeader(); }
 
   // the result line on the game over card: "Against Felix now 4 : 2"
   function scoreOnBanner() {
@@ -541,13 +603,14 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       onStatus: (s) => { status = s; if (s === 'connected') match?.retrySend(); render(); },
       onState: (s) => {
         const first = !state, prevGames = gamesOf();
+        const asked = new Set((state?.challenges.out || []).filter((c) => c.status === 'open').map((c) => c.to));   // whom we had asked before this state
         state = s; receivedAt = Date.now();
         if (login.name !== s.me.name) { login = { ...login, name: s.me.name }; if (!preview) writeLogin(login); }
         // a new challenge to you, a new game
         const ins = new Set(s.challenges.in.map((c) => c.id));
         if (!first) for (const c of s.challenges.in) if (!lastIn.has(c.id)) toast(t('online.challengesYou', '{name} challenges you', { name: c.from }), 'info', 3200);
         lastIn = ins;
-        match.update(s);   // the board never switches by itself (match.js has the one exception)
+        try { match.update(s); } catch (e) { console.warn('online: the board could not follow the game', e); }   // a throw here must never leave the tab on the old state (the stream loop would swallow it and the cards would stay stale)
         watchMessages(first);
         const running = activeGames();
         if (first) {
@@ -560,7 +623,12 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
         for (const g of running) {
           if (knownGames.has(g.id)) continue;
           knownGames.add(g.id);
-          if (!first) { toast(t('online.started', 'Game against {name}. You play {side}.', { name: g.opponent, side: sideName(g.color) }), 'info', 3200); if (match.attached && match.game?.id === g.id) closeSheets(); }
+          if (!first) {
+            // CHE-403: they accepted our challenge (a note, and the board switched by itself unless a local game is in progress: then a bubble to tap) or we accepted theirs
+            const theyAccepted = asked.has(g.opponent), onBoard = match.attached && match.game?.id === g.id;
+            toast(theyAccepted ? t('online.acceptedNote', '{name} accepted', { name: g.opponent }) : t('online.started', 'Game against {name}. You play {side}.', { name: g.opponent, side: sideName(g.color) }), 'info', 3200);
+            if (onBoard) closeSheets(); else showGameBub({ kind: theyAccepted ? 'accepted' : 'new', id: g.id });
+          }
           push?.acted();
         }
         scoreOnBanner();
@@ -577,7 +645,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
 
   // the countdown in an open Details box, the 3 day finish appearing on time
   setInterval(() => { if ((detailsOpen || lockDetails) && status === 'unreachable') renderDetails(); else if (lockDetails) renderDetails(); }, 1000);
-  setInterval(() => { if (activeGames().length) renderMain(); }, 30000);
+  const tick = () => { if (activeGames().length) { renderMain(); renderGame(); syncHeader(); } };
+  setInterval(tick, 60000);   // Waiting time and the last day line: each minute
   onLanguage(() => { translateTree(root); translateTree(lock); translateTree(ch); translateTree(bubEl); translateTree(gameBubEl); render(); });
   translateTree(root); translateTree(lock); translateTree(ch); translateTree(bubEl); translateTree(gameBubEl);
   onShown?.(() => { markRead(); renderMain(); });
@@ -585,7 +654,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const hook = {
     get state() { return state; }, get status() { return status; }, get match() { return match; }, get api() { return api; },
     get login() { return login ? { server: login.server, name: login.name } : null },
-    get push() { return push; }, render, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; }, get boardGame() { return boardGame(); },
+    get push() { return push; }, render, tick, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; }, get boardGame() { return boardGame(); },
   };
   window.__chessOnline = hook;
   return hook;

@@ -67,6 +67,8 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   document.body.classList.toggle('menu-a', menuA);
   // Online play (CHE-271): only with ?online=<server url> (remembered for the session) and menu A. Without it nothing here changes.
   const online = menuA ? onlineServer() : '';
+  let leaveModes = null;   // main.js: ends a running puzzle, drill or lesson through its own controller (CHE-403)
+  let onlineTurn = null;   // the online module's header text for the board turn (CHE-403): names instead of colours, null when no online game is on the board
   let onlineBoard = false;   // the board shows an online game: Back and Good move? are off (src/online/match.js sets it)
   let left = null, right = null, help = null, drawerBtn = null, dsk = null;
   const showBtn = el('button', 'show-btn', 'Show HUD');
@@ -430,6 +432,10 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     } else if (st.thinking) { sub = t('turn.thinking', 'Computer is thinking'); }
     else if (st.check) sub = t('turn.check', 'Check');
     else if (st.vsComputer) sub = st.turn === st.computerColor ? t('turn.computerMove', 'Computer to move') : t('turn.yourMove', 'Your move');
+    if (onlineBoard && onlineTurn && !st.over) {   // an online game: "Du bist dran (Weiss)" / "Felix ist dran" and since when; games against the computer keep "White to move"
+      const o = onlineTurn(st.turn);
+      if (o) { main = o.main; sub = [st.check ? t('turn.check', 'Check') : '', o.sub].filter(Boolean).join(' \u00b7 ') || ' '; }
+    }
     // desktop: while a lesson runs the status line names it (the board position is still the lesson's)
     const kind = dsk ? [['explaining', 'openings', 'Opening'], ['drilling', 'drill', 'Drill'], ['puzzling', 'puzzles', 'Puzzle']].find(([c]) => document.body.classList.contains(c)) : null;
     if (kind) sub = [t(`panel.kind.${kind[1]}`, kind[2]), sub.trim()].filter(Boolean).join(' \u00b7 ');
@@ -985,6 +991,9 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
       phone: !dsk,
       showTab: () => { if (dsk) { dsk.setTab('online'); dsk.setRail(false); } else phoneUI.openSheet('online'); shown.forEach((fn) => fn()); },
       closeSheets: () => phoneUI?.close(),
+      setTurn: (fn) => { onlineTurn = fn; },
+      leaveMode: () => leaveModes?.(),
+      refreshTurn: () => { if (lastSt) render(game.getState()); },
       setBoard: (on) => { if (onlineBoard === !!on) return; onlineBoard = !!on; document.body.classList.toggle('online-game', onlineBoard); goodKey = ''; render(game.getState()); },
     })).catch((e) => console.warn('online play failed to load', e));
   }
@@ -1003,5 +1012,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     on: (fn) => { hostFns.push(fn); },
   };
 
-  return { menuA, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountNewsEntry, setNewsDot, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
+  return { menuA, setLeaveModes: (fn) => { leaveModes = fn; }, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountNewsEntry, setNewsDot, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove };
 }

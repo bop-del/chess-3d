@@ -1,6 +1,6 @@
 // Online tab logic (CHE-301, fast tier): the second button of a player card and the floating chat state.
 import assert from 'node:assert/strict';
-import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, chatView } from '../src/online/cards.js';
+import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, chatView, spanOf, waitingMs, limitInfo, moveNo, runningGames } from '../src/online/cards.js';
 
 const P = (o) => ({ name: 'Nina', playing: false, withMe: false, ...o });
 assert.equal(secondAction(P({})), 'challenge');
@@ -37,6 +37,38 @@ c = chatStep(c, 'open', 'Mia');
 assert.deepEqual(c, { with: 'Mia', shown: true, min: false }, 'opening a chat expands a collapsed one');
 assert.equal(chatView(c, false), 'none', 'an unknown player shows nothing');
 assert.equal(chatView(chatStep(c, 'close')), 'none');
+
+// CHE-403: Waiting time, the last day line, the running games block order
+const MIN = 60000, H = 3600000, D = 24 * H;
+assert.deepEqual(spanOf(0), { unit: 'min', n: 1 }, 'under a minute reads 1 min');
+assert.deepEqual(spanOf(90 * 1000), { unit: 'min', n: 1 });
+assert.deepEqual(spanOf(12 * MIN + 59000), { unit: 'min', n: 12 });
+assert.deepEqual(spanOf(59 * MIN), { unit: 'min', n: 59 });
+assert.deepEqual(spanOf(60 * MIN), { unit: 'h', n: 1 });
+assert.deepEqual(spanOf(3 * H + 40 * MIN), { unit: 'h', n: 3 }, 'hours round down');
+assert.deepEqual(spanOf(24 * H), { unit: 'd', n: 1 });
+assert.deepEqual(spanOf(2 * D + 23 * H), { unit: 'd', n: 2 });
+assert.deepEqual(spanOf(-5), { unit: 'min', n: 1 });
+const NOW = 1e12, G = (o) => ({ id: 1, status: 'active', color: 'w', turn: 'w', moves: [], lastMoveAt: NOW - 5 * MIN, staleAt: NOW - 5 * MIN + 72 * H, ...o });
+assert.equal(waitingMs(G({}), NOW), 5 * MIN);
+assert.equal(waitingMs(G({ lastMoveAt: NOW + 9 * MIN }), NOW), 0, 'a clock a little ahead never gives a negative time');
+assert.equal(limitInfo(G({}), NOW), null, 'far from the limit: no line');
+assert.equal(limitInfo(G({ staleAt: NOW + D + 1 }), NOW), null, 'just over a day left: no line');
+assert.deepEqual(limitInfo(G({ staleAt: NOW + 5 * H + 10 * MIN, turn: 'b' }), NOW), { left: { unit: 'h', n: 5 }, over: false, mine: false }, 'their move: you can end it');
+assert.deepEqual(limitInfo(G({ staleAt: NOW + 30 * MIN, turn: 'w' }), NOW), { left: { unit: 'min', n: 30 }, over: false, mine: true }, 'your move: they win');
+assert.equal(limitInfo(G({ staleAt: NOW - 1, turn: 'b' }), NOW).over, true);
+assert.equal(limitInfo(G({ status: 'over', staleAt: NOW + H }), NOW), null, 'a finished game has none');
+assert.equal(moveNo(G({ moves: [] })), 1);
+assert.equal(moveNo(G({ moves: ['e2e4'] })), 1, 'white has moved, black plays move 1');
+assert.equal(moveNo(G({ moves: ['e2e4', 'e7e5'] })), 2);
+assert.equal(moveNo(G({ moves: Array(23).fill('x') })), 12);
+const run = runningGames([
+  G({ id: 1, turn: 'b', lastMoveAt: NOW - 3 * D }), G({ id: 2, turn: 'w', lastMoveAt: NOW - 1 * H }), G({ id: 3, turn: 'w', lastMoveAt: NOW - 5 * H }),
+  G({ id: 4, turn: 'b', lastMoveAt: NOW - 10 * MIN }), G({ id: 5, status: 'over', turn: 'w', lastMoveAt: NOW - 9 * D }),
+], NOW).map((g) => g.id);
+assert.deepEqual(run, [3, 2, 1, 4], 'yours to move first, then the longest waiting first; a finished game is not listed');
+assert.deepEqual(runningGames([], NOW), []);
+assert.deepEqual(runningGames(undefined, NOW), []);
 console.log('online cards: ok');
 
 // CHE-290: statView

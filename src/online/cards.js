@@ -20,6 +20,37 @@ export const gameLine = (g) => (g.turn === g.color ? 'mine' : 'theirs');
 /** the number on the bell: running games where it is your move */
 export const myTurnCount = (games = []) => games.filter((g) => g.status === 'active' && g.turn === g.color).length;
 
+const MIN = 60000, HOUR = 3600000, DAY = 86400000;
+
+/** a span of time in coarse words (CHE-403, Waiting time): { unit: 'min' | 'h' | 'd', n }, rounded down, at least 1 minute */
+export function spanOf(ms) {
+  const m = Math.floor(Math.max(0, ms) / MIN);
+  if (m < 60) return { unit: 'min', n: Math.max(1, m) };
+  const h = Math.floor(m / 60);
+  return h < 24 ? { unit: 'h', n: h } : { unit: 'd', n: Math.floor(h / 24) };
+}
+
+/** the Waiting time of a running game: ms since the last move, on the server's clock (`now` is nowServer()) */
+export const waitingMs = (g, now) => Math.max(0, now - (g.lastMoveAt || now));
+
+/** the limit line of a running game (CHE-403): null until the last day before the 3 day limit, then { left: span, over, mine }.
+ * `mine` is your move: the opponent wins when the time runs out. Else you are the waiting player and can end the game. */
+export function limitInfo(g, now) {
+  if (g.status !== 'active' || !g.staleAt) return null;
+  const left = g.staleAt - now;
+  if (left > DAY) return null;
+  return { left: spanOf(left), over: left <= 0, mine: g.turn === g.color };
+}
+
+/** the full move number of the game ("Zug 12"): the move being played now */
+export const moveNo = (g) => Math.floor((g.moves?.length || 0) / 2) + 1;
+
+/** the running games for the block at the top of the Online tab: only active ones, yours to move first, then the longest waiting first */
+export function runningGames(games = [], now = Date.now()) {
+  return games.filter((g) => g.status === 'active').map((g) => ({ g, mine: g.turn === g.color, wait: waitingMs(g, now) }))
+    .sort((a, b) => (b.mine - a.mine) || (b.wait - a.wait) || (b.g.id - a.g.id)).map((x) => x.g);
+}
+
 /** the chat window: { with, shown, min }. actions: open(name), to(name) switcher, min, expand, close */
 export function chatStep(st, action, name = '') {
   switch (action) {

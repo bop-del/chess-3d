@@ -327,6 +327,8 @@ try {
   await moveOn(Y, 'e7e5');
   R.expect('in a lesson the opponent moved: bubble', await until(X, (n) => document.querySelector('.obub[data-k=game] .obub-main')?.textContent === `♟ ${n} hat gezogen: Du bist am Zug ›`, nY));
   await click(X, '.obub[data-k=game] .obub-main');
+  R.expect('tap in a lesson asks first (CHE-403), the lesson stays', await until(X, () => !document.querySelector('.oask').hidden && /Lektion abbrechen und zur Partie/.test(document.querySelector('.oask').textContent)) && await ev(X, () => !window.__chessOnline.match.attached));
+  await click(X, '.oask [data-a=ask-yes]');
   R.expect('tap in a lesson attaches the game (play mode again, both moves)', await until(X, () => window.__chessOnline.match.attached && window.__chess.game.mode === 'play' && window.__chess.game.getState().moves.length === 2));
   // on open: the game attaches by itself and a bubble says whose move; with a chat message the two stack, game on top
   await click(X, `[data-a=chat][data-n="${nY}"]`);
