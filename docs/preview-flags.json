@@ -9,6 +9,7 @@
     { "flag": "tiles", "item": "CHE-287", "status": "picked", "pickRef": "owner 2026-10-06 (CHE-265 grill): style A, rendered images; the flag was removed in CHE-287" },
     { "flag": "review", "item": "CHE-155", "status": "open", "question": "keep both game review guidance variants, or drop a (b, the summary first, is the default)" },
     { "flag": "menu", "item": "CHE-223", "status": "open", "question": "remove ?menu=old once Menu A has shipped for one release" },
+    { "flag": "alive", "item": "CHE-372", "status": "picked", "pickRef": "owner 2026-10-09 (pick page): the living island is the default on all islands a to e; the flag was removed in CHE-372" },
     { "flag": "rqueen", "status": "open", "question": "pick the Blocks red queen look a, b or c (a is the default; the Blocks theme is hidden)" },
     { "flag": "musicset", "status": "open", "question": "pick the background music set a or b (a is the default)" },
     { "flag": "variant", "item": "CHE-333", "status": "picked", "pickRef": "owner 2026-10-08, variant a (a row at the top of Options) is the only look; the flag and variants b and c were removed in CHE-356" },
@@ -18,7 +19,7 @@
   ],
   "normal": [
     "adapt", "ai", "backdrop", "birds", "capture", "clock", "daily", "diag", "fen", "gore", "help", "hud", "intro", "island", "light", "line",
-    "living", "manual", "moves", "news", "online", "onlinepv", "open", "pieces", "preset", "promo", "quality", "select", "set", "sw",
+    "living", "manual", "moves", "news", "online", "onlinepv", "open", "pieces", "pixteam", "preset", "promo", "quality", "select", "set", "sw",
     "sig", "sky", "sound", "spin", "symbols", "theme", "touch", "view", "with", "world"
   ]
 }

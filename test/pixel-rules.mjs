@@ -18,7 +18,7 @@ let failed = 0;
 const checkAll = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`); if (!ok) failed++; };
 
 const check = checkAll;
-const ISLANDS = [null, 'a', 'b', 'c', 'd', 'e'];   // CHE-106: today's island and the five variants behind ?island=; rules 1 to 5 run for each
+const ISLANDS = [null, 'a', 'b', 'c', 'd', 'e'];   // CHE-106: today's island and the five variants behind ?island=; rules 1 to 5 run for each (CHE-372: the living island included)
 // 3 wrap modes
 {
   const ALLOW_REPEAT = ['water', 'fall', 'planks', 'cloud', 'sun', 'lava', 'lavafall'];
@@ -98,7 +98,7 @@ world.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
         if (b.intersectsBox(treeBox)) { hits.push(`cloud ${i} (z ${pz}) at x ${x} lift ${lift}`); return; }
       }
     });
-    const noTrees = isl === 'c' || isl === 'e';   // the village and the volcano have no tree
+    const noTrees = /^[ce]\b/.test(isl || '');   // the village and the volcano have no tree
     check(`${name}: no cloud passes through the tree (${clouds.length} clouds, drift span and lift range swept)`, (noTrees ? treeBox.isEmpty() : !treeBox.isEmpty()) && clouds.length === 7 && hits.length === 0, hits.join('; '));
   }
 }

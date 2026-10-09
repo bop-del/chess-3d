@@ -7,6 +7,7 @@ import { buildAvoid, approach } from '../blocks/island.js';
 import { makePixelKit } from './kit.js';
 import { createSkyLayer } from './sky.js';
 import { ISLANDS, OAK, islandChoice } from './islands.js';
+import { createLife } from './alive.js';
 
 const rnd = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
@@ -152,6 +153,7 @@ export function createPixelWorld({ track, view, light } = {}) {
   group.add(sun);
   const avoid = buildAvoid(group, tree, clouds, view, PIXEL_EDGE, true);
   const sky = createSkyLayer({ group, kit, clouds, light });   // CHE-239: sky mood, weather and backdrop
+  const life = createLife({ group, kit, island: id, light: !!light, ctx: ISLAND_CTX, view });   // CHE-372: animals, villagers, birds, spray
   group.userData.sky = sky;
   let time = 2.2, tick = -1;
   // CHE-299 treefade: the camera inside or within 1.5 of the oak's box shrinks the whole tree softly (0.35 s ease), so no green fills the screen.
@@ -178,9 +180,10 @@ export function createPixelWorld({ track, view, light } = {}) {
   anim(time);
   return {
     group, kit, avoid: avoid.state,
-    update(dt) { time += dt; anim(time); avoid.update(dt); sky.update(dt); treeFade(dt); },
+    update(dt) { time += dt; anim(time); avoid.update(dt); sky.update(dt); treeFade(dt); life.update(dt, time); },
     settle() { avoid.update(5); },
     dispose() {
+      life.dispose();
       sky.dispose();
       group.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
       for (const c of clouds) for (const mt of c.userData.mats) mt.dispose();

@@ -6,12 +6,14 @@ import { buildSetA } from './seta.js';
 import { heroKnight, heroKing, monsterQueen, monsterKing, normalise } from './teams.js';
 import { coplanarOverlaps } from '../blocks/mesher.js';
 
+import { teamVox } from './heroes.js';
+
 const TEAM = { wn: heroKnight, wk: heroKing, bq: monsterQueen, bk: monsterKing };
 
-/** The box list of one figure: color 'w' or 'b', type p, n, b, r, q or k. */
+/** The box list of one figure: color 'w' or 'b', type p, n, b, r, q or k. ?pixteam= (heroes.js, CHE-372) swaps in a team variant. */
 export function buildPixelVox(color, type) {
   const make = TEAM[color + type];
-  const vox = make ? normalise(make(PAL[color]), type) : buildSetA(color, type, PAL[color]);
+  const vox = teamVox(color, type) || (make ? normalise(make(PAL[color]), type) : buildSetA(color, type, PAL[color]));
   return pushClashes(vox);
 }
 

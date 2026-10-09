@@ -7,6 +7,7 @@ import { mountLookSetting } from './themes/pixel/look-setting.js';
 import { worldChoice, onWorld } from './worlds/choice.js';
 import { mountWorldSetting } from './worlds/setting.js';
 import { mountIslandSetting } from './themes/pixel/island-setting.js';
+import { mountTeamSetting } from './themes/pixel/team-setting.js';
 import { mountPieceSetting, pieceChoice } from './piece-setting.js';
 import { t, translateTree, i18n } from './i18n.js';
 import { LEVELS } from './ai.js';
@@ -337,6 +338,7 @@ async function boot() {
   mountLookSetting({ themes, ui, stage });   // CHE-239: Sky and Backdrop rows under the swatches, shown with Pixelwelt
   mountPieceSetting({ themes, ui });   // CHE-367: Pieces row (Classic, Fantasy, Animals), hidden with Pixelwelt
   mountIslandSetting({ themes, ui });   // CHE-357: Island row below Backdrop, shown with Pixelwelt
+  mountTeamSetting({ themes, ui });   // CHE-372: Team row below Island (knights or sun knights against dragons), shown with Pixelwelt
   mountWorldSetting({ themes, ui });   // CHE-370: World row for the lit themes
   onWorld(applyWorld);
 

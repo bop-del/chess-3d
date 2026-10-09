@@ -1,10 +1,13 @@
 // Contract of the Pixelwelt figures, headless: all 12 build, stand on the board inside their square, keep the blocky
 // proportions (the head is a cube of 8 pixels with a face), are told apart by height, have the animated parts the rig expects and
-// stay inside a triangle budget. Run: node test/pixel-chars.mjs    Exit 0 pass, 1 on any failed check.
+// stay inside a triangle budget. Run: node test/pixel-chars.mjs [--team=<id>]    Exit 0 pass, 1 on any failed check.
+// --team=dragons (or wizards, pirates) checks the figures of that team pair (CHE-372, ?pixteam=) instead of today's set.
 import * as THREE from 'three';
 import { buildTemplate } from '../src/themes/blocks/rig.js';
 import { buildPixelVox } from '../src/themes/pixel/figures.js';
 
+const TEAM = (process.argv.find((a) => a.startsWith('--team=')) || '').slice(7);
+globalThis.location = { search: TEAM ? `?pixteam=${TEAM}` : '' };
 const TYPES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
 const mat = new THREE.MeshBasicMaterial();
 let failed = 0;
@@ -69,7 +72,7 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
     const shaft = sp.find((p) => p.d >= 19);
     const skin = vox.parts.filter((p) => p.g === 'poseSpear' && p.w === 3.4 && p.h === 3 && Math.abs(p.y - 16.2) < 1e-6);
     const rest = vox.parts.filter((p) => p.g === 'poseRest');
-    check(`${tag}: a rest pose of its own (${color === 'w' ? 'arms folded across the front' : 'arms stretched out in front'})`, color === 'w' ? rest.length === 2 && rest.some((p) => p.w > 9 && p.z > 3) : rest.length === 4 && rest.filter((p) => p.d === 12).length === 2);
+    check(`${tag}: a rest pose of its own (${color === 'w' ? 'arms folded across the front' : 'arms stretched out in front'})`, TEAM ? rest.length > 0 : color === 'w' ? rest.length === 2 && rest.some((p) => p.w > 9 && p.z > 3) : rest.length === 4 && rest.filter((p) => p.d === 12).length === 2);
     const { rig } = buildTemplate(color, 'p', mat, buildPixelVox, { shade: true }), vis = (n) => rig.getObjectByName(n).visible;
     check(`${tag}: at rest the rest pose shows, the spear pose and the spear are hidden`, vis('poseRest') && !vis('poseSpear') && !vis('spear'));
     const { setPawnPose } = await import('../src/themes/pixel/seta.js');
@@ -79,5 +82,5 @@ const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} 
     check(`${tag}: two hands close round the shaft`, skin.length === 2 && skin.every((h) => Math.abs(h.x - shaft.x) < 1.2 && h.y <= shaft.y && h.y + h.h >= shaft.y + shaft.h && h.z - h.d / 2 > shaft.z - shaft.d / 2 && h.z + h.d / 2 < shaft.z + shaft.d / 2), `${skin.length} hands`);
   }
 }
-console.log(failed ? `\n${failed} check(s) failed` : '\nPixelwelt figures contract passed');
+console.log(failed ? `\n${failed} check(s) failed` : `\nPixelwelt figures contract passed${TEAM ? ` (team ${TEAM})` : ''}`);
 process.exit(failed ? 1 : 0);

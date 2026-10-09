@@ -286,4 +286,4 @@ export function buildSetA(color, type, palette) {
 }
 
 // the helpers the team figures reuse
-export { legs, arms, paint, facePal, horse, ribcage, FACE, BONE, BONE2, BLACK, EMBER, sideTag };
+export { legs, arms, paint, facePal, horse, ribcage, holdSpear, FACE, BONE, BONE2, BLACK, EMBER, sideTag };
