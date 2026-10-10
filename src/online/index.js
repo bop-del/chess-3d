@@ -213,7 +213,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const PIECES = ['♞', '♜', '♝', '♛', '♚', '♟'];
   const hashN = (name) => Math.max(0, (state?.players || []).findIndex((p) => p.name === name));   // one piece and colour per player, in list order
   const avatarOf = (name) => `<b class="oglyph" data-c="${hashN(name) % 6}">${PIECES[hashN(name) % PIECES.length]}</b>`;
-  const scoreLine = (s) => scoreOf(s) || t('online.noGameYet', 'no game yet');
+  const scoreLine = (s) => scoreOf(s) || t('online.noGameYet', 'no finished game yet');
   // one player card (CHE-335): dot, name, score; the state of the game or the challenge with this player; Chat and the second button
   function playerCard(p) {
     const n = p.unread || 0;
@@ -261,7 +261,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     own.hidden = !e || e.err;
     own.dataset.n = me;
     own.setAttribute('aria-label', t('online.st.open', 'Numbers of {name}', { name: me }));
-    own.innerHTML = !v ? `<span class="ostx">${esc(t('online.st.loading', 'Loading numbers...'))}</span>` : v.empty ? `<span class="ostx">${esc(t('online.st.none', 'no game yet'))}</span>`
+    own.innerHTML = !v ? `<span class="ostx">${esc(t('online.st.loading', 'Loading numbers...'))}</span>` : v.empty ? `<span class="ostx">${esc(t('online.st.none', 'no finished game yet'))}</span>`
       : `${nums(v)}<span class="ostc streak ${v.streak.type || ''}"><b>${esc(streakText(v))}</b><small>${esc(t('online.st.streak', 'Streak'))}</small></span>`;
     // the detail card of one player
     det.hidden = !statWith;
@@ -270,7 +270,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     let body;
     if (!d || d.loading) body = `<p class="ostx">${esc(t('online.st.loading', 'Loading numbers...'))}</p>`;
     else if (d.err) body = `<p class="ostx">${esc(t('online.st.failed', 'The numbers are not available right now.'))}</p>`;
-    else if (dv.empty) body = `<p class="ostx">${esc(t('online.st.none', 'no game yet'))}</p>${isOwn ? '' : `<p class="oh2h">${esc(t('online.st.h2hNone', 'Never played each other'))}</p>`}`;
+    else if (dv.empty) body = `<p class="ostx">${esc(t('online.st.none', 'no finished game yet'))}</p>${isOwn ? '' : `<p class="oh2h">${esc(t('online.st.h2hNone', 'Never played each other'))}</p>`}`;
     else {
       const h = isOwn ? '' : dv.h2h ? `<p class="oh2h"><small>${esc(t('online.st.h2h', 'Head to head'))}</small><b>${esc(t('online.st.h2hLine', 'You {score} {name}', { score: dv.h2h.line, name: statWith }))}</b></p>` : `<p class="oh2h"><small>${esc(t('online.st.h2h', 'Head to head'))}</small><b>${esc(t('online.st.h2hNone', 'Never played each other'))}</b></p>`;
       const rows = [

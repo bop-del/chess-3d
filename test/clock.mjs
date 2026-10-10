@@ -96,10 +96,12 @@ const at = (fen) => { const ch = new Chess(); ch.load(fen); return ch; };
 function fakeGame() {
   const chess = new Chess();
   const ev = {};
-  let mode = 'play', over = null, vs = false, computerColor = 'b';
+  let mode = 'play', over = null, vs = false, computerColor = 'b', guarded = false;
   const g = {
     chess, ended: null,
     get mode() { return mode; },
+    get guarded() { return guarded; },
+    setGuard(on) { guarded = on; g.emit('change'); },
     on(e, fn) { (ev[e] = ev[e] || []).push(fn); },
     emit(e, d) { (ev[e] || []).forEach((fn) => fn(d)); },
     getState() { return { over, vsComputer: vs, computerColor, turn: chess.turn }; },
@@ -145,6 +147,17 @@ function fakeGame() {
   ok('bound: mate stops the clocks', g.getState().over?.reason === 'checkmate' && !c.state().running);
   c.tick(10);
   ok('bound: times stay after the game', c.remaining('w') === 300 + 0 && c.remaining('b') === 300);
+}
+{
+  const g = fakeGame();
+  const c = createGameClock({ game: g, preset: '3+2' });
+  g.move('e2', 'e4');
+  g.setGuard(true);   // CHE-420: an online match holds the board
+  ok('bound: an online match suspends and resets the clock', c.state().suspended && !c.state().started && c.remaining('w') === 180);
+  g.move('e7', 'e5'); c.tick(500);
+  ok('bound: online it never ticks or flags', c.remaining('b') === 180 && g.ended === null);
+  g.setGuard(false);
+  ok('bound: leaving the match restores a fresh local clock', !c.state().suspended && c.remaining('w') === 180 && !c.state().started);
 }
 {
   const g = fakeGame();

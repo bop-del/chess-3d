@@ -20,6 +20,12 @@ assert.equal(scoreOf(null), '');
 assert.equal(scoreOf({ w: 0, l: 0, d: 0 }), '');
 assert.equal(scoreOf({ w: 2, l: 1, d: 0 }), '2 : 1');
 assert.equal(scoreOf({ w: 0, l: 3, d: 1 }), '0 : 3  ½ 1');
+{   // CHE-420: no score yet is "noch keine Partie beendet", never "noch keine Partie" (a game may be running)
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../src/online/strings.js', import.meta.url), 'utf8');
+  assert.ok(/'online\.noGameYet': 'noch keine Partie beendet'/.test(src) && /'online\.st\.none': 'noch keine Partie beendet'/.test(src));
+  assert.ok(!/noch keine Partie'/.test(src));
+}
 
 let c = { with: null, shown: false, min: false };
 assert.equal(chatView(c), 'none');
