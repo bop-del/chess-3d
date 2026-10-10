@@ -3,6 +3,23 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.13.0', date: '2026-10-10',
+    de: [
+      'Online: Ganz oben stehen deine laufenden Partien, mit der Wartezeit und einem Knopf direkt zur Partie.',
+      'Nimmt jemand deine Herausforderung an, springt das Brett von selbst in die Partie.',
+      'Eine Zeile in der Kopfleiste sagt dir immer, was läuft und wer am Zug ist.',
+      'Neu: Über die Sprechblase oben schickst du uns einen Fehler oder einen Wunsch.',
+      'Gibt es eine neue Version des Spiels oder des Servers, sagt es dir das Spiel.',
+    ],
+    en: [
+      'Online: your running games now sit at the top, with the waiting time and a button straight to the game.',
+      'When someone accepts your challenge, the board switches to the game by itself.',
+      'One line in the header always says what is running and whose move it is.',
+      'New: the speech bubble at the top sends us a bug or a wish.',
+      'If there is a new version of the game or the server, the game tells you.',
+    ],
+  },
+  {
     version: '1.12.0', date: '2026-10-09',
     de: [
       'Pixelwelt: Beim Schlagen kämpft jede Figur jetzt auf mehrere Arten, immer abwechselnd.',
