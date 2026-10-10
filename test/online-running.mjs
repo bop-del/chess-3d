@@ -9,14 +9,13 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { reporter, launchBrowser, startServer, build, settleUi, lanePorts, portAnswers, sleep, ROOT } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, startServer, build, settleUi, claimPort, sleep, ROOT } from '../tools/_lib.mjs';
 import { runAdmin, inviteLink } from '../server/admin.mjs';
 
 const args = process.argv.slice(2);
 const SHOTS = join(ROOT, '.tmp/online-shots'), OUT = '.tmp/online-dist';
 const R = reporter();
-const SPORT = lanePorts().dev + 210;
-const SERVER = `http://127.0.0.1:${SPORT}`;
+let SPORT = 0, SERVER = '', claim = null, sclaim = null;
 const DB = join(ROOT, `.tmp/online/running-${process.pid}.db`);
 let server = null, browser = null, online = null;
 
@@ -34,6 +33,7 @@ function startOnline() {
 const finish = async () => {
   try { await browser?.close(); } catch (e) { /* ignore */ }
   try { server?.stop(); } catch (e) { /* ignore */ }
+  claim?.release(); sclaim?.release();
   if (online) { const c = online; online = null; c.kill('SIGTERM'); for (let i = 0; i < 40 && c.exitCode === null; i++) await sleep(50); if (c.exitCode === null) c.kill('SIGKILL'); }
   for (const f of [DB, DB + '-wal', DB + '-shm']) rmSync(f, { force: true });
   const s = R.summary();
@@ -45,9 +45,11 @@ process.on('uncaughtException', (e) => { R.fail('uncaught exception', String(e &
 
 let BASE = '';
 try {
-  if (await portAnswers(SPORT)) throw new Error(`the online server port ${SPORT} is in use (another run?)`);
+  sclaim = await claimPort({ kind: 'dev' }); SPORT = sclaim.port; SERVER = `http://127.0.0.1:${SPORT}`;
+  process.env.ONLINE_PORT = String(SPORT);
   if (!args.includes('--skip-build')) { build(OUT); R.pass('vite build'); }
-  server = await startServer({ mode: 'preview', outDir: OUT });
+  claim = await claimPort();
+  server = await startServer({ mode: 'preview', outDir: OUT, port: claim.port });
   BASE = server.base.replace(/\/$/, '');
   mkdirSync(join(ROOT, '.tmp/online'), { recursive: true });
   rmSync(DB, { force: true });
@@ -58,7 +60,7 @@ try {
   await finish();
 }
 
-process.env.ONLINE_DB = DB; process.env.ONLINE_PORT = String(SPORT);
+process.env.ONLINE_DB = DB;
 const quiet = { out: () => {} };
 const felix = runAdmin(['invite', 'Felix'], quiet), mia = runAdmin(['invite', 'Mia'], quiet), ben = runAdmin(['invite', 'Ben'], quiet);
 const Q = 'quality=low&intro=0&sound=0';

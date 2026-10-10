@@ -1,5 +1,5 @@
 // The feedback bubble and dialog in the real page (CHE-404, smoke group `feedback`): node test/feedback-page.mjs [--skip-build] [--shots]
-// Starts the online server in this process (fresh in memory database, admin secret) on the lane's dev port + 210, opens the game
+// Starts the online server in this process (fresh in memory database, admin secret) on a free port (listen(0)), opens the game
 // with ?online=<server> and NO login: the bubble is in the header (desktop panel and rail, phone beside the bulb, 44 px on a phone,
 // clear of the status line and the bulb in portrait, landscape and short landscape), the dialog sends a bug with a board picture
 // (a JPEG) and the context, a wish without the picture, shows a thank you toast, keeps the text and says so when the server is away,
@@ -7,7 +7,7 @@
 // Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { reporter, launchBrowser, startServer, build, settleUi, lanePorts, ROOT } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, startServer, build, settleUi, claimPort, ROOT } from '../tools/_lib.mjs';
 import { createOnlineServer } from '../server/index.mjs';
 import { openDb } from '../server/db.mjs';
 import { contactSheets } from '../tools/contact-sheet.mjs';
@@ -16,10 +16,11 @@ const args = process.argv.slice(2);
 const OUT = '.tmp/feedback-dist', SHOTS = join(ROOT, '.tmp/feedback-shots');
 const SECRET = 'feedback-smoke-secret';
 const R = reporter();
-let server = null, browser = null, app = null;
+let server = null, browser = null, app = null, claim = null;
 const finish = async () => {
   try { await browser?.close(); } catch (e) { /* ignore */ }
   try { server?.stop(); } catch (e) { /* ignore */ }
+  claim?.release();
   try { await app?.close(); } catch (e) { /* ignore */ }
   const s = R.summary();
   console.log(`\nfeedback: ${s.rows.length} checks: ${s.np} pass, ${s.nw} warn, ${s.nf} fail`);
@@ -31,10 +32,11 @@ process.on('uncaughtException', (e) => { R.fail('uncaught exception', String(e &
 let SERVER = '';
 try {
   app = createOnlineServer({ db: openDb(':memory:'), adminSecret: SECRET });
-  const sport = await app.listen(lanePorts().dev + 210, '127.0.0.1');
+  const sport = await app.listen(0, '127.0.0.1');
   SERVER = `http://127.0.0.1:${sport}`;
   if (!args.includes('--skip-build')) { build(OUT); R.pass('vite build'); }
-  server = await startServer({ mode: 'preview', outDir: OUT });
+  claim = await claimPort();
+  server = await startServer({ mode: 'preview', outDir: OUT, port: claim.port });
   browser = await launchBrowser({ w: 1280, h: 720 });
 } catch (e) {
   R.fail('build, serve and launch', String(e.stderr || e.stdout || e.message).split('\n').slice(-4).join(' | ').slice(0, 400));
