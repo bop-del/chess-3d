@@ -9,14 +9,14 @@ export const NEWS = [
       'Nimmt jemand deine Herausforderung an, springt das Brett von selbst in die Partie.',
       'Eine Zeile in der Kopfleiste sagt dir immer, was läuft und wer am Zug ist.',
       'Neu: Über die Sprechblase oben schickst du uns einen Fehler oder einen Wunsch.',
-      'Gibt es eine neue Version des Spiels oder des Servers, sagt es dir das Spiel.',
+      'Gibt es eine neue Version des Spiels oder des Servers, sagt es dir das Spiel, und im Online-Tab siehst du oben immer, ob der Server erreichbar ist.',
     ],
     en: [
       'Online: your running games now sit at the top, with the waiting time and a button straight to the game.',
       'When someone accepts your challenge, the board switches to the game by itself.',
       'One line in the header always says what is running and whose move it is.',
       'New: the speech bubble at the top sends us a bug or a wish.',
-      'If there is a new version of the game or the server, the game tells you.',
+      'If there is a new version of the game or the server, the game tells you, and the Online tab always shows at the top whether the server can be reached.',
     ],
   },
   {
