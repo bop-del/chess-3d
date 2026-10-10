@@ -390,7 +390,7 @@ async function boot() {
   {
     let fb = null;
     const mod = () => fb || (fb = import('./feedback/index.js').then((m) => { const server = onlineServer(); const login = server ? loginFor(server) : null; return window.__chess.feedback = m.mountFeedback({ ui, stage, game, themes, views, server, login, version: VERSION, toast: ui.toast }); }));
-    ui.bindFeedback(() => mod().then((f) => f.open()).catch((e) => console.warn('feedback failed to load', e)));
+    ui.bindFeedback(() => mod().then((f) => f.open()).catch((e) => console.warn('feedback failed to load', e)), !!onlineServer());
     window.__chess.feedbackLoad = mod;
   }
   // on device diagnostics overlay: loaded only for exactly ?diag=1, so nothing of it exists otherwise

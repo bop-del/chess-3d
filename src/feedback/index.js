@@ -11,7 +11,7 @@ addDE({
   'fb.text': 'Was ist passiert, oder was wünschst du dir?', 'fb.name': 'Dein Name (freiwillig)', 'fb.picture': 'Bild vom Brett mitschicken',
   'fb.note': 'Mitgeschickt werden: dein Text, das Bild, die Version, Gerät und Bildschirmgröße, Thema und Ansicht, Stellung und Züge, die letzten Fehlermeldungen. Nie der Chat.',
   'fb.send': 'Senden', 'fb.sending': 'Sende...', 'fb.cancel': 'Abbrechen', 'fb.close': 'Schließen', 'fb.thanks': 'Danke! Deine Rückmeldung ist angekommen.',
-  'fb.slow': 'Du hast schon einige geschickt. Versuch es später noch einmal.', 'fb.offline': 'Das Senden hat nicht geklappt. Prüfe die Verbindung.', 'fb.empty': 'Schreib bitte kurz etwas dazu.',
+  'fb.slow': 'Du hast schon einige geschickt. Versuch es später noch einmal.', 'fb.offline': 'Das Senden hat nicht geklappt. Prüfe die Verbindung.', 'fb.rejected': 'Der Server hat die Nachricht nicht angenommen. Bitte später nochmal.', 'fb.empty': 'Schreib bitte kurz etwas dazu.',
 });
 
 /** the board as a small JPEG (base64 without the prefix), or null. Renders one frame first: the canvas is not kept between frames. */
@@ -91,7 +91,8 @@ export function mountFeedback({ ui, stage, game, themes, views, server = '', log
       text.value = ''; count.textContent = `0 / ${TEXT_MAX}`; msg.textContent = '';
       close();
       toast?.(t('fb.thanks', 'Thank you! Your feedback was sent.'), 'info', 3200);
-    } else msg.textContent = out.error === 'slow-down' ? t('fb.slow', 'You already sent a few. Please try again later.') : t('fb.offline', 'Sending failed. Check your connection.');
+    } else msg.textContent = out.error === 'slow-down' ? t('fb.slow', 'You already sent a few. Please try again later.')
+      : out.error === 'rejected' ? t('fb.rejected', 'The server did not accept the message. Please try again later.') : t('fb.offline', 'Sending failed. Check your connection.');
   });
   $('#fb-cancel').addEventListener('click', close);
   closeBtn.addEventListener('click', close);

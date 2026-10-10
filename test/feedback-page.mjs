@@ -6,6 +6,7 @@
 // Escape closes it and game keys do not fire while typing. --shots writes the dialog at four sizes to .tmp/feedback-shots.
 // Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { mkdirSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { reporter, launchBrowser, startServer, build, settleUi, claimPort, ROOT } from '../tools/_lib.mjs';
 import { createOnlineServer } from '../server/index.mjs';
@@ -49,10 +50,10 @@ const rect = (page, sel) => ev(page, (s) => { const e = document.querySelector(s
 const overlap = (a, b) => a && b && a.x < b.r - 0.5 && b.x < a.r - 0.5 && a.y < b.b - 0.5 && b.y < a.b - 0.5;
 const items = async () => (await (await fetch(`${SERVER}/feedback`, { headers: { Authorization: `Bearer ${SECRET}` } })).json()).items;
 
-async function load(page, [, w, h, phone], { lang = 'en', query = '' } = {}) {
+async function load(page, [, w, h, phone], { lang = 'en', query = '', online = SERVER } = {}) {
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
   await page.evaluateOnNewDocument((l) => { try { localStorage.clear(); localStorage.setItem('chess3d.lang', l); localStorage.setItem('chess3d.newsSeen', '99.0.0'); } catch (e) { /* blocked */ } }, lang);
-  await page.goto(`${server.base}?quality=low&ai=0&intro=0&online=${encodeURIComponent(SERVER)}${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
+  await page.goto(`${server.base}?quality=low&ai=0&intro=0&online=${encodeURIComponent(online)}${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   const err = await ev(page, () => window.__chessError || null);
   if (err) throw new Error('page failed to start: ' + err);
@@ -142,6 +143,36 @@ try {
   await ev(page, () => document.querySelector('#fb-send').click());
   await page.waitForFunction(() => document.querySelector('#fb-msg').textContent.includes('connection'), { timeout: 15000 });
   R.expect('server away: the message says so and the text is kept', (await ev(page, () => document.querySelector('#fb-text').value)) === 'one too many');
+
+  // CHE-417: a mock server per http status, and no server at all
+  let mockStatus = 404;
+  const mock = createServer((req, res) => { res.writeHead(req.method === 'OPTIONS' ? 204 : mockStatus, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Content-Type': 'application/json' }); res.end(req.method === 'OPTIONS' ? '' : '{}'); });
+  await new Promise((ok) => mock.listen(0, '127.0.0.1', ok));
+  try {
+    for (const [status, lang, re] of [[404, 'de', /Server hat die Nachricht nicht angenommen/], [500, 'en', /server did not accept/]]) {
+      mockStatus = status;
+      await load(page, DESK, { lang, online: `http://127.0.0.1:${mock.address().port}` });
+      await ev(page, () => document.querySelector('#btn-feedback').click());
+      await settleUi(page);
+      await page.type('#fb-text', 'http ' + status);
+      await ev(page, () => document.querySelector('#fb-send').click());
+      await page.waitForFunction(() => document.querySelector('#fb-msg').textContent.length > 0, { timeout: 15000 });
+      const m = await ev(page, () => document.querySelector('#fb-msg').textContent);
+      R.expect(`http ${status} (${lang}): its own text, not the connection text`, re.test(m) && !/onnection|Verbindung/.test(m), String(re), m);
+    }
+  } finally { mock.close(); }
+  // no server set: no bubble on desktop and phone, the header still fits
+  for (const size of [DESK, PHONE, SMALL]) {
+    const [tag, w, h, phone] = size;
+    await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
+    await ev(page, () => { try { sessionStorage.clear(); } catch (e) { /* blocked */ } });   // the ?online= of an earlier load is remembered per tab
+    await page.goto(`${server.base}?quality=low&ai=0&intro=0${phone ? '&touch=1' : ''}`, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForFunction(() => window.__chessReady, { timeout: 120000, polling: 100 });
+    await settleUi(page);
+    const shown = await ev(page, () => [...document.querySelectorAll('#btn-feedback, #btn-feedback-rail, #btn-feedback-phone')].filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 2).length);
+    R.expect(`no server (${tag}): the feedback bubble is hidden`, shown === 0, '0', shown);
+    if (phone) { const st = await rect(page, '.pstatus'); R.expect(`no server (${tag}): the status line keeps room`, st && st.w >= 120, '>= 120', st && st.w); }
+  }
 
   // German
   await load(page, DESK, { lang: 'de' });

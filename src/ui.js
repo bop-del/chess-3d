@@ -337,7 +337,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   let goodMove = null, goodKey = '';
   const goodBtns = [$('#btn-good')];
   const feedbackBtns = [...hud.querySelectorAll('#btn-feedback, #btn-feedback-rail')];   // CHE-404: the speech bubble in the header, the rail and (phone) beside the bulb
-  function bindFeedback(open) { for (const b of feedbackBtns) b.addEventListener('click', () => { closeSheetsAny(); open(); }); }
+  function bindFeedback(open, available = true) { for (const b of feedbackBtns) { b.addEventListener('click', () => { closeSheetsAny(); open(); }); if (!available) { b.hidden = true; b.style.display = 'none'; } } }   // CHE-417: no server, no bubble
   const closeSheetsAny = () => phoneUI?.close();
   function syncGood() {
     if (!goodMove) return;
