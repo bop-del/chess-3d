@@ -227,6 +227,21 @@ try {
   ok('the copied details never contain the key or a code', !text.includes(felix.key) && !text.includes(mia.code) && !text.includes('FELIX-ZZZZ') && text.includes('http status: 500') && text.includes('server host: 127.0.0.1:5702'), text);
   ok('the details text has no chat field', !/chat|message:/i.test(text));
   ok('release default (CHE-326): no flag uses the fallback, ?online= wins, a dev build has no default', onlineServer('', 'https://chess.borisdiebold.com') === 'https://chess.borisdiebold.com' && onlineServer('?online=http://localhost:5502', 'https://chess.borisdiebold.com') === 'http://localhost:5502' && DEFAULT_SERVER === '');
+  // CHE-416: fake preview data does not overwrite the remembered server of the tab
+  {
+    const mem = new Map(); globalThis.sessionStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
+    onlineServer('?online=https://chess.borisdiebold.com', '');
+    const fake = onlineServer('?online=http://preview.invalid&onlinepv=list', '');
+    ok('fake preview data (CHE-416): used for the page, not remembered', fake === 'http://preview.invalid' && onlineServer('', '') === 'https://chess.borisdiebold.com');
+    delete globalThis.sessionStorage;
+  }
+  // CHE-416: CHESS_ONLINE_DEFAULT sets the default without CHESS_RELEASE (no service worker); a release build keeps the live server
+  {
+    const def = async (env) => { const keep = { r: process.env.CHESS_RELEASE, d: process.env.CHESS_ONLINE_DEFAULT }; delete process.env.CHESS_RELEASE; delete process.env.CHESS_ONLINE_DEFAULT; Object.assign(process.env, env);
+      try { const m = await import('../vite.config.js?' + JSON.stringify(env)); return m.default.define; } finally { for (const [k, v] of [['CHESS_RELEASE', keep.r], ['CHESS_ONLINE_DEFAULT', keep.d]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } } };
+    const a = await def({ CHESS_ONLINE_DEFAULT: 'https://chess.borisdiebold.com' }), b = await def({}), c = await def({ CHESS_RELEASE: '1' });
+    ok('build env CHESS_ONLINE_DEFAULT (CHE-416): server default without the service worker', a.__ONLINE_DEFAULT__ === '"https://chess.borisdiebold.com"' && a.__SW_DEFAULT__ === 'false' && b.__ONLINE_DEFAULT__ === '""' && c.__ONLINE_DEFAULT__ === '"https://chess.borisdiebold.com"' && c.__SW_DEFAULT__ === 'true');
+  }
   ok('the server flag is cleaned (no credentials, no other scheme)', cleanServer('http://u:p@h:1/') === '' && cleanServer('javascript:alert(1)') === '' && cleanServer('http://127.0.0.1:5702/') === 'http://127.0.0.1:5702');
   // the fragment is stripped at once and stored (a stand in for location, history and storage)
   const store = new Map();

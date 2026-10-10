@@ -9,14 +9,13 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { reporter, launchBrowser, startServer, build, settleUi, lanePorts, portAnswers, sleep, ROOT } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, startServer, build, settleUi, claimPort, sleep, ROOT } from '../tools/_lib.mjs';
 import { runAdmin, inviteLink } from '../server/admin.mjs';
 
 const args = process.argv.slice(2);
 const SHOTS = join(ROOT, '.tmp/online-shots'), OUT = '.tmp/online-dist';
 const R = reporter();
-const SPORT = lanePorts().dev + 210;
-const SERVER = `http://127.0.0.1:${SPORT}`;
+let SPORT = 0, SERVER = '', claim = null, sclaim = null;
 const DB = join(ROOT, `.tmp/online/running-${process.pid}.db`);
 let server = null, browser = null, online = null;
 
@@ -34,6 +33,7 @@ function startOnline() {
 const finish = async () => {
   try { await browser?.close(); } catch (e) { /* ignore */ }
   try { server?.stop(); } catch (e) { /* ignore */ }
+  claim?.release(); sclaim?.release();
   if (online) { const c = online; online = null; c.kill('SIGTERM'); for (let i = 0; i < 40 && c.exitCode === null; i++) await sleep(50); if (c.exitCode === null) c.kill('SIGKILL'); }
   for (const f of [DB, DB + '-wal', DB + '-shm']) rmSync(f, { force: true });
   const s = R.summary();
@@ -45,9 +45,11 @@ process.on('uncaughtException', (e) => { R.fail('uncaught exception', String(e &
 
 let BASE = '';
 try {
-  if (await portAnswers(SPORT)) throw new Error(`the online server port ${SPORT} is in use (another run?)`);
+  sclaim = await claimPort({ kind: 'dev' }); SPORT = sclaim.port; SERVER = `http://127.0.0.1:${SPORT}`;
+  process.env.ONLINE_PORT = String(SPORT);
   if (!args.includes('--skip-build')) { build(OUT); R.pass('vite build'); }
-  server = await startServer({ mode: 'preview', outDir: OUT });
+  claim = await claimPort();
+  server = await startServer({ mode: 'preview', outDir: OUT, port: claim.port });
   BASE = server.base.replace(/\/$/, '');
   mkdirSync(join(ROOT, '.tmp/online'), { recursive: true });
   rmSync(DB, { force: true });
@@ -58,7 +60,7 @@ try {
   await finish();
 }
 
-process.env.ONLINE_DB = DB; process.env.ONLINE_PORT = String(SPORT);
+process.env.ONLINE_DB = DB;
 const quiet = { out: () => {} };
 const felix = runAdmin(['invite', 'Felix'], quiet), mia = runAdmin(['invite', 'Mia'], quiet), ben = runAdmin(['invite', 'Ben'], quiet);
 const Q = 'quality=low&intro=0&sound=0';
@@ -99,7 +101,7 @@ try {
   await click(B, '[data-a=accept]');
   R.expect('accept with a local game in progress: the board is not replaced', await until(A, () => window.__chessOnline.state.games.some((g) => g.status === 'active')) && !(await ev(A, () => window.__chessOnline.match.attached)) && (await ev(A, () => window.__chess.game.getState().fen)) === localFen);
   R.expect('a bubble says "Mia hat angenommen · Zur Partie ›"', await until(A, () => !document.querySelector('.obub[data-k=game]').hidden && document.querySelector('.obub[data-k=game] .obub-main').textContent === '♟ Mia hat angenommen · Zur Partie ›'), await ev(A, () => document.querySelector('.obub[data-k=game] .obub-main').textContent));
-  R.expect('stale card regression: the card of Mia knows the game (Zur Partie, no gold Herausfordern)', await ev(A, () => { const c = [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia'); return !!c.querySelector('.ostate.game') && !c.querySelector('[data-a=challenge]') && !!c.querySelector('.oacts2 [data-a=board]'); }));
+  R.expect('stale card regression: the postcard of Mia knows the game (Zur Partie), she is not in the address book and has no Herausfordern', await ev(A, () => { const c = [...document.querySelectorAll('.orc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia'); return !!c && !!c.querySelector('[data-a=board]') && ![...document.querySelectorAll('.opc')].some((r) => r.querySelector('.oname')?.textContent === 'Mia') && !document.querySelector('[data-a=challenge][data-n="Mia"]'); }));
   R.expect('the block "Laufende Partien" lists the game with colour, move and waiting time', await ev(A, () => { const b = document.querySelector('.orun'); const c = b.querySelector('.orc'); return !b.hidden && /Laufende Partien/i.test(b.querySelector('h4').textContent) && b.querySelectorAll('.orc').length === 1 && /Mia/.test(c.textContent) && /Du spielst (Weiß|Schwarz)/.test(c.textContent) && /Zug 1/.test(c.textContent) && /seit 1 Min/.test(c.textContent) && !!c.querySelector('[data-a=board]'); }), await ev(A, () => document.querySelector('.orun').textContent));
   R.expect('Mia accepted herself: her fresh board has the game and no "hat angenommen" bubble', await until(B, () => window.__chessOnline.match.attached) && await ev(B, () => document.querySelector('.obub[data-k=game]').hidden));
   await click(A, '.obub[data-k=game] .obub-main');
@@ -134,7 +136,7 @@ try {
   R.expect('running: texts "Du bist dran · seit 2 Tage", "seit 2 Std", "Opa ist dran · seit 2 Tage", "Mia ist dran · seit 12 Min"', got[0].turn === 'Du bist dran · seit 2 Tage' && got[1].turn === 'Du bist dran · seit 2 Std' && got[2].turn === 'Opa ist dran · seit 2 Tage' && got[3].turn === 'Mia ist dran · seit 12 Min', JSON.stringify(got.map((c) => c.turn)));
   R.expect('running: the last day line both ways, none before', got[0].limit === 'noch 12 Std, dann gewinnt Felix' && got[2].limit === 'noch 5 Std, dann kannst du beenden' && !got[1].limit && !got[3].limit, JSON.stringify(got.map((c) => c.limit)));
   R.expect('running: side and move number', await ev(M, () => /Du spielst Weiß · Zug 2/.test(document.querySelector('.orun .orc[data-id="11"] .orinfo').textContent)));
-  R.expect('running: the player card keeps its short line', await ev(M, () => { const c = [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Nina'); return /Du bist dran/.test(c.querySelector('.ostate.game .oturn').textContent) && !!c.querySelector('.oacts2 [data-a=board]'); }));
+  R.expect('running: every game is a postcard, none of the four players is in the address book', await ev(M, () => !document.querySelectorAll('.opc').length && document.querySelectorAll('.orc [data-a=board]').length === 4));
   await click(M, '.orun .orc[data-id="14"] [data-a=board]');
   R.expect('Zur Partie from the block: Opa on the board, the header says "Online gegen Opa · Opa ist dran · seit 2 Tage"', await until(M, () => window.__chessOnline.match.attached && window.__chessOnline.match.game.id === 14 && document.querySelector('#turn-main').title === 'Online gegen Opa · Opa ist dran · seit 2 Tage'), await head(M));
   await click(M, '.orun .orc[data-id="12"] [data-a=board]');

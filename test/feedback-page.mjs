@@ -1,13 +1,14 @@
 // The feedback bubble and dialog in the real page (CHE-404, smoke group `feedback`): node test/feedback-page.mjs [--skip-build] [--shots]
-// Starts the online server in this process (fresh in memory database, admin secret) on the lane's dev port + 210, opens the game
+// Starts the online server in this process (fresh in memory database, admin secret) on a free port (listen(0)), opens the game
 // with ?online=<server> and NO login: the bubble is in the header (desktop panel and rail, phone beside the bulb, 44 px on a phone,
 // clear of the status line and the bulb in portrait, landscape and short landscape), the dialog sends a bug with a board picture
 // (a JPEG) and the context, a wish without the picture, shows a thank you toast, keeps the text and says so when the server is away,
 // Escape closes it and game keys do not fire while typing. --shots writes the dialog at four sizes to .tmp/feedback-shots.
 // Exit codes: 0 pass, 1 a check failed, 2 setup error.
 import { mkdirSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
-import { reporter, launchBrowser, startServer, build, settleUi, lanePorts, ROOT } from '../tools/_lib.mjs';
+import { reporter, launchBrowser, startServer, build, settleUi, claimPort, ROOT } from '../tools/_lib.mjs';
 import { createOnlineServer } from '../server/index.mjs';
 import { openDb } from '../server/db.mjs';
 import { contactSheets } from '../tools/contact-sheet.mjs';
@@ -16,10 +17,11 @@ const args = process.argv.slice(2);
 const OUT = '.tmp/feedback-dist', SHOTS = join(ROOT, '.tmp/feedback-shots');
 const SECRET = 'feedback-smoke-secret';
 const R = reporter();
-let server = null, browser = null, app = null;
+let server = null, browser = null, app = null, claim = null;
 const finish = async () => {
   try { await browser?.close(); } catch (e) { /* ignore */ }
   try { server?.stop(); } catch (e) { /* ignore */ }
+  claim?.release();
   try { await app?.close(); } catch (e) { /* ignore */ }
   const s = R.summary();
   console.log(`\nfeedback: ${s.rows.length} checks: ${s.np} pass, ${s.nw} warn, ${s.nf} fail`);
@@ -31,10 +33,11 @@ process.on('uncaughtException', (e) => { R.fail('uncaught exception', String(e &
 let SERVER = '';
 try {
   app = createOnlineServer({ db: openDb(':memory:'), adminSecret: SECRET });
-  const sport = await app.listen(lanePorts().dev + 210, '127.0.0.1');
+  const sport = await app.listen(0, '127.0.0.1');
   SERVER = `http://127.0.0.1:${sport}`;
   if (!args.includes('--skip-build')) { build(OUT); R.pass('vite build'); }
-  server = await startServer({ mode: 'preview', outDir: OUT });
+  claim = await claimPort();
+  server = await startServer({ mode: 'preview', outDir: OUT, port: claim.port });
   browser = await launchBrowser({ w: 1280, h: 720 });
 } catch (e) {
   R.fail('build, serve and launch', String(e.stderr || e.stdout || e.message).split('\n').slice(-4).join(' | ').slice(0, 400));
@@ -47,10 +50,10 @@ const rect = (page, sel) => ev(page, (s) => { const e = document.querySelector(s
 const overlap = (a, b) => a && b && a.x < b.r - 0.5 && b.x < a.r - 0.5 && a.y < b.b - 0.5 && b.y < a.b - 0.5;
 const items = async () => (await (await fetch(`${SERVER}/feedback`, { headers: { Authorization: `Bearer ${SECRET}` } })).json()).items;
 
-async function load(page, [, w, h, phone], { lang = 'en', query = '' } = {}) {
+async function load(page, [, w, h, phone], { lang = 'en', query = '', online = SERVER } = {}) {
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
   await page.evaluateOnNewDocument((l) => { try { localStorage.clear(); localStorage.setItem('chess3d.lang', l); localStorage.setItem('chess3d.newsSeen', '99.0.0'); } catch (e) { /* blocked */ } }, lang);
-  await page.goto(`${server.base}?quality=low&ai=0&intro=0&online=${encodeURIComponent(SERVER)}${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
+  await page.goto(`${server.base}?quality=low&ai=0&intro=0&online=${encodeURIComponent(online)}${phone ? '&touch=1' : ''}${query}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
   const err = await ev(page, () => window.__chessError || null);
   if (err) throw new Error('page failed to start: ' + err);
@@ -140,6 +143,36 @@ try {
   await ev(page, () => document.querySelector('#fb-send').click());
   await page.waitForFunction(() => document.querySelector('#fb-msg').textContent.includes('connection'), { timeout: 15000 });
   R.expect('server away: the message says so and the text is kept', (await ev(page, () => document.querySelector('#fb-text').value)) === 'one too many');
+
+  // CHE-417: a mock server per http status, and no server at all
+  let mockStatus = 404;
+  const mock = createServer((req, res) => { res.writeHead(req.method === 'OPTIONS' ? 204 : mockStatus, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Content-Type': 'application/json' }); res.end(req.method === 'OPTIONS' ? '' : '{}'); });
+  await new Promise((ok) => mock.listen(0, '127.0.0.1', ok));
+  try {
+    for (const [status, lang, re] of [[404, 'de', /Server hat die Nachricht nicht angenommen/], [500, 'en', /server did not accept/]]) {
+      mockStatus = status;
+      await load(page, DESK, { lang, online: `http://127.0.0.1:${mock.address().port}` });
+      await ev(page, () => document.querySelector('#btn-feedback').click());
+      await settleUi(page);
+      await page.type('#fb-text', 'http ' + status);
+      await ev(page, () => document.querySelector('#fb-send').click());
+      await page.waitForFunction(() => document.querySelector('#fb-msg').textContent.length > 0, { timeout: 15000 });
+      const m = await ev(page, () => document.querySelector('#fb-msg').textContent);
+      R.expect(`http ${status} (${lang}): its own text, not the connection text`, re.test(m) && !/onnection|Verbindung/.test(m), String(re), m);
+    }
+  } finally { mock.close(); }
+  // no server set: no bubble on desktop and phone, the header still fits
+  for (const size of [DESK, PHONE, SMALL]) {
+    const [tag, w, h, phone] = size;
+    await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
+    await ev(page, () => { try { sessionStorage.clear(); } catch (e) { /* blocked */ } });   // the ?online= of an earlier load is remembered per tab
+    await page.goto(`${server.base}?quality=low&ai=0&intro=0${phone ? '&touch=1' : ''}`, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForFunction(() => window.__chessReady, { timeout: 120000, polling: 100 });
+    await settleUi(page);
+    const shown = await ev(page, () => [...document.querySelectorAll('#btn-feedback, #btn-feedback-rail, #btn-feedback-phone')].filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 2).length);
+    R.expect(`no server (${tag}): the feedback bubble is hidden`, shown === 0, '0', shown);
+    if (phone) { const st = await rect(page, '.pstatus'); R.expect(`no server (${tag}): the status line keeps room`, st && st.w >= 120, '>= 120', st && st.w); }
+  }
 
   // German
   await load(page, DESK, { lang: 'de' });

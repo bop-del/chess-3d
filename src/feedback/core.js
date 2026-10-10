@@ -44,7 +44,7 @@ export function fitPicture(toData, cap = PICTURE_MAX, qualities = [0.7, 0.55, 0.
   return null;
 }
 
-/** POST /feedback. Resolves { ok, id } or { ok: false, error } with error: slow-down, offline, or the server's code. Never throws. */
+/** POST /feedback. Resolves { ok, id } or { ok: false, error } with error: slow-down (429), offline (network), rejected (any other http error) or the server's code on an ok:false answer. Never throws. */
 export async function sendFeedback({ server, kind, text, name = '', picture = null, context = null, device = '', key = '', fetch: doFetch = globalThis.fetch?.bind(globalThis) }) {
   const body = { kind, text: String(text).trim(), name: String(name).trim(), device, ...(picture ? { picture } : {}), ...(context ? { context } : {}) };
   try {
@@ -53,6 +53,6 @@ export async function sendFeedback({ server, kind, text, name = '', picture = nu
     });
     const j = await r.json().catch(() => ({}));
     if (r.ok) return { ok: true, id: j.id };
-    return { ok: false, error: r.status === 429 ? 'slow-down' : j.error || `http-${r.status}` };
+    return { ok: false, error: r.status === 429 ? 'slow-down' : 'rejected' };
   } catch (e) { return { ok: false, error: 'offline' }; }
 }

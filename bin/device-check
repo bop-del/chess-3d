@@ -50,7 +50,8 @@ function findAddress() {
 }
 
 console.log('Building into .tmp/device-dist ...');
-const build = run(vite, ['build', '--outDir', outDir, '--emptyOutDir'], { cwd: root, stdio: 'inherit' });
+// CHE-416: the Online tab and the feedback dialog need the live server; no CHESS_RELEASE, so no service worker on the preview
+const build = run(vite, ['build', '--outDir', outDir, '--emptyOutDir'], { cwd: root, stdio: 'inherit', env: { ...process.env, CHESS_ONLINE_DEFAULT: process.env.CHESS_ONLINE_DEFAULT || 'https://chess.borisdiebold.com' } });
 if (build.status !== 0) {
   console.error('device-check: build failed');
   process.exit(1);

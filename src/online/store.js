@@ -20,7 +20,8 @@ export const DEFAULT_SERVER = typeof __ONLINE_DEFAULT__ === 'string' ? cleanServ
 export function onlineServer(search = typeof location !== 'undefined' ? location.search : '', fallback = DEFAULT_SERVER) {
   const flag = cleanServer(new URLSearchParams(search).get('online'));
   try {
-    if (flag) { sessionStorage.setItem(SESSION, flag); return flag; }
+    // fake data (?onlinepv=, CHE-416) never overwrites the server the tab remembers
+    if (flag) { if (!new URLSearchParams(search).has('onlinepv')) sessionStorage.setItem(SESSION, flag); return flag; }
     return cleanServer(sessionStorage.getItem(SESSION)) || fallback;
   } catch (e) { return flag || fallback; }
 }

@@ -40,7 +40,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(VERSION), __APP_COMMIT__: JSON.stringify(COMMIT),
     // online play (CHE-326): a release build (CHESS_RELEASE=1) uses the live server without ?online=, dev and test builds none
     __SW_DEFAULT__: JSON.stringify(process.env.CHESS_RELEASE === '1'),   // the offline cache: on in a release build, ?sw=1 turns it on elsewhere
-    __ONLINE_DEFAULT__: JSON.stringify(process.env.CHESS_RELEASE === '1' ? 'https://chess.borisdiebold.com' : ''),
+    // CHESS_ONLINE_DEFAULT=<url> (CHE-416) sets the same default without the release build or the service worker: the device preview builds use it
+    __ONLINE_DEFAULT__: JSON.stringify(process.env.CHESS_RELEASE === '1' ? 'https://chess.borisdiebold.com' : (process.env.CHESS_ONLINE_DEFAULT || '')),
   },
   build: { target: 'safari15', chunkSizeWarningLimit: 1400 },
 });

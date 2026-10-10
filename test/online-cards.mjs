@@ -19,7 +19,21 @@ assert.equal(myTurnCount(), 0);
 assert.equal(scoreOf(null), '');
 assert.equal(scoreOf({ w: 0, l: 0, d: 0 }), '');
 assert.equal(scoreOf({ w: 2, l: 1, d: 0 }), '2 : 1');
-assert.equal(scoreOf({ w: 0, l: 3, d: 1 }), '0 : 3  ½ 1');
+assert.equal(scoreOf({ w: 0, l: 3, d: 1 }), '½ : 3½', 'a draw is half a point each, the half glued to the number');
+assert.equal(scoreOf({ w: 3, l: 0, d: 1 }), '3½ : ½');
+assert.equal(scoreOf({ w: 1, l: 3, d: 2 }), '2 : 4');
+assert.equal(scoreOf({ w: 0, l: 0, d: 1 }), '½ : ½');
+{   // CHE-421 fix: second person moved text, own form
+  const { lastMoveText } = await import('../src/online/view.js');
+  const T = (k, d, v = {}) => d.replace(/\{(\w+)\}/g, (_, n) => v[n]);
+  const c = { t: T };
+  const g = (turn) => ({ moves: ['e2e4', 'e7e5', 'g1f3', 'b8c6'].slice(0, turn === 'w' ? 4 : 3), color: 'w', turn, opponent: 'Felix' });
+  assert.equal(lastMoveText(c, g('w')), 'Felix moved a knight to c6');
+  assert.equal(lastMoveText(c, g('b')), 'You moved a knight to f3');
+  const src = (await import('node:fs')).readFileSync(new URL('../src/online/strings.js', import.meta.url), 'utf8');
+  for (const k of 'pnbrqk') assert.ok(src.includes(`'online.movedYou.${k}'`), `German movedYou.${k}`);
+  assert.ok(src.includes("'online.movedYou.p': 'Du hast einen Bauern nach {sq} gezogen'"));
+}
 {   // CHE-420: no score yet is "noch keine Partie beendet", never "noch keine Partie" (a game may be running)
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../src/online/strings.js', import.meta.url), 'utf8');
@@ -89,7 +103,7 @@ assert.deepEqual([SV.games, SV.wins, SV.losses, SV.draws], [6, 3, 2, 1]);
 assert.equal(SV.bar.w + SV.bar.d + SV.bar.l, 100, 'the bar is always 100 percent');
 assert.deepEqual(SV.streak, { type: 'loss', n: 2 });
 assert.equal(SV.bestWins, 2);
-assert.equal(SV.h2h.line, '3 : 0  ½ 1', 'head to head from the asker with the draws');
+assert.equal(SV.h2h.line, '3½ : ½', 'head to head from the asker with the draws');
 assert.equal(SV.avgMoves, 3);
 assert.equal(SV.avgMinutes, '6,8', 'German decimal comma');
 assert.equal(SV.openings.length, 3, 'three openings at most');

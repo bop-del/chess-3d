@@ -99,6 +99,8 @@ try {
   ok('sendFeedback posts to /feedback with the key when logged in', out.ok && calls[0].url === 'https://s.example/feedback' && calls[0].init.headers.Authorization === 'Bearer KEY' && sentBody.text === 'more music' && sentBody.picture === JPEG && sentBody.device === 'dev-12345678');
   ok('sendFeedback reports 429 as slow-down and a network error as offline', (await sendFeedback({ server: 'https://s.example', kind: 'bug', text: 'x', fetch: async () => ({ ok: false, status: 429, json: async () => ({ error: 'slow-down' }) }) })).error === 'slow-down'
     && (await sendFeedback({ server: 'https://s.example', kind: 'bug', text: 'x', fetch: async () => { throw new TypeError('fail'); } })).error === 'offline');
+  ok('sendFeedback reports any other http error as rejected (CHE-417)', (await sendFeedback({ server: 'https://s.example', kind: 'bug', text: 'x', fetch: async () => ({ ok: false, status: 404, json: async () => ({}) }) })).error === 'rejected'
+    && (await sendFeedback({ server: 'https://s.example', kind: 'bug', text: 'x', fetch: async () => ({ ok: false, status: 500, json: async () => ({ error: 'boom' }) }) })).error === 'rejected');
 } finally {
   await app.close();
 }
