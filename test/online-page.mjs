@@ -118,7 +118,30 @@ try {
   R.expect('with the flag: the Online tab sits between Learn and Options', (await ev(B, () => [...document.querySelectorAll('.tabs .tab')].map((x) => x.dataset.tab).join())) === 'play,learn,online,settings');
   R.expect('the deep link open=online shows the tab', await until(B, () => document.querySelector('#tab-online')?.classList.contains('on') && !document.querySelector('#tp-online').hidden));
   R.expect('no invite: the sentence and the code field show', await until(B, () => !!document.querySelector('.ologin:not([hidden]) .oneed')) && (await ev(B, () => document.querySelector('.ologin .oneed').textContent)).startsWith('Online spielen geht nur mit Einladung') && await shown(B, '.ocode input'));
-  R.expect('no invite: no request button, no connection line', !(await shown(B, '.oconn')) && (await ev(B, () => document.querySelectorAll('.ologin button').length)) === 1);
+  R.expect('no invite: no request button', (await ev(B, () => document.querySelectorAll('.ologin button').length)) === 1);
+  // CHE-412: the pill shows before a login too: green with a reachable server, red (with Details) with an unreachable one
+  R.expect('no invite, server up: one pill, green "Server verbunden"', await until(B, () => document.querySelector('.oconn')?.dataset.s === 'connected') && await shown(B, '.oconn') && (await ev(B, () => document.querySelectorAll('.onl .oconn').length)) === 1 && (await ev(B, () => document.querySelector('.oconn .otxt').textContent)) === 'Server verbunden');
+  const DEAD = `http://127.0.0.1:${SPORT + 1}`;
+  if (await portAnswers(SPORT + 1)) R.fail('the dead port answers', String(SPORT + 1));
+  else {
+    const D = await open(await browser.createBrowserContext(), `${BASE_B}/?${Q}&online=${encodeURIComponent(DEAD)}&open=online`);
+    R.expect('no invite, server down: red "Server nicht erreichbar" with Details', await until(D, () => document.querySelector('.oconn')?.dataset.s === 'unreachable') && (await ev(D, () => document.querySelector('.oconn .otxt').textContent)) === 'Server nicht erreichbar' && await shown(D, '.oconn [data-a=details]') && await shown(D, '.ocode input'));
+    await click(D, '.oconn [data-a=details]');
+    R.expect('no invite, server down: Details open with Try again', await until(D, () => !!document.querySelector('.odet [data-a=retry]')) && !(await ev(D, () => !!document.querySelector('.odet .onext'))));
+    if (args.includes('--shots')) { mkdirSync(join(ROOT, '.tmp/conn/shots'), { recursive: true }); await D.screenshot({ path: join(ROOT, '.tmp/conn/shots/login-red-desktop.png') }); }
+    await D.close();
+    for (const [name, vp] of [['390x844', PHONE], ['320x568', [320, 568, true]]]) {
+      for (const [col, url] of [['green', SERVER], ['red', DEAD]]) {
+        const P = await open(await browser.createBrowserContext(), `${BASE_B}/?${Q}&online=${encodeURIComponent(url)}&open=online`, vp);
+        await until(P, (c) => document.querySelector('.oconn')?.dataset.s === c, col === 'green' ? 'connected' : 'unreachable');
+        const fit = await ev(P, () => { const q = (x) => document.querySelector(x)?.getBoundingClientRect(); const a = q('.oconn'), b = q('.oneed'), c = q('.ocode'); return { apart: !!a && a.width > 2 && a.bottom <= b.top + 1 && b.bottom <= c.top + 1, inside: a.left >= 0 && a.right <= innerWidth && c.right <= innerWidth, noScroll: document.documentElement.scrollWidth <= innerWidth }; });
+        R.expect(`phone ${name} ${col}: pill, sentence and code field stack without overlap or overflow`, fit.apart && fit.inside && fit.noScroll, JSON.stringify(fit));
+        if (args.includes('--shots')) await P.screenshot({ path: join(ROOT, `.tmp/conn/shots/login-${col}-phone-${name}.png`) });
+        await P.close();
+      }
+    }
+  }
+  if (args.includes('--shots')) { mkdirSync(join(ROOT, '.tmp/conn/shots'), { recursive: true }); await B.screenshot({ path: join(ROOT, '.tmp/conn/shots/login-green-desktop.png') }); }
 
   // ------------------------------------------------------------ Felix by link, Mia by code
   const link = inviteLink({ game: `${BASE}/?${Q}`, server: SERVER, key: felix.key });
