@@ -5,14 +5,14 @@ export const NEWS = [
   {
     version: '1.13.0', date: '2026-10-10',
     de: [
-      'Online: Ganz oben stehen deine laufenden Partien, mit der Wartezeit und einem Knopf, der direkt zurück ins Spiel führt.',
+      'Online sieht jetzt aus wie Postkarten: Oben stehen deine laufenden Partien mit Brett, letztem Zug und Wartezeit, ein Tipp führt direkt zurück ins Spiel.',
       'Nimmt jemand deine Herausforderung an, springt das Brett von selbst in die Partie.',
       'Eine Zeile in der Kopfleiste sagt dir immer, was läuft und wer am Zug ist.',
       'Neu: Über die Sprechblase oben schickst du uns einen Fehler oder einen Wunsch.',
       'Gibt es eine neue Version des Spiels oder des Servers, sagt es dir das Spiel, und im Online-Tab siehst du oben immer, ob der Server erreichbar ist.',
     ],
     en: [
-      'Online: your running games now sit at the top, with the waiting time and a button straight to the game.',
+      'Online now looks like postcards: your running games sit at the top with the board, the last move and the waiting time, and a tap takes you straight back to the game.',
       'When someone accepts your challenge, the board switches to the game by itself.',
       'One line in the header always says what is running and whose move it is.',
       'New: the speech bubble at the top sends us a bug or a wish.',
