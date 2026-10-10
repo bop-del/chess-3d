@@ -5,7 +5,7 @@ export const NEWS = [
   {
     version: '1.13.0', date: '2026-10-10',
     de: [
-      'Online: Ganz oben stehen deine laufenden Partien, mit der Wartezeit und einem Knopf direkt zur Partie.',
+      'Online: Ganz oben stehen deine laufenden Partien, mit der Wartezeit und einem Knopf, der direkt zurück ins Spiel führt.',
       'Nimmt jemand deine Herausforderung an, springt das Brett von selbst in die Partie.',
       'Eine Zeile in der Kopfleiste sagt dir immer, was läuft und wer am Zug ist.',
       'Neu: Über die Sprechblase oben schickst du uns einen Fehler oder einen Wunsch.',
