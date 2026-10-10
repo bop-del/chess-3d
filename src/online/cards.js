@@ -1,8 +1,10 @@
 // Online tab logic without DOM (CHE-301), tested in test/online-cards.mjs: what the second button of a player card does, and the
 // state of the floating chat (open with a player, shown or collapsed to the pill).
 
-/** wins : losses from your side, the draws only when there are some; '' when never played */
-export const scoreOf = (s) => (!s || !(s.w + s.l + s.d) ? '' : `${s.w} : ${s.l}${s.d ? `  ½ ${s.d}` : ''}`);
+/** points as chess counts them: a draw is half a point, the half glued to the number ("3½", "½", "2") */
+const pts = (n) => { const h = Math.floor(n); return n % 1 ? `${h || ''}½` : String(h); };
+/** own points : their points (a draw gives each side half a point); '' when never played */
+export const scoreOf = (s) => (!s || !(s.w + s.l + s.d) ? '' : `${pts(s.w + s.d / 2)} : ${pts(s.l + s.d / 2)}`);
 
 /** the second button of a card (CHE-335): 'game' (a running game with this player: "Zur Partie"), 'asked' (your challenge is open: "Zurückziehen"),
  * 'incoming' (they challenged you: answered in the card above the list), else 'challenge' (gold). `game`: a running game with this player. */

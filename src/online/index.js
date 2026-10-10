@@ -21,7 +21,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const SEEN = 'chess3d.onlineSeen';
 const hhmm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 /** wins : losses from your side, then the draws only when there are some; a dash when never played */
-export const scoreText = (s) => (!s || !(s.w + s.l + s.d) ? '-' : `${s.w} : ${s.l}${s.d ? `  ½ ${s.d}` : ''}`);
+export const scoreText = (s) => scoreOf(s) || '-';
 const seenGet = () => { try { return JSON.parse(localStorage.getItem(SEEN) || '{}'); } catch (e) { return {}; } };
 const seenSet = (v) => { try { localStorage.setItem(SEEN, JSON.stringify(v)); } catch (e) { /* blocked: for this page only */ } };
 

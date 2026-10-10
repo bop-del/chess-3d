@@ -26,8 +26,8 @@ export function replay(g) {
 export const lastMoveText = (c, g) => {
   const { last } = replay(g);
   if (!last) return c.t('online.noMove', 'No move yet');
-  const who = g.turn === g.color ? g.opponent : c.t('online.you2', 'You');
-  return c.t(`online.moved.${last.piece}`, `{name} moved ${PIECE_EN[last.piece]} to {sq}`, { name: who, sq: last.to });
+  if (g.turn !== g.color) return c.t(`online.movedYou.${last.piece}`, `You moved ${PIECE_EN[last.piece]} to {sq}`, { sq: last.to });
+  return c.t(`online.moved.${last.piece}`, `{name} moved ${PIECE_EN[last.piece]} to {sq}`, { name: g.opponent, sq: last.to });
 };
 /** a flat 8 by 8 board with the piece glyphs of the avatars (white light, black dark), seen from your side; `size` in px */
 export function miniBoard(g, size = 112) {
@@ -83,7 +83,7 @@ const book = (c) => {
     return `<li class="op opc${e.chatOpen ? ' on' : ''}${e.n ? ' unread' : ''}"><span class="oav" data-a="stats" data-n="${c.esc(p.name)}" role="button" aria-label="${c.esc(c.t('online.st.open', 'Numbers of {name}', { name: p.name }))}">${c.avatarOf(p.name)}${dot(p)}</span>
       <div class="obody" data-a="stats" data-n="${c.esc(p.name)}" role="button"><span class="oname">${c.esc(p.name)}${p.bot ? ` <small class="obot">${c.esc(c.t('online.botTag', 'Bot'))}</small>` : ''}</span><span class="osub"><span class="opres">${c.esc(presence(c, p))}</span> · <span class="oscore">${c.esc(c.scoreLine(p.score))}</span></span>${e.kind === 'asked' ? `<span class="ostate asked" role="status">${c.esc(c.t('online.askedLine', 'Challenged, waiting...'))}</span>` : ''}</div>
       ${chatIcon(c, p, e.n)}${act}${bot}</li>`;
-  }).join('') : `<li class="oempty">${c.esc(c.t('online.noPlayers', 'Nobody else is invited yet.'))}</li>`}</ul>`;
+  }).join('') : `<li class="oempty">${c.esc(c.people.length ? c.t('online.bookAllBusy', 'Everyone is in a game or has challenged you.') : c.t('online.noPlayers', 'Nobody else is invited yet.'))}</li>`}</ul>`;
 };
 const ownLine = (c) => (c.own && !c.own.empty
   ? `<button class="ostat own oline" type="button" data-a="stats" data-n="${c.esc(c.me)}" aria-label="${c.esc(c.t('online.st.own', 'Your numbers'))}"><span class="ostc games"><b>${c.own.games}</b> ${c.esc(c.t('online.st.games', 'Games'))}</span><span class="ostc wins"><b>${c.own.wins}</b> ${c.esc(c.t('online.st.wins', 'Wins'))}</span><span class="ostc streak ${c.own.streak.type || ''}">${c.esc(c.streakText(c.own))}</span><i aria-hidden="true">›</i></button>` : '');

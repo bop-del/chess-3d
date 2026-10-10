@@ -353,13 +353,17 @@ body.online-updating .obubs, body.online-updating .obub, body.online-updating .o
 .opd .oact .obtn:not(.gold) { background: #fffdf6; color: #2a2433; border-color: #b9a37a; }
 .opd .oact .obtn { border-width: 2px; border-radius: 6px; box-shadow: none; }
 
-/* from the second running game on a postcard is small, so the address book is not scrolled far away */
-.onl .ecard.small { gap: 6px; padding: 10px 12px; }
-.onl .ecard.small .en { font-size: 20px; padding-right: 52px; }
-.onl .ecard.small .ek { font-size: 12.5px; padding-right: 52px; }
-.onl .ecard.small .estamp { top: 8px; right: 8px; padding: 2px; }
+/* from the second running game on a postcard is a slim row (head, name, turn, last move, small button), so the address book is not scrolled far away */
+.onl .ecard.small { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "s n b" "s k b" "s l c" "x x x"; align-items: center; column-gap: 10px; row-gap: 2px; padding: 8px 10px; }
+.onl .ecard.small > * { min-width: 0; }
+.onl .ecard.small .estamp { position: static; grid-area: s; align-self: start; padding: 2px; }
 .onl .ecard.small .estamp .oglyph { width: 32px; height: 32px; font-size: 20px; }
-.onl .ecard.small .orinfo, .onl .ecard.small .erule { display: none; }
-.onl .ecard.small .el { font-size: 15px; }
-.onl .ecard.small .eb { align-items: center; }
-.onl .ecard.small .obtn.gold { min-height: 48px; }
+.onl .ecard.small .en { grid-area: n; font-size: 18px; padding-right: 0; }
+.onl .ecard.small .ek { grid-area: k; font-size: 11.5px; padding-right: 0; }
+.onl .ecard.small .eb { grid-area: l; }
+.onl .ecard.small .omini, .onl .ecard.small .orinfo, .onl .ecard.small .erule { display: none; }
+.onl .ecard.small .el { font-size: 14px; font-weight: 600; }
+.onl .ecard.small .orlimit { margin: 0; font-size: 12px; }
+.onl .ecard.small > .obtn.gold { grid-area: b; min-height: 44px; padding: 0 12px; font-size: 14px; }
+.onl .ecard.small .chx { grid-area: c; justify-content: flex-end; }
+.onl .ecard.small .oconfirm, .onl .ecard.small .ohint, .onl .ecard.small > .orow { grid-column: 1 / -1; }
