@@ -186,9 +186,9 @@ try {
   await click(A, '[data-a=chat][data-n="Mia"]');
   await ev(A, () => { const i = document.querySelector('.osend input'); i.value = 'Hallo Mia, viel Glück!'; document.querySelector('.osend').requestSubmit(); });
   R.expect('the chat head says mitgelesen with the eye icon', (await ev(A, () => document.querySelector('.omon').textContent.trim())) === 'mitgelesen' && await ev(A, () => !!document.querySelector('.omon svg')) && await shown(A, '.omon'));
-  R.expect('Mia gets the message: the count 1 on the Chat button and on the Online tab', await until(B, () => document.querySelector('.op .ochatbtn .ocnt')?.textContent === '1' && document.querySelector('#tab-online')?.dataset.n === String(1 + window.__chessOnline.state.games.filter((g) => g.status === 'active' && g.turn === g.color).length)));   // CHE-335: the bell counts unread messages plus games where it is your move
+  R.expect('Mia gets the message: the count 1 on the Chat button and on the Online tab', await until(B, () => document.querySelector('.oview .ochatbtn .ocnt')?.textContent === '1' && document.querySelector('#tab-online')?.dataset.n === String(1 + window.__chessOnline.state.games.filter((g) => g.status === 'active' && g.turn === g.color).length)));   // CHE-335: the bell counts unread messages plus games where it is your move
   R.expect('the chat of Felix is closed on her side: a bubble over the board, "💬 Felix: text ›"', await until(B, () => !document.querySelector('.obub').hidden && document.querySelector('.obub-main').textContent === '💬 Felix: Hallo Mia, viel Glück! ›'), await ev(B, () => document.querySelector('.obub-main').textContent));
-  R.expect('the game card has a Chat button with the count too', (await ev(B, () => document.querySelector('.opc.ingame .ochatbtn .ocnt')?.textContent)) === '1');
+  R.expect('the game card has a Chat button with the count too', (await ev(B, () => document.querySelector('.orc .ochatbtn .ocnt')?.textContent)) === '1');
   R.expect('Felix, whose chat is open and visible, got no bubble for his own message', await ev(A, () => document.querySelector('.obub').hidden));
   await click(B, '.obub-main');
   R.expect('a tap on the bubble opens that chat and hides the bubble', await until(B, () => document.querySelector('.obub').hidden && !document.querySelector('.ochat').hidden && /Chat mit Felix/.test(document.querySelector('.owith').textContent) && document.activeElement === document.querySelector('.osend input')));
@@ -221,6 +221,7 @@ try {
   R.expect('the move after the reconnect goes through, once', await until(Bl, () => window.__chess.game.getState().moves.length === 7 && window.__chessOnline.state.game.moves.length === 7, null, 10000));
 
   // ------------------------------------------------------------ resign, the result and the new score on both sides
+  await click(Bl, '[data-a=look-more]');   // Resign sits behind the three dots of the postcard
   await click(Bl, '[data-a=resign]');
   R.expect('resign asks first', await until(Bl, () => /Partie wirklich aufgeben/.test(document.querySelector('.oconfirm')?.textContent || '')));
   await click(Bl, '[data-a=resign-yes]');
@@ -320,8 +321,8 @@ try {
     // the player rows: no horizontal scroll, the Chat buttons 44 px
     await click(M, '.tb[data-act=online]');
     await until(M, () => document.querySelector('.psheet.ponline')?.classList.contains('open'));
-    const rows = await ev(M, () => { const sh = document.querySelector('.psheet-body') && document.querySelector('.ponline .psheet-body'); return { rows: [...document.querySelectorAll('.ponline .op')].map((r) => { const b = r.querySelector('.ochatbtn').getBoundingClientRect(), rr = r.getBoundingClientRect(), n = r.querySelector('.oname').getBoundingClientRect(), sc = r.querySelector('.oscore').getBoundingClientRect(), b2 = r.querySelectorAll('.oacts2 .obtn')[1].getBoundingClientRect(); return { bh: b.height, bw: b.width, out: rr.right > innerWidth + 0.5, sameLine: n.bottom <= sc.top + 1 && Math.abs(b.width - b2.width) < 1 && Math.abs(b.top - b2.top) < 1 && b2.height >= 43.5, left: Math.round(b.left) }; }), over: sh ? sh.scrollWidth > sh.clientWidth : false }; });
-    R.expect(`phone ${tag}: player cards: Chat and the second button equal and side by side on every card, 44 px, name above score, no horizontal scroll`, rows.rows.length >= 2 && rows.rows.every((r) => r.bh >= 43.5 && r.bw >= 43.5 && !r.out && r.sameLine && r.left === rows.rows[0].left) && !rows.over, JSON.stringify(rows));
+    const rows = await ev(M, () => { const sh = document.querySelector('.psheet-body') && document.querySelector('.ponline .psheet-body'); return { rows: [...document.querySelectorAll('.ponline .op')].map((r) => { const b = r.querySelector('.ochatbtn').getBoundingClientRect(), rr = r.getBoundingClientRect(), n = r.querySelector('.oname').getBoundingClientRect(), sc = r.querySelector('.oscore').getBoundingClientRect(), b2 = r.querySelector('.obtn').getBoundingClientRect(); return { bh: b.height, bw: b.width, out: rr.right > innerWidth + 0.5, sameLine: n.bottom <= sc.top + 1 && b2.right <= innerWidth + 0.5 && Math.abs((b.top + b.height / 2) - (b2.top + b2.height / 2)) < 2 && b2.height >= 43.5, left: Math.round(b.left) }; }), over: sh ? sh.scrollWidth > sh.clientWidth : false }; });
+    R.expect(`phone ${tag}: address book rows: the Chat icon and the button side by side on every row, 44 px, name above score, no horizontal scroll`, rows.rows.length >= 1 && rows.rows.every((r) => r.bh >= 43.5 && r.bw >= 43.5 && !r.out && r.sameLine && r.left === rows.rows[0].left) && !rows.over, JSON.stringify(rows));
     if (args.includes('--shots')) await M.screenshot({ path: join(SHOTS, `phone-${tag}-rows.png`) });
     await click(A, '[data-a=chat-close]');
     await M.close();
@@ -382,8 +383,8 @@ try {
   const D1 = await open(ctxA, `${BASE}/?${PVQ}wait&open=online`, WIDE);
   R.expect('waiting is a line in the card of Nina (Herausgefordert, wartet...) with Zurückziehen, no banner on top', await until(D1, () => /Herausgefordert, wartet/.test(document.querySelector('.opc:has([data-n="Nina"]) .ostate.asked')?.textContent || '') && [...document.querySelectorAll('.opc [data-a=cancel-out]')].length === 1 && document.querySelector('.opc [data-a=cancel-out]')?.textContent === 'Zurückziehen' && !document.querySelector('.owait') && !document.querySelector('.ochal .odots')));
   await click(D1, '[data-a=cancel-out]');
-  R.expect('Zurückziehen takes the status away and gives the gold button back', await until(D1, () => !document.querySelector('.ostate.asked') && /Herausfordern/.test([...document.querySelectorAll('.opc')].find((r) => r.textContent.includes('Nina'))?.querySelector('.oacts2 .obtn.gold')?.textContent || '')));
-  R.expect('every card: score or noch keine Partie beendet, Chat and Herausfordern in two equal columns', await ev(D1, () => [...document.querySelectorAll('.op')].every((r) => { const a = r.querySelectorAll('.oacts2 .obtn'), sc = r.querySelector('.oscore').textContent; return a.length === 2 && Math.abs(a[0].getBoundingClientRect().width - a[1].getBoundingClientRect().width) < 1 && (/^\d+ : \d+/.test(sc) || sc === 'noch keine Partie beendet'); })));
+  R.expect('Zurückziehen takes the status away and gives the gold button back', await until(D1, () => !document.querySelector('.ostate.asked') && /Herausfordern/.test([...document.querySelectorAll('.opc')].find((r) => r.textContent.includes('Nina'))?.querySelector('[data-a=challenge]')?.textContent || '')));
+  R.expect('every address book row: score or noch keine Partie beendet, the Chat icon and one button', await ev(D1, () => [...document.querySelectorAll('.op')].every((r) => { const sc = r.querySelector('.oscore').textContent; return !!r.querySelector('.ochatbtn') && r.querySelectorAll('.obtn').length === 1 && (/^\d+ : \d+/.test(sc) || sc === 'noch keine Partie beendet'); })));
   await click(D1, '[data-a=chat][data-n="Nina"]');
   R.expect('desktop: the chat floats at the bottom right over the board with the switcher and the eye', await until(D1, () => { const c = document.querySelector('.ochat').getBoundingClientRect(); return !document.querySelector('.ochat').hidden && c.bottom > innerHeight - 40 && c.right < innerWidth - 300 && document.querySelectorAll('.oswitch .osw').length === 4 && !!document.querySelector('.omon svg'); }));
   R.expect('the switcher shows an unread dot for Felix', await ev(D1, () => !!document.querySelector('.osw[data-n="Felix"] .oud')));
@@ -405,31 +406,34 @@ try {
 
   // ------------------------------------------------------------ CHE-335 several games and challenges on the fake fixture (?onlinepv=multi)
   const M = await open(ctxA, `${BASE}/?${PVQ}multi&open=online`, WIDE);
-  R.expect('multi: Nina has "Du bist dran" highlighted and Zur Partie', await until(M, () => { const c = [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Nina'); return /Du bist dran/.test(c?.querySelector('.ostate.game.mine .oturn')?.textContent || '') && c.querySelector('.oacts2 .obtn.gold')?.textContent === 'Zur Partie'; }));
-  R.expect('multi: Mia says "Mia ist dran" (not highlighted) and Zur Partie', await ev(M, () => { const c = [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia'); return c.querySelector('.ostate.game .oturn')?.textContent === 'Mia ist dran' && !c.querySelector('.ostate.mine') && c.querySelector('.oacts2 .obtn.gold')?.textContent === 'Zur Partie'; }));
+  const card = (name) => `[...document.querySelectorAll('.orc')].find((r) => r.querySelector('.oname')?.textContent === '${name}')`;
+  R.expect('multi: Nina has "Du bist dran" highlighted and Zur Partie', await until(M, () => { const c = [...document.querySelectorAll('.orc')].find((r) => r.querySelector('.oname')?.textContent === 'Nina'); return !!c && c.classList.contains('mine') && c.querySelector('.orwho')?.textContent === 'Du bist dran' && c.querySelector('[data-a=board]')?.textContent === 'Zur Partie'; }));
+  R.expect('multi: Mia says "Mia ist dran" (not highlighted) and Zur Partie', await ev(M, () => { const c = [...document.querySelectorAll('.orc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia'); return c.querySelector('.orwho')?.textContent === 'Mia ist dran' && !c.classList.contains('mine') && c.querySelector('[data-a=board]')?.textContent === 'Zur Partie'; }));
+  R.expect('multi: a game shows once: Nina and Mia are not in the address book', await ev(M, () => ![...document.querySelectorAll('.opc')].some((r) => ['Nina', 'Mia'].includes(r.querySelector('.oname')?.textContent))));
   R.expect('multi: Felix is challenged: status in the card and Zurückziehen, no banner', await ev(M, () => { const c = [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Felix'); return /Herausgefordert, wartet/.test(c.querySelector('.ostate.asked')?.textContent || '') && c.querySelector('[data-a=cancel-out]')?.textContent === 'Zurückziehen' && !document.querySelector('.owait'); }));
   R.expect('multi: Opa challenges Boris: the card with Annehmen sits above the list', await ev(M, () => /Opa fordert dich heraus/.test(document.querySelector('.ochal .ocard')?.textContent || '') && !!document.querySelector('.ochal [data-a=accept]')));
   R.expect('multi: two running games and nothing attached: the board waits for Zur Partie', await ev(M, () => !window.__chessOnline.match.attached && !window.__line().startsWith('Online gegen')));
   R.expect('multi: the dot counts the unread messages (3) plus the games where it is your move (1)', await until(M, () => document.querySelector('#tab-online').dataset.n === '4'));
-  await click(M, '.opc [data-a=board][data-id="11"]');
+  await click(M, '.orc [data-a=board][data-id="11"]');
   R.expect('multi: Zur Partie on Nina puts that game on the board, the top row names her', await until(M, () => window.__chessOnline.match.attached && window.__chessOnline.match.game.id === 11 && window.__chess.game.getState().moves.length === 2 && /^Online gegen Nina/.test(window.__line())));
-  await click(M, '.opc [data-a=board][data-id="12"]');
+  await click(M, '.orc [data-a=board][data-id="12"]');
   R.expect('multi: Zur Partie on Mia switches, the top row names Mia, her one move is on the board', await until(M, () => window.__chessOnline.match.game.id === 12 && window.__chess.game.getState().moves.length === 1 && /^Online gegen Mia/.test(window.__line())));
   await ev(M, () => window.__chessOnline.api.sim((st) => { const g = st.games.find((x) => x.id === 11); g.moves.push('g1f3', 'b8c6'); g.sans.push('Nf3', 'Nc6'); }));
   R.expect('multi: a move in the other game never moves the board, it only shows in the bubble', await until(M, () => /Nina/.test(document.querySelector('.obub[data-k=game] .obub-main')?.textContent || '') && !document.querySelector('.obub[data-k=game]').hidden) && await ev(M, () => window.__chessOnline.match.game.id === 12 && window.__chess.game.getState().moves.length === 1 && /^Online gegen Mia/.test(window.__line())));
   await click(M, '.opc [data-a=cancel-out]');
-  R.expect('multi: Zurückziehen on Felix removes the status', await until(M, () => !document.querySelector('.ostate.asked') && /Herausfordern/.test([...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Felix').querySelector('.oacts2 .obtn.gold')?.textContent || '')));
+  R.expect('multi: Zurückziehen on Felix removes the status', await until(M, () => !document.querySelector('.ostate.asked') && /Herausfordern/.test([...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Felix').querySelector('[data-a=challenge]')?.textContent || '')));
   await click(M, '.ochal [data-a=accept]');
-  R.expect('multi: accepting Opa gives a third game and the board stays on Mia', await until(M, () => window.__chessOnline.state.games.filter((g) => g.status === 'active').length === 3 && window.__chessOnline.match.game.id === 12 && /^Online gegen Mia/.test(window.__line()) && [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Opa').querySelector('.oacts2 .obtn.gold')?.textContent === 'Zur Partie'));
+  R.expect('multi: accepting Opa gives a third game and the board stays on Mia', await until(M, () => window.__chessOnline.state.games.filter((g) => g.status === 'active').length === 3 && window.__chessOnline.match.game.id === 12 && /^Online gegen Mia/.test(window.__line()) && [...document.querySelectorAll('.orc')].find((r) => r.querySelector('.oname')?.textContent === 'Opa')?.querySelector('[data-a=board]')?.textContent === 'Zur Partie'));
   R.expect('multi: the dot is unread (3) plus games where it is your move (Nina, Opa)', await until(M, () => document.querySelector('#tab-online').dataset.n === '5'));
-  await click(M, '.opc [data-a=resign][data-id="12"]');
-  R.expect('multi: Aufgeben asks in the card of that game only', await until(M, () => document.querySelectorAll('.oconfirm').length === 1 && [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia').querySelector('.oconfirm') !== null));
+  await click(M, '.orc [data-a=look-more][data-id="12"]');
+  await click(M, '.orc [data-a=resign][data-id="12"]');
+  R.expect('multi: Aufgeben asks in the card of that game only', await until(M, () => document.querySelectorAll('.oconfirm').length === 1 && [...document.querySelectorAll('.orc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia').querySelector('.oconfirm') !== null));
   if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await M.screenshot({ path: join(SHOTS, 'desktop-multi.png') }); }
   await M.close();
   // CHE-420: an attached online match has no chess clock, whatever ?clock= says; leaving the game gives the local clock back
   const MC = await open(ctxA, `${BASE}/?${PVQ}multi&open=online&manual=1&clock=3%2B2`, WIDE);
   R.expect('no clock online: before attaching the local 3+2 clock is on', await ev(MC, () => window.__chess.clock.state().enabled && !window.__chess.clock.state().suspended));
-  await click(MC, '.opc [data-a=board][data-id="11"]');
+  await click(MC, '.orc [data-a=board][data-id="11"]');
   R.expect('no clock online: attached, the clock is suspended and the faces are hidden', await until(MC, () => window.__chessOnline.match.attached && window.__chess.clock.state().suspended) && await ev(MC, () => { return ![...document.querySelectorAll('.cface')].some((f) => f.offsetWidth > 0); }));
   await ev(MC, () => { window.__chess.step(10); });
   R.expect('no clock online: step(10) does not tick', await ev(MC, () => { const c = window.__chess.clock; return c.remaining('w') === 180 && c.remaining('b') === 180 && !c.state().running; }));
@@ -438,7 +442,7 @@ try {
   await MC.close();
   const MP = await open(ctxA, `${BASE}/?${PVQ}multi&open=online`, PHONE);
   await settleUi(MP);
-  R.expect('multi phone 390: every button in the cards is at least 44 px, nothing overflows', await until(MP, () => document.querySelectorAll('.opc .ostate').length === 3) && await ev(MP, () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 && [...document.querySelectorAll('.opc .obtn:not([disabled]), .ochal .obtn')].every((b) => { const r = b.getBoundingClientRect(); return r.height >= 43.5 && r.right <= innerWidth + 1; })));
+  R.expect('multi phone 390: every button in the cards is at least 44 px, nothing overflows', await until(MP, () => document.querySelectorAll('.orc').length === 2) && await ev(MP, () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 && [...document.querySelectorAll('.orc .obtn, .opc .obtn:not([disabled]), .ochal .obtn')].every((b) => { const r = b.getBoundingClientRect(); return r.height >= 43.5 && r.right <= innerWidth + 1; })));
   if (args.includes('--shots')) await MP.screenshot({ path: join(SHOTS, 'phone-multi.png') });
   await MP.close();
 
@@ -460,7 +464,7 @@ try {
   const overflowFree = (page) => ev(page, () => { const w = document.documentElement.clientWidth; return document.documentElement.scrollWidth <= w + 1 && [...document.querySelectorAll('.ostat, .opd')].filter((e) => e.getClientRects().length).every((e) => { const r = e.getBoundingClientRect(); return r.left >= -0.5 && r.right <= w + 0.5 && e.scrollWidth <= e.clientWidth + 1; }); });
   for (const [tag, size] of [['phone 360', [360, 740, true]], ['phone 390', PHONE], ['desktop', DESK]]) {
     const S = await open(ctxA, `${BASE}/?${PVQ}stats&open=online`, size);
-    R.expect(`${tag}: your numbers at the top (games, wins, losses, draws, streak), above the players`, await until(S, () => { const o = document.querySelector('.ostat.own'); return o && !o.hidden && o.querySelectorAll('.ostc').length === 5 && o.querySelector('.ostc.games b').textContent === '14' && o.querySelector('.ostc.wins b').textContent === '8' && /3 Siege in Folge/.test(o.querySelector('.ostc.streak').textContent) && o.getBoundingClientRect().bottom <= document.querySelector('.oplayers').getBoundingClientRect().top; }));
+    R.expect(`${tag}: your numbers as one line (games, wins, streak), above the address book`, await until(S, () => { const o = document.querySelector('.ostat.own'); return o && !o.hidden && /14 Partien/.test(o.textContent) && /8 Siege/.test(o.textContent) && /3 Siege in Folge/.test(o.textContent) && o.getBoundingClientRect().top >= document.querySelector('.oplayers').getBoundingClientRect().bottom - 1; }));
     R.expect(`${tag}: your numbers fit, no overflow`, await overflowFree(S));
     await click(S, '.opc [data-a=stats][data-n="Nina"].oav');
     await new Promise((r) => setTimeout(r, 500));   // the sheet slides in
@@ -537,6 +541,7 @@ try {
   await click(F, '[data-a=chat][data-n="Bot"]');
   await ev(F, () => { const i = document.querySelector('.osend input'); i.value = 'Hallo Bot'; document.querySelector('.osend').requestSubmit(); });
   R.expect('bot chat: a canned German line comes back', await until(F, () => [...document.querySelectorAll('.omsgs li:not(.mine) span')].some((x) => x.textContent.length > 3), null, 9000));
+  await ev(F, () => document.querySelector('[data-a=look-more]')?.click());
   await ev(F, () => document.querySelector('[data-a=resign]')?.click());
   await ev(F, () => document.querySelector('[data-a=resign-yes]')?.click());
   const PM = await open(ctxM, botLink(mb.key));

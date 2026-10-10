@@ -231,7 +231,7 @@ try {
 
       // the Online lobby with several games and challenges (CHE-335, the fake server scene onlinepv=multi)
       await load('&online=http%3A%2F%2Fpreview.invalid&onlinepv=multi&open=online');
-      R.expect(`${name} Online lobby (multi) shows its cards`, await page.evaluate(() => document.querySelectorAll('.opc .ostate').length === 3).catch(() => false), '', 'the three card states are missing');
+      R.expect(`${name} Online lobby (multi) shows its cards`, await page.evaluate(() => document.querySelectorAll('.orc').length === 2 && document.querySelectorAll('.ochal .ein').length === 1).catch(() => false), '', 'the two postcards and the challenge are missing');
       await shot('online');
 
       const bad = [...watch.errs, ...watch.foreign.map((u) => 'foreign ' + u)];

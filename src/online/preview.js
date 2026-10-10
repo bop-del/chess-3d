@@ -4,7 +4,7 @@
 export const previewOn = (search = typeof location !== 'undefined' ? location.search : '') => new URLSearchParams(search).has('onlinepv');
 export const previewScene = (search = typeof location !== 'undefined' ? location.search : '') => {
   const v = new URLSearchParams(search).get('onlinepv');
-  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell', 'multi', 'running', 'updating'].includes(v) ? v : 'list';
+  return ['list', 'wait', 'chat', 'min', 'stats', 'card', 'pushcard', 'bell', 'multi', 'running', 'updating', 'redesign', 'redesign3', 'result', 'login'].includes(v) ? v : 'list';
 };
 
 const MIN = 60000;
@@ -59,6 +59,24 @@ export function createPreviewApi({ scene, onState, onStatus }) {
     for (const n of ['Nina', 'Felix', 'Mia', 'Opa']) st.players.find((p) => p.name === n).withMe = true;
     st.challenges = { in: [], out: [] };
     st.game = st.games[0];
+  }
+  if (scene === 'redesign' || scene === 'redesign3' || scene === 'result') {   // CHE-421: the same content a running game with Felix (your move), Nina without a game, Opa challenges you, unread chat from Nina and Felix
+    st.games = [mk(21, 'Felix', ['e2e4', 'e7e5', 'g1f3', 'b8c6'], 'w')];
+    st.games[0].lastMoveAt = now - 130 * MIN; st.games[0].staleAt = now + 70 * 60 * MIN;
+    st.players.find((p) => p.name === 'Felix').withMe = true;
+    st.players.find((p) => p.name === 'Felix').score = { w: 1, l: 0, d: 1 };
+    st.players.find((p) => p.name === 'Opa').playing = false;
+    st.challenges = { in: [{ id: 9, from: 'Opa', at: now }], out: [] };
+    st.game = st.games[0];
+  }
+  if (scene === 'redesign3') {   // CHE-421: three running games: Felix (your move, 2 h), Mia (your move, 5 h), Nina (her move, 12 min); Opa still challenges
+    const ago = (m) => ({ lastMoveAt: now - m * MIN, staleAt: now - m * MIN + 72 * 60 * MIN });
+    st.games = [{ ...st.games[0], ...ago(130) }, { ...mk(22, 'Mia', ['d2d4', 'd7d5', 'c2c4'], 'w'), ...ago(300) }, { ...mk(23, 'Nina', ['e2e4'], 'w'), ...ago(12) }];
+    for (const n of ['Mia', 'Nina']) st.players.find((p) => p.name === n).withMe = true;
+  }
+  if (scene === 'result') {   // CHE-421: Boris just won against Mia: the result card with the score
+    st.games = [{ ...mk(24, 'Mia', ['e2e4', 'e7e5'], 'w'), status: 'over', winner: 'w', result: '1-0', reason: 'resign' }, ...st.games];
+    st.players.find((p) => p.name === 'Mia').score = { w: 1, l: 3, d: 1 };
   }
   setTimeout(() => { onStatus('connected'); onState(JSON.parse(JSON.stringify(st))); }, 0);
   const push = () => onState(JSON.parse(JSON.stringify(st)));

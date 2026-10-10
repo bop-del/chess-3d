@@ -42,26 +42,16 @@
 
 /* cards: a challenge, the game, the result */
 .ome { color: var(--dim); font-size: 13px; }
-.ochal, .ogame { display: flex; flex-direction: column; gap: 8px; }
-.ochal:empty, .ogame:empty { display: none; }
 .ocard { padding: 12px; border-radius: 12px; border: 1px solid var(--line, rgba(255, 255, 255, 0.09)); background: rgba(8, 9, 12, 0.55); }
 .ocard.mine, .ocard.oresult { border-color: rgba(216, 180, 104, 0.55); }
 .oconfirm { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line, rgba(255, 255, 255, 0.09)); }
 .ohint { margin-top: 8px !important; color: var(--dim); font-size: 13px; }
 
 /* the player list: name and score on one line, the buttons below when the row is narrow (360 px) */
-.oplayers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.op { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 4px 4px 4px 8px; border-radius: 10px; }
-.op.on { background: rgba(216, 180, 104, 0.1); }
-.ohead { display: flex; align-items: center; gap: 8px; flex: 1 1 140px; min-width: 0; min-height: 40px; }
 .oname { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
 .pres { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); flex: none; }
 .pres.on { background: #4cc46a; }
-.oacts { display: flex; gap: 6px; flex: 1 1 auto; justify-content: flex-end; }
-.oacts > .obtn { flex: 1 1 auto; }
 .ochatbtn .ocnt, .ogamecard .ocnt { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: #ff6b5a; color: #fff; font-size: 11.5px; line-height: 18px; text-align: center; }
-.oscore { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--dim); font-size: 13px; white-space: pre; }
-.oplay { color: var(--dim); font-size: 12.5px; font-style: italic; padding: 0 6px; }
 .oempty { color: var(--dim); font-size: 13px; list-style: none; }
 
 /* the chat */
@@ -130,21 +120,6 @@ body.phone .ochat-x { width: 44px; height: 44px; margin-right: -8px; }
 .odots i:nth-child(2) { animation-delay: 0.2s; }
 .odots i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes odot { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.15); } }
-.ocards { gap: 8px; }
-.opc { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av body" "state state" "acts acts"; align-items: center; gap: 8px 10px; padding: 10px; border-radius: 12px; border: 1px solid var(--line, rgba(255, 255, 255, 0.09)); background: rgba(8, 9, 12, 0.45); }
-.opc .oav { grid-area: av; position: relative; display: flex; align-items: center; }
-.opc .obody { grid-area: body; display: flex; flex-direction: column; min-width: 0; }
-.opc .oname { font-size: 15px; }
-.opc .oscore { margin: 0; font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
-.opc .ostatew { grid-area: state; min-width: 0; }
-.ostate { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-height: 36px; color: var(--dim); font-size: 13.5px; font-weight: 650; }
-.ostate.asked { color: var(--text); }
-.ostate.game .oturn { color: var(--text); }
-.ostate.game.mine .oturn { padding: 3px 10px; border-radius: 999px; background: #f0c24b; color: #1b1608; font-weight: 800; }
-.ostate .oside { flex: 1; min-width: 0; font-size: 12.5px; }
-.opc.ingame { border-color: rgba(216, 180, 104, 0.35); }
-.opc .oacts2 { grid-area: acts; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.opc .oacts2 .obtn { width: 100%; min-width: 0; }
 .oglyph, .oinit { display: grid; place-items: center; font-weight: 800; }
 .oav .pres { position: absolute; right: -2px; bottom: -2px; box-shadow: 0 0 0 2px #14161c; }
 .oav .pres:not(.on) { background: #5d6270; }
@@ -174,7 +149,6 @@ body:not(.phone) .ochat.ochf { position: fixed; z-index: 26; right: calc(var(--p
 body.phone .ochat.ochf .grip { display: block; }
 
 /* --- B playful: piece avatars, chunky flat tiles --- */
-.opc { border: 2px solid rgba(255, 255, 255, 0.14); border-radius: 14px; background: rgba(30, 32, 44, 0.8); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
 .oglyph { width: 46px; height: 46px; border-radius: 8px; font-size: 28px; line-height: 1; border: 2px solid rgba(0, 0, 0, 0.35); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.22); color: #fff; }
 .oglyph[data-c="0"] { background: #e0654f; }
 .oglyph[data-c="1"] { background: #4f9fe0; }
@@ -182,7 +156,6 @@ body.phone .ochat.ochf .grip { display: block; }
 .oglyph[data-c="3"] { background: #b569d6; }
 .oglyph[data-c="4"] { background: #e0a93a; }
 .oglyph[data-c="5"] { background: #3fb5a8; }
-.opc .oname { font-size: 16px; font-weight: 800; }
 .obtn { border-width: 2px; border-radius: 10px; font-weight: 800; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
 .obtn.gold { background: #f0c24b; }
 .ochat.ochf { border-width: 2px; border-radius: 18px; }
@@ -217,7 +190,6 @@ body.phone:has(.psheet.ponline.open) .ochpill, body.phone:has(.psheet.ponline.op
 .opushnote { color: var(--dim); }
 .ocodebig { font: 700 28px/1.2 ui-monospace, Menlo, monospace; letter-spacing: 0.08em; user-select: all; }
 /* --- player card (CHE-290): the own numbers at the top, the detail card of one player --- */
-.ostat { appearance: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 6px; width: 100%; box-sizing: border-box; padding: 8px; font: inherit; color: var(--text); text-align: center; cursor: pointer; touch-action: manipulation; border: 2px solid rgba(255, 255, 255, 0.14); border-radius: 14px; background: rgba(30, 32, 44, 0.8); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
 .ostat[hidden], .opd[hidden] { display: none; }
 .ostx { grid-column: 1 / -1; flex: 1; align-self: center; color: var(--dim); font-size: 13px; }
 .ostc { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 2px; border-radius: 8px; background: rgba(0, 0, 0, 0.22); }
@@ -226,13 +198,8 @@ body.phone:has(.psheet.ponline.open) .ochpill, body.phone:has(.psheet.ponline.op
 .ostc.wins b { color: #6fd08c; }
 .ostc.losses b { color: #ff8a7a; }
 .ostc.draws b { color: #c3c8d6; }
-.ostat .ostc.streak { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; padding: 6px 12px; }
-.ostat .ostc.streak b { font-size: 14px; line-height: 1.2; font-weight: 800; overflow: hidden; text-overflow: ellipsis; }
-.ostat .ostc.streak small { order: -1; font-size: 12px; }
 .ostc.streak.win b { color: #6fd08c; }
 .ostc.streak.loss b { color: #ff8a7a; }
-.opc .oav[data-a], .opc .obody[data-a] { cursor: pointer; }
-.opc .obody { min-height: 44px; justify-content: center; }
 .opd { display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; padding: 10px 12px 12px; border-radius: 16px; border: 2px solid #f0c24b; background: #14161c; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
 .opd header { display: flex; align-items: center; gap: 10px; }
 .opd .opd-name { flex: 1; min-width: 0; font-size: 17px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -269,21 +236,130 @@ body.phone:not(:has(.psheet.ponline.open)) .opd.opds { display: none; }
 .oupdate { margin: 8px 0; }
 body.online-updating .obubs, body.online-updating .obub, body.online-updating .ogline, body.online-updating .ochpill, body.online-updating .ochat { display: none !important; }
 /* ===== CHE-403: the running games block at the top of the tab, above Players ===== */
-.orun { display: flex; flex-direction: column; gap: 6px; }
-.orun[hidden] { display: none; }
-.orunl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.orc { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av body go" "turn turn turn" "limit limit limit"; align-items: center; gap: 4px 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(216, 180, 104, 0.35); background: rgba(255, 255, 255, 0.04); }
-.orc.mine { border-color: #f0c24b; background: rgba(240, 194, 75, 0.1); }
-.orc .oav { grid-area: av; display: flex; align-items: center; }
-.orc .orbody { grid-area: body; display: flex; flex-direction: column; min-width: 0; }
-.orc .oname { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.orc .orinfo { font-size: 12.5px; color: var(--dim); }
-.orc [data-a=board] { grid-area: go; }
-.orc .orturn { grid-area: turn; margin: 4px 0 0; font-size: 13.5px; font-weight: 650; color: var(--dim); }
-.orc .orwho { color: var(--text); }
-.orc.mine .orwho { padding: 2px 9px; border-radius: 999px; background: #f0c24b; color: #1b1608; font-weight: 800; }
-.orc .orlimit { grid-area: limit; margin: 0; font-size: 12.5px; font-weight: 650; color: #ffb27a; }
 
 .oask { position: fixed; z-index: 40; left: 50%; top: 40%; transform: translateX(-50%); width: min(340px, calc(100vw - 32px)); box-sizing: border-box; background: #1a1c24; border: 1px solid rgba(216, 180, 104, 0.6); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55); }
 .oask[hidden] { display: none; }
 .oask p { margin: 0 0 10px; font-weight: 700; }
+
+/* ===== CHE-421: the Postkarten look (the Online tab): flat fills, crisp 2px edges, warm panels, gold only for the one primary action ===== */
+.onl { gap: 10px; font-size: 16px; padding-bottom: 14px; }
+.onl ul { list-style: none; margin: 0; padding: 0; }
+.onl h4 { font-size: 12px; letter-spacing: 0.08em; margin-top: 6px; color: #b9bdc9; }
+.onl .omain:not([hidden]) { display: flex; flex-direction: column; gap: 10px; }
+.onl .oview { display: flex; flex-direction: column; gap: 10px; order: 1; }
+.onl .opushcard, .onl .opushnote { order: 9; }   /* the push question sits under the content, never above the games */
+.onl[data-logged] .oconn[data-s="connected"] { display: none; }   /* a green connection is a dot in the name row, words only when it is not green */
+.onl .omehead { gap: 8px; order: 0; }
+.onl .omehead::before { content: ''; width: 10px; height: 10px; flex: none; background: #8a8f9c; }
+.onl .oconn[data-s="connected"] ~ .omain .omehead::before { background: #4cc46a; }
+.onl .ome { color: var(--text); font-size: 16px; font-weight: 800; }
+.onl .obell { width: 44px; height: 44px; border-radius: 6px; border-width: 2px; }
+.onl .obtn { border-width: 2px; border-radius: 6px; box-shadow: none; font-weight: 800; }
+.onl .obtn.gold { background: #f0c24b; color: #1b1608; }
+.onl .obtn.faint { background: transparent; color: var(--dim); border-color: rgba(255, 255, 255, 0.14); font-weight: 700; }
+.onl .obtn.big { min-height: 52px; font-size: 16px; width: 100%; }
+.onl .ocard, .onl .opushcard { border: 2px solid #4a4036; border-radius: 6px; background: #241f1a; }
+.onl .oglyph { flex: none; width: 40px; height: 40px; font-size: 24px; border-radius: 4px; box-shadow: none; border-width: 2px; }
+.onl .oav { position: relative; display: flex; flex: none; }
+.onl .oav .pres { position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border-radius: 0; box-shadow: 0 0 0 2px #14161c; }
+.onl .ocnt { position: absolute; top: -6px; right: -6px; min-width: 18px; padding: 0 5px; border-radius: 0; background: #f08a2b; color: #1b1608; font-size: 11.5px; line-height: 18px; text-align: center; font-weight: 800; }
+.onl .ochatic { appearance: none; position: relative; flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 6px; border: 2px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.05); color: var(--text); cursor: pointer; touch-action: manipulation; }
+.onl .orlimit { margin: 0; font-size: 13px; font-weight: 700; color: #ffb27a; }
+.onl .oempty { color: var(--dim); }
+.onl .chx { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+.omini { flex: none; border: 2px solid #2b2e3a; }
+/* the push question: one narrow row */
+.onl .opushcard { padding: 6px 8px 6px 10px; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.onl .opushcard p { flex: 1 1 auto; font-size: 13px; }
+.onl .opushcard .orow { margin: 0; flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
+.onl .opushcard .orow > .obtn { flex: none; min-height: 44px; padding: 0 10px; font-size: 12.5px; }
+.onl .opushcard .obtn.gold { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+/* the people strip: small heads with the online dot, a tap opens the person */
+.estrip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 6px; scrollbar-width: none; }
+.estrip::-webkit-scrollbar { display: none; }
+.ehead { appearance: none; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px; min-height: 64px; padding: 2px 4px; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; touch-action: manipulation; }
+.ehead small { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
+.ehead.away .oglyph { filter: grayscale(0.7); opacity: 0.7; }
+/* the incoming challenge and the result */
+.onl .ein { padding: 10px 12px; border: 2px solid #f0c24b; display: flex; flex-direction: column; gap: 8px; }
+.onl .eh { display: flex; align-items: center; gap: 10px; font-size: 17px; }
+.onl .ein .orow, .onl .oresult .orow { margin: 0; }
+.onl .oresult { border-color: #f0c24b; display: flex; flex-direction: column; gap: 6px; }
+.onl .orh { font-size: 20px; }
+.onl .oresult.won .orh b { color: #6fd08c; }
+.onl .oscoreline { color: var(--p-gold-text, #ecd193); font-weight: 700; }
+/* a running game is a postcard */
+.orun { display: flex; flex-direction: column; gap: 8px; }
+.orunl { display: flex; flex-direction: column; gap: 12px; }
+.onl .ecard { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 2px solid #b9a37a; border-radius: 4px; background: #f3ead6; color: #2a2433; }
+.onl .ecard.mine { border-color: #f0c24b; box-shadow: 0 0 0 3px #f0c24b; }
+.onl .ecard .oname { color: #2a2433; overflow: visible; }
+.onl .estamp { position: absolute; top: 12px; right: 12px; padding: 4px; border: 2px dashed #a67c52; background: #fffdf6; }
+.onl .ek { margin: 0; padding-right: 64px; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; color: #6b5f4a; }
+.onl .ecard.mine .ek { color: #a2561b; }
+.onl .en { margin: 0; padding-right: 64px; font-size: 26px; font-weight: 900; line-height: 1.1; }
+.onl .orinfo { margin: 0; font-size: 14px; color: #6b5f4a; }
+.onl .eb { display: flex; gap: 12px; align-items: flex-start; }
+.onl .eb > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.onl .el { font-size: 17px; font-weight: 700; color: #2a2433; line-height: 1.3; text-wrap: balance; }
+.onl .erule { margin: 0; font-size: 14px; color: #6b5f4a; text-wrap: balance; }
+.onl .ecard .obtn:not(.gold) { background: #fffdf6; color: #2a2433; border-color: #b9a37a; }
+.onl .ecard .obtn.faint { background: transparent; color: #6b5f4a; }
+.onl .ecard .ochatic { background: #fffdf6; color: #2a2433; border-color: #b9a37a; }
+.onl .ecard .oconfirm, .onl .ecard .ohint { color: #2a2433; border-color: #b9a37a; }
+.onl .omorew { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.onl .omore { appearance: none; width: 44px; height: 44px; border: 2px solid #b9a37a; border-radius: 6px; background: transparent; color: #6b5f4a; font: inherit; font-size: 18px; font-weight: 900; letter-spacing: 1px; cursor: pointer; touch-action: manipulation; }
+/* the address book */
+.oplayers { display: flex; flex-direction: column; }
+.onl .op { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 4px 0; border-bottom: 2px solid rgba(255, 255, 255, 0.08); }
+.onl .op.on { background: rgba(240, 194, 75, 0.08); }
+.onl .opc .oav[data-a], .onl .opc .obody[data-a] { cursor: pointer; }
+.onl .obody { flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+.onl .obody .oname { font-size: 16px; font-weight: 800; }
+.onl .osub { color: var(--dim); font-size: 14px; line-height: 1.3; }
+.onl .oscore { margin: 0; color: var(--dim); font-size: 14px; }
+.onl .ostate { color: var(--text); font-size: 13px; font-weight: 700; }
+.onl .op .obtn.small { min-height: 44px; }
+/* the own numbers: one line */
+.onl .ostat.own { appearance: none; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; box-sizing: border-box; border-radius: 6px; border: 2px solid rgba(255, 255, 255, 0.12); background: transparent; color: var(--dim); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-align: left; }
+.onl .ostat.own .ostc { flex: none; display: inline; padding: 0; background: none; font-size: 14px; color: var(--dim); }
+.onl .ostat.own .ostc b { display: inline; font-size: 14px; color: var(--text); }
+.onl .ostat.own .ostc.wins b { color: #6fd08c; }
+.onl .ostat.own i { margin-left: auto; font-style: normal; }
+/* without an invite: a postcard with a stamp */
+.onl .ologin { position: relative; padding: 16px; border: 2px solid #b9a37a; border-radius: 4px; background: #f3ead6; color: #2a2433; }
+.onl .ologin::before { content: '♞\FE0E'; position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 40px; height: 40px; border: 2px dashed #a67c52; background: #fffdf6; font-size: 24px; }
+.onl .ologin .oneed { padding-right: 56px; font-size: 17px; font-weight: 700; }
+.onl .ologin label { color: #6b5f4a; font-size: 14px; }
+.onl .ologin input[type="text"] { background: #fffdf6; color: #2a2433; border-color: #b9a37a; border-width: 2px; border-radius: 4px; }
+.onl .ologin .obtn:not(.gold) { background: #fffdf6; color: #2a2433; }
+.onl .ologin .oerr { color: #a2561b; font-weight: 700; }
+.onl .oupdate { border-width: 2px; }
+/* the numbers card of a person: a postcard too, with the actions at the bottom */
+.opd { background: #f3ead6; color: #2a2433; border: 2px solid #b9a37a; border-radius: 4px; box-shadow: none; }
+.opd .oglyph { border-radius: 4px; }
+.opd .opd-name { color: #2a2433; }
+.opd .opd-x { color: #6b5f4a; }
+.opd .ostc { background: rgba(42, 36, 51, 0.08); }
+.opd .ostc small, .opd .ost dt, .opd h5, .opd .oh2h small { color: #6b5f4a; }
+.opd .ostc.wins b { color: #2f7d46; }
+.opd .ostc.losses b { color: #a2561b; }
+.opd .ostc.draws b, .opd .ostc.streak.loss b { color: #6b5f4a; }
+.opd .ostc.streak.win b { color: #2f7d46; }
+.opd .obar { border-color: rgba(42, 36, 51, 0.4); background: rgba(42, 36, 51, 0.1); }
+.opd .oh2h { background: rgba(240, 194, 75, 0.25); border-color: #f0c24b; }
+.opd .ostx { color: #6b5f4a; }
+.opd .oact { margin: 4px 0 0; }
+.opd .oact .obtn:not(.gold) { background: #fffdf6; color: #2a2433; border-color: #b9a37a; }
+.opd .oact .obtn { border-width: 2px; border-radius: 6px; box-shadow: none; }
+
+/* from the second running game on a postcard is small, so the address book is not scrolled far away */
+.onl .ecard.small { gap: 6px; padding: 10px 12px; }
+.onl .ecard.small .en { font-size: 20px; padding-right: 52px; }
+.onl .ecard.small .ek { font-size: 12.5px; padding-right: 52px; }
+.onl .ecard.small .estamp { top: 8px; right: 8px; padding: 2px; }
+.onl .ecard.small .estamp .oglyph { width: 32px; height: 32px; font-size: 20px; }
+.onl .ecard.small .orinfo, .onl .ecard.small .erule { display: none; }
+.onl .ecard.small .el { font-size: 15px; }
+.onl .ecard.small .eb { align-items: center; }
+.onl .ecard.small .obtn.gold { min-height: 48px; }

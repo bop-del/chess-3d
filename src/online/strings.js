@@ -48,6 +48,9 @@ addDE({
   'online.st.s.win1': '1 Sieg', 'online.st.s.winN': '{n} Siege in Folge', 'online.st.s.loss1': '1 Niederlage', 'online.st.s.lossN': '{n} Niederlagen in Folge', 'online.st.s.draw1': '1 Remis', 'online.st.s.drawN': '{n} Remis in Folge',
   'online.st.nowStreak': 'Jetzt', 'online.st.bestStreak': 'Beste Siegesserie', 'online.st.bestN': '{n} Siege',
   'online.st.avgLen': 'Länge im Schnitt', 'online.st.lenN': '{n} Züge', 'online.st.avgTime': 'Dauer im Schnitt', 'online.st.timeN': '{n} Min.', 'online.st.openings': 'Lieblingseröffnungen',
+  'online.noMove': 'Noch kein Zug', 'online.moved.p': '{name} zog einen Bauern nach {sq}', 'online.moved.n': '{name} zog einen Springer nach {sq}', 'online.moved.b': '{name} zog einen Läufer nach {sq}',
+  'online.moved.r': '{name} zog einen Turm nach {sq}', 'online.moved.q': '{name} zog die Dame nach {sq}', 'online.moved.k': '{name} zog den König nach {sq}',
+  'online.rematch': 'Nochmal!', 'online.rule': 'Bis zu 3 Tage pro Zug', 'online.more': 'Mehr', 'online.book': 'Adressbuch',
   'banner.resign': 'Aufgegeben', 'banner.stale': 'Partie beendet',
   'reason.resign': 'Aufgegeben', 'reason.stale': '3 Tage kein Zug',
 });
