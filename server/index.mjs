@@ -24,10 +24,10 @@ export const CHAT_MAX = 200;
 const BODY_MAX = 4096;
 const LIMITS = { move: [60, 60e3], chat: [10, 60e3], other: [30, 60e3], login: [5, 10 * 60e3], events: [10, 60e3], mycode: [5, 10 * 60e3] };   // [count, window ms]
 
-/** Is this browser origin allowed? A list from ONLINE_ORIGINS, else the local preview origins (localhost, 127.0.0.1, the Tailscale range). */
+/** Is this browser origin allowed? An origin from the ONLINE_ORIGINS list, or always a local preview origin (http on localhost, 127.0.0.1, the Tailscale range, *.ts.net). CHE-411 */
 export function originAllowed(origin, list) {
   if (!origin) return false;
-  if (list?.length) return list.includes(origin);
+  if (list?.includes(origin)) return true;
   try {
     const u = new URL(origin);
     const h = u.hostname;

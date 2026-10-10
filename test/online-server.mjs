@@ -201,7 +201,10 @@ try {
   const cr = await call('/state', { key: felix.key });
   const cf = await call('/state', { key: felix.key, origin: 'https://evil.example' });
   ok('CORS: a local game origin is allowed, a foreign one gets no allow header', cr.headers.get('access-control-allow-origin') === ORIGIN && !cf.headers.get('access-control-allow-origin'));
-  ok('CORS: an explicit list wins', originAllowed('https://chess.example', ['https://chess.example']) && !originAllowed(ORIGIN, ['https://chess.example']) && originAllowed(`http://${['100', '101', '1', '2'].join('.')}:5400`, []));
+  ok('CORS: an explicit list adds to the preview origins', originAllowed('https://chess.example', ['https://chess.example']) && originAllowed(ORIGIN, ['https://chess.example']) && originAllowed(`http://${['100', '101', '1', '2'].join('.')}:5400`, []));
+  const L = ['https://chess.example'];
+  ok('CORS: with a list set, a listed origin and the local preview origins are allowed', originAllowed('https://chess.example', L) && originAllowed(`http://${['100', '95', '180', '72'].join('.')}:4173`, L) && originAllowed('http://localhost:4173', L) && originAllowed('http://127.0.0.1:5400', L) && originAllowed('http://mac.tail1234.ts.net:4173', L));
+  ok('CORS: with a list set, a foreign https, a public http and an empty origin stay rejected', !originAllowed('https://evil.example', L) && !originAllowed('http://8.8.8.8:4173', L) && !originAllowed('https://localhost:4173', L) && !originAllowed('', L) && !originAllowed(undefined, L));
   ok('a body over 4 KB is refused', (await call('/chat', { key: felix.key, raw: JSON.stringify({ to: 'Mia', text: 'z'.repeat(5000) }) })).status === 413);
 
   // ------------------------------------------------------------ wrong code throttle (per IP, 5 per 10 minutes)
