@@ -14,7 +14,7 @@ import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, statView, spanO
 import { previewOn, previewScene, createPreviewApi, previewPushEnv } from './preview.js';
 import { createPush } from './push.js';
 import { startStats } from './stats.js';
-import { createVersionCheck } from './version.js';
+import { createVersionCheck, fetchVersion } from './version.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SEEN = 'chess3d.onlineSeen';
@@ -31,6 +31,22 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   let push = null;
   let api = null, match = null, state = null, status = 'connecting', receivedAt = 0, apiVerdict = 'unknown';   // apiVerdict (CHE-405): ok | server-old | client-old | unknown
   const vcheck = createVersionCheck({ server, onChange: (v) => { apiVerdict = v; if (v === 'client-old') window.__chess?.update?.show?.(); render(); } });   // the server too old hides the cards, the client too old asks for a reload (CHE-304 banner)
+  // CHE-412: before a login there is no api, so the pill asks GET /version (no key) once on mount, then on tab open, online and
+  // visibilitychange, at most every 30 s; Try again asks at once. After a login the api's status is the pill (one pill).
+  let preStatus = 'connecting', preAt = 0, preBusy = false, preCause = 'noanswer', preOk = 0;
+  const conn = () => (login ? status : preStatus);
+  async function probe(force = false) {
+    if (login || preview || preBusy) return;
+    if (!force && preAt && Date.now() - preAt < 30000) return;
+    preBusy = true; preAt = Date.now();
+    if (preStatus !== 'connected') { preStatus = 'connecting'; render(); }
+    const v = await fetchVersion(server);
+    preBusy = false;
+    if (login) return;
+    preStatus = v ? 'connected' : 'unreachable';
+    if (v) preOk = Date.now(); else preCause = navigator.onLine === false ? 'offline' : 'noanswer';
+    render();
+  }
   let chatWith = null, chatShown = false, bub = null, bubTimer = 0, bubDone = false, gbub = null, gTimer = 0, confirmResign = 0, detailsOpen = false, lockDetails = false, codeErr = '';
   const seen = seenGet();   // { game: finished game ids up to this one are acknowledged, games: more acknowledged ids, out: older single declined challenge id, outs: acknowledged declined challenge ids }
   const ackGame = (id) => id <= (seen.game || 0) || (seen.games || []).includes(id);
@@ -121,18 +137,18 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
 
   // ------------------------------------------------------------ the Details box (two places, one content)
   function detailsHtml() {
-    const d = api ? api.details() : {};
+    const d = api ? api.details() : { cause: preCause, lastOk: preOk, retryIn: 0 };
     const cause = { offline: 'This device has no internet right now.', noanswer: 'The server does not answer.', server: 'The server has an error.', invite: 'The invite is no longer valid.' }[d.cause] || 'The server does not answer.';
     const secs = Math.ceil((d.retryIn || 0) / 1000);
     return `<div class="odet"><p class="ocause">${esc(t(`online.cause.${d.cause || 'noanswer'}`, cause))}</p>
       <p class="olast">${esc(d.lastOk ? t('online.lastOk', 'Last connected: {time}', { time: hhmm(d.lastOk) }) : t('online.neverOk', 'Not connected yet'))}</p>
-      <p class="onext">${esc(secs ? t('online.retryIn', 'Next try in {s} s', { s: secs }) : t('online.retrying', 'Trying now...'))}</p>
+      ${api ? `<p class="onext">${esc(secs ? t('online.retryIn', 'Next try in {s} s', { s: secs }) : t('online.retrying', 'Trying now...'))}</p>` : ''}
       <div class="orow"><button class="obtn" type="button" data-a="retry">${esc(t('online.retry', 'Try again'))}</button><button class="obtn" type="button" data-a="copy">${esc(t('online.copy', 'Copy details'))}</button></div>
       <pre class="otech">${esc(techText())}</pre></div>`;
   }
-  const techText = () => { const d = api ? api.details() : {}; return detailsText({ ...d, time: Date.now() }, [login?.key]); };
+  const techText = () => { const d = api ? api.details() : { cause: preCause, lastOk: preOk }; return detailsText({ ...d, time: Date.now() }, [login?.key]); };
   function renderDetails() {
-    const red = status === 'unreachable';
+    const red = conn() === 'unreachable';
     const a = $('.odet-host'), b = $('.odet-host', lock);
     a.innerHTML = red && detailsOpen ? detailsHtml() : '';
     b.innerHTML = lockDetails && !lock.hidden ? detailsHtml() : '';
@@ -181,11 +197,11 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
 
   function renderConn() {
     const c = $('.oconn');
-    c.hidden = !login;
-    c.dataset.s = status;
-    $('.otxt', c).textContent = t(`online.conn.${status}`, { connected: 'Server connected', connecting: 'connecting...', unreachable: 'Server unreachable' }[status]);
-    $('[data-a=details]', c).hidden = status !== 'unreachable';
-    if (status !== 'unreachable') detailsOpen = false;
+    const cs = conn();
+    c.dataset.s = cs;
+    $('.otxt', c).textContent = t(`online.conn.${cs}`, { connected: 'Server connected', connecting: 'connecting...', unreachable: 'Server unreachable' }[cs]);
+    $('[data-a=details]', c).hidden = cs !== 'unreachable';
+    if (cs !== 'unreachable') detailsOpen = false;
     const showLock = !!match?.locked;
     if (!showLock) lockDetails = false;
     lock.hidden = !showLock;
@@ -484,7 +500,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (!b) return;
     const a = b.dataset.a, id = Number(b.dataset.id), n = b.dataset.n;
     if (a === 'details') { detailsOpen = !detailsOpen; renderDetails(); return; }
-    if (a === 'retry') { api?.retry(); renderDetails(); return; }
+    if (a === 'retry') { if (api) api.retry(); else probe(true); renderDetails(); return; }
     if (a === 'copy') { copyDetails(b); return; }
     if (a === 'challenge') { if (await act('/challenge', { to: n })) push?.acted(); return; }
     if (a === 'bot-challenge') { await act('/bot/challenge', {}); return; }
@@ -644,15 +660,18 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   if (preview && scene === 'updating') { apiVerdict = 'server-old'; render(); }
 
   // the countdown in an open Details box, the 3 day finish appearing on time
-  setInterval(() => { if ((detailsOpen || lockDetails) && status === 'unreachable') renderDetails(); else if (lockDetails) renderDetails(); }, 1000);
+  setInterval(() => { if ((detailsOpen || lockDetails) && conn() === 'unreachable') renderDetails(); else if (lockDetails) renderDetails(); }, 1000);
   const tick = () => { if (activeGames().length) { renderMain(); renderGame(); syncHeader(); } };
   setInterval(tick, 60000);   // Waiting time and the last day line: each minute
   onLanguage(() => { translateTree(root); translateTree(lock); translateTree(ch); translateTree(bubEl); translateTree(gameBubEl); render(); });
   translateTree(root); translateTree(lock); translateTree(ch); translateTree(bubEl); translateTree(gameBubEl);
-  onShown?.(() => { markRead(); renderMain(); });
+  onShown?.(() => { markRead(); renderMain(); probe(); });
+  addEventListener('online', () => probe());
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') probe(); });
+  probe();
 
   const hook = {
-    get state() { return state; }, get status() { return status; }, get match() { return match; }, get api() { return api; }, get apiVerdict() { return apiVerdict; },
+    get state() { return state; }, get status() { return status; }, get conn() { return conn(); }, probe, get match() { return match; }, get api() { return api; }, get apiVerdict() { return apiVerdict; },
     get login() { return login ? { server: login.server, name: login.name } : null },
     get push() { return push; }, render, tick, openChat, openStats, viewport, get bubble() { return bub; }, get gameBubble() { return gbub; }, get boardGame() { return boardGame(); },
   };
