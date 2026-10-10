@@ -324,15 +324,11 @@ body.phone .pstatus { right: calc(var(--sr) + 88px + 2 * var(--gap)); }
 body.phone .pgood:active { transform: scale(0.96); }
 body.phone .pgood:disabled { opacity: 0.35; }
 body.phone .pgood.on { background: var(--gold-soft); border-color: rgba(216, 180, 104, 0.6); color: #f3dfa8; }
-body.phone .pstatus b { font-weight: 600; flex: none; }
-body.phone .pstatus .ps-sub { color: var(--dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+body.phone .pstatus b { font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }   /* the Context line: cut with an ellipsis, Last: keeps its place */
+body.phone .pstatus .ps-last.drop { display: none; }
 body.phone .pstatus .ps-last { margin-left: auto; color: var(--dim); font-variant-numeric: tabular-nums; flex: none; }
 body.phone .pstatus.check { border-color: rgba(255, 107, 90, 0.55); background: rgba(60, 24, 22, 0.9); }
-body.phone .pstatus.check .ps-sub { color: #ff9b8f; }
-body.phone .pstatus .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; border: 1px solid rgba(255, 255, 255, 0.35); }
-body.phone .pstatus .dot.w { background: radial-gradient(circle at 35% 30%, #fff, #d9d4c6 70%); }
-body.phone .pstatus .dot.b { background: radial-gradient(circle at 35% 30%, #4a4d57, #0b0c10 70%); }
-body.phone .pstatus.think .dot { animation: pulse 1s ease-in-out infinite; }
+body.phone .pstatus.check b { color: #ff9b8f; }
 
 /* chess clock (src/clock-ui.js): two compact faces at the right end of the status line, the running one gold, under 30 s red and bold;
    the last move steps aside while the clock shows */

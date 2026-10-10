@@ -206,7 +206,7 @@ export async function runLearnBarChecks({ browser, baseUrl, log = () => {}, part
       const b = await geometry();
       ok('puzzles: solved shows Help, Next (gold), Path, End', b.buttons.join() === 'help,next,path,end' && b.primary.join() === 'next', JSON.stringify([b.buttons, b.primary]));
       ok('puzzles: solved, the board is still inside the free frame', inside(b), fmt(b));
-      ok('puzzles: the status line is one short phrase while learning', await page.evaluate(() => { const l = document.querySelector('.pstatus .ps-last'), s = document.querySelector('.pstatus .ps-sub'); return getComputedStyle(l).display === 'none' && getComputedStyle(s).display === 'none'; }), 'sub or last still shown');
+      ok('puzzles: the status line is one short phrase while learning', await page.evaluate(() => { return getComputedStyle(document.querySelector('.pstatus .ps-last')).display === 'none'; }), 'Last: still shown');
       await end();
       await checkEnded('puzzles');
     }

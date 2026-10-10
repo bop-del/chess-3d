@@ -79,7 +79,7 @@ async function open(ctx, url, [w, h, phone] = DESK) {
 const ev = (page, fn, ...a) => page.evaluate(fn, ...a);
 const until = async (page, fn, arg, ms = 15000) => { try { await page.waitForFunction(fn, { timeout: ms, polling: 100 }, arg); return true; } catch (e) { return false; } };
 const click = (page, sel) => ev(page, (s) => { const e = document.querySelector(s); if (!e) return false; e.click(); return true; }, sel);
-const head = (page) => ev(page, () => `${document.querySelector('#turn-main')?.textContent}|${document.querySelector('#turn-sub')?.textContent.trim()}`);
+const head = (page) => ev(page, () => document.querySelector('#turn-main')?.title);   // the full line (the text drops the waiting time when the panel is narrow)
 
 try {
   // ============================================================ part 1: the real server
@@ -93,7 +93,7 @@ try {
   await ev(A, () => { const g = window.__chess.game; g.clickSquare(g.nameSq('e2')); g.clickSquare(g.nameSq('e4')); });
   R.expect('Felix plays a local game (his move and the computer answer)', await until(A, () => window.__chess.game.getState().moves.length === 2));
   const localFen = await ev(A, () => window.__chess.game.getState().fen);
-  R.expect('local game: the header keeps "Weiß am Zug" (no online game)', /^(Weiß am Zug|White to move)\|/.test(await head(A)), await head(A));
+  R.expect('local game: the header says "Gegen Computer" (no online game)', /^Gegen Computer/.test(await head(A)), await head(A));
   await click(A, '[data-a=challenge][data-n="Mia"]');
   await until(B, () => !!document.querySelector('[data-a=accept]'));
   await click(B, '[data-a=accept]');
@@ -106,14 +106,14 @@ try {
   R.expect('tap on the bubble: the online game is on the board', await until(A, () => window.__chessOnline.match.attached && window.__chess.game.getState().moves.length === 0));
   const colA = await ev(A, () => window.__chessOnline.state.games[0].color);
   const hA = await head(A);
-  R.expect('header of an online game names the players, not colours', colA === 'w' ? /^Du bist dran \(Weiß\)\|seit 1 Min$/.test(hA) : /^Mia ist dran\|seit 1 Min$/.test(hA), hA);
+  R.expect('header of an online game names the players, not colours', colA === 'w' ? /^Online gegen Mia · Du bist dran \(Weiß\) · seit 1 Min$/.test(hA) : /^Online gegen Mia · Mia ist dran · seit 1 Min$/.test(hA), hA);
   const hB = await head(B);
-  R.expect('the other side sees the mirror', colA === 'w' ? /^Felix ist dran\|seit 1 Min$/.test(hB) : /^Du bist dran \(Weiß\)\|seit 1 Min$/.test(hB), hB);
+  R.expect('the other side sees the mirror', colA === 'w' ? /^Online gegen Felix · Felix ist dran · seit 1 Min$/.test(hB) : /^Online gegen Felix · Du bist dran \(Weiß\) · seit 1 Min$/.test(hB), hB);
   const W = colA === 'w' ? A : B;
   await ev(W, () => { const g = window.__chess.game; g.clickSquare(g.nameSq('e2')); g.clickSquare(g.nameSq('e4')); });
   R.expect('after a move the header flips to the other player at once', await until(W, () => /ist dran/.test(document.querySelector('#turn-main').textContent) && !/Du bist dran/.test(document.querySelector('#turn-main').textContent)), await head(W));
   await ev(A, () => { window.__chess.game.newGame(); });
-  R.expect('a new local game leaves the online game: the header is "Weiß am Zug" again', await until(A, () => !window.__chessOnline.match.attached && /^(Weiß am Zug|White to move)$/.test(document.querySelector('#turn-main').textContent)), await head(A));
+  R.expect('a new local game leaves the online game: the header is "Gegen Computer" again', await until(A, () => !window.__chessOnline.match.attached && /^Gegen Computer/.test(document.querySelector('#turn-main').textContent)), await head(A));
 
   // Ben has a fresh board: Mia accepts his challenge, the board switches by itself and a note says so
   await click(C, '[data-a=challenge][data-n="Mia"]');
@@ -136,9 +136,9 @@ try {
   R.expect('running: side and move number', await ev(M, () => /Du spielst Weiß · Zug 2/.test(document.querySelector('.orun .orc[data-id="11"] .orinfo').textContent)));
   R.expect('running: the player card keeps its short line', await ev(M, () => { const c = [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Nina'); return /Du bist dran/.test(c.querySelector('.ostate.game .oturn').textContent) && !!c.querySelector('.oacts2 [data-a=board]'); }));
   await click(M, '.orun .orc[data-id="14"] [data-a=board]');
-  R.expect('Zur Partie from the block: Opa on the board, the header says "Opa ist dran" and since when', await until(M, () => window.__chessOnline.match.attached && window.__chessOnline.match.game.id === 14 && document.querySelector('#turn-main').textContent === 'Opa ist dran' && document.querySelector('#turn-sub').textContent.trim() === 'seit 2 Tage'), await head(M));
+  R.expect('Zur Partie from the block: Opa on the board, the header says "Online gegen Opa · Opa ist dran · seit 2 Tage"', await until(M, () => window.__chessOnline.match.attached && window.__chessOnline.match.game.id === 14 && document.querySelector('#turn-main').title === 'Online gegen Opa · Opa ist dran · seit 2 Tage'), await head(M));
   await click(M, '.orun .orc[data-id="12"] [data-a=board]');
-  R.expect('Zur Partie on Felix: the header says "Du bist dran (Weiß)"', await until(M, () => window.__chessOnline.match.game.id === 12 && document.querySelector('#turn-main').textContent === 'Du bist dran (Weiß)' && document.querySelector('#turn-sub').textContent.trim() === 'seit 2 Tage'), await head(M));
+  R.expect('Zur Partie on Felix: the header says "Du bist dran (Weiß)"', await until(M, () => window.__chessOnline.match.game.id === 12 && document.querySelector('#turn-main').title === 'Online gegen Felix · Du bist dran (Weiß) · seit 2 Tage'), await head(M));
   // the minute refresh: an hour passes on the page clock, the tick recomputes the texts
   await ev(M, () => { const d = Date.now; window.__d0 = d; Date.now = () => d.call(Date) + 3600000; window.__chessOnline.tick(); });
   const later = await cards();
@@ -170,7 +170,7 @@ try {
   R.expect('running phone 390: four cards, every button 44 px, nothing overflows', await until(MP, () => document.querySelectorAll('.orun .orc').length === 4) && await ev(MP, () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 && [...document.querySelectorAll('.orun .obtn')].every((b) => { const r = b.getBoundingClientRect(); return r.height >= 43.5 && r.width >= 43.5 && r.right <= innerWidth; }) && [...document.querySelectorAll('.orun .orc')].every((c) => c.getBoundingClientRect().right <= innerWidth + 1)));
   if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await MP.screenshot({ path: join(SHOTS, 'phone-running.png') }); }
   await click(MP, '.orun .orc[data-id="14"] [data-a=board]');
-  R.expect('running phone: the status line names the player and since when', await until(MP, () => window.__chessOnline.match.attached && document.querySelector('.pstatus .ps-main')?.textContent === 'Opa ist dran' && /seit 2 Tage/.test(document.querySelector('.pstatus .ps-sub')?.textContent || '')), await ev(MP, () => document.querySelector('.pstatus')?.textContent));
+  R.expect('running phone: the pill names the player', await until(MP, () => window.__chessOnline.match.attached && /^Online gegen Opa · Opa ist dran/.test(document.querySelector('.pstatus .ps-main')?.textContent || '')), await ev(MP, () => document.querySelector('.pstatus')?.textContent));
   await MP.close();
   const MS = await open(ctxA, `${BASE}/?${PVQ}running&open=online`, [844, 390, true]);
   R.expect('running phone landscape: nothing overflows sideways', await until(MS, () => document.querySelectorAll('.orun .orc').length === 4) && await ev(MS, () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));

@@ -82,6 +82,7 @@ async function open(ctx, url, [w, h, phone] = DESK, lang = 'de') {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => R.fail('page error', String(e).slice(0, 200)));
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
+  await page.evaluateOnNewDocument(() => { window.__line = () => { const m = document.querySelector('#turn-main'); return ((m && m.clientWidth ? m : document.querySelector('.pstatus .ps-main')) || {}).textContent || ''; }; });   // the Context line: the header on a computer, the pill on a phone (CHE-407)
   await page.evaluateOnNewDocument((l) => { try { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('chess3d.lang', l); sessionStorage.setItem('seeded', '1'); } } catch (e) { /* blocked */ } }, lang);
   await page.goto(url + (phone && !url.includes('touch=1') ? '&touch=1' : ''), { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__chessReady || window.__chessError, { timeout: 120000, polling: 100 });
@@ -320,11 +321,11 @@ try {
   R.expect('nothing is interrupted: the local board is untouched, the tab shows 1 game to move', (await boardMoves(Y)) === 0 && await ev(Y, () => document.querySelector('#tab-online').dataset.n === '1'));
   await click(Y, '.obub[data-k=game] .obub-main');
   R.expect('tap on the bubble attaches the game (the move is on the board)', await until(Y, () => window.__chessOnline.match.attached && window.__chess.game.getState().moves.length === 1 && document.querySelector('.obub[data-k=game]').hidden));
-  R.expect('the game line shows while attached', await until(Y, (n) => !document.querySelector('.ogline').hidden && document.querySelector('.ogline').textContent === `Online gegen ${n} · Du bist am Zug`, nX), await ev(Y, () => document.querySelector('.ogline').textContent));
+  R.expect('the Context line names the opponent while attached', await until(Y, (n) => window.__line().startsWith(`Online gegen ${n} · `), nX), await ev(Y, () => window.__line()));
   // a lesson: the game is not attached, a tap sets the board to play and attaches
   await ev(X, () => window.__chess.game.setMode('explain'));
   R.expect('X is in a lesson: the game left the board', await until(X, () => !window.__chessOnline.match.attached && window.__chess.game.mode === 'explain'));
-  R.expect('the game line is gone off the board', await ev(X, () => document.querySelector('.ogline').hidden));
+  R.expect('the Context line is not "Online" off the board', await ev(X, () => !window.__line().startsWith('Online gegen')), await ev(X, () => window.__line()));
   await moveOn(Y, 'e7e5');
   R.expect('in a lesson the opponent moved: bubble', await until(X, (n) => document.querySelector('.obub[data-k=game] .obub-main')?.textContent === `♟ ${n} hat gezogen: Du bist am Zug ›`, nY));
   await click(X, '.obub[data-k=game] .obub-main');
@@ -341,14 +342,13 @@ try {
   R.expect('on open: the game is on the board by itself', await until(Y2, () => window.__chessOnline.match?.attached && window.__chess.game.getState().moves.length === 2));
   R.expect('on open: bubble "Partie gegen <name>: <name> ist am Zug"', await until(Y2, (n) => document.querySelector('.obub[data-k=game] .obub-main')?.textContent === `♟ Partie gegen ${n}: ${n} ist am Zug ›`, nX), await gtxt(Y2));
   R.expect('two bubbles stacked: game on top, chat summary below', await until(Y2, () => !document.querySelector('.obub[data-k=chat]').hidden) && await ev(Y2, () => { const g = document.querySelector('.obub[data-k=game]').getBoundingClientRect(), c = document.querySelector('.obub[data-k=chat]').getBoundingClientRect(); return g.top < c.top && g.bottom <= c.top + 1; }));
-  R.expect('the game line sits above the bubbles, no overlap', await ev(Y2, () => { const l = document.querySelector('.ogline').getBoundingClientRect(), b = document.querySelector('.obubs').getBoundingClientRect(); return !document.querySelector('.ogline').hidden && l.bottom <= b.top + 1; }));
   if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await Y2.screenshot({ path: join(SHOTS, 'desktop-two-bubbles.png') }); }
   await click(Y2, '.obub[data-k=game] .obub-x');
   R.expect('x on the game bubble leaves the chat bubble', await ev(Y2, () => document.querySelector('.obub[data-k=game]').hidden && !document.querySelector('.obub[data-k=chat]').hidden));
   await Y2.close();
   const Y3 = await open(Y === A ? ctxA : ctxB, urlOf(Y) , PHONE);
   await until(Y3, () => !document.querySelector('.obub[data-k=game]').hidden && !document.querySelector('.obub[data-k=chat]').hidden);
-  R.expect('phone 390: game line, game bubble and chat bubble fit, nothing overlaps, targets 44 px', await ev(Y3, () => { const r = (s) => document.querySelector(s).getBoundingClientRect(), l = r('.ogline'), g = r('.obub[data-k=game]'), c = r('.obub[data-k=chat]'); return l.bottom <= g.top + 1 && g.bottom <= c.top + 1 && g.left >= 0 && g.right <= innerWidth && l.right <= innerWidth && g.height >= 43.5 && c.height >= 43.5; }));
+  R.expect('phone 390: the pill, game bubble and chat bubble fit, nothing overlaps, targets 44 px', await ev(Y3, () => { const r = (s) => document.querySelector(s).getBoundingClientRect(), l = r('.pstatus'), g = r('.obub[data-k=game]'), c = r('.obub[data-k=chat]'); return l.bottom <= g.top + 1 && g.bottom <= c.top + 1 && g.left >= 0 && g.right <= innerWidth && l.right <= innerWidth && g.height >= 43.5 && c.height >= 43.5; }));
   if (args.includes('--shots')) await Y3.screenshot({ path: join(SHOTS, 'phone-two-bubbles.png') });
   await click(Y3, '.obub[data-k=chat] .obub-main');
   R.expect('tap on the chat bubble opens the chat, the game bubble stays', await until(Y3, () => !document.querySelector('.ochat').hidden && !document.querySelector('.obub[data-k=game]').hidden));
@@ -386,18 +386,18 @@ try {
   R.expect('multi: Mia says "Mia ist dran" (not highlighted) and Zur Partie', await ev(M, () => { const c = [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia'); return c.querySelector('.ostate.game .oturn')?.textContent === 'Mia ist dran' && !c.querySelector('.ostate.mine') && c.querySelector('.oacts2 .obtn.gold')?.textContent === 'Zur Partie'; }));
   R.expect('multi: Felix is challenged: status in the card and Zurückziehen, no banner', await ev(M, () => { const c = [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Felix'); return /Herausgefordert, wartet/.test(c.querySelector('.ostate.asked')?.textContent || '') && c.querySelector('[data-a=cancel-out]')?.textContent === 'Zurückziehen' && !document.querySelector('.owait'); }));
   R.expect('multi: Opa challenges Boris: the card with Annehmen sits above the list', await ev(M, () => /Opa fordert dich heraus/.test(document.querySelector('.ochal .ocard')?.textContent || '') && !!document.querySelector('.ochal [data-a=accept]')));
-  R.expect('multi: two running games and nothing attached: the board waits for Zur Partie', await ev(M, () => !window.__chessOnline.match.attached && document.querySelector('.ogline').hidden));
+  R.expect('multi: two running games and nothing attached: the board waits for Zur Partie', await ev(M, () => !window.__chessOnline.match.attached && !window.__line().startsWith('Online gegen')));
   R.expect('multi: the dot counts the unread messages (3) plus the games where it is your move (1)', await until(M, () => document.querySelector('#tab-online').dataset.n === '4'));
   await click(M, '.opc [data-a=board][data-id="11"]');
-  R.expect('multi: Zur Partie on Nina puts that game on the board, the top row names her', await until(M, () => window.__chessOnline.match.attached && window.__chessOnline.match.game.id === 11 && window.__chess.game.getState().moves.length === 2 && /Online gegen Nina/.test(document.querySelector('.ogline').textContent) && !document.querySelector('.ogline').hidden));
+  R.expect('multi: Zur Partie on Nina puts that game on the board, the top row names her', await until(M, () => window.__chessOnline.match.attached && window.__chessOnline.match.game.id === 11 && window.__chess.game.getState().moves.length === 2 && /^Online gegen Nina/.test(window.__line())));
   await click(M, '.opc [data-a=board][data-id="12"]');
-  R.expect('multi: Zur Partie on Mia switches, the top row names Mia, her one move is on the board', await until(M, () => window.__chessOnline.match.game.id === 12 && window.__chess.game.getState().moves.length === 1 && /Online gegen Mia/.test(document.querySelector('.ogline').textContent)));
+  R.expect('multi: Zur Partie on Mia switches, the top row names Mia, her one move is on the board', await until(M, () => window.__chessOnline.match.game.id === 12 && window.__chess.game.getState().moves.length === 1 && /^Online gegen Mia/.test(window.__line())));
   await ev(M, () => window.__chessOnline.api.sim((st) => { const g = st.games.find((x) => x.id === 11); g.moves.push('g1f3', 'b8c6'); g.sans.push('Nf3', 'Nc6'); }));
-  R.expect('multi: a move in the other game never moves the board, it only shows in the bubble', await until(M, () => /Nina/.test(document.querySelector('.obub[data-k=game] .obub-main')?.textContent || '') && !document.querySelector('.obub[data-k=game]').hidden) && await ev(M, () => window.__chessOnline.match.game.id === 12 && window.__chess.game.getState().moves.length === 1 && /Online gegen Mia/.test(document.querySelector('.ogline').textContent)));
+  R.expect('multi: a move in the other game never moves the board, it only shows in the bubble', await until(M, () => /Nina/.test(document.querySelector('.obub[data-k=game] .obub-main')?.textContent || '') && !document.querySelector('.obub[data-k=game]').hidden) && await ev(M, () => window.__chessOnline.match.game.id === 12 && window.__chess.game.getState().moves.length === 1 && /^Online gegen Mia/.test(window.__line())));
   await click(M, '.opc [data-a=cancel-out]');
   R.expect('multi: Zurückziehen on Felix removes the status', await until(M, () => !document.querySelector('.ostate.asked') && /Herausfordern/.test([...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Felix').querySelector('.oacts2 .obtn.gold')?.textContent || '')));
   await click(M, '.ochal [data-a=accept]');
-  R.expect('multi: accepting Opa gives a third game and the board stays on Mia', await until(M, () => window.__chessOnline.state.games.filter((g) => g.status === 'active').length === 3 && window.__chessOnline.match.game.id === 12 && /Online gegen Mia/.test(document.querySelector('.ogline').textContent) && [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Opa').querySelector('.oacts2 .obtn.gold')?.textContent === 'Zur Partie'));
+  R.expect('multi: accepting Opa gives a third game and the board stays on Mia', await until(M, () => window.__chessOnline.state.games.filter((g) => g.status === 'active').length === 3 && window.__chessOnline.match.game.id === 12 && /^Online gegen Mia/.test(window.__line()) && [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Opa').querySelector('.oacts2 .obtn.gold')?.textContent === 'Zur Partie'));
   R.expect('multi: the dot is unread (3) plus games where it is your move (Nina, Opa)', await until(M, () => document.querySelector('#tab-online').dataset.n === '5'));
   await click(M, '.opc [data-a=resign][data-id="12"]');
   R.expect('multi: Aufgeben asks in the card of that game only', await until(M, () => document.querySelectorAll('.oconfirm').length === 1 && [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia').querySelector('.oconfirm') !== null));

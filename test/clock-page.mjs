@@ -298,7 +298,7 @@ try {
       const q = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round).join(','); };
       const st = document.querySelector('.pstatus'), sr = st.getBoundingClientRect();
       const faces = [...st.querySelectorAll('.cface')].filter((f) => getComputedStyle(f).display !== 'none').map((f) => { const r = f.getBoundingClientRect(); return { in: r.left >= sr.left && r.right <= sr.right + 0.5 && r.top >= sr.top && r.bottom <= sr.bottom, w: Math.round(r.width), h: Math.round(r.height), text: f.querySelector('.ct').textContent, cls: f.className }; });
-      return { bar: q('.pbar'), status: q('.pstatus'), frame: q('.pframe'), faces, overflow: st.scrollWidth - st.clientWidth, last: getComputedStyle(st.querySelector('.ps-last')).display, main: st.querySelector('.ps-main').textContent, sub: st.querySelector('.ps-sub').textContent, subW: Math.round(st.querySelector('.ps-sub').getBoundingClientRect().width) };
+      return { bar: q('.pbar'), status: q('.pstatus'), frame: q('.pframe'), faces, overflow: st.scrollWidth - st.clientWidth, last: getComputedStyle(st.querySelector('.ps-last')).display, main: st.querySelector('.ps-main').textContent };
     });
     R.expect(`phone ${size}: two faces in the status line, inside it, no overflow`, ph.faces.length === 2 && ph.faces.every((f) => f.in) && ph.overflow <= 0, 'two faces', JSON.stringify(ph));
     R.expect(`phone ${size}: the thumb bar has the same rectangle with the clock on and off`, ph.bar === off.bar && ph.status === off.status, off.bar, `${off.bar} vs ${ph.bar}; status ${off.status} vs ${ph.status}`);
@@ -310,7 +310,7 @@ try {
   await load('&clock=3+2', 'portrait', { ai: true });
   await page.evaluate(() => window.__chess.game.move('e2', 'e4'));
   await step(8);
-  const pc = await page.evaluate(() => ({ faces: [...document.querySelectorAll('.pstatus .cface')].filter((f) => getComputedStyle(f).display !== 'none').length, sub: document.querySelector('.ps-sub').textContent }));
+  const pc = await page.evaluate(() => ({ faces: [...document.querySelectorAll('.pstatus .cface')].filter((f) => getComputedStyle(f).display !== 'none').length }));
   R.expect('phone against the computer: one face (the player)', pc.faces === 1, '1', JSON.stringify(pc));
   await shot('phone-portrait-vs-computer');
   await load('&open=clock', 'portrait');

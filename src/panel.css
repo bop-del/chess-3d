@@ -21,14 +21,12 @@
 .panel .sec { min-width: 0; }
 
 /* header: logo, status, New game / Undo / Fold */
-.phead { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px 16px 12px; border-bottom: 1px solid var(--p-line); }
+.phead { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 14px 14px 12px; border-bottom: 1px solid var(--p-line); }
 .panel .logo { width: 36px; height: 36px; border-radius: 10px; font-size: 22px; }
 .panel .turn { margin: 0; padding: 0; background: none; border: 0; border-radius: 0; display: flex; align-items: center; gap: 9px; min-width: 0; }
-.panel .turn .dot { width: 14px; height: 14px; }
-.panel .turn .status { min-width: 0; }
-.panel .turn b { font-size: 15.5px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.panel .turn small { margin: 1px 0 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel .turn b { display: block; min-width: 0; font-size: 13.5px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* the Context line (CHE-407): one line, ellipsis */
 .panel .turn.check { background: none; border: 0; }
+.panel .turn.check b { color: #ff9b8f; }
 .hbtns { display: flex; gap: 6px; }
 .ib {
   appearance: none; width: 38px; height: 38px; padding: 0; display: grid; place-items: center; border-radius: 9px; border: 1px solid var(--p-line);
@@ -263,7 +261,6 @@ body.puzzling .lcard[data-card="openings"], body.drilling .lcard[data-card="open
 .lcard .xrow { flex-wrap: wrap; }
 .lcard .xrow .btn { flex: 1 1 40%; min-height: 40px; }
 .lcard .xclose { align-self: flex-start; }
-body.touch:not(.phone) .panel .turn b { white-space: normal; line-height: 1.2; }
 
 /* CHE-304: "New version, reload" banner. A thin bar on top; a tap on it reloads, nothing reloads on its own. */
 #update-banner { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 45; pointer-events: auto; }

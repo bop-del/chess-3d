@@ -36,7 +36,7 @@ addDE({
   'online.chat': 'Chat', 'online.chatWith': 'Chat mit {name}', 'online.message': 'Nachricht', 'online.send': 'Senden',
   'online.monitored': 'Chat wird mitgelesen', 'online.muted': 'Du kannst gerade nicht schreiben.', 'online.noMessages': 'Noch keine Nachrichten.',
   'online.chatFailed': 'Nachricht nicht gesendet.', 'online.bubbleMsg': '💬 {name}: {text} ›', 'online.bubbleOne': '💬 {name}: {text}{more} ›',
-  'online.bubbleMany': '💬 {n} neue Nachrichten von {names} ›', 'online.and': 'und', 'online.gameLine': 'Online gegen {name} · {turn}', 'online.gameBubble': '♟ Partie gegen {name}: {turn} ›', 'online.movedBubble': '♟ {name} hat gezogen: {turn} ›', 'online.bubbleHide': 'Ausblenden', 'online.close': 'Schließen',
+  'online.bubbleMany': '💬 {n} neue Nachrichten von {names} ›', 'online.and': 'und', 'online.gameBubble': '♟ Partie gegen {name}: {turn} ›', 'online.movedBubble': '♟ {name} hat gezogen: {turn} ›', 'online.bubbleHide': 'Ausblenden', 'online.close': 'Schließen',
   'online.monitoredShort': 'mitgelesen', 'online.minimize': 'Verkleinern', 'online.noGameYet': 'noch keine Partie', 'online.waitingShort': 'Warte auf {name}', 'online.asked': 'Gefragt', 'online.you2': 'Du',
   'online.pushAsk': 'Soll ich dir Bescheid sagen, wenn du dran bist?', 'online.pushYes': 'Ja, gern', 'online.pushNo': 'Nein danke',
   'online.bellOn': 'Benachrichtigungen an', 'online.bellOff': 'Benachrichtigungen aus', 'online.bellDenied': 'Benachrichtigungen sind im Browser gesperrt',

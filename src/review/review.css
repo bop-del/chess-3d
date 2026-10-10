@@ -49,7 +49,6 @@ body.phone .rv-msg { font-size: 13px; min-height: 2.9em; }
 body.phone .rv-chip, body.phone .rv-btn { min-height: 44px; }
 body.phone .rv-chip { padding: 0 11px; min-width: 44px; }
 body.phone .rv-btn { min-width: 44px; padding: 0 8px; }
-body.phone.reviewing .pstatus .ps-sub { visibility: hidden; }
 
 /* CHE-155 guidance: a = guided strip (coach line, legend), b = summary first (card, "So lesen" panel) */
 .rv-coach { margin: 0; font-weight: 600; line-height: 1.4; color: var(--text); }

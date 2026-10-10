@@ -117,6 +117,7 @@ const FAST = [
   ['several online games and challenges at once (test/online-multi.mjs)', 'test/online-multi.mjs', true],
   ['web push: RFC 8291 vector, VAPID, routes, fake push service (test/online-push.mjs)', 'test/online-push.mjs', true],
   ['online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs'],
+  ['context line text, modes and drop order (test/context-line.mjs)', 'test/context-line.mjs'],
   ['server and client API version check: compare, fetch, check, GET /version (test/online-version.mjs)', 'test/online-version.mjs', true],
   ['player stats: statsFor, GET /player/<name>, head to head, openings (test/online-stats-player.mjs)', 'test/online-stats-player.mjs', true],
   ['own stats: events, limits, roll up, cleanup, /stats auth, sender (test/online-stats.mjs)', 'test/online-stats.mjs', true],

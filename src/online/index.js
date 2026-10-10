@@ -111,11 +111,6 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   const bubEl = mkBubEl('chat'), gameBubEl = mkBubEl('game');
   bubsEl.append(gameBubEl);
   hud.append(bubEl, bubsEl);   // the chat bubble sits with the collapsed chat pill (bottom right), the game bubble stays on top
-  // the game line over the board while the online game is attached
-  const gline = document.createElement('div');
-  gline.className = 'ogline';
-  gline.hidden = true;
-  hud.append(gline);
 
   // the board lock line: over the board while an online game has no connection
   const lock = document.createElement('div');
@@ -174,16 +169,15 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     const tt = spanText(li.left);
     return li.mine ? t('online.limitThem', '{t} left, then {name} wins', { t: tt, name: g.opponent }) : t('online.limitYou', '{t} left, then you can end it', { t: tt });
   }
-  /** the header line of the board while an online game is on it (ui.js asks, CHE-403): names instead of colours, null for every other game */
+  /** what the Context line needs while an online game is on the board (ui.js asks, CHE-403, CHE-407): the opponent, my colour, the waiting time text; null for every other game */
   function headerTurn(turn) {
     const g = boardGame();
     if (!g || g.status !== 'active' || !match?.attached) return null;
-    const mine = turn === g.color;
-    return { main: mine ? t('online.hdrYou', 'Your move ({side})', { side: sideName(g.color) }) : t('online.theirTurnCard', '{name} to move', { name: g.opponent }), sub: g.turn === turn && !match.pending ? sinceText(g) : '' };
+    return { opponent: g.opponent, color: g.color, since: g.turn === turn && !match.pending ? sinceText(g) : '' };
   }
   setTurn(headerTurn);
   let hdrKey = '';
-  const syncHeader = () => { const o = headerTurn(game.getState().turn), k = o ? `${o.main}|${o.sub}` : ''; if (k !== hdrKey) { hdrKey = k; refreshTurn(); } };
+  const syncHeader = () => { const o = headerTurn(game.getState().turn), k = o ? `${o.opponent}|${o.since}` : ''; if (k !== hdrKey) { hdrKey = k; refreshTurn(); } };
 
   function renderConn() {
     const c = $('.oconn');
@@ -369,12 +363,10 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   }
   const turnText = (g) => (g.turn === g.color ? t('online.yourTurn', 'Your move') : t('online.theirTurn', '{name} to move', { name: g.opponent }));
   function renderGame() {
-    const g = boardGame(), bg = gbub ? gameById(gbub.id) : null;   // the game on the board names the top row; the bubble names the game it is about
+    const bg = gbub ? gameById(gbub.id) : null;   // the bubble names the game it is about
     if (gbub && (!bg || bg.status !== 'active' || (gbub.kind !== 'open' && match?.attached && match.game?.id === bg.id))) gbub = null;
     gameBubEl.hidden = !gbub;
     if (gbub) $('.obub-main', gameBubEl).textContent = gbub.kind === 'moved' ? t('online.movedBubble', '♟ {name} moved: {turn} ›', { name: bg.opponent, turn: turnText(bg) }) : gbub.kind === 'accepted' ? t('online.acceptedBubble', '♟ {name} accepted · To the game ›', { name: bg.opponent }) : t('online.gameBubble', '♟ Game against {name}: {turn} ›', { name: bg.opponent, turn: turnText(bg) });
-    gline.hidden = !(g && g.status === 'active' && match?.attached) || !!match?.locked;   // the lock line takes the place when there is no connection
-    if (!gline.hidden) gline.textContent = t('online.gameLine', 'Online against {name} · {turn}', { name: g.opponent, turn: turnText(g) });
   }
   function showGameBub(b) {
     gbub = b; clearTimeout(gTimer);

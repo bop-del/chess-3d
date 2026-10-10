@@ -99,6 +99,7 @@ export function createPuzzleProgress({ storage = null, puzzles, bands = DEFAULT_
 
   return {
     band: () => activeBand(),
+    numberOf: (id) => { const p = byId.get(id); return p ? order[p.band].indexOf(p) + 1 : 0; },   // 1 based place on its level's path (the Context line)
     stats,
     // The puzzle to play now: the station the player tapped, else where the path goes on.
     next() {

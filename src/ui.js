@@ -4,6 +4,7 @@
 import { device } from './device.js';
 import './learn/strings.js';
 import { t, setLanguage, onLanguage, translateTree, sanDisplay, i18n } from './i18n.js';
+import { contextParts, contextText } from './context-line.js';
 import { createDesktop, chipGroup, VIEW_ICONS } from './panel.js';
 import { onlineServer } from './online/store.js';
 import './menu-a.css';
@@ -70,6 +71,14 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   const online = menuA ? onlineServer() : '';
   let leaveModes = null;   // main.js: ends a running puzzle, drill or lesson through its own controller (CHE-403)
   let onlineTurn = null;   // the online module's header text for the board turn (CHE-403): names instead of colours, null when no online game is on the board
+  let lineParts = [];   // the Context line as parts (src/context-line.js), refitted when its element changes width
+  let modeInfo = null;   // main.js: { puzzle: { no, daily, own }, name } of the running puzzle, drill or opening
+  /** puts the Context line into `elm`, dropping parts in DROP order until it fits (CSS cuts what still does not) */
+  function fitLine(elm) {
+    const fits = (txt) => { elm.textContent = txt; return !elm.clientWidth || elm.scrollWidth <= elm.clientWidth; };
+    elm.textContent = contextText(lineParts, fits);
+    elm.title = contextText(lineParts);
+  }
   let onlineBoard = false;   // the board shows an online game: Back and Good move? are off (src/online/match.js sets it)
   let left = null, right = null, help = null, drawerBtn = null, dsk = null;
   const showBtn = el('button', 'show-btn', 'Show HUD');
@@ -94,7 +103,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
         <button class="icon-btn" id="btn-hide" title="Hide HUD (H)" aria-label="Hide HUD" data-i18n-title="hud.hide" data-i18n-aria="hud.hideLabel">&#x2715;</button>
       </div>
       <div class="lang" role="group" aria-label="Language" data-i18n-aria="lang.label"><button class="lang-btn" data-lang="en" aria-label="English">EN</button><button class="lang-btn" data-lang="de" aria-label="Deutsch">DE</button></div>
-      <div class="turn" id="turn"><i class="dot w"></i><div><b id="turn-main">White to move</b><small id="turn-sub">&nbsp;</small></div></div>
+      <div class="turn" id="turn"><b id="turn-main">White to move</b></div>
     </section>
 
     <div class="tools" id="tools">
@@ -422,29 +431,16 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   const sideName = (w) => (w === 'w' ? t('side.white', 'White') : t('side.black', 'Black'));
   function render(st) {
     lastSt = st;
-    // turn
-    const white = st.turn === 'w';
-    const dot = $('.turn .dot');
-    dot.className = 'dot ' + st.turn;
-    let main = white ? t('turn.white', 'White to move') : t('turn.black', 'Black to move'), sub = ' ';
-    if (st.over) {
-      const w = st.over.winner;
-      const timeLoss = st.over.reason === 'time' && w;   // a draw on time reads like any draw, with its own reason below
-      const outside = w && (st.over.reason === 'resign' || st.over.reason === 'stale');   // an online game: resigned, or ended after 3 days without a move
-      main = st.over.reason === 'checkmate' ? t('turn.checkmate', 'Checkmate. {side} wins', { side: sideName(w) }) : timeLoss ? t('turn.timeout', 'Time out. {side} wins', { side: sideName(w) }) : outside ? t('banner.wins', '{side} wins', { side: sideName(w) }) : t('turn.draw', 'Draw');
-      sub = outside ? t(`reason.${st.over.reason}`, st.over.reason === 'resign' ? 'Resigned' : 'No move for 3 days') : st.over.reason === 'checkmate' || timeLoss ? t('turn.gameOver', 'Game over') : st.over.reason === 'time' ? t('reason.timeDraw', 'Time out, draw: the opponent has only a king') : t(`reason.${st.over.reason}`, st.over.reason);
-    } else if (st.thinking) { sub = t('turn.thinking', 'Computer is thinking'); }
-    else if (st.check) sub = t('turn.check', 'Check');
-    else if (st.vsComputer) sub = st.turn === st.computerColor ? t('turn.computerMove', 'Computer to move') : t('turn.yourMove', 'Your move');
-    if (onlineBoard && onlineTurn && !st.over) {   // an online game: "Du bist dran (Weiss)" / "Felix ist dran" and since when; games against the computer keep "White to move"
-      const o = onlineTurn(st.turn);
-      if (o) { main = o.main; sub = [st.check ? t('turn.check', 'Check') : '', o.sub].filter(Boolean).join(' \u00b7 ') || ' '; }
-    }
-    // desktop: while a lesson runs the status line names it (the board position is still the lesson's)
-    const kind = dsk ? [['explaining', 'openings', 'Opening'], ['drilling', 'drill', 'Drill'], ['puzzling', 'puzzles', 'Puzzle']].find(([c]) => document.body.classList.contains(c)) : null;
-    if (kind) sub = [t(`panel.kind.${kind[1]}`, kind[2]), sub.trim()].filter(Boolean).join(' \u00b7 ');
-    $('#turn-main').textContent = main;
-    $('#turn-sub').textContent = sub;
+    // the Context line (CHE-407): what runs on the board and who moves; the desktop header and the phone pill show the same text
+    const cl = document.body.classList;
+    const info = modeInfo?.() || {};
+    const o = onlineBoard && onlineTurn && !st.over ? onlineTurn(st.turn) : null;
+    const mode = o ? 'online' : cl.contains('reviewing') ? 'review' : cl.contains('explaining') ? 'opening' : cl.contains('drilling') ? 'drill' : cl.contains('puzzling') ? 'puzzle' : 'play';
+    lineParts = contextParts({
+      mode, turn: st.turn, check: st.check, thinking: st.thinking, over: st.over, vsComputer: st.vsComputer, computerColor: st.computerColor,
+      level: st.level ? t(`hud.${st.level}`, st.level) : '', online: o, puzzle: info.puzzle, name: info.name,
+    }, t);
+    fitLine($('#turn-main'));
     $('.turn').classList.toggle('check', !!st.check && !st.over);
     $('.turn').classList.toggle('think', !!st.thinking);
 
@@ -487,6 +483,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     syncGood();
     phoneUI?.status(st);
   }
+  if (dsk && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnimationFrame(() => fitLine($('#turn-main')))).observe($('#turn-main'));   // the panel width changes with the fold animation
   game.on('change', render);
   game.on('newgame', () => { abandonRun = null; const b = abandonBox(); if (b) b.hidden = true; });
   render(game.getState());
@@ -537,6 +534,14 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     new MutationObserver(watch).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
 
+  // the Context line follows the mode classes on <body> (review, Explain, Drill, Puzzle), on a phone too
+  {
+    const MODES = ['reviewing', 'explaining', 'drilling', 'puzzling'];
+    const sig = () => MODES.filter((c) => document.body.classList.contains(c)).join();
+    let last = sig();
+    new MutationObserver(() => { const s = sig(); if (s !== last) { last = s; if (lastSt) render(game.getState()); } }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  }
+
   // ------------------------------------------------------------ per-frame control sync
   let lastSig = '';
   function sync() {
@@ -562,7 +567,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     const cardOf = (n) => hud.querySelector(`.card[data-card="${n}"]`);
     const status = el('div', 'pstatus');
     status.setAttribute('role', 'status');
-    status.innerHTML = '<i class="dot w"></i><b class="ps-main">White to move</b><span class="ps-sub"></span><span class="ps-last"></span>';
+    status.innerHTML = '<b class="ps-main">White to move</b><span class="ps-last"></span>';
     const bar = el('nav', 'pbar');
     bar.setAttribute('aria-label', 'Game controls');
     bar.dataset.i18nAria = 'phone.controls';
@@ -808,19 +813,25 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     frame();
 
     let lastKey = '';
+    const psMain = status.querySelector('.ps-main'), psLast = status.querySelector('.ps-last');
+    /** the pill: "Last: e4" drops first (class drop), so the mover part of a long line stays readable; then the line's own drop order */
+    function fitPill() {
+      psLast.classList.remove('drop');
+      psMain.textContent = contextText(lineParts);
+      if (psMain.clientWidth && psMain.scrollWidth > psMain.clientWidth) psLast.classList.add('drop');
+      fitLine(psMain);
+    }
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnimationFrame(fitPill)).observe(psMain);   // a rotation or the clock faces change its room
     function statusRender(st) {
-      const sub = $('#turn-sub').textContent.trim();
-      const main = $('#turn-main').textContent;
+      const main = contextText(lineParts);
       const last = st.moves.length ? t('phone.last', 'Last: {move}', { move: sanDisplay(st.moves[st.moves.length - 1]) }) : '';
-      const key = `${st.turn}|${main}|${sub}|${last}|${!!st.check}|${!!st.thinking}`;
+      const key = `${st.turn}|${main}|${last}|${!!st.check}|${!!st.thinking}`;
       btn.undo.disabled = !st.canUndo || onlineBoard;
       if (menuA) btn.undo.classList.toggle('gone', !st.canUndo || onlineBoard);   // the place stays, nothing grey stands there
       if (key === lastKey) return;
       lastKey = key;
-      status.querySelector('.dot').className = 'dot ' + st.turn;
-      status.querySelector('.ps-main').textContent = main;
-      status.querySelector('.ps-sub').textContent = sub;
-      status.querySelector('.ps-last').textContent = last;
+      psLast.textContent = last;
+      fitPill();
       status.classList.toggle('check', !!st.check && !st.over);
       status.classList.toggle('think', !!st.thinking);
     }
@@ -1013,6 +1024,7 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   function setBottomInset(px) { px = Math.max(0, Math.round(px)); if (px === deskBottom) return; deskBottom = px; if (dsk) deskFrame(); }
 
   /** the game review shows its game in the Moves list: { sans, kinds, cur (1 based, 0 at the start), pick(n) }, null when it closes */
+  function setModeInfo(fn) { modeInfo = fn; if (lastSt) render(lastSt); }
   function setReviewMoves(v) { revMoves = v; lastMovesKey = null; if (lastSt) render(lastSt); }
   /** desktop: the slot in the panel where the review puts its Details box, null when there is no panel or it is folded to the rail.
    *  reveal() shows the Play tab (unfolding the panel); on(fn) is told when the panel is folded or unfolded */
@@ -1022,5 +1034,5 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     on: (fn) => { hostFns.push(fn); },
   };
 
-  return { menuA, setLeaveModes: (fn) => { leaveModes = fn; }, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountNewsEntry, setNewsDot, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove, bindFeedback };
+  return { menuA, setLeaveModes: (fn) => { leaveModes = fn; }, setModeInfo, confirmAbandon, sync, toast, setBottomInset, setReviewMoves, reviewHost, toggleHud, toggleHelp, render, mountPanel, mountSettings, mountFooter, mountNewsEntry, setNewsDot, mountDaily, openPanel, closeSheets: () => phoneUI?.close(), learnSheet: phoneUI ? phoneUI.learn : null, setLearnBar: phoneUI ? phoneUI.setLearnBar : () => {}, bindGoodMove, bindFeedback };
 }

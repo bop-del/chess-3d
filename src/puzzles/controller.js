@@ -82,7 +82,7 @@ export function createPuzzles({ game, hint = null, sweep = null, progress, rewar
   function state() {
     const d = due();
     return {
-      phase, puzzle, daily: isDaily, band: puzzle ? puzzle.band : progress.band(), theme: puzzle ? puzzle.theme : null,
+      phase, puzzle, no: puzzle && !isDaily ? progress.numberOf?.(puzzle.id) || 0 : 0, daily: isDaily, band: puzzle ? puzzle.band : progress.band(), theme: puzzle ? puzzle.theme : null,
       ply, total: total(), message, misses, helped,
       clean: phase === 'solved' ? misses === 0 && !helped : null,
       own: ownColor(), canHelp: phase === 'playing' && !!d && isOwn(ply) && !helped,

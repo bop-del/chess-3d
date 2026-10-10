@@ -46,7 +46,7 @@ body:not(.phone) .xcardbox { height: clamp(18em, 46vh, 28em); overflow-y: auto; 
 /* phone: a top bar with the one thing to do, a text card in a fixed slot (under the board in portrait, left of it in landscape)
    and the learning bar at the bottom. The camera frame (.pframe) is the free area between them, so the board is never cut off. */
 .xtop, .xcard { display: none; }
-body.phone.learnbar .pstatus .ps-sub, body.phone.learnbar .pstatus .ps-last { display: none; }   /* learning: one short phrase, no Last: */
+body.phone.learnbar .pstatus .ps-last { display: none; }   /* learning: one short phrase, no Last: */
 body.phone.lines { --stat: 48px; --xcard-h: clamp(150px, 28vh, 200px); --xcard-w: clamp(230px, 36vw, 340px); }
 body.phone.lines .pstatus, body.phone.lines .pgood { display: none; }
 body.phone .xtop {

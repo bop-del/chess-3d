@@ -376,6 +376,11 @@ async function boot() {
 
   window.__chess = { adapt: { state: () => adapter.state(), feed: (ms, skip) => adapter.feed(ms, skip), lock: () => adapter.lock('user') }, stage, gimbal, board, game, controls, ui, battle, audio, music, sfx, THREE, pick, openings, views, play, symbols, puzzles, puzzleProgress, daily, badges: { store: badges, evaluate: lookAgain, earn: (id) => badges.earn(id) }, reward, goodMove, review, themes, living, clock, train: { store, drill, sweep, learn } };
   ui.setLeaveModes(() => { if (puzzles.state().phase !== 'idle') puzzles.stop(); if (drill.state().phase !== 'idle') drill.stop(); if (openings.explain.state().phase !== 'list') openings.explain.stop(); });   // CHE-403: Zur Partie leaves a lesson through its own stop
+  ui.setModeInfo(() => {   // CHE-407: what the Context line says about a running puzzle, drill or opening
+    const ps = puzzles.state(), dl = drill.state().line, ex = openings.explain.state().line, pick = (p) => (p ? p[i18n.language] || p.en || '' : '');
+    return { puzzle: ps.phase !== 'idle' ? { no: ps.no, daily: ps.daily, own: ps.own } : null, name: pick((dl || ex)?.name) };
+  });
+  for (const c of [puzzles, drill, openings.explain]) c.on(() => ui.render(game.getState()));   // a new puzzle or line changes the Context line
   window.__chess.clockUi = clockUi;
   window.__chess.world = world;
   if (swWanted()) { const updates = createUpdates(); window.__chess.update = updates; updates.start(); }   // CHE-304: offline cache + new version banner

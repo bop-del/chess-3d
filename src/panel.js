@@ -17,6 +17,8 @@ addDE({
   'panel.views': 'Ansicht wählen (V)', 'panel.viewsList': 'Ansichten', 'panel.viewBar': 'Ansicht der Kamera',
   'panel.keys': 'Tastenkürzel (?)', 'panel.closeHelp': 'Schließen',
   'panel.kind.openings': 'Eröffnung', 'panel.kind.drill': 'Übung', 'panel.kind.puzzles': 'Rätsel',
+  'ctx.online': 'Online gegen {name}', 'ctx.daily': 'Tagesrätsel', 'ctx.puzzle': 'Rätsel {n}', 'ctx.computer': 'Gegen Computer', 'ctx.computerLevel': 'Gegen Computer ({level})',
+  'ctx.twoPlayers': 'Zwei Spieler', 'ctx.youSide': 'Du bist dran ({side})', 'ctx.you': 'Du bist dran', 'ctx.theirMove': '{name} ist dran', 'ctx.computerMove': 'Computer ist dran',
   'audio.mute': 'Ton aus',
   'key.hDesk': 'Panel ein- und ausklappen',
   'panel.advancedHintA': 'Brett neigen, Fortschritt sichern',
@@ -139,7 +141,7 @@ export function createDesktop({ hud, onLayout = () => {}, keyRows = () => '', fa
   root.innerHTML = `
     <header class="phead">
       <div class="logo" aria-hidden="true">&#x265E;&#xFE0E;</div>
-      <div class="turn" id="turn"><i class="dot w"></i><div class="status"><b id="turn-main">White to move</b><small id="turn-sub">&nbsp;</small></div></div>
+      <div class="turn" id="turn"><b id="turn-main">White to move</b></div>
       <div class="hbtns">
 ${headBtns}
         <button class="ib" id="btn-feedback" type="button" title="Send feedback" aria-label="Send feedback" data-i18n-title="fb.open" data-i18n-aria="fb.open">${ICONS.feedback}</button>
