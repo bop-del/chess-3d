@@ -720,7 +720,9 @@ export function createGame({ gimbal, board, pieceSet, materials }) {
       changed();
       maybeComputer();
     },
-    setMoveGuard(fn) { moveGuard = typeof fn === 'function' ? fn : null; },
+    setMoveGuard(fn) { const was = !!moveGuard; moveGuard = typeof fn === 'function' ? fn : null; if (was !== !!moveGuard) changed(); },
+    /** an online match holds the board (a move guard is set): the chess clock stays out of it */
+    get guarded() { return !!moveGuard; },
     get mode() { return mode; },
     onMove(fn) { (listeners.move = listeners.move || []).push(fn); },
     onSelect(fn) { (listeners.select = listeners.select || []).push(fn); },

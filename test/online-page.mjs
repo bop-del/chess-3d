@@ -154,7 +154,7 @@ try {
   await ev(B, (c) => { const i = document.querySelector('.ocode input'); i.value = c; document.querySelector('.ocode').requestSubmit(); }, mia.code);
   R.expect('code login: connected as Mia', await until(B, () => window.__chessOnline?.status === 'connected' && window.__chessOnline.state?.me.name === 'Mia'));
   R.expect('presence: Felix sees Mia online (green dot)', await until(A, () => !!document.querySelector('.op .pres.on')));
-  R.expect('score: noch keine Partie before the first game', (await ev(A, () => document.querySelector('.op .oscore')?.textContent)) === 'noch keine Partie');
+  R.expect('score: noch keine Partie beendet before the first game', (await ev(A, () => document.querySelector('.op .oscore')?.textContent)) === 'noch keine Partie beendet');
 
   // ------------------------------------------------------------ challenge, accept
   await click(A, '[data-a=challenge][data-n="Mia"]');
@@ -383,7 +383,7 @@ try {
   R.expect('waiting is a line in the card of Nina (Herausgefordert, wartet...) with Zurückziehen, no banner on top', await until(D1, () => /Herausgefordert, wartet/.test(document.querySelector('.opc:has([data-n="Nina"]) .ostate.asked')?.textContent || '') && [...document.querySelectorAll('.opc [data-a=cancel-out]')].length === 1 && document.querySelector('.opc [data-a=cancel-out]')?.textContent === 'Zurückziehen' && !document.querySelector('.owait') && !document.querySelector('.ochal .odots')));
   await click(D1, '[data-a=cancel-out]');
   R.expect('Zurückziehen takes the status away and gives the gold button back', await until(D1, () => !document.querySelector('.ostate.asked') && /Herausfordern/.test([...document.querySelectorAll('.opc')].find((r) => r.textContent.includes('Nina'))?.querySelector('.oacts2 .obtn.gold')?.textContent || '')));
-  R.expect('every card: score or noch keine Partie, Chat and Herausfordern in two equal columns', await ev(D1, () => [...document.querySelectorAll('.op')].every((r) => { const a = r.querySelectorAll('.oacts2 .obtn'), sc = r.querySelector('.oscore').textContent; return a.length === 2 && Math.abs(a[0].getBoundingClientRect().width - a[1].getBoundingClientRect().width) < 1 && (/^\d+ : \d+/.test(sc) || sc === 'noch keine Partie'); })));
+  R.expect('every card: score or noch keine Partie beendet, Chat and Herausfordern in two equal columns', await ev(D1, () => [...document.querySelectorAll('.op')].every((r) => { const a = r.querySelectorAll('.oacts2 .obtn'), sc = r.querySelector('.oscore').textContent; return a.length === 2 && Math.abs(a[0].getBoundingClientRect().width - a[1].getBoundingClientRect().width) < 1 && (/^\d+ : \d+/.test(sc) || sc === 'noch keine Partie beendet'); })));
   await click(D1, '[data-a=chat][data-n="Nina"]');
   R.expect('desktop: the chat floats at the bottom right over the board with the switcher and the eye', await until(D1, () => { const c = document.querySelector('.ochat').getBoundingClientRect(); return !document.querySelector('.ochat').hidden && c.bottom > innerHeight - 40 && c.right < innerWidth - 300 && document.querySelectorAll('.oswitch .osw').length === 4 && !!document.querySelector('.omon svg'); }));
   R.expect('the switcher shows an unread dot for Felix', await ev(D1, () => !!document.querySelector('.osw[data-n="Felix"] .oud')));
@@ -426,6 +426,16 @@ try {
   R.expect('multi: Aufgeben asks in the card of that game only', await until(M, () => document.querySelectorAll('.oconfirm').length === 1 && [...document.querySelectorAll('.opc')].find((r) => r.querySelector('.oname')?.textContent === 'Mia').querySelector('.oconfirm') !== null));
   if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await M.screenshot({ path: join(SHOTS, 'desktop-multi.png') }); }
   await M.close();
+  // CHE-420: an attached online match has no chess clock, whatever ?clock= says; leaving the game gives the local clock back
+  const MC = await open(ctxA, `${BASE}/?${PVQ}multi&open=online&manual=1&clock=3%2B2`, WIDE);
+  R.expect('no clock online: before attaching the local 3+2 clock is on', await ev(MC, () => window.__chess.clock.state().enabled && !window.__chess.clock.state().suspended));
+  await click(MC, '.opc [data-a=board][data-id="11"]');
+  R.expect('no clock online: attached, the clock is suspended and the faces are hidden', await until(MC, () => window.__chessOnline.match.attached && window.__chess.clock.state().suspended) && await ev(MC, () => { return ![...document.querySelectorAll('.cface')].some((f) => f.offsetWidth > 0); }));
+  await ev(MC, () => { window.__chess.step(10); });
+  R.expect('no clock online: step(10) does not tick', await ev(MC, () => { const c = window.__chess.clock; return c.remaining('w') === 180 && c.remaining('b') === 180 && !c.state().running; }));
+  await ev(MC, () => window.__chess.game.newGame());
+  R.expect('no clock online: a new local game gives the local clock back', await until(MC, () => !window.__chessOnline.match.attached && !window.__chess.clock.state().suspended && window.__chess.clock.state().enabled));
+  await MC.close();
   const MP = await open(ctxA, `${BASE}/?${PVQ}multi&open=online`, PHONE);
   await settleUi(MP);
   R.expect('multi phone 390: every button in the cards is at least 44 px, nothing overflows', await until(MP, () => document.querySelectorAll('.opc .ostate').length === 3) && await ev(MP, () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 && [...document.querySelectorAll('.opc .obtn:not([disabled]), .ochal .obtn')].every((b) => { const r = b.getBoundingClientRect(); return r.height >= 43.5 && r.right <= innerWidth + 1; })));
@@ -465,7 +475,7 @@ try {
     await click(S, '.ostat.own');
     R.expect(`${tag}: your own card has no head to head`, await until(S, () => /Deine Zahlen/.test(document.querySelector('.opd-name').textContent) && !document.querySelector('.oh2h')));
     await click(S, '.opc [data-a=stats][data-n="Maximiliane-Charlotte"].obody');
-    R.expect(`${tag}: a long name and zero games: "noch keine Partie", fits`, await until(S, () => /noch keine Partie/.test(document.querySelector('.opd').textContent) && /Maximiliane-Charlotte/.test(document.querySelector('.opd-name').textContent)) && await overflowFree(S));
+    R.expect(`${tag}: a long name and zero games: "noch keine Partie beendet", fits`, await until(S, () => /noch keine Partie beendet/.test(document.querySelector('.opd').textContent) && /Maximiliane-Charlotte/.test(document.querySelector('.opd-name').textContent)) && await overflowFree(S));
     if (args.includes('--shots') && size === PHONE) await S.screenshot({ path: join(SHOTS, 'stats-card-phone-long-name-zero.png') });
     await S.close();
   }
@@ -477,7 +487,7 @@ try {
   R.expect('desktop: the card is a section in the panel (not fixed)', await until(SD, () => { const d = document.querySelector('.opd'); return !d.hidden && getComputedStyle(d).position !== 'fixed' && !!d.closest('#online-host'); }));
   if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await SD.screenshot({ path: join(SHOTS, 'stats-card-desktop-wide.png') }); }
   await SD.close();
-  // the real route: Mia and Felix have no finished game here yet, so the real card shows "noch keine Partie"; the route is the contract
+  // the real route: Mia and Felix have no finished game here yet, so the real card shows "noch keine Partie beendet"; the route is the contract
   const SR = await open(ctxA, `${BASE}/?${Q}&${flag}&open=online`, DESK);
   await until(SR, () => window.__chessOnline?.status === 'connected');
   R.expect('real server: your own numbers load, the card of another player opens', await (async () => { await until(SR, () => !document.querySelector('.ostat.own')?.hidden); await ev(SR, () => window.__chessOnline.openStats(window.__chessOnline.state.players[0].name)); return until(SR, () => !document.querySelector('.opd').hidden && !!document.querySelector('.opd .ostx, .opd .ostats4')); })());

@@ -9,7 +9,7 @@
 //
 // Rules: the clock of the side to move runs, from the first move of White (so a player can look at the board first). A move adds the
 // increment to the side that made it. Against the computer only the player's clock runs (setUntimed names the computer's side).
-// Lessons and puzzles (game.mode other than 'play') never run the clock. Undo does not touch the clocks.
+// Lessons, puzzles (game.mode other than 'play') and an attached online match (game.guarded) never run the clock. Undo does not touch the clocks.
 export const PRESETS = {
   off: null,
   '3+2': { base: 180, inc: 2 },
@@ -111,7 +111,7 @@ export function flagVerdict(chess, flagged) {
 /** Binds a clock to a game (src/game.js or a stand in with the same events): moves switch it, a new game resets it, a finished game
  *  stops it, lessons suspend it, the computer's side is untimed, and a flag ends the game through game.end(). */
 export function bindGame({ clock, game }) {
-  let mode = game.mode;
+  let mode = game.mode, held = false;
   const sync = () => {
     const st = game.getState();
     const m = game.mode;
@@ -119,7 +119,9 @@ export function bindGame({ clock, game }) {
       mode = m;
       clock.reset();
     }
-    clock.suspend(m !== 'play');
+    const g = !!game.guarded;     // an online match is on the board: the server decides, no local clock; leaving it restores the local one
+    if (g !== held) { held = g; clock.reset(); }
+    clock.suspend(m !== 'play' || g);
     clock.setUntimed(st.vsComputer && m === 'play' ? st.computerColor : null);
     if (st.over) clock.stop();
   };
