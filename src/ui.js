@@ -74,10 +74,10 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
   let lineParts = [];   // the Context line as parts (src/context-line.js), refitted when its element changes width
   let modeInfo = null;   // main.js: { puzzle: { no, daily, own }, name } of the running puzzle, drill or opening
   /** puts the Context line into `elm`, dropping parts in DROP order until it fits (CSS cuts what still does not) */
-  function fitLine(elm) {
+  function fitLine(elm, phone = false) {
     const fits = (txt) => { elm.textContent = txt; return !elm.clientWidth || elm.scrollWidth <= elm.clientWidth; };
-    elm.textContent = contextText(lineParts, fits);
-    elm.title = contextText(lineParts);
+    elm.textContent = contextText(lineParts, fits, phone);
+    elm.title = contextText(lineParts, null, phone);
   }
   let onlineBoard = false;   // the board shows an online game: Back and Good move? are off (src/online/match.js sets it)
   let left = null, right = null, help = null, drawerBtn = null, dsk = null;
@@ -817,13 +817,13 @@ export function createUI({ game, controls, stage, quality = 'high', views }) {
     /** the pill: "Last: e4" drops first (class drop), so the mover part of a long line stays readable; then the line's own drop order */
     function fitPill() {
       psLast.classList.remove('drop');
-      psMain.textContent = contextText(lineParts);
+      psMain.textContent = contextText(lineParts, null, true);
       if (psMain.clientWidth && psMain.scrollWidth > psMain.clientWidth) psLast.classList.add('drop');
-      fitLine(psMain);
+      fitLine(psMain, true);
     }
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnimationFrame(fitPill)).observe(psMain);   // a rotation or the clock faces change its room
     function statusRender(st) {
-      const main = contextText(lineParts);
+      const main = contextText(lineParts, null, true);
       const last = st.moves.length ? t('phone.last', 'Last: {move}', { move: sanDisplay(st.moves[st.moves.length - 1]) }) : '';
       const key = `${st.turn}|${main}|${last}|${!!st.check}|${!!st.thinking}`;
       btn.undo.disabled = !st.canUndo || onlineBoard;

@@ -30,7 +30,7 @@ export function contextParts(c, t) {
   const outside = over && w && (over.reason === 'resign' || over.reason === 'stale');   // an online game: resigned, or ended after 3 days without a move
 
   // 1. what runs
-  if (c.mode === 'online') add('kind', t('ctx.online', 'Online vs {name}', { name: c.online.opponent }));
+  if (c.mode === 'online') { add('kind', t('ctx.online', 'Online vs {name}', { name: c.online.opponent })); parts[0].phone = c.online.opponent; }   // CHE-423: the pill says the name only
   else if (c.mode === 'puzzle') add('kind', c.puzzle?.daily ? t('ctx.daily', 'Daily puzzle') : c.puzzle?.no ? t('ctx.puzzle', 'Puzzle {n}', { n: c.puzzle.no }) : t('panel.kind.puzzles', 'Puzzle'));
   else if (c.mode === 'drill') add('kind', t('panel.kind.drill', 'Drill'));
   else if (c.mode === 'opening') add('kind', t('panel.kind.openings', 'Opening'));
@@ -57,6 +57,7 @@ export function contextParts(c, t) {
     if (c.mode === 'online') {
       const o = c.online;
       add('turn', c.turn === o.color ? t('ctx.youSide', 'Your move ({side})', { side: side(o.color) }) : t('ctx.theirMove', '{name} to move', { name: o.opponent }));
+      parts[parts.length - 1].phone = c.turn === o.color ? t('ctx.you', 'Your move') : t('ctx.theirMovePill', 'To move');   // the name stands in front already
       add('since', o.since);
     } else if (c.mode === 'puzzle' && c.puzzle?.own === c.turn) {
       add('turn', t('ctx.youSide', 'Your move ({side})', { side: side(c.turn) }));
@@ -70,9 +71,10 @@ export function contextParts(c, t) {
   return parts;
 }
 
-/** the parts as one string; drops parts in DROP order until fits(text) is true (no fits: nothing dropped) */
-export function contextText(parts, fits) {
-  let list = parts;
+/** the parts as one string; drops parts in DROP order until fits(text) is true (no fits: nothing dropped).
+ * phone: the short wording of the phone pill where a part has one (CHE-423: "Felix · Your move") */
+export function contextText(parts, fits, phone = false) {
+  let list = phone ? parts.map((p) => (p.phone ? { ...p, text: p.phone } : p)) : parts;
   const join = () => list.map((p) => p.text).join(SEP);
   let text = join();
   if (!fits) return text;

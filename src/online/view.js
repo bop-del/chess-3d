@@ -65,11 +65,11 @@ const results = (c) => c.results.map((r) => `<div class="ocard oresult ${r.kind}
 
 const postcard = (c, e, small) => {
   const g = e.g, turn = e.sending ? c.t('online.sending', 'Sending the move...') : e.mine ? c.t('online.yourTurnCard', 'Your move') : c.t('online.theirTurnCard', '{name} to move', { name: e.p.name });
-  return `<li class="orc ecard${small ? ' small' : ''}${e.mine ? ' mine' : ''}${e.onBoard ? ' onboard' : ''}" data-id="${g.id}"><span class="estamp oav">${c.avatarOf(e.p.name)}</span>
+  return `<li class="orc ecard${small ? ' small' : ''}${e.mine ? ' mine' : ''}${e.onBoard ? ' onboard' : ''}" data-id="${g.id}"><span class="estamp oav">${c.avatarOf(e.p.name)}${dot(e.p)}</span>
     <p class="orturn ek"><span class="orwho">${c.esc(turn)}</span> · <span class="orsince">${c.esc(e.since)}</span></p>
     <h5 class="en oname">${c.esc(e.p.name)}</h5><p class="orinfo">${c.esc(c.t('online.youPlay', 'You play {side}', { side: c.sideName(g.color) }))} · ${c.esc(c.t('online.moveNo', 'Move {n}', { n: c.moveNo(g) }))}</p>
     <div class="eb">${miniBoard(g, small ? 72 : 112)}<div><p class="el">${c.esc(lastMoveText(c, g))}</p>${e.limit ? `<p class="orlimit">${c.esc(e.limit)}</p>` : `<p class="erule">${c.esc(c.t('online.rule', 'Up to 3 days per move'))}</p>`}</div></div>
-    <button class="obtn gold${small ? '' : ' big'}" type="button" data-a="board" data-id="${g.id}">${c.esc(c.t('online.toGame', 'To the game'))}</button>
+    ${e.onBoard ? `<p class="eonboard">${c.esc(c.t('online.onBoard', 'On the board'))}</p>` : `<button class="obtn gold${small ? '' : ' big'}" type="button" data-a="board" data-id="${g.id}">${c.esc(c.t('online.toGame', 'To the game'))}</button>`}
     <div class="chx">${chatIcon(c, e.p, e.n)}${moreMenu(c, g)}</div>${extras(c, e)}</li>`;
 };
 const running = (c) => `<section class="orun"${c.games.length ? '' : ' hidden'}><h4>${c.esc(c.t('online.running', 'Running games'))}</h4><ul class="orunl">${c.games.map((e, i) => postcard(c, e, i > 0)).join('')}</ul></section>`;

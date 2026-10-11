@@ -18,7 +18,7 @@ addDE({
   'panel.keys': 'Tastenkürzel (?)', 'panel.closeHelp': 'Schließen',
   'panel.kind.openings': 'Eröffnung', 'panel.kind.drill': 'Übung', 'panel.kind.puzzles': 'Rätsel',
   'ctx.online': 'Online gegen {name}', 'ctx.daily': 'Tagesrätsel', 'ctx.puzzle': 'Rätsel {n}', 'ctx.computer': 'Gegen Computer', 'ctx.computerLevel': 'Gegen Computer ({level})',
-  'ctx.twoPlayers': 'Zwei Spieler', 'ctx.youSide': 'Du bist dran ({side})', 'ctx.you': 'Du bist dran', 'ctx.theirMove': '{name} ist dran', 'ctx.computerMove': 'Computer ist dran',
+  'ctx.twoPlayers': 'Zwei Spieler', 'ctx.youSide': 'Du bist dran ({side})', 'ctx.you': 'Du bist dran', 'ctx.theirMove': '{name} ist dran', 'ctx.theirMovePill': 'am Zug', 'ctx.computerMove': 'Computer ist dran',
   'audio.mute': 'Ton aus',
   'key.hDesk': 'Panel ein- und ausklappen',
   'panel.advancedHintA': 'Brett neigen, Fortschritt sichern',

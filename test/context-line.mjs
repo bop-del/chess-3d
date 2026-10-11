@@ -6,7 +6,7 @@ const DE = {
   'side.white': 'Weiß', 'side.black': 'Schwarz', 'turn.white': 'Weiß am Zug', 'turn.black': 'Schwarz am Zug', 'turn.check': 'Schach', 'turn.thinking': 'Computer denkt nach',
   'turn.checkmate': 'Schachmatt. {side} gewinnt', 'turn.draw': 'Remis', 'banner.wins': '{side} gewinnt', 'reason.resign': 'Aufgegeben', 'reason.stalemate': 'Patt',
   'ctx.online': 'Online gegen {name}', 'ctx.daily': 'Tagesrätsel', 'ctx.puzzle': 'Rätsel {n}', 'ctx.computer': 'Gegen Computer', 'ctx.computerLevel': 'Gegen Computer ({level})',
-  'ctx.twoPlayers': 'Zwei Spieler', 'ctx.youSide': 'Du bist dran ({side})', 'ctx.you': 'Du bist dran', 'ctx.theirMove': '{name} ist dran', 'ctx.computerMove': 'Computer ist dran',
+  'ctx.twoPlayers': 'Zwei Spieler', 'ctx.youSide': 'Du bist dran ({side})', 'ctx.you': 'Du bist dran', 'ctx.theirMove': '{name} ist dran', 'ctx.theirMovePill': 'am Zug', 'ctx.computerMove': 'Computer ist dran',
   'panel.kind.drill': 'Übung', 'panel.kind.openings': 'Eröffnung', 'panel.kind.puzzles': 'Rätsel', 'review.title': 'Partie ansehen',
 };
 const sub = (s, v = {}) => s.replace(/\{(\w+)\}/g, (_, k) => v[k]);
@@ -56,4 +56,9 @@ const cpu = { vsComputer: true, computerColor: 'b', level: 'Leicht 900', turn: '
 assert.equal(line(cpu), 'Gegen Computer (Leicht) · Computer ist dran · Schach');
 assert.equal(line(cpu, tDE, within(43)), 'Gegen Computer (Leicht) · Computer ist dran', 'the detail first');
 assert.equal(line(cpu, tDE, within(36)), 'Gegen Computer · Computer ist dran', 'then the level in brackets');
+// CHE-423: the phone pill says the name and the turn only
+const pill = (c) => contextText(contextParts({ turn: 'w', mode: 'online', ...c }, tDE), null, true);
+assert.equal(pill({ online: { opponent: 'Felix', color: 'w', since: '' } }), 'Felix · Du bist dran');
+assert.equal(pill({ turn: 'b', online: { opponent: 'Felix', color: 'w', since: '' } }), 'Felix · am Zug');
+assert.equal(pill({ over: { reason: 'resign', winner: 'b' }, online: { opponent: 'Felix', color: 'w', since: '' } }), 'Felix · Schwarz gewinnt · Aufgegeben');
 console.log('PASS context line');
