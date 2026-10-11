@@ -290,7 +290,7 @@ body.touch:not(.phone) .pbtn { min-height: 44px; }
 body.phone {
   --sl: max(8px, env(safe-area-inset-left)); --sr: max(8px, env(safe-area-inset-right));
   --st: max(8px, env(safe-area-inset-top)); --sb: max(6px, env(safe-area-inset-bottom));
-  --stat: 36px; --bar: 52px; --barw: 60px; --gap: 6px;
+  --stat: 36px; --bar: 52px; --barw: 60px; --gap: 6px; --bargap: 3px;
   --glass: rgba(22, 24, 32, 0.84); --glass-strong: rgba(16, 17, 24, 0.94); --r: 14px;
 }
 body.phone .col, body.phone .drawer-btn, body.phone .help, body.phone #btn-help, body.phone .row.good { display: none !important; }
@@ -307,7 +307,7 @@ body.phone .pstatus {
 body.phone .pgood {
   position: fixed; z-index: 17; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
   top: calc(var(--st) - 4px); right: var(--sr); border-radius: 12px; border: 1px solid var(--line-strong); background: var(--glass); color: var(--text);
-  cursor: pointer; touch-action: manipulation; transition: opacity 0.35s ease;
+  cursor: pointer; touch-action: manipulation; pointer-events: auto; transition: opacity 0.35s ease;
 }
 body.phone .pgood svg { width: 22px; height: 22px; }
 /* CHE-404: the feedback bubble sits left of the bulb; the status line gives it room */
@@ -315,7 +315,7 @@ body.phone .pgood svg { width: 22px; height: 22px; }
 body.phone .pfb {
   position: fixed; z-index: 17; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
   top: calc(var(--st) - 4px); right: calc(var(--sr) + 44px + var(--gap)); border-radius: 12px; border: 1px solid var(--line-strong); background: var(--glass); color: var(--text);
-  cursor: pointer; touch-action: manipulation; transition: opacity 0.35s ease;
+  cursor: pointer; touch-action: manipulation; pointer-events: auto; transition: opacity 0.35s ease;
 }
 body.phone .pfb svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 body.phone .pfb:active { transform: scale(0.96); }
@@ -354,7 +354,7 @@ body.phone .clock-settings .chips { flex-wrap: nowrap; }
 body.phone .pieceset .chip { min-height: 44px; }
 
 body.phone .pbar {
-  position: fixed; z-index: 16; left: var(--sl); right: var(--sr); bottom: var(--sb); height: var(--bar); gap: var(--gap);
+  position: fixed; z-index: 16; left: var(--sl); right: var(--sr); bottom: var(--sb); height: var(--bar); gap: var(--bargap);
   pointer-events: auto; transition: opacity 0.35s ease;
 }
 body.phone .tb {
@@ -362,7 +362,7 @@ body.phone .tb {
   border-radius: 14px; border: 1px solid var(--line-strong); background: var(--glass); color: var(--text); cursor: pointer; touch-action: manipulation;
 }
 body.phone .tb svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-body.phone .tb span { font-size: 11px; line-height: 1.1; font-weight: 550; letter-spacing: 0.01em; }
+body.phone .tb span { font-size: min(11px, 2.5vw); line-height: 1.1; font-weight: 550; letter-spacing: -0.02em; max-width: 100%; }   /* CHE-434: German labels fit at 360 px */
 body.phone .tb:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.14); }
 body.phone .tb:disabled { opacity: 0.35; }
 /* learning bar: replaces the thumb bar while Explain, Drill, Practise or a Puzzle runs; the gold button is the primary action */

@@ -184,6 +184,17 @@ try {
       R.expect(`${name} emulation`, ins.vw === w && ins.vh === h && ins.dpr === DPR && ins.touch, `${ins.vw}x${ins.vh} @${ins.dpr}, touch ${ins.touch}, phone ${ins.phone}, safe area ${insetOk ? inset.join('/') : 'off'}`, `got ${JSON.stringify(ins)}`);
       await shot('start');
 
+      // CHE-434: the top buttons take the tap themselves (not the canvas under them) and every thumb bar label fits its button
+      const top = await page.evaluate(() => ['.pgood', '.pfb'].map((q) => {
+        const e = document.querySelector(q); if (!e || !e.getClientRects().length || +getComputedStyle(e).opacity < 0.05) return null;
+        const r = e.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { q, ok: !!hit && e.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()}#${hit.id}.${hit.className}` : 'none' };
+      }).filter(Boolean));
+      for (const t of top) R.expect(`${name} ${t.q} takes the tap`, t.ok, 'elementFromPoint hits the button', `tap lands on ${t.hit}`);
+      R.expect(`${name} bulb is checked`, top.some((t) => t.q === '.pgood'), 'bulb visible', 'bulb not visible');
+      const over = await page.evaluate(() => [...document.querySelectorAll('.pbar .tb')].filter((b) => b.getClientRects().length).map((b) => { const sp = b.querySelector('span'); return sp && sp.scrollWidth > b.clientWidth ? `${sp.textContent} ${sp.scrollWidth}>${b.clientWidth}` : null; }).filter(Boolean));
+      R.expect(`${name} thumb bar labels fit`, over.length === 0, 'all labels inside their buttons', over.join(', '));
+
       // a piece selected by a real tap. The HUD can cover the board, so take the first white piece whose point is free
       // canvas and that the app's own picking resolves to that square.
       const tapPt = await page.evaluate(() => {
