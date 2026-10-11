@@ -182,7 +182,10 @@ function agent(branch, name, brief, model = 'sonnet') {
       const relTool = (t) => `Bash(${join(process.env.HOME, 'code', 'chess-3d-private', 'bin', t)} *)`;
       const permissions = name === 'land' ? { allow: [`Bash(${lockTool} *)`, `Bash(${root}/bin/lane close *)`, `Bash(bin/lane close *)`, relTool('release-next'), relTool('release-result')] }
         : name === 'release' ? { allow: [relTool('release-next'), relTool('release-result')] } : undefined;
-      writeFileSync(f, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node ${h} ${branch} ${name} ${id}` }] }] }, ...(permissions ? { permissions } : {}) }, null, 2));
+      // CHE-414: lane sessions may not touch the server or its secrets (ssh hnr-prod, kamal, the deploy key, the chess-agent-* Keychain items)
+      const guard = join(process.env.HOME, 'code', 'chess-3d-private', 'bin', 'agent-secrets-guard');
+      const pre = existsSync(guard) ? { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: `node ${guard}` }] }] } : {};
+      writeFileSync(f, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node ${h} ${branch} ${name} ${id}` }] }], ...pre }, ...(permissions ? { permissions } : {}) }, null, 2));
       extra.push('--settings', f);
     } }
   // a fresh tab needs a moment before its shell takes input: retry while herdr says the pane is busy
