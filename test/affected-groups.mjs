@@ -33,7 +33,8 @@ check('every group name in the table is a real group', MAP.flatMap(([, gs]) => g
 check('every group script exists', GROUPS.every(([, s]) => existsSync(new URL('../' + s, import.meta.url))));
 
 check('server code: the fast tier only, no smoke group', g(['server/stats.mjs']) === '' && g(['server/db.mjs', 'server/admin.mjs', 'server/health.mjs', 'server/README.md', 'server/Dockerfile']) === '');
-check('server/index.mjs and server/live.mjs run the online page group', g(['server/index.mjs']) === 'online' && g(['server/live.mjs']) === 'online' && g(['server/live.mjs', 'server/stats.mjs']) === 'online');
+check('server/index.mjs and server/live.mjs run the online page groups (CHE-422: messages too)', g(['server/index.mjs']) === 'online,online messages' && g(['server/live.mjs']) === 'online,online messages' && g(['server/live.mjs', 'server/stats.mjs']) === 'online,online messages');
+check('server/messages.mjs and its page test run the online messages group only', g(['server/messages.mjs']) === 'online messages' && g(['test/online-messages.mjs']) === 'online messages');
 check('server change next to a core path still runs everything', g(['server/index.mjs', 'src/rules.js']) === 'ALL');
 
 // headlessShell compares the major version only

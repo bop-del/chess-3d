@@ -74,6 +74,7 @@ export const PUSH_TEXT = {
   turn: (from) => ({ title: `${from} hat gezogen, du bist dran`, body: 'Tippe, um weiterzuspielen.' }),
   chat: (from) => ({ title: `Neue Nachricht von ${from}`, body: 'Tippe, um sie zu lesen.' }),
   over: (from, line) => ({ title: `Partie gegen ${from} zu Ende`, body: line }),
+  message: () => ({ title: 'Chess 3D', body: 'Tippe, um die Nachricht zu lesen.' }),   // CHE-422: from Chess 3D, never the text
   accepted: (from) => ({ title: `${from} hat deine Herausforderung angenommen`, body: 'Die Partie wartet.' }),
 };
 /** the result line for the recipient of a game over push */

@@ -25,3 +25,4 @@
 .fbactions .fbsend { background: var(--gold, #d8b468); color: #1d170b; border-color: transparent; }
 .fbactions button:disabled { opacity: 0.45; cursor: default; }
 @media (max-height: 460px) { .fbform { gap: 6px; } .fbform textarea { min-height: 56px; } .fbnote { display: none; } }
+.fbguest { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text, #e8e6f0); }

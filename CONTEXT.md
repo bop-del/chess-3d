@@ -271,6 +271,10 @@ A chat message the player has not seen with its chat open and visible. The count
 A bug report or a wish a visitor sends from the game, with its kind (bug or wish), a text and, unless switched off, a picture of the board and the context of the game. The owner decides whether it becomes an item; sending one creates nothing by itself.
 _Avoid_: ticket, issue, support request
 
+**Chess 3D (Absender)**:
+The reserved sender of messages from us to one player, an answer to that player's Feedback ("Danke, gelesen", "Das bauen wir ein", "Ist jetzt im Spiel", "Fehler behoben"). It is not a player: it cannot be invited, challenged or written to, has no presence and no game status, and shows in a player's address book only once it has written to them. Its thread is read only; the way back is the Feedback button. Anonymous Feedback gets no answer.
+_Avoid_: bot (the Bot is a player that plays), system message, notification
+
 **Waiting time**:
 How long ago the last move of a running online game was made. On the last day before the 3 day limit it also says how long is left.
 _Avoid_: clock, timer (an online game has no clock)

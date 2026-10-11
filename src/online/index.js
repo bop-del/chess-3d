@@ -17,6 +17,7 @@ import { startStats } from './stats.js';
 import { createVersionCheck, fetchVersion } from './version.js';
 import { stamp } from './stamp.js';
 import { renderView, toggleMore } from './view.js';
+import { isSystem, sysText, sysItem, sysHint, SYSTEM_AVATAR } from './system.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SEEN = 'chess3d.onlineSeen';
@@ -75,6 +76,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
         <header><i class="grip"></i><b class="owith"></b><span class="omon" title=""><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><em data-i18n="online.monitoredShort">mitgelesen</em></span><button class="ochat-min" type="button" data-a="chat-min" data-i18n-aria="online.minimize" aria-label="Minimize">–</button><button class="ochat-x" type="button" data-a="chat-close" data-i18n-aria="online.close" aria-label="Close">×</button></header>
         <nav class="oswitch"></nav>
         <ol class="omsgs"></ol>
+        <p class="osyshint" hidden></p>
         <form class="osend" autocomplete="off"><input name="text" type="text" maxlength="200" enterkeyhint="send" data-i18n-aria="online.message" aria-label="Message"><button class="obtn gold" type="submit" data-i18n="online.send">Send</button></form>
         <p class="oerr" hidden></p>
       </section>
@@ -206,8 +208,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   }
 
   const PIECES = ['♞', '♜', '♝', '♛', '♚', '♟'];
-  const hashN = (name) => Math.max(0, (state?.players || []).findIndex((p) => p.name === name));   // one piece and colour per player, in list order
-  const avatarOf = (name) => `<b class="oglyph" data-c="${hashN(name) % 6}">${PIECES[hashN(name) % PIECES.length]}</b>`;
+  const hashN = (name) => Math.max(0, (state?.players || []).filter((p) => !p.system).findIndex((p) => p.name === name));   // one piece and colour per player, in list order (Chess 3D not counted, CHE-422)
+  const avatarOf = (name) => isSystem(name) ? SYSTEM_AVATAR : `<b class="oglyph" data-c="${hashN(name) % 6}">${PIECES[hashN(name) % PIECES.length]}</b>`;
   const scoreLine = (s) => scoreOf(s) || t('online.noGameYet', 'no finished game yet');
   const nums = (v) => ['games', 'wins', 'losses', 'draws'].map((k) => `<span class="ostc ${k}"><b>${v[k]}</b><small>${esc(t(`online.st.${k}`, { games: 'Games', wins: 'Wins', losses: 'Losses', draws: 'Draws' }[k]))}</small></span>`).join('');
   const STREAK_EN = { win1: '1 win', winN: '{n} wins in a row', loss1: '1 loss', lossN: '{n} losses in a row', draw1: '1 draw', drawN: '{n} draws in a row' };
@@ -256,6 +258,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       canFinish: !!g && g.turn !== g.color && nowServer() >= g.staleAt, confirm: !!g && confirmResign === g.id, chatOpen: chatWith === p.name,
     });
     const people = state.players.map((p) => {
+      if (p.system) return { ...entry(p, null), kind: 'system' };   // CHE-422: Chess 3D, pinned on top, no challenge
       const kind = secondAction(p, { game: !!gameWith(p.name), out: out.map((c) => c.to), inc: state.challenges.in.map((c) => c.from) });
       return { ...entry(p, gameWith(p.name)), kind, mineOut: out.find((c) => c.to === p.name) };
     });
@@ -303,10 +306,13 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       const key = list.map((m) => m.id).join(',') + i18n();
       if (ol.dataset.key !== key) {
         ol.dataset.key = key;
-        ol.innerHTML = list.length ? list.map((m) => `<li class="${m.mine ? 'mine' : ''}"><span>${esc(m.text)}</span><small>${esc(stamp(m.at))}</small></li>`).join('') : `<li class="oempty">${esc(t('online.noMessages', 'No messages yet.'))}</li>`;
+        ol.innerHTML = list.length ? list.map((m) => (isSystem(chatWith) ? sysItem(m, { t, esc, time: stamp }) : `<li class="${m.mine ? 'mine' : ''}"><span>${esc(m.text)}</span><small>${esc(stamp(m.at))}</small></li>`)).join('') : `<li class="oempty">${esc(t('online.noMessages', 'No messages yet.'))}</li>`;
         ol.scrollTop = ol.scrollHeight;
       }
-      const muted = state.me.muted;
+      const sysChat = isSystem(chatWith), hint = $c('.osyshint');   // CHE-422: Chess 3D is read only, a line points to the Feedback button
+      hint.hidden = !sysChat; hint.textContent = sysChat ? sysHint(t) : '';
+      $c('.osend').hidden = sysChat; ch.classList.toggle('osysthread', sysChat);
+      const muted = state.me.muted && !sysChat;
       $c('.osend input').disabled = muted; $c('.osend button').disabled = muted;
       const e = $c('.oerr');
       if (muted) { e.hidden = false; e.textContent = t('online.muted', 'You cannot write at the moment.'); } else if (e.dataset.kind !== 'send') e.hidden = true;
@@ -387,7 +393,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     for (const [name, list] of Object.entries(state.chats || {})) {
       const top = Math.max(0, ...list.map((m) => m.id));
       const newer = list.filter((m) => !m.mine && m.id > (lastMsg[name] || 0));
-      if (!first && newer.length && !(chatWith === name && chatVisible())) fresh = { kind: 'msg', name, text: newer[newer.length - 1].text };
+      if (!first && newer.length && !(chatWith === name && chatVisible())) fresh = { kind: 'msg', name, text: sysText(newer[newer.length - 1], t) };
       lastMsg[name] = top;
     }
     if (fresh) showBub(fresh, 8000);

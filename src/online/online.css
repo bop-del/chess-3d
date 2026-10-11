@@ -367,3 +367,11 @@ body.online-updating .obubs, body.online-updating .obub, body.online-updating .o
 .onl .ecard.small > .obtn.gold { grid-area: b; min-height: 44px; padding: 0 12px; font-size: 14px; }
 .onl .ecard.small .chx { grid-area: c; justify-content: flex-end; }
 .onl .ecard.small .oconfirm, .onl .ecard.small .ohint, .onl .ecard.small > .orow { grid-column: 1 / -1; }
+
+/* CHE-422: Chess 3D, the sender of answers to Feedback: pinned on top of the address book, read only thread, grey quote above our line */
+.oglyph[data-c="sys"] { background: var(--accent, #f0c24b); color: #241f2e; }
+.osysrow .obody { cursor: pointer; }
+.osyshint { margin: 0; padding: 10px 14px; font-size: 13px; color: var(--dim); text-align: center; }
+.ochat.osysthread .omon { display: none; }
+.omsgs li.osys { align-self: flex-start; display: flex; flex-direction: column; gap: 2px; }
+.omsgs li.osys .oquote { color: var(--dim); font-size: 11.5px; opacity: 0.85; font-style: italic; overflow-wrap: anywhere; }

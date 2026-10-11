@@ -46,7 +46,8 @@
   "to_id": "INTEGER",
   "text": "TEXT",
   "at": "INTEGER",
-  "read": "INTEGER"
+  "read": "INTEGER",
+  "meta": "TEXT"
  },
  "moves": {
   "game_id": "INTEGER",
@@ -63,7 +64,8 @@
   "muted": "INTEGER",
   "created": "INTEGER",
   "bot": "INTEGER",
-  "admin": "INTEGER"
+  "admin": "INTEGER",
+  "system": "INTEGER"
  },
  "push_subs": {
   "player": "INTEGER",

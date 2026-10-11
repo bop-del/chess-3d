@@ -11,6 +11,7 @@ addDE({
   'fb.text': 'Was ist passiert, oder was wünschst du dir?', 'fb.name': 'Dein Name (freiwillig)', 'fb.picture': 'Bild vom Brett mitschicken',
   'fb.note': 'Mitgeschickt werden: dein Text, das Bild, die Version, Gerät und Bildschirmgröße, Thema und Ansicht, Stellung und Züge, die letzten Fehlermeldungen. Nie der Chat.',
   'fb.send': 'Senden', 'fb.sending': 'Sende...', 'fb.cancel': 'Abbrechen', 'fb.close': 'Schließen', 'fb.thanks': 'Danke! Deine Rückmeldung ist angekommen.',
+  'fb.guest': 'Melde dich an, dann können wir dir antworten.',
   'fb.slow': 'Du hast schon einige geschickt. Versuch es später noch einmal.', 'fb.offline': 'Das Senden hat nicht geklappt. Prüfe die Verbindung.', 'fb.rejected': 'Der Server hat die Nachricht nicht angenommen. Bitte später nochmal.', 'fb.empty': 'Schreib bitte kurz etwas dazu.',
 });
 
@@ -43,6 +44,7 @@ export function mountFeedback({ ui, stage, game, themes, views, server = '', log
       <span class="fbcount" id="fb-count" aria-hidden="true">0 / ${TEXT_MAX}</span>
       <label id="fb-namebox"><span data-i18n="fb.name">Your name (optional)</span><input type="text" id="fb-name" maxlength="40" autocomplete="off"></label>
       <label class="fbpic"><input type="checkbox" id="fb-pic" checked><span data-i18n="fb.picture">Send a picture of the board</span></label>
+      <p class="fbguest" id="fb-guest" data-i18n="fb.guest" hidden>Log in and we can answer you.</p>
       <p class="fbnote" data-i18n="fb.note">Sent along: your text, the picture, the game version, device and screen size, theme and view, the position and moves, the last error messages. Never the chat.</p>
       <p class="fbmsg" id="fb-msg" role="status"></p>
       <div class="fbactions"><button type="button" id="fb-cancel" data-i18n="fb.cancel">Cancel</button><button type="submit" class="fbsend" id="fb-send" data-i18n="fb.send">Send</button></div>
@@ -52,6 +54,7 @@ export function mountFeedback({ ui, stage, game, themes, views, server = '', log
   const $ = (s) => ov.querySelector(s);
   const text = $('#fb-text'), name = $('#fb-name'), pic = $('#fb-pic'), msg = $('#fb-msg'), send = $('#fb-send'), count = $('#fb-count'), closeBtn = $('#fb-close');
   let kind = 'bug', from = null, busy = false;
+  $('#fb-guest').hidden = !!login?.key;   // CHE-422: only a logged in player can get an answer from Chess 3D
   if (login?.name) { name.value = login.name; $('#fb-namebox').hidden = true; }   // a logged in player is named by the server
   const setKind = (k) => { kind = k; for (const b of ov.querySelectorAll('.fbkind')) b.setAttribute('aria-checked', String(b.dataset.kind === k)); };
   for (const b of ov.querySelectorAll('.fbkind')) b.addEventListener('click', () => setKind(b.dataset.kind));

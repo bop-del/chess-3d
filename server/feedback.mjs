@@ -58,5 +58,7 @@ export function createFeedback(db, { now = () => Date.now() } = {}) {
     return q('SELECT id, at, kind, name, player, text, picture, context FROM feedback WHERE id > ? ORDER BY id LIMIT ?').all(Math.max(0, Number(id) || 0), limit)
       .map((r) => ({ id: r.id, at: r.at, kind: r.kind, name: r.name, player: !!r.player, text: r.text, picture: r.picture, context: r.context ? JSON.parse(r.context) : null }));
   }
-  return { limited, add, since };
+  /** one Feedback by id (CHE-422: who sent it and what it said), or null */
+  const get = (id) => q('SELECT id, player, text FROM feedback WHERE id = ?').get(Number(id) || 0) || null;
+  return { limited, add, since, get };
 }

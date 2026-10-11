@@ -57,7 +57,7 @@ const extras = (c, e) => `${e.confirm ? `<div class="oconfirm"><p>${c.esc(c.t('o
   ${e.canFinish ? `<p class="ohint">${c.esc(c.t('online.finishHint', '{name} has not moved for 3 days. Ending counts as a win for you.', { name: e.p.name }))}</p><div class="orow"><button class="obtn gold" type="button" data-a="finish" data-id="${e.g.id}">${c.esc(c.t('online.finish', 'End the game'))}</button></div>` : ''}`;
 
 // ---- the blocks
-const strip = (c) => (c.people.length ? `<nav class="estrip" aria-label="${c.esc(c.t('online.players', 'Players'))}">${c.people.map((e) => `<button class="ehead${e.p.online ? '' : ' away'}" type="button" data-a="stats" data-n="${c.esc(e.p.name)}" aria-label="${c.esc(`${e.p.name}, ${presence(c, e.p)}`)}"><span class="oav">${c.avatarOf(e.p.name)}${dot(e.p)}${e.n ? `<b class="ocnt">${e.n}</b>` : ''}</span><small>${c.esc(e.p.name)}</small></button>`).join('')}</nav>` : '');
+const strip = (c) => (c.people.some((e) => !e.p.system) ? `<nav class="estrip" aria-label="${c.esc(c.t('online.players', 'Players'))}">${c.people.filter((e) => !e.p.system).map((e) => `<button class="ehead${e.p.online ? '' : ' away'}" type="button" data-a="stats" data-n="${c.esc(e.p.name)}" aria-label="${c.esc(`${e.p.name}, ${presence(c, e.p)}`)}"><span class="oav">${c.avatarOf(e.p.name)}${dot(e.p)}${e.n ? `<b class="ocnt">${e.n}</b>` : ''}</span><small>${c.esc(e.p.name)}</small></button>`).join('')}</nav>` : '');
 
 const incoming = (c) => c.incoming.map((ch) => `<section class="ein ocard"><p class="eh"><span class="oav" data-a="stats" data-n="${c.esc(ch.from)}">${c.avatarOf(ch.from)}</span><b>${c.esc(c.t('online.challengesYou', '{name} challenges you', { name: ch.from }))}</b></p><div class="orow"><button class="obtn gold" type="button" data-a="accept" data-id="${ch.id}">${c.esc(c.t('online.accept', 'Accept'))}</button><button class="obtn" type="button" data-a="decline" data-id="${ch.id}">${c.esc(c.t('online.decline', 'No thanks'))}</button></div></section>`).join('');
 const declined = (c) => c.declined.map((d) => `<div class="ocard"><p>${c.esc(c.t('online.declined', '{name} declined', { name: d.to }))}</p><div class="orow"><button class="obtn" type="button" data-a="seen-out" data-id="${d.id}">${c.esc(c.t('online.ok', 'OK'))}</button></div></div>`).join('');
@@ -74,10 +74,15 @@ const postcard = (c, e, small) => {
 };
 const running = (c) => `<section class="orun"${c.games.length ? '' : ' hidden'}><h4>${c.esc(c.t('online.running', 'Running games'))}</h4><ul class="orunl">${c.games.map((e, i) => postcard(c, e, i > 0)).join('')}</ul></section>`;
 
+// CHE-422: Chess 3D, pinned on top: its own symbol, no online dot, no score, no challenge button; the whole row opens its read only thread
+const systemRow = (c, e) => `<li class="op opc osysrow${e.chatOpen ? ' on' : ''}${e.n ? ' unread' : ''}"><span class="oav" data-a="chat" data-n="${c.esc(e.p.name)}" role="button" aria-label="${c.esc(c.t('online.chatWith', 'Chat with {name}', { name: e.p.name }))}">${c.avatarOf(e.p.name)}</span>
+  <div class="obody" data-a="chat" data-n="${c.esc(e.p.name)}" role="button"><span class="oname">${c.esc(e.p.name)}</span><span class="osub">${c.esc(c.t('online.sys.sub', 'Messages from us'))}</span></div>
+  ${chatIcon(c, e.p, e.n)}</li>`;
 const book = (c) => {
   const rows = c.people.filter((e) => !e.g && e.kind !== 'incoming');
   return `<h4>${c.esc(c.t('online.book', 'Address book'))}</h4><ul class="oplayers eab">${rows.length ? rows.map((e) => {
     const p = e.p;
+    if (p.system) return systemRow(c, e);
     const act = e.kind === 'asked' ? `<button class="obtn small" type="button" data-a="cancel-out" data-id="${e.mineOut.id}">${c.esc(c.t('online.withdraw', 'Withdraw'))}</button>` : `<button class="obtn small" type="button" data-a="challenge" data-n="${c.esc(p.name)}">${c.esc(c.t('online.challenge', 'Challenge'))}</button>`;
     const bot = p.bot && c.state.me.admin && e.kind === 'challenge' ? `<div class="ostate"><button class="obtn small" type="button" data-a="bot-challenge">${c.esc(c.t('online.botChallenge', 'Bot challenges me'))}</button></div>` : '';
     return `<li class="op opc${e.chatOpen ? ' on' : ''}${e.n ? ' unread' : ''}"><span class="oav" data-a="stats" data-n="${c.esc(p.name)}" role="button" aria-label="${c.esc(c.t('online.st.open', 'Numbers of {name}', { name: p.name }))}">${c.avatarOf(p.name)}${dot(p)}</span>

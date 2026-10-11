@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { existsSync } from 'node:fs';
 import { Chess, nameSq } from '../src/rules.js';
-import { openDb, sha256, normCode, adminOps, newKey, newCode } from './db.mjs';
+import { openDb, SYSTEM_NAME, sha256, normCode, adminOps, newKey, newCode } from './db.mjs';
 import { createLive } from './live.mjs';
 import { versionInfo } from './version.mjs';
 import { createHealth, healthVerdict, serverSection, systemProbe, SAMPLE_MS } from './health.mjs';
@@ -17,6 +17,7 @@ import { createBot, BOT_NAME } from './bot.mjs';
 import { createAuthSpike } from './auth-spike.mjs';
 import { createLease } from './lease.mjs';
 import { createFeedback, cleanFeedback, BODY_MAX as FEEDBACK_BODY_MAX } from './feedback.mjs';
+import { ensureSystem, addSystemMessage, cleanTemplate, quoteOf } from './messages.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
 export const STALE_MS = 3 * 24 * 3600 * 1000;   // a game with no move for 3 days: the waiting player may end it as a win
@@ -37,6 +38,7 @@ export function originAllowed(origin, list) {
 
 export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', authSpike = {}, pushFetch, log = () => {}, random = Math.random, bot: botOpts = null, lease: leaseOpts = null } = {}) {
   const admin = adminOps(db, now);
+  const sys = ensureSystem(db, now);   // CHE-422: the sender "Chess 3D"
   const spike = createAuthSpike({ origins, originOk: (o) => originAllowed(o, origins), ...authSpike });   // CHE-341: a spike, off without a client id
   const stats = createStats(db, { now });
   const feedback = createFeedback(db, { now });   // CHE-404
@@ -113,12 +115,16 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       canFinish: g.status === 'active' && turn !== color && now() >= g.last_move_at + STALE_MS,
     };
   }
+  /** CHE-422: the template, params and quote of a message from Chess 3D, for the client to render in its language */
+  const metaOf = (j) => { if (!j) return {}; try { const m = JSON.parse(j); return { ...(m.tpl ? { tpl: m.tpl, params: m.params || {} } : {}), ...(m.quote ? { quote: m.quote } : {}) }; } catch (e) { return {}; } };
   function stateFor(pid) {
     const me = playerById(pid);
     if (!me || me.revoked) return null;
     const score = scoreTable(pid);
     const mineAll = activeGames(pid);
-    const players = q('SELECT * FROM players WHERE id != ? AND revoked = 0 ORDER BY name COLLATE NOCASE').all(pid).map((p) => {
+    // CHE-422: the sender "Chess 3D" is in the list only once it has written to this player; it has no presence, score or game
+    const players = q('SELECT * FROM players WHERE id != ? AND revoked = 0 AND (system = 0 OR EXISTS (SELECT 1 FROM messages WHERE from_id = players.id AND to_id = ?)) ORDER BY system DESC, name COLLATE NOCASE').all(pid, pid).map((p) => {
+      if (p.system) return { name: p.name, system: true, online: false, playing: false, withMe: false, score: { w: 0, l: 0, d: 0 }, played: 0, unread: q('SELECT COUNT(*) AS n FROM messages WHERE from_id = ? AND to_id = ? AND read = 0').get(p.id, pid).n };
       const s = score.get(p.id) || { w: 0, l: 0, d: 0 };
       return {
         name: p.name, online: live.online(p.id) || !!p.bot, ...(p.bot ? { bot: true } : {}),   // CHE-343: the bot is always there
@@ -140,9 +146,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     const chats = {}, unread = {};
     for (const p of players) {
       const other = playerByName(p.name);
-      const rows = q(`SELECT * FROM (SELECT m.id, m.from_id, m.text, m.at FROM messages m WHERE (m.from_id = ? AND m.to_id = ?) OR (m.from_id = ? AND m.to_id = ?) ORDER BY m.id DESC LIMIT 50) ORDER BY id`)
+      const rows = q(`SELECT * FROM (SELECT m.id, m.from_id, m.text, m.at, m.meta FROM messages m WHERE (m.from_id = ? AND m.to_id = ?) OR (m.from_id = ? AND m.to_id = ?) ORDER BY m.id DESC LIMIT 50) ORDER BY id`)
         .all(pid, other.id, other.id, pid);
-      if (rows.length) chats[p.name] = rows.map((r) => ({ id: r.id, from: r.from_id === pid ? me.name : p.name, mine: r.from_id === pid, text: r.text, at: r.at }));
+      if (rows.length) chats[p.name] = rows.map((r) => ({ id: r.id, from: r.from_id === pid ? me.name : p.name, mine: r.from_id === pid, text: r.text, at: r.at, ...metaOf(r.meta) }));
       if (p.unread) unread[p.name] = p.unread;
     }
     return {
@@ -186,6 +192,8 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         const next = g.white_id === me.id ? g.black_id : g.white_id;
         to(next, 'turn', { from: me.name, tag: `turn:${g.id}`, query: `?open=online&with=${encodeURIComponent(me.name)}`, data: { with: me.name, game: g.id } });
       }
+    } else if (name === 'admin/message') {   // CHE-422: from Chess 3D, the chat path of CHE-409 with the sender's name as the title
+      to(body.pid, 'message', { from: SYSTEM_NAME, tag: `chat:${SYSTEM_NAME}`, query: `?open=online&with=${encodeURIComponent(SYSTEM_NAME)}`, data: { with: SYSTEM_NAME } });
     } else if (name === 'chat') {
       const other = playerByName(body.to);
       to(other.id, 'chat', { from: me.name, tag: `chat:${me.name}`, query: `?open=online&with=${encodeURIComponent(me.name)}`, data: { with: me.name } });
@@ -214,7 +222,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   const ACTIONS = {
     challenge(me, { to }) {
       const other = playerByName(to);
-      if (!other || other.revoked || other.id === me.id) fail(404, 'unknown-player');
+      if (!other || other.revoked || other.system || other.id === me.id) fail(404, 'unknown-player');
       if (activeGameWith(me.id, other.id)) fail(409, 'you-are-playing');   // one game per pair, either way round
       const open = q("SELECT id FROM challenges WHERE from_id = ? AND to_id = ? AND status = 'open'").get(me.id, other.id);
       if (open) return { id: open.id, again: true };   // already asked: the same challenge, no second push
@@ -282,6 +290,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       if (me.muted) fail(403, 'muted');
       const other = playerByName(to);
       if (!other || other.revoked || other.id === me.id) fail(404, 'unknown-player');
+      if (other.system) fail(403, 'read-only');   // CHE-422: Chess 3D does not read answers; Feedback is the way
       const t = String(text ?? '').replace(/\s+/g, ' ').trim();
       if (!t) fail(400, 'empty');
       if ([...t].length > CHAT_MAX) fail(400, 'too-long');
@@ -334,6 +343,35 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   });
   const ipOf = (req) => (trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
 
+  /** CHE-422: validate and store one message from Chess 3D; { status, body, pid } */
+  function adminMessage(body) {
+    const bad = (status, error) => ({ status, body: { error } });
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return bad(400, 'bad-body');
+    let player, quote, feedbackId;
+    if (body.feedbackId != null) {
+      const f = feedback.get(body.feedbackId);
+      if (!f) return bad(404, 'no-feedback');
+      if (!f.player) return bad(409, 'no-player');   // anonymous Feedback cannot be answered
+      player = playerByName(f.player); quote = quoteOf(f.text); feedbackId = f.id;
+      if (body.to != null && String(body.to).toLowerCase() !== f.player.toLowerCase()) return bad(400, 'to-mismatch');
+    } else if (typeof body.to === 'string' && body.to) player = playerByName(body.to);
+    else return bad(400, 'no-recipient');
+    if (!player || player.revoked || player.system || player.bot) return bad(404, 'unknown-player');
+    let row;
+    if (body.tpl != null) {
+      const c = cleanTemplate(body.tpl, body.params);
+      if (c.error) return bad(400, c.error);
+      row = { tpl: body.tpl, params: c.params };
+    } else {
+      const t = String(body.text ?? '').replace(/\s+/g, ' ').trim();
+      if (!t) return bad(400, 'empty');
+      if ([...t].length > CHAT_MAX) return bad(400, 'too-long');
+      row = { text: t };
+    }
+    const id = addSystemMessage(db, sys, player.id, { ...row, feedbackId, quote, now });
+    return { status: 200, body: { ok: true, id, to: player.name }, pid: player.id };
+  }
+
   async function handle(req, res) {
     const path = new URL(req.url, 'http://x').pathname;
     let status = 200, counted = true;
@@ -384,6 +422,10 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
           const h0 = String(req.headers.authorization || '');
           const who = h0.startsWith('Bearer ') ? authKey(h0.slice(7).trim()) : null;
           const id = feedback.add(c.row, who && !who.revoked ? who.name : '');
+          if (who && !who.revoked) {   // CHE-422: "read" at once, a badge only (no push); anonymous Feedback gets nothing
+            addSystemMessage(db, sys, who.id, { tpl: 'read', params: {}, feedbackId: id, quote: quoteOf(c.row.text), now });
+            broadcast();
+          }
           status = 201; return send(req, res, 201, { ok: true, id });
         }
         if (req.method !== 'GET') { status = 405; return send(req, res, 405); }
@@ -393,6 +435,21 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         const given = h1.startsWith('Bearer ') ? h1.slice(7).trim() : '';
         if (!given || !secretOk(given, adminSecret)) { loginFailed(ip); status = 401; return send(req, res, 401); }
         return send(req, res, 200, { items: feedback.since(new URL(req.url, 'http://x').searchParams.get('since')) });
+      }
+      if (path === '/admin/message') {   // CHE-422: a message from Chess 3D to one player, admin secret as Bearer (like GET /feedback)
+        if (req.method !== 'POST') { status = 405; return send(req, res, 405); }
+        if (!adminSecret) { status = 404; return send(req, res, 404); }
+        const ip = ipOf(req);
+        if (loginBlocked(ip)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+        const h2 = String(req.headers.authorization || '');
+        const given = h2.startsWith('Bearer ') ? h2.slice(7).trim() : '';
+        if (!given || !secretOk(given, adminSecret)) { loginFailed(ip); status = 401; return send(req, res, 401); }
+        if (limited('chat', 'admin')) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+        const body = await readBody(req);
+        const out = adminMessage(body);
+        status = out.status; send(req, res, out.status, out.body);
+        if (out.status === 200) { broadcast(); try { pushAfter('admin/message', sys, { pid: out.pid }, {}); } catch (e) { console.error(e); } }
+        return;
       }
       const auth = String(req.headers.authorization || '');
       const me = authKey(auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
@@ -425,7 +482,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       if (playerPath) {   // CHE-290: the numbers of one player and your head to head with them; unknown, revoked or deleted: 404
         let name = ''; try { name = decodeURIComponent(path.slice('/player/'.length)); } catch (e) { /* bad escape: no such player */ }
         const p = name && playerByName(name);
-        if (!p || p.revoked) { status = 404; return send(req, res, 404, { error: 'unknown-player' }); }
+        if (!p || p.revoked || p.system) { status = 404; return send(req, res, 404, { error: 'unknown-player' }); }
         const own = p.id === me.id;
         return send(req, res, 200, { name: p.name, own, ...statsFor(db, p.id, { vs: own ? null : me.id }) });
       }

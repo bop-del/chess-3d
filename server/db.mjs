@@ -6,6 +6,8 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+/** CHE-422: the reserved sender of messages to the players (a players row with system = 1, no key, no code) */
+export const SYSTEM_NAME = 'Chess 3D';
 export const sha256 = (s) => createHash('sha256').update(String(s)).digest('hex');
 export const newKey = () => randomBytes(32).toString('base64url');
 // codes: NAME-XXXX, four characters from an alphabet without 0, O, 1 and I (easy to read aloud and to type on a phone)
@@ -21,12 +23,12 @@ export function normCode(s) {
 
 // CHE-406: writer_lease is the one row that says which server runs the background work (server/lease.mjs)
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, code_hash TEXT, revoked INTEGER NOT NULL DEFAULT 0, muted INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, bot INTEGER NOT NULL DEFAULT 0, admin INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, code_hash TEXT, revoked INTEGER NOT NULL DEFAULT 0, muted INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, bot INTEGER NOT NULL DEFAULT 0, admin INTEGER NOT NULL DEFAULT 0, system INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS keys (key_hash TEXT PRIMARY KEY, player_id INTEGER NOT NULL, created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS challenges (id INTEGER PRIMARY KEY, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, status TEXT NOT NULL, created INTEGER NOT NULL, answered INTEGER);
 CREATE TABLE IF NOT EXISTS games (id INTEGER PRIMARY KEY, white_id INTEGER NOT NULL, black_id INTEGER NOT NULL, status TEXT NOT NULL, result TEXT, reason TEXT, winner_id INTEGER, created INTEGER NOT NULL, last_move_at INTEGER NOT NULL, ended INTEGER);
 CREATE TABLE IF NOT EXISTS moves (game_id INTEGER NOT NULL, ply INTEGER NOT NULL, uci TEXT NOT NULL, san TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (game_id, ply));
-CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL, read INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL, read INTEGER NOT NULL DEFAULT 0, meta TEXT);
 CREATE TABLE IF NOT EXISTS actions (player_id INTEGER NOT NULL, cid TEXT NOT NULL, response TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (player_id, cid));
 CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, device TEXT NOT NULL, value INTEGER, data TEXT);
 CREATE TABLE IF NOT EXISTS stats_daily (day TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, device TEXT NOT NULL, n INTEGER NOT NULL, v INTEGER NOT NULL, PRIMARY KEY (day, kind, name, device));
@@ -47,7 +49,8 @@ export function openDb(file) {
   if (file !== ':memory:') db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 3000;');
   db.exec(SCHEMA);
   const cols = db.prepare('PRAGMA table_info(players)').all().map((c) => c.name);   // CHE-343: a database from before the bot gets its two columns
-  for (const c of ['bot', 'admin']) if (!cols.includes(c)) db.exec(`ALTER TABLE players ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);
+  for (const c of ['bot', 'admin', 'system']) if (!cols.includes(c)) db.exec(`ALTER TABLE players ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // CHE-422: system = the sender "Chess 3D"
+  if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'meta')) db.exec('ALTER TABLE messages ADD COLUMN meta TEXT');   // CHE-422: template key, params, quote as JSON
   return db;
 }
 
@@ -68,6 +71,7 @@ export function adminOps(db, now = () => Date.now()) {
     invite(name, { fresh = false } = {}) {
       name = String(name || '').trim();
       if (!name || name.length > 24) throw new Error('a name of 1 to 24 characters is needed');
+      if (name.toLowerCase() === SYSTEM_NAME.toLowerCase()) throw new Error(`${SYSTEM_NAME} is reserved`);   // CHE-422
       let p = byName(name);
       if (p && !fresh) throw new Error(`${p.name} is invited already; use --new for a fresh link and code`);
       if (!p) { db.prepare('INSERT INTO players (name, created) VALUES (?, ?)').run(name, now()); p = byName(name); }
@@ -75,6 +79,7 @@ export function adminOps(db, now = () => Date.now()) {
     },
     revoke(name) {
       const p = byName(name); if (!p) throw new Error(`no player ${name}`);
+      if (p.system) throw new Error(`${p.name} is the sender of messages`);
       db.prepare('UPDATE players SET revoked = 1, code_hash = NULL WHERE id = ?').run(p.id);
       db.prepare('DELETE FROM keys WHERE player_id = ?').run(p.id);
       db.prepare('DELETE FROM push_subs WHERE player = ?').run(p.id);   // CHE-272
@@ -82,6 +87,7 @@ export function adminOps(db, now = () => Date.now()) {
     },
     delete(name) {
       const p = byName(name); if (!p) throw new Error(`no player ${name}`);
+      if (p.system) throw new Error(`${p.name} is the sender of messages`);
       const games = db.prepare('SELECT id FROM games WHERE white_id = ? OR black_id = ?').all(p.id, p.id);
       for (const g of games) db.prepare('DELETE FROM moves WHERE game_id = ?').run(g.id);
       db.prepare('DELETE FROM games WHERE white_id = ? OR black_id = ?').run(p.id, p.id);
