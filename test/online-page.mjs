@@ -449,7 +449,7 @@ try {
   // ------------------------------------------------------------ CHE-272 push card and bell on the fake PushManager (no permission prompt, no server)
   const P1 = await open(ctxA, `${BASE}/?${PVQ}pushcard&open=online`, PHONE);
   await settleUi(P1);
-  R.expect('push: the card "Soll ich dir Bescheid sagen" shows, the bell is off', await until(P1, () => !document.querySelector('.opushcard').hidden && /Bescheid sagen/.test(document.querySelector('.opushcard').textContent) && document.querySelector('.obell')?.dataset.s === 'off'));
+  R.expect('push: the card "Benachrichtigungen einschalten" shows, the bell is off', await until(P1, () => !document.querySelector('.opushcard').hidden && /Benachrichtigungen einschalten/.test(document.querySelector('.opushcard').textContent) && document.querySelector('.obell')?.dataset.s === 'off'));
   R.expect('push: card buttons and bell are at least 44 px', await ev(P1, () => [...document.querySelectorAll('.opushcard .obtn'), document.querySelector('.obell')].every((b) => { const r = b.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
   if (args.includes('--shots')) { mkdirSync(SHOTS, { recursive: true }); await P1.screenshot({ path: join(SHOTS, 'phone-pushcard.png') }); }
   await click(P1, '[data-a=push-yes]');

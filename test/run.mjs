@@ -117,6 +117,7 @@ const FAST = [
   ['online bot: listing, accept, moves, chat, pushes, admin button, capped search (test/online-bot.mjs)', 'test/online-bot.mjs', true],
   ['several online games and challenges at once (test/online-multi.mjs)', 'test/online-multi.mjs', true],
   ['web push: RFC 8291 vector, VAPID, routes, fake push service (test/online-push.mjs)', 'test/online-push.mjs', true],
+  ['push fixes: renotify, failing push step named, hidden players (test/push-fixes.mjs)', 'test/push-fixes.mjs', true],
   ['online tab cards and floating chat state (test/online-cards.mjs)', 'test/online-cards.mjs'],
   ['chat time stamp: today, yesterday, weekday, date, year, both languages (test/online-stamp.mjs)', 'test/online-stamp.mjs'],
   ['context line text, modes and drop order (test/context-line.mjs)', 'test/context-line.mjs'],

@@ -122,8 +122,9 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
     if (!me || me.revoked) return null;
     const score = scoreTable(pid);
     const mineAll = activeGames(pid);
+    const sees = me.admin || me.hidden;   // CHE-439: a hidden player shows only to admins and to other hidden players
     // CHE-422: the sender "Chess 3D" is in the list only once it has written to this player; it has no presence, score or game
-    const players = q('SELECT * FROM players WHERE id != ? AND revoked = 0 AND (system = 0 OR EXISTS (SELECT 1 FROM messages WHERE from_id = players.id AND to_id = ?)) ORDER BY system DESC, name COLLATE NOCASE').all(pid, pid).map((p) => {
+    const players = q('SELECT * FROM players WHERE id != ? AND revoked = 0 AND (system = 0 OR EXISTS (SELECT 1 FROM messages WHERE from_id = players.id AND to_id = ?)) ORDER BY system DESC, name COLLATE NOCASE').all(pid, pid).filter((p) => sees || !p.hidden).map((p) => {
       if (p.system) return { name: p.name, system: true, online: false, playing: false, withMe: false, score: { w: 0, l: 0, d: 0 }, played: 0, unread: q('SELECT COUNT(*) AS n FROM messages WHERE from_id = ? AND to_id = ? AND read = 0').get(p.id, pid).n };
       const s = score.get(p.id) || { w: 0, l: 0, d: 0 };
       return {
@@ -168,7 +169,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   /** CHE-272: the web push of one action, after it is committed. Never a chat text, only the sender name. A live stream suppresses it. */
   function pushAfter(name, me, body, out) {
     if (!push.enabled || !isWriter()) return;   // CHE-406: only the writer sends pushes
-    const to = (pid, kind, o) => push.notify(pid, kind, { streamOpen: live.online(pid), ...o });
+    const to = (pid, kind, o) => push.notify(pid, kind, { streamOpen: live.visible(pid, now()), ...o });   // CHE-437: a hidden tab (30 s) does not count as open
     const overTo = (g) => {
       const row = q('SELECT * FROM games WHERE id = ?').get(g.id);
       for (const pid of [row.white_id, row.black_id]) {
@@ -453,7 +454,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       }
       const auth = String(req.headers.authorization || '');
       const me = authKey(auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
-      const known = ['/state', '/events', '/my-code', ...Object.keys(ACTIONS).filter((a) => bot || a !== 'bot/challenge').map((a) => '/' + a), ...(push.enabled ? ['/push/key', '/push/subscribe', '/push/unsubscribe'] : [])];   // push off: its routes do not exist (404)
+      const known = ['/state', '/events', '/my-code', '/visibility', ...Object.keys(ACTIONS).filter((a) => bot || a !== 'bot/challenge').map((a) => '/' + a), ...(push.enabled ? ['/push/key', '/push/subscribe', '/push/unsubscribe'] : [])];   // push off: its routes do not exist (404)
       const playerPath = req.method === 'GET' && path.startsWith('/player/');   // CHE-290
       if (!known.includes(path) && !playerPath) { status = 404; return send(req, res, 404); }
       if (!me) { status = 401; return send(req, res, 401); }   // an unknown key gets 401 and nothing else
@@ -462,6 +463,13 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         const out = stats.ingest(me.id, await readBody(req, EVENTS_BODY_MAX));
         if (out.error) { status = out.status; return send(req, res, out.status, { error: out.error }); }
         status = 202; return send(req, res, 202, { ok: true, n: out.n });
+      }
+      if (path === '/visibility') {   // CHE-437: the client says whether the tab of stream sid is hidden; a push waits until every stream is hidden for 30 s
+        if (req.method !== 'POST') { status = 405; return send(req, res, 405); }
+        if (limited('other', me.id)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
+        const body = await readBody(req);
+        if (typeof body.sid === 'string' && body.sid.length <= 64) live.setHidden(me.id, body.sid, body.hidden === true, now());
+        return send(req, res, 200, { ok: true });
       }
       if (path === '/my-code') {   // CHE-272: a fresh login code for the calling player; the old code stops working, keys stay valid. The code is never logged.
         if (req.method !== 'POST') { status = 405; return send(req, res, 405); }
@@ -487,7 +495,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         return send(req, res, 200, { name: p.name, own, ...statsFor(db, p.id, { vs: own ? null : me.id }) });
       }
       if (req.method === 'GET' && path === '/state') return send(req, res, 200, stateFor(me.id));
-      if (req.method === 'GET' && path === '/events') { live.open(req, res, me.id, stateFor(me.id), cors(req)); return; }
+      if (req.method === 'GET' && path === '/events') { live.open(req, res, me.id, stateFor(me.id), cors(req), String(new URL(req.url, 'http://x').searchParams.get('sid') || '').slice(0, 64)); return; }
       if (req.method !== 'POST') { status = 405; return send(req, res, 405); }
       const name = path.slice(1);
       const body = await readBody(req);

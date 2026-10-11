@@ -32,6 +32,9 @@ export function createApi({ server, key, onState = () => {}, onStatus = () => {}
   }
   const causeOf = (e) => (typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : e?.name === 'TypeError' ? 'noanswer' : 'noanswer');
 
+  const sid = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);   // CHE-437: names this stream for the hidden/visible report
+  const tellVisibility = () => { if (typeof document !== 'undefined') fetch(base + '/visibility', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ sid, hidden: document.hidden }), cache: 'no-store', keepalive: true }).catch(() => {}); };
+
   async function connect() {
     if (stopped) return;
     clearTimeout(retryT); retryAt = 0;
@@ -40,7 +43,7 @@ export function createApi({ server, key, onState = () => {}, onStatus = () => {}
     if (status !== 'unreachable') set('connecting');
     let r;
     try {
-      r = await fetch(base + '/events', { headers: { Authorization: `Bearer ${key}`, Accept: 'text/event-stream' }, signal: mine.signal, cache: 'no-store' });
+      r = await fetch(base + '/events?sid=' + sid, { headers: { Authorization: `Bearer ${key}`, Accept: 'text/event-stream' }, signal: mine.signal, cache: 'no-store' });
     } catch (e) {
       if (mine !== ctrl) return;
       problem({ cause: causeOf(e), request: 'GET /events', status: null, error: String(e?.message || e) });
@@ -54,6 +57,7 @@ export function createApi({ server, key, onState = () => {}, onStatus = () => {}
     const reader = r.body.getReader(), dec = new TextDecoder();
     let buf = '';
     lastData = now();
+    if (typeof document !== 'undefined' && document.hidden) tellVisibility();   // a stream opened (again) in a hidden tab
     try {
       for (;;) {
         const { value, done } = await reader.read();
@@ -95,6 +99,7 @@ export function createApi({ server, key, onState = () => {}, onStatus = () => {}
 
   // back in the foreground after a while: the stream may have died with the app in the background, so connect afresh (grey)
   const onVis = () => {
+    tellVisibility();
     if (document.hidden) { hiddenAt = now(); return; }
     if (status === 'connected' && now() - hiddenAt < 5000) return;
     attempt = 0;

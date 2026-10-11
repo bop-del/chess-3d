@@ -48,7 +48,8 @@ Nothing secret lives in the repo: keys and codes are stored only as sha256 hashe
     node server/admin.mjs chat <name>           # print all of that player's conversations
     node server/admin.mjs mute <name>           # cannot write chat messages (unmute <name> undoes it)
     node server/admin.mjs admin <name>          # CHE-343: may make the bot challenge them (unadmin <name> undoes it)
-    node server/admin.mjs list                  # the players (marks admin and bot)
+    node server/admin.mjs hide <name>           # CHE-439: left out of other players' address book, people strip and presence (unhide <name> undoes it); admins and other hidden players still see them
+    node server/admin.mjs list                  # the players (marks admin, bot, hidden)
     ONLINE_VAPID_FILE=/path/vapid.json node server/admin.mjs push-keys   # the push key pair, once (refuses to overwrite)
 
 The link is `<game>?online=<server>&open=online#online=<key>`: the key travels in the fragment, which the browser never sends to a
@@ -81,6 +82,7 @@ JSON, `Authorization: Bearer <key>` except `/up` and `/login-code`. An unknown k
 | `GET /feedback?since=<id>` | admin secret | `{ items: [{ id, at, kind, name, player, text, picture, context }] }` oldest first, at most 50 after `id`, pictures as base64. Only with `ONLINE_ADMIN_SECRET` as `Authorization: Bearer <secret>`: 401 without it, 404 when no secret is set. Read by `bin/feedback` in the private repo |
 | `POST /admin/message` | admin secret, `{ to: <player name> \| feedbackId: <n>, tpl: 'accepted' \| 'shipped' \| 'fixed', params?: { v } } or `{ to \| feedbackId, text }` | `200 { ok, id, to }`. CHE-422: a message from the reserved sender "Chess 3D" (a `players` row with `system = 1`, no key, no code, created on start) to one player. `feedbackId` resolves the player and fills the grey quote (first 80 characters of that Feedback); anonymous Feedback is `409 no-player`, an unknown id `404 no-feedback`, a `to` that is not the Feedback's player `400 to-mismatch`. `shipped` and `fixed` need `params.v` (a version like `1.14.0`, else `400 bad-params`); `tpl` `read` is sent by the server itself. Free text is plain, whitespace collapsed, at most 200 characters (`400 empty`, `too-long`). Rate like chat (10 per minute, 429). `Authorization: Bearer <ONLINE_ADMIN_SECRET>`: 401 without it, 404 when no secret is set. Pushes like a chat message, title "Chess 3D", no text in the push. Stored in `messages` with `meta` JSON `{ tpl, params, feedbackId, quote }`; `text` holds the German rendering |
 | `POST /my-code` | `{}` | `{ ok, code }` (CHE-272): a fresh login code for the calling player (Bearer key). The old code stops working, keys stay valid. 5 per 10 minutes, the code is never logged |
+| `POST /visibility` | `{ sid, hidden }` | `{ ok }` CHE-437: the client says whether the tab of its stream (`GET /events?sid=<id>`) is hidden. A push goes out only when no stream of the player is visible, or hidden for less than 30 s; a stream without `sid` (older client) counts as visible |
 | `GET /push/key` | | `{ key }` the VAPID public key (base64url). CHE-272. 404 for all three push routes when push is off |
 | `POST /push/subscribe` | `{ endpoint, keys: { p256dh, auth } }` | `{ ok }` (the browser's `PushSubscription.toJSON()`; one row per endpoint, at most 10 per player; an endpoint must be https) |
 | `POST /push/unsubscribe` | `{ endpoint }` | `{ ok }` |

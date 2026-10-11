@@ -65,6 +65,7 @@
   "created": "INTEGER",
   "bot": "INTEGER",
   "admin": "INTEGER",
+  "hidden": "INTEGER",
   "system": "INTEGER"
  },
  "push_subs": {

@@ -188,6 +188,7 @@ body.phone:has(.psheet.ponline.open) .ochpill, body.phone:has(.psheet.ponline.op
 .obell[data-s="denied"], .obell[data-s="install"] { opacity: 0.6; }
 .opushcard { border-color: rgba(216, 180, 104, 0.55); }
 .opushnote { color: var(--dim); }
+.opushhelp { color: var(--dim); font-size: 12px; margin: 4px 0 0; }
 .ocodebig { font: 700 28px/1.2 ui-monospace, Menlo, monospace; letter-spacing: 0.08em; user-select: all; }
 /* --- player card (CHE-290): the own numbers at the top, the detail card of one player --- */
 .ostat[hidden], .opd[hidden] { display: none; }
@@ -247,7 +248,8 @@ body.online-updating .obubs, body.online-updating .obub, body.online-updating .o
 .onl h4 { font-size: 12px; letter-spacing: 0.08em; margin-top: 6px; color: #b9bdc9; }
 .onl .omain:not([hidden]) { display: flex; flex-direction: column; gap: 10px; }
 .onl .oview { display: flex; flex-direction: column; gap: 10px; order: 1; }
-.onl .opushcard, .onl .opushnote { order: 9; }   /* the push question sits under the content, never above the games */
+.onl .opushnote, .onl .opushhelp { order: 9; }   /* the failure note sits under the content, never above the games */
+.onl .opushcard { order: -1; }   /* CHE-440: the push card sits at the top of the Online tab */
 .onl[data-logged] .oconn[data-s="connected"] { display: none; }   /* a green connection is a dot in the name row, words only when it is not green */
 .onl .omehead { gap: 8px; order: 0; }
 .onl .omehead::before { content: ''; width: 10px; height: 10px; flex: none; background: #8a8f9c; }
@@ -269,8 +271,8 @@ body.online-updating .obubs, body.online-updating .obub, body.online-updating .o
 .onl .chx { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
 .omini { flex: none; border: 2px solid #2b2e3a; }
 /* the push question: one narrow row */
-.onl .opushcard { padding: 6px 8px 6px 10px; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
-.onl .opushcard p { flex: 1 1 auto; font-size: 13px; }
+.onl .opushcard { padding: 6px 8px 6px 10px; display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; }   /* CHE-440: the text is longer now, so the buttons may drop under it on a narrow phone */
+.onl .opushcard p { flex: 1 1 150px; min-width: 0; font-size: 13px; }
 .onl .opushcard .orow { margin: 0; flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
 .onl .opushcard .orow > .obtn { flex: none; min-height: 44px; padding: 0 10px; font-size: 12.5px; }
 .onl .opushcard .obtn.gold { background: rgba(255, 255, 255, 0.1); color: var(--text); }

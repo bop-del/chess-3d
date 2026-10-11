@@ -7,7 +7,7 @@
 // Update: a new worker waits (no skipWaiting on its own, so a running game never loses its lazy chunks). The page shows "New version,
 // reload"; a tap sends {type:'skip-waiting'}, the worker activates, the page reloads. Without a tap the new worker activates when the
 // last tab closes, so the next open loads the new version. Old caches go on activate.
-// Push: JSON payload { kind, title, body, tag, url, data }. One notification per tag replaces the older one, renotify off.
+// Push: JSON payload { kind, title, body, tag, url, data }. One notification per tag replaces the older one; renotify on (CHE-436), so the replacement still shows a banner and sounds.
 const BUILD = 'dev'; /* BUILD */
 const PRECACHE = [/* PRECACHE */];
 const CACHE = 'chess3d-' + BUILD;
@@ -47,7 +47,7 @@ self.addEventListener('push', (e) => {
   let p = null;
   try { p = e.data ? e.data.json() : null; } catch (err) { p = null; }
   if (!p || !p.title) return;
-  e.waitUntil(self.registration.showNotification(p.title, { body: p.body || '', tag: p.tag || p.kind || 'chess', renotify: false, icon: 'icon-192.png', data: { url: p.url || '?open=online' } }));
+  e.waitUntil(self.registration.showNotification(p.title, { body: p.body || '', tag: p.tag || p.kind || 'chess', renotify: true, icon: 'icon-192.png', data: { url: p.url || '?open=online' } }));
 });
 
 self.addEventListener('notificationclick', (e) => {

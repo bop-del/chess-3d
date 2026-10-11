@@ -9,7 +9,7 @@ import './online.css';
 import { loginFor, writeLogin } from './store.js';
 import { createApi, loginWithCode } from './api.js';
 import { createMatch } from './match.js';
-import { detailsText } from './details.js';
+import { detailsText, redact } from './details.js';
 import { secondAction, gameLine, myTurnCount, scoreOf, chatStep, statView, spanOf, waitingMs, limitInfo, moveNo, runningGames } from './cards.js';
 import { previewOn, previewScene, createPreviewApi, previewPushEnv } from './preview.js';
 import { createPush } from './push.js';
@@ -68,8 +68,8 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     <p class="oupdate ocard" role="status" data-i18n="online.serverUpdating" hidden>The server is being updated. Your games are safe, please check back later.</p>
     <div class="omain" hidden>
       <div class="omehead"><p class="ome"></p><button class="obell" type="button" data-a="bell" hidden></button></div>
-      <div class="opushcard ocard" hidden><p data-i18n="online.pushAsk">Shall I tell you when it is your turn?</p><div class="orow"><button class="obtn gold" type="button" data-a="push-yes" data-i18n="online.pushYes">Yes please</button><button class="obtn" type="button" data-a="push-no" data-i18n="online.pushNo">No thanks</button></div></div>
-      <p class="opushnote oerr" hidden></p>
+      <div class="opushcard ocard" hidden><p data-i18n="online.pushAsk">Turn on notifications so you know when it is your turn.</p><div class="orow"><button class="obtn gold" type="button" data-a="push-yes" data-i18n="online.pushYes">Yes please</button><button class="obtn" type="button" data-a="push-no" data-i18n="online.pushNo">No thanks</button></div></div>
+      <p class="opushnote oerr" hidden></p><p class="opushhelp" hidden></p>
       <div class="oview"></div>
       <section class="opd" hidden></section>
       <section class="ochat" hidden>
@@ -144,7 +144,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       <div class="orow"><button class="obtn" type="button" data-a="retry">${esc(t('online.retry', 'Try again'))}</button><button class="obtn" type="button" data-a="copy">${esc(t('online.copy', 'Copy details'))}</button></div>
       <pre class="otech">${esc(techText())}</pre></div>`;
   }
-  const techText = () => { const d = api ? api.details() : { cause: preCause, lastOk: preOk }; return detailsText({ ...d, time: Date.now() }, [login?.key]); };
+  const techText = () => { const d = api ? api.details() : { cause: preCause, lastOk: preOk }; return detailsText({ ...d, time: Date.now() }, [login?.key]) + (push?.detailText() ? '\n' + redact(push.detailText(), [login?.key]) : ''); };
   function renderDetails() {
     const red = conn() === 'unreachable';
     const a = $('.odet-host'), b = $('.odet-host', lock);
@@ -325,7 +325,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   function renderDot() {
     if (!state || apiVerdict === 'server-old') { setDot(false, 0); return; }
     const n = unreadTotal() + myTurnCount(gamesOf());   // unread messages plus the games where it is your move
-    setDot(n > 0 || state.challenges.in.length > 0, n);
+    setDot(n > 0 || state.challenges.in.length > 0 || !!push?.wantCard(), n);   // CHE-440: the push card also lights the tab dot
   }
 
   // ------------------------------------------------------------ the bubble
@@ -419,7 +419,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
   if (phone) { viewport(0, window.innerHeight); vv?.addEventListener('resize', fitKeyboard); vv?.addEventListener('scroll', fitKeyboard); }
   // CHE-272: the permission card (after the first online action, once) and the bell (on, off, blocked, or "add to Home Screen first")
   const BELL = { on: ['online.bellOn', 'Notifications on'], off: ['online.bellOff', 'Notifications off'], denied: ['online.bellDenied', 'Notifications are blocked in the browser'], install: ['online.bellInstall', 'Add to Home Screen to get notifications'] };
-  let pushNote = '';
+  let pushNote = '', pushDetailsOpen = false;
   function renderPush() {
     const st = push ? push.state() : 'unsupported', bell = $('.obell');
     bell.hidden = !push || st === 'unsupported';
@@ -428,10 +428,20 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       bell.dataset.s = st; bell.setAttribute('aria-label', t(k, d)); bell.title = t(k, d); bell.setAttribute('aria-pressed', st === 'on' ? 'true' : 'false');
       bell.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Z"/><path d="M10 20a2 2 0 0 0 4 0"/>${st === 'on' ? '' : '<path d="M4 4l16 16"/>'}</svg>`;
     }
-    $('.opushcard').hidden = !push || !push.wantCard();
-    const n = $('.opushnote'); n.hidden = !pushNote; n.textContent = pushNote;
+    const card = $('.opushcard'), want = !!push && push.wantCard();
+    card.hidden = !want;
+    if (want) {
+      const ios = st === 'install';   // an iPhone Safari tab cannot ask: the Home Screen hint instead of the button
+      card.querySelector('p').textContent = ios ? t('online.bellInstall', 'Add to Home Screen to get notifications') : t('online.pushAsk', 'Turn on notifications so you know when it is your turn.');
+      card.querySelector('[data-a="push-yes"]').hidden = ios;
+    }
+    renderDot();
+    const n = $('.opushnote'); n.hidden = !pushNote;
+    const failed = !!(pushNote && push?.error && push.detailText());   // CHE-438: a failed turn on shows the reason and a Details button with the failing step
+    n.innerHTML = `${esc(pushNote)}${failed ? ` <button class="obtn small" type="button" data-a="push-details">${esc(t('online.details', 'Details'))}</button>` : ''}${failed && pushDetailsOpen ? `<pre class="otech">${esc(redact(push.detailText(), [login?.key]))}</pre>` : ''}`;
+    const h = $('.opushhelp'); h.hidden = bell.hidden || st === 'install'; h.textContent = t('online.pushHelp', 'Nothing arrives? On a Mac: System Settings, Notifications, Google Chrome.');
   }
-  async function pushDo(p) { pushNote = ''; await p; pushNote = push.error === 'off-server' ? t('online.pushServerOff', 'The server is not sending notifications right now.') : push.error ? t('online.pushFailed', 'That did not work.') : ''; renderPush(); }
+  async function pushDo(p) { pushNote = ''; pushDetailsOpen = false; await p; pushNote = push.error === 'off-server' ? t('online.pushServerOff', 'The server is not sending notifications right now.') : push.error ? t('online.pushFailed', 'Notifications did not turn on.') : ''; renderPush(); }
   function render() { renderConn(); renderMain(); renderDot(); renderBub(); renderGame(); renderPush(); syncHeader(); }
 
   // the result line on the game over card: "Against Felix now 4 : 2"
@@ -463,6 +473,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     if (!b) return;
     const a = b.dataset.a, id = Number(b.dataset.id), n = b.dataset.n;
     if (a === 'look-more') { toggleMore(id); render(); return; }   // the more menu of a postcard (Resign)
+    if (a === 'push-details') { pushDetailsOpen = !pushDetailsOpen; renderPush(); return; }
     if (a === 'details') { detailsOpen = !detailsOpen; renderDetails(); return; }
     if (a === 'retry') { if (api) api.retry(); else probe(true); renderDetails(); return; }
     if (a === 'copy') { copyDetails(b); return; }

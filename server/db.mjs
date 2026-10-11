@@ -48,8 +48,8 @@ export function openDb(file) {
   const db = new DatabaseSync(file);
   if (file !== ':memory:') db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 3000;');
   db.exec(SCHEMA);
-  const cols = db.prepare('PRAGMA table_info(players)').all().map((c) => c.name);   // CHE-343: a database from before the bot gets its two columns
-  for (const c of ['bot', 'admin', 'system']) if (!cols.includes(c)) db.exec(`ALTER TABLE players ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // CHE-422: system = the sender "Chess 3D"
+  const cols = db.prepare('PRAGMA table_info(players)').all().map((c) => c.name);   // CHE-343: a database from before the bot gets its columns (CHE-439: hidden)
+  for (const c of ['bot', 'admin', 'hidden', 'system']) if (!cols.includes(c)) db.exec(`ALTER TABLE players ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // CHE-422: system = the sender "Chess 3D"
   if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'meta')) db.exec('ALTER TABLE messages ADD COLUMN meta TEXT');   // CHE-422: template key, params, quote as JSON
   return db;
 }
@@ -124,6 +124,13 @@ export function adminOps(db, now = () => Date.now()) {
       db.prepare('UPDATE players SET admin = ? WHERE id = ?').run(on ? 1 : 0, p.id);
       return p.name;
     },
-    list() { return db.prepare('SELECT name, revoked, muted, admin, bot, created FROM players ORDER BY name').all(); },
+    /** CHE-439: a hidden player is left out of other players' lists (not out of an admin's or another hidden player's) */
+    setHidden(name, on = true) {
+      const p = byName(name); if (!p) throw new Error(`no player ${name}`);
+      if (p.bot) throw new Error(`${p.name} is the bot`);
+      db.prepare('UPDATE players SET hidden = ? WHERE id = ?').run(on ? 1 : 0, p.id);
+      return p.name;
+    },
+    list() { return db.prepare('SELECT name, revoked, muted, admin, bot, hidden, created FROM players ORDER BY name').all(); },
   };
 }
