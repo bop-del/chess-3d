@@ -3,6 +3,21 @@
 // (src/news.js) links the full release notes on GitHub from each entry.
 export const NEWS = [
   {
+    version: '1.14.0', date: '2026-10-11',
+    de: [
+      'Antworten auf deine Rückmeldung: Wenn du angemeldet einen Fehler oder Wunsch schickst, antwortet Chess 3D im Online-Tab.',
+      'Benachrichtigungen sind jetzt gleich an. Klappt das Einschalten nicht, steht der Grund da.',
+      'Im Chat und bei Zuletzt verbunden steht jetzt auch der Tag, nicht nur die Uhrzeit.',
+      'Auf dem Handy ist die Anzeige oben kürzer, und die Leiste oben reagiert wieder auf Tipper.',
+    ],
+    en: [
+      'Answers to your feedback: if you send a bug or a wish while logged in, Chess 3D answers in the Online tab.',
+      'Notifications are on from the start now. If turning them on does not work, the reason is shown.',
+      'Chat and Last connected show the day now, not only the time.',
+      'On a phone the line at the top is shorter, and the top bar takes taps again.',
+    ],
+  },
+  {
     version: '1.13.0', date: '2026-10-10',
     de: [
       'Online sieht jetzt aus wie Postkarten: Oben stehen deine laufenden Partien mit Brett, letztem Zug und Wartezeit, ein Tipp führt direkt zurück ins Spiel.',
