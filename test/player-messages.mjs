@@ -15,7 +15,7 @@ const SECRET = 'test-admin-secret-1234';
 const pushes = [];
 const pushFetch = async (url, init) => { pushes.push({ url, init }); return new Response(null, { status: 201 }); };
 const db = openDb(':memory:');
-const app = createOnlineServer({ db, now: () => clock, adminSecret: SECRET, vapid: vapidGenerate(), vapidSubject: 'mailto:test@example.com', pushFetch, gameUrl: 'http://127.0.0.1/' });
+const app = createOnlineServer({ db, now: () => clock, adminSecret: SECRET, vapid: vapidGenerate(), vapidSubject: 'mailto:test@localhost', pushFetch, gameUrl: 'http://127.0.0.1/' });
 const port = await app.listen(0, '127.0.0.1');
 const BASE = `http://127.0.0.1:${port}`;
 const call = async (path, { key, body, method = 'POST' } = {}) => {
