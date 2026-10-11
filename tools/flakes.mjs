@@ -5,7 +5,10 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
-import { ROOT } from './_lib.mjs';
+import { fileURLToPath } from 'node:url';
+
+// own ROOT, not from _lib.mjs: lane-preland imports this module and must not load puppeteer-core (private test-lane-keys copies tools/ without node_modules)
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // One ledger for all lanes: a lane worktree is removed when it lands, so the file sits in the main checkout (git common dir). FLAKES_FILE overrides (tests).
 const mainRoot = () => { try { return resolve(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(), '..'); } catch (e) { return ROOT; } };
