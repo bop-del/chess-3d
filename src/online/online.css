@@ -61,7 +61,7 @@
 .omsgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
 .omsgs li { align-self: flex-start; max-width: 85%; padding: 6px 10px; border-radius: 12px 12px 12px 4px; background: rgba(255, 255, 255, 0.08); word-break: break-word; }
 .omsgs li.mine { align-self: flex-end; border-radius: 12px 12px 4px 12px; background: rgba(216, 180, 104, 0.2); }
-.omsgs li small { display: block; margin-top: 2px; font-size: 10.5px; color: var(--dim); }
+.omsgs li small { display: block; white-space: nowrap; margin-top: 2px; font-size: 10.5px; color: var(--dim); }
 .omsgs li.oempty { background: none; }
 .osend { display: flex; gap: 8px; }
 .osend input { flex: 1; }

@@ -15,11 +15,11 @@ import { previewOn, previewScene, createPreviewApi, previewPushEnv } from './pre
 import { createPush } from './push.js';
 import { startStats } from './stats.js';
 import { createVersionCheck, fetchVersion } from './version.js';
+import { stamp } from './stamp.js';
 import { renderView, toggleMore } from './view.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SEEN = 'chess3d.onlineSeen';
-const hhmm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 /** wins : losses from your side, then the draws only when there are some; a dash when never played */
 export const scoreText = (s) => scoreOf(s) || '-';
 const seenGet = () => { try { return JSON.parse(localStorage.getItem(SEEN) || '{}'); } catch (e) { return {}; } };
@@ -137,7 +137,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
     const cause = { offline: 'This device has no internet right now.', noanswer: 'The server does not answer.', server: 'The server has an error.', invite: 'The invite is no longer valid.' }[d.cause] || 'The server does not answer.';
     const secs = Math.ceil((d.retryIn || 0) / 1000);
     return `<div class="odet"><p class="ocause">${esc(t(`online.cause.${d.cause || 'noanswer'}`, cause))}</p>
-      <p class="olast">${esc(d.lastOk ? t('online.lastOk', 'Last connected: {time}', { time: hhmm(d.lastOk) }) : t('online.neverOk', 'Not connected yet'))}</p>
+      <p class="olast">${esc(d.lastOk ? t('online.lastOk', 'Last connected: {time}', { time: stamp(d.lastOk) }) : t('online.neverOk', 'Not connected yet'))}</p>
       ${api ? `<p class="onext">${esc(secs ? t('online.retryIn', 'Next try in {s} s', { s: secs }) : t('online.retrying', 'Trying now...'))}</p>` : ''}
       <div class="orow"><button class="obtn" type="button" data-a="retry">${esc(t('online.retry', 'Try again'))}</button><button class="obtn" type="button" data-a="copy">${esc(t('online.copy', 'Copy details'))}</button></div>
       <pre class="otech">${esc(techText())}</pre></div>`;
@@ -303,7 +303,7 @@ export function mountOnline({ server, host, hud, game, controls, toast = () => {
       const key = list.map((m) => m.id).join(',') + i18n();
       if (ol.dataset.key !== key) {
         ol.dataset.key = key;
-        ol.innerHTML = list.length ? list.map((m) => `<li class="${m.mine ? 'mine' : ''}"><span>${esc(m.text)}</span><small>${esc(hhmm(m.at))}</small></li>`).join('') : `<li class="oempty">${esc(t('online.noMessages', 'No messages yet.'))}</li>`;
+        ol.innerHTML = list.length ? list.map((m) => `<li class="${m.mine ? 'mine' : ''}"><span>${esc(m.text)}</span><small>${esc(stamp(m.at))}</small></li>`).join('') : `<li class="oempty">${esc(t('online.noMessages', 'No messages yet.'))}</li>`;
         ol.scrollTop = ol.scrollHeight;
       }
       const muted = state.me.muted;

@@ -3,6 +3,11 @@ import { addDE } from '../i18n.js';
 
 addDE({
   'online.tab': 'Online',
+  'online.stamp.yesterday': 'Gestern {time}', 'online.stamp.weekday': '{day} {time}',
+  'online.stamp.date': '{d}. {month} {time}', 'online.stamp.dateYear': '{d}. {month} {y} {time}',
+  'online.wd.0': 'So', 'online.wd.1': 'Mo', 'online.wd.2': 'Di', 'online.wd.3': 'Mi', 'online.wd.4': 'Do', 'online.wd.5': 'Fr', 'online.wd.6': 'Sa',
+  'online.mo.0': 'Jan.', 'online.mo.1': 'Feb.', 'online.mo.2': 'März', 'online.mo.3': 'Apr.', 'online.mo.4': 'Mai', 'online.mo.5': 'Juni',
+  'online.mo.6': 'Juli', 'online.mo.7': 'Aug.', 'online.mo.8': 'Sep.', 'online.mo.9': 'Okt.', 'online.mo.10': 'Nov.', 'online.mo.11': 'Dez.',
   'online.conn.connected': 'Server verbunden', 'online.conn.connecting': 'verbinde...', 'online.conn.unreachable': 'Server nicht erreichbar',
   'online.serverUpdating': 'Der Server wird gerade aktualisiert. Deine Partien sind sicher, bitte später nochmal schauen.',
   'online.details': 'Details', 'online.detailsTitle': 'Verbindung',

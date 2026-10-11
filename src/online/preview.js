@@ -33,7 +33,7 @@ export function createPreviewApi({ scene, onState, onStatus }) {
     challenges: { in: [], out: scene === 'wait' ? [{ id: 7, to: 'Nina', status: 'open' }] : [] },
     games: [], game: null,
     chats: {
-      Nina: [msg(false, 'Hallo Boris! Spielen wir?', 9), msg(true, 'Gleich, ich mache erst den Tisch fertig.', 7), msg(false, 'Okay, ich warte.', 3), msg(false, 'Ich nehme Weiß!', 2)],
+      Nina: [msg(false, 'Letzte Woche war schön', 60000), msg(true, 'Finde ich auch', 5000), msg(false, 'Hallo Boris! Spielen wir?', 9), msg(true, 'Gleich, ich mache erst den Tisch fertig.', 7), msg(false, 'Okay, ich warte.', 3), msg(false, 'Ich nehme Weiß!', 2)],
       Felix: [msg(false, 'Schau mal, mein neuer Zug', 5)],
       Mia: [msg(true, 'Gute Partie gestern', 1440), msg(false, 'Danke, morgen wieder?', 1430)],
     },
