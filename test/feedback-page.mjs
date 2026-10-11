@@ -116,7 +116,7 @@ try {
   R.expect('it carries a board picture that is a JPEG under 150 KB', !!one.picture && one.picture.startsWith('/9j/') && one.picture.length <= 150 * 1024, 'jpeg', one.picture ? `${one.picture.length} chars, ${one.picture.slice(0, 8)}` : 'none');
   const c = one.context || {};
   R.expect('the context has version, device, screen, theme, view, position, moves, errors', c.version && c.device && c.screen?.w === 390 && c.theme && c.view && /^[rnbqkp1-8/]+ [wb] /i.test(c.fen) && Array.isArray(c.moves) && Array.isArray(c.errors), 'full', JSON.stringify(c).slice(0, 300));
-  R.expect('no chat, key or login in what was sent', !/chat|"key"|token|Bearer/i.test(JSON.stringify(one)));
+  R.expect('no chat, key or login in what was sent', !/chat|"key"|token|Bearer/i.test(JSON.stringify({ ...one, picture: '' })))   // not the base64 picture: random bytes spell 'chat' or 'token' now and then (CHE-431 flake);
   R.expect('no login needed: the item is not marked as a player', one.player === false);
 
   // a wish without the picture; the dialog has been emptied

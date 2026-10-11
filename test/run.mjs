@@ -92,6 +92,7 @@ const FAST = [
   ['bin/lane agent identity prepend (test/lane-identity.mjs)', 'test/lane-identity.mjs', true],
   ['bin/lane kickoff verify and resend (test/kickoff.mjs)', 'test/kickoff.mjs', true],
   ['affected smoke groups, Chrome slots, lane ports (test/affected-groups.mjs)', 'test/affected-groups.mjs', true],
+  ['flake ledger: record, window counts, failing check names (test/flakes.mjs)', 'test/flakes.mjs', true],
   ['run lock and group retry classifier (test/run-lock.mjs)', 'test/run-lock.mjs', true],
   ['chrome registry and reaper (test/reap-chromes.mjs)', 'test/reap-chromes.mjs', true],
   ['opening lines are legal (test/openings.mjs)', 'test/openings.mjs'],

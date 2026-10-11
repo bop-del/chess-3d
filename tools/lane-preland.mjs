@@ -6,6 +6,7 @@
 // Pure parts (parsePrelandArgs, stampOk) and prelandRun with injected io, so the fast tier drives it with a temp git repo.
 import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { failingChecks } from './flakes.mjs';
 
 export const STAMP = join('.tmp', 'preland.json');
 
@@ -22,6 +23,8 @@ export function parsePrelandArgs(args) {
 }
 
 const tail = (s, n = 6) => String(s).trim().split('\n').slice(-n).join(' | ');
+// CHE-431: a red names the failing checks (the FAIL rows), then the last lines; no FAIL row: the tail as before
+export const redDetail = (out) => { const names = failingChecks(out, 8); return names.length ? `failing checks: ${names.join(' | ')}\n${tail(out, 3)}` : tail(out); };
 
 // CHE-329: the files a merge of main into the branch would conflict on, read off `git merge-tree --write-tree --name-only main <branch>`
 // without touching any worktree. exit 1 = conflicts: stdout is the tree id, then the conflicted file names, then a blank line and messages.
@@ -73,10 +76,10 @@ export function prelandRun({ dir, branch, io, all = false, noCache = false }) {
   const tree = git('rev-parse', 'HEAD^{tree}').out.trim(), before = readStamp(dir), runs = before && before.tree === tree ? (before.runs || 0) + 1 : 1;
   const stamp = (extra) => { try { mkdirSync(join(dir, '.tmp'), { recursive: true }); writeFileSync(join(dir, STAMP), JSON.stringify({ branch, head, tree, runs, t: io.now(), preview, ...extra })); } catch (e) { /* the gate then asks for a rerun */ } };
   const f = sh(io.fast, [], { shell: true });
-  if (f.status) { stamp({ ok: false, smoke: false, red: 'fast tier' }); return done(false, 'red', 'red: fast tier', tail(f.out)); }
+  if (f.status) { stamp({ ok: false, smoke: false, red: 'fast tier' }); return done(false, 'red', 'red: fast tier', redDetail(f.out)); }
   const smoke = `${io.smoke}${all ? ' --all' : ''}${noCache ? ' --no-cache' : ''}`;
   const s = sh(smoke, [], { shell: true });
-  if (s.status) { stamp({ ok: false, smoke: false, red: 'smoke groups' }); return done(false, 'red', 'red: smoke groups', tail(s.out)); }
+  if (s.status) { stamp({ ok: false, smoke: false, red: 'smoke groups' }); return done(false, 'red', 'red: smoke groups', redDetail(s.out)); }
   if (io.privateDir && io.privateTests) {
     const changed = io.sh('git', ['diff', '--name-only', 'main...HEAD'], { cwd: io.privateDir }).out.split('\n').filter(Boolean);
     if (changed.some((p) => /^(bin|lib)\//.test(p) || /^test-.*\.mjs$/.test(p))) {
