@@ -17,6 +17,7 @@ import { createBot, BOT_NAME } from './bot.mjs';
 import { createAuthSpike } from './auth-spike.mjs';
 import { createLease } from './lease.mjs';
 import { createFeedback, cleanFeedback, BODY_MAX as FEEDBACK_BODY_MAX } from './feedback.mjs';
+import { createMcp } from './mcp.mjs';
 import { ensureSystem, addSystemMessage, cleanTemplate, quoteOf } from './messages.mjs';
 import { createStats, EVENTS_BODY_MAX, loginPage, dashboardPage, secretOk } from './stats.mjs';
 
@@ -36,7 +37,7 @@ export function originAllowed(origin, list) {
   } catch (e) { return false; }
 }
 
-export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', vapid = null, vapidSubject = '', gameUrl = '', authSpike = {}, pushFetch, log = () => {}, random = Math.random, bot: botOpts = null, lease: leaseOpts = null } = {}) {
+export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.now(), origins = [], heartbeatMs = 20000, sampleMs = SAMPLE_MS, firstSampleMs = 10000, probe, dbFile = '', trustProxy = false, adminSecret = '', mcpSecret = '', vapid = null, vapidSubject = '', gameUrl = '', authSpike = {}, pushFetch, log = () => {}, random = Math.random, bot: botOpts = null, lease: leaseOpts = null } = {}) {
   const admin = adminOps(db, now);
   const sys = ensureSystem(db, now);   // CHE-422: the sender "Chess 3D"
   const spike = createAuthSpike({ origins, originOk: (o) => originAllowed(o, origins), ...authSpike });   // CHE-341: a spike, off without a client id
@@ -388,6 +389,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
         res.writeHead(status, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
         return res.end(req.method === 'HEAD' ? undefined : v.ok ? 'ok' : v.reasons.join(', '));
       }
+      if (mcp && path.startsWith('/mcp/')) { counted = false; await mcp.handle(req, res, path, ipOf(req), readBody); status = res.statusCode; return; }   // CHE-442: the Server-Dashboard connector, the path is the secret
       if (req.method === 'POST' && path === '/login-code') {
         const ip = ipOf(req);
         if (loginBlocked(ip)) { status = 429; return send(req, res, 429, { error: 'slow-down' }); }
@@ -513,7 +515,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
       else { status = 500; console.error(e); if (!res.headersSent) send(req, res, 500, { error: 'server' }); }
     } finally {
       if (counted) health.request(status);
-      log(`${req.method} ${path} ${status}`);   // never the Authorization header, never a body
+      log(`${req.method} ${path.startsWith('/mcp/') ? '/mcp/*' : path} ${status}`);   // never the Authorization header, never a body
     }
   }
 
@@ -526,6 +528,7 @@ export function createOnlineServer({ db = openDb(':memory:'), now = () => Date.n
   } }) : null;
   if (lease) { bot?.pause(); lease.start(); } else startDuties();   // CHE-406: with a lease the duties start once it is ours
 
+  const mcp = createMcp({ db, health, secret: mcpSecret, now });   // CHE-442: null without a secret of 32 characters or more: no route
   const server = createServer((req, res) => { handle(req, res); });
   server.keepAliveTimeout = 65000;
   return {
@@ -547,6 +550,7 @@ export function loadEnv() {
     origins: (process.env.ONLINE_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
     trustProxy: process.env.ONLINE_TRUST_PROXY === '1',
     adminSecret: process.env.ONLINE_ADMIN_SECRET || '',
+    mcpSecret: process.env.ONLINE_MCP_SECRET || '',   // CHE-442
     vapidFile: process.env.ONLINE_VAPID_FILE || '',   // CHE-272: no file, no push
     vapidSubject: process.env.ONLINE_VAPID_SUBJECT || '',
     gameUrl: process.env.ONLINE_GAME_URL || '',
@@ -559,7 +563,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const env = loadEnv();
   const vapid = vapidLoad(env.vapidFile);
   if (!vapid || !/^(mailto:|https:)/.test(env.vapidSubject)) console.log(`push is off (${vapid ? 'ONLINE_VAPID_SUBJECT is not a mailto: or https: address' : 'no ONLINE_VAPID_FILE'})`);
-  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, authSpike: env.authSpike, bot: env.bot, lease: { graceMs: env.leaseGraceMs }, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
+  if (env.mcpSecret && env.mcpSecret.length < 32) console.log('the Server-Dashboard (mcp) is off: ONLINE_MCP_SECRET is shorter than 32 characters');
+  const app = createOnlineServer({ db: openDb(env.db), dbFile: env.db, origins: env.origins, trustProxy: env.trustProxy, adminSecret: env.adminSecret, mcpSecret: env.mcpSecret, vapid, vapidSubject: env.vapidSubject, gameUrl: env.gameUrl, authSpike: env.authSpike, bot: env.bot, lease: { graceMs: env.leaseGraceMs }, log: (l) => console.log(`${new Date().toISOString()} ${l}`) });
   const port = await app.listen(env.port, env.host);
   console.log(`online server on http://${env.host}:${port} (db ${env.db})`);
   const stop = () => { app.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 2000).unref(); };

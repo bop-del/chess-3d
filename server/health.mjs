@@ -5,11 +5,30 @@ import os from 'node:os';
 import { statfsSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { readFileSync } from 'node:fs';
 
 export const SAMPLE_MS = 5 * 60 * 1000;
 export const KEEP_DAYS = 90;
 export const LIMITS = { diskUsed: 0.85, memFree: 0.10, loopMs: 200, errorRate: 0.05, windowMs: 15 * 60 * 1000, minSamples: 3, minRequests: 20 };   // over these a value turns red; errorRate, disk and the window also drive /health (CHE-307)
+export const ALERT = { cpu: 80, ram: 85, disk: 90 };   // CHE-433/CHE-362: the percent limits of the external server alert (bin/pulse), also the red marks of the MCP dashboard (CHE-442)
 const DAY_MS = 24 * 3600 * 1000;
+
+/** CHE-442: CPU percent between two reads. Process: user + system CPU time over wall time (100 = one core). Host: /proc/stat busy share
+ *  over all cores (null where there is no /proc/stat, e.g. macOS). The first read, and a read under minMs after the last, report the last value. */
+function cpuMeter({ minMs = 2000, clock = () => Date.now(), usage = () => process.cpuUsage(), stat = () => readFileSync('/proc/stat', 'utf8') } = {}) {
+  const hostTimes = () => { try { const n = stat().split('\n')[0].trim().split(/\s+/).slice(1).map(Number); return n.length >= 5 && n.every(Number.isFinite) ? { idle: n[3] + (n[4] || 0), total: n.slice(0, 8).reduce((a, b) => a + b, 0) } : null; } catch (e) { return null; } };
+  let t0 = clock(), u0 = usage(), h0 = hostTimes(), last = { proc: null, host: null };
+  return () => {
+    const t = clock();
+    if (t - t0 < minMs) return last;
+    const u = usage(), h = hostTimes();
+    const proc = Math.round(10 * (u.user + u.system - u0.user - u0.system) / 1000 / (t - t0) * 100) / 10;
+    const host = h && h0 && h.total > h0.total ? Math.round(1000 * (1 - (h.idle - h0.idle) / (h.total - h0.total))) / 10 : null;
+    t0 = t; u0 = u; h0 = h;
+    return (last = { proc, host });
+  };
+}
+export { cpuMeter };
 
 /** The real machine and process readings. Tests pass their own probe. */
 export function systemProbe({ dbFile = ':memory:' } = {}) {
@@ -23,6 +42,8 @@ export function systemProbe({ dbFile = ':memory:' } = {}) {
       const l = os.loadavg(), d = disk();
       return { rss: process.memoryUsage.rss(), load: l, memFree: os.freemem(), memTotal: os.totalmem(), diskFree: d.free, diskTotal: d.total, dbBytes: size(dbFile) + size(dbFile + '-wal') };
     },
+    cpu: cpuMeter(),         // live reads (the dashboard)
+    cpuSample: cpuMeter({ minMs: 0 }),   // one read per health sample: the average over the interval
     loopMax: () => ms(loop.max),   // since the last resetLoop(), in ms
     resetLoop: () => loop.reset(),
     stop: () => loop.disable(),
@@ -51,20 +72,31 @@ export function createHealth(db, { now = () => Date.now(), probe, gauges = {} } 
     max.streams = Math.max(max.streams, c.streams);
     max.games = Math.max(max.games, c.games);
   }
+  const minutes = new Map();   // CHE-442: minute number -> [requests, 4xx, 5xx], the last 5 minutes for the live dashboard
   function request(status) {
     count.req++;
     if (status >= 500) count.r5xx++; else if (status >= 400) count.r4xx++;
+    const m = Math.floor(now() / 60000), b = minutes.get(m) || [0, 0, 0];
+    b[0]++; if (status >= 500) b[2]++; else if (status >= 400) b[1]++;
+    minutes.set(m, b);
+    for (const k of minutes.keys()) if (k < m - 5) minutes.delete(k);
+  }
+  /** requests, 4xx and 5xx of the last 5 minutes (this process only) */
+  function recent() {
+    const m = Math.floor(now() / 60000), out = { req: 0, r4xx: 0, r5xx: 0 };
+    for (const [k, b] of minutes) if (k > m - 5) { out.req += b[0]; out.r4xx += b[1]; out.r5xx += b[2]; }
+    return out;
   }
 
   /** write the row of the interval that ends now and start the next one */
   function sample() {
     touch();
-    const t = now(), m = probe.read();
+    const t = now(), m = probe.read(), cpu = probe.cpuSample?.() || { proc: null, host: null };
     max.rss = Math.max(max.rss, m.rss);
     q(`INSERT OR REPLACE INTO server_health (at, started, uptime_s, present_max, streams_max, games_max, loop_max_ms, rss_max, req, r4xx, r5xx,
-        load1, load5, load15, mem_free, mem_total, disk_free, disk_total, db_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        load1, load5, load15, mem_free, mem_total, disk_free, disk_total, db_bytes, proc_cpu, host_cpu) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(t, started, Math.round((t - started) / 1000), max.present, max.streams, max.games, probe.loopMax(), max.rss, count.req, count.r4xx, count.r5xx,
-        m.load[0], m.load[1], m.load[2], m.memFree, m.memTotal, m.diskFree, m.diskTotal, m.dbBytes);
+        m.load[0], m.load[1], m.load[2], m.memFree, m.memTotal, m.diskFree, m.diskTotal, m.dbBytes, cpu.proc, cpu.host);
     fresh();
   }
 
@@ -77,9 +109,9 @@ export function createHealth(db, { now = () => Date.now(), probe, gauges = {} } 
     touch();
     const m = probe.read(), c = cur();
     return { at: now(), started, uptime_s: Math.round((now() - started) / 1000), present: c.present, streams: c.streams, games: c.games,
-      loop_ms: probe.loopMax(), rss: m.rss, load: m.load, memFree: m.memFree, memTotal: m.memTotal, diskFree: m.diskFree, diskTotal: m.diskTotal, dbBytes: m.dbBytes };
+      loop_ms: probe.loopMax(), rss: m.rss, cpu: probe.cpu?.() || { proc: null, host: null }, load: m.load, memFree: m.memFree, memTotal: m.memTotal, diskFree: m.diskFree, diskTotal: m.diskTotal, dbBytes: m.dbBytes };
   }
-  return { touch, request, sample, prune, history, current, stop: () => probe.stop?.() };
+  return { touch, request, recent, sample, prune, history, current, stop: () => probe.stop?.() };
 }
 
 /** CHE-307: the verdict behind GET /health, from the rows of server_health only (pure; memory and event loop are display only).

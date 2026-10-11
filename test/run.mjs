@@ -127,6 +127,7 @@ const FAST = [
   ['feedback: POST /feedback open to anyone, limits, picture and size checks, admin GET, client helpers (test/feedback.mjs)', 'test/feedback.mjs', true],
   ['Google sign-in spike: POST /auth-spike with local keys, CSRF, allow list, page text (test/auth-spike.mjs)', 'test/auth-spike.mjs'],
   ['server history: samples, maxima, retention, gaps, markers, /stats Server section (test/online-health.mjs)', 'test/online-health.mjs', true],
+  ['live Server-Dashboard: MCP handshake, tools, secret gate, no leaks, rate limit, CPU meter (test/online-mcp.mjs)', 'test/online-mcp.mjs', true],
   ['writer lease: two servers on one database, one runs the background work (test/online-lease.mjs)', 'test/online-lease.mjs', true],
   ['messages from Chess 3D: reserved sender, read at once, POST /admin/message, quote, push, limits (test/player-messages.mjs)', 'test/player-messages.mjs', true],
   ['additive schema lint and snapshot for the online database (test/online-schema.mjs)', 'test/online-schema.mjs'],

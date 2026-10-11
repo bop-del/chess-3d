@@ -51,6 +51,8 @@ export function openDb(file) {
   const cols = db.prepare('PRAGMA table_info(players)').all().map((c) => c.name);   // CHE-343: a database from before the bot gets its columns (CHE-439: hidden)
   for (const c of ['bot', 'admin', 'hidden', 'system']) if (!cols.includes(c)) db.exec(`ALTER TABLE players ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // CHE-422: system = the sender "Chess 3D"
   if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'meta')) db.exec('ALTER TABLE messages ADD COLUMN meta TEXT');   // CHE-422: template key, params, quote as JSON
+  const hcols = db.prepare('PRAGMA table_info(server_health)').all().map((c) => c.name);   // CHE-442: CPU percent of the process and the host per sample (null where unknown)
+  for (const c of ['proc_cpu', 'host_cpu']) if (!hcols.includes(c)) db.exec(`ALTER TABLE server_health ADD COLUMN ${c} REAL`);
   return db;
 }
 

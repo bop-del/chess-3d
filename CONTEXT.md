@@ -286,3 +286,7 @@ _Avoid_: status line, turn line, pill
 **Server update**:
 The moment the server is replaced by a newer one, and the time while the game and the server do not yet fit together. Online games, moves, chats and players survive it; the Online tab says it is happening instead of showing empty cards.
 _Avoid_: deploy (the tooling word), downtime, maintenance
+
+**Server-Dashboard**:
+The owner's live view of the chess server and its machine: players present, running games, load, memory, disk and the red marks, refreshing on its own. It shows counts only, never a name, a message or an address.
+_Avoid_: monitoring, admin panel, /stats (that is the page you reload)

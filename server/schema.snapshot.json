@@ -94,7 +94,9 @@
   "mem_total": "INTEGER",
   "disk_free": "INTEGER",
   "disk_total": "INTEGER",
-  "db_bytes": "INTEGER"
+  "db_bytes": "INTEGER",
+  "proc_cpu": "REAL",
+  "host_cpu": "REAL"
  },
  "stats_daily": {
   "day": "TEXT",
