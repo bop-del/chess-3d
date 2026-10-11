@@ -57,6 +57,9 @@ try {
     calls = []; r = prelandRun({ dir: lane, branch: 'che-1-x', io: { ...io('echo F', 'echo S'), privateMerge: () => ({ ok: false, files: ['lib/a.mjs', 'bin/b'] }) } });
   assert.equal(r.kind, 'conflict'); assert.equal(r.line, 'conflict: private: lib/a.mjs, bin/b'); assert.deepEqual(calls, []);
   r = prelandRun({ dir: lane, branch: 'che-1-x', io: { ...io('true', 'true'), privateMerge: () => ({ ok: true, moved: true }) } }); assert.match(r.line, /main merged/);
+  // CHE-444: with a private worktree the stamp also names its tree (board loop autoland compares both with the HEADs)
+  r = prelandRun({ dir: lane, branch: 'che-1-x', io: { ...io('true', 'true'), privateDir: lane, privateMerge: () => ({ ok: true, moved: false }) } });
+  assert.equal(readStamp(lane).privTree, g(lane, 'rev-parse', 'HEAD^{tree}'));
 
   // conflict: merge aborted, lane unchanged, files named
   writeFileSync(join(repo, 'b.txt'), 'main side\n'); g(repo, 'add', '-A'); g(repo, 'commit', '-qm', 'main b');

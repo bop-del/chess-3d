@@ -73,8 +73,8 @@ export function prelandRun({ dir, branch, io, all = false, noCache = false }) {
   }
   const head = git('rev-parse', 'HEAD').out.trim();
   // CHE-401: the stamp names the tested tree and how often preland ran on it, so a report can prove which tree it speaks for
-  const tree = git('rev-parse', 'HEAD^{tree}').out.trim(), before = readStamp(dir), runs = before && before.tree === tree ? (before.runs || 0) + 1 : 1;
-  const stamp = (extra) => { try { mkdirSync(join(dir, '.tmp'), { recursive: true }); writeFileSync(join(dir, STAMP), JSON.stringify({ branch, head, tree, runs, t: io.now(), preview, ...extra })); } catch (e) { /* the gate then asks for a rerun */ } };
+  const tree = git('rev-parse', 'HEAD^{tree}').out.trim(), privTree = io.privateDir ? io.sh('git', ['rev-parse', 'HEAD^{tree}'], { cwd: io.privateDir }).out.trim() || undefined : undefined, before = readStamp(dir), runs = before && before.tree === tree ? (before.runs || 0) + 1 : 1;
+  const stamp = (extra) => { try { mkdirSync(join(dir, '.tmp'), { recursive: true }); writeFileSync(join(dir, STAMP), JSON.stringify({ branch, head, tree, privTree, runs, t: io.now(), preview, ...extra })); } catch (e) { /* the gate then asks for a rerun */ } };
   const f = sh(io.fast, [], { shell: true });
   if (f.status) { stamp({ ok: false, smoke: false, red: 'fast tier' }); return done(false, 'red', 'red: fast tier', redDetail(f.out)); }
   const smoke = `${io.smoke}${all ? ' --all' : ''}${noCache ? ' --no-cache' : ''}`;
